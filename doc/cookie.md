@@ -27,7 +27,7 @@ For example, `localhost` or `.xyz` may not work properly, but `.app.localhost` o
 
 ```ini
 [seacatauth:cookie]
-domain=service.xyz
+domain=.service.xyz
 ```
 
 *Such cookie is valid on the `service.xyz` domain and all of its subdomains and subpaths, 
