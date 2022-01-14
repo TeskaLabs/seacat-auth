@@ -1,0 +1,324 @@
+import logging
+import re
+from typing import Optional
+
+import asab.storage.exceptions
+
+#
+
+L = logging.getLogger(__name__)
+
+#
+
+
+class RoleService(asab.Service):
+
+	"""
+	Role object schema:
+	{
+		"_id": str,
+		"resources": [str, str, ...]
+	}
+	"""
+
+	RoleCollection = "r"
+	CredentialsRolesCollection = "cr"
+	RoleIdRegex = re.compile(r"^([a-zA-Z0-9_-]+|\*)/([a-zA-Z0-9:_-]+)$")  # {tenant}/{role_name}
+
+	def __init__(self, app, service_name="seacatauth.RoleService"):
+		super().__init__(app, service_name)
+		self.StorageService = app.get_service("asab.StorageService")
+		self.CredentialService = app.get_service("seacatauth.CredentialsService")
+		self.ResourceService = app.get_service("seacatauth.ResourceService")
+		self.TenantService = app.get_service("seacatauth.TenantService")
+
+	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
+		collection = self.StorageService.Database[self.RoleCollection]
+		if tenant is not None:
+			query_filter = {"tenant": {"$in": [tenant, None]}}
+		else:
+			query_filter = {}
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		roles = []
+		async for role_dict in cursor:
+			roles.append(role_dict)
+
+		return {
+			"data": roles,
+			"count": await collection.count_documents(query_filter)
+		}
+
+	async def get(self, role_id: str):
+		match = self.RoleIdRegex.match(role_id)
+		if match is None:
+			raise ValueError("Invalid role name: '{}'".format(role_id))
+		result = await self.StorageService.get(self.RoleCollection, role_id)
+		return result
+
+	async def get_role_resources(self, role_id: str):
+		role_obj = await self.get(role_id)
+		return role_obj["resources"]
+
+	async def create(self, role_id: str):
+		match = self.RoleIdRegex.match(role_id)
+		if match is None:
+			raise ValueError("Invalid role name: '{}'".format(role_id))
+		tenant = match.group(1)
+
+		upsertor = self.StorageService.upsertor(
+			self.RoleCollection,
+			role_id
+		)
+		upsertor.set("resources", [])
+		if tenant != "*":
+			upsertor.set("tenant", tenant)
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Role created", struct_data={'role_id': role_id})
+		return "OK"
+
+	async def delete(self, role_id: str):
+		"""
+		Delete a role. Also remove all role assignments.
+		"""
+		match = self.RoleIdRegex.match(role_id)
+		if match is None:
+			raise ValueError("Invalid role name: '{}'".format(role_id))
+
+		# Unassign the role from all credentials
+		await self.delete_role_assignments(role_id)
+
+		# Delete the role
+		await self.StorageService.delete(self.RoleCollection, role_id)
+		L.log(asab.LOG_NOTICE, "Role deleted", struct_data={'role_id': role_id})
+		return "OK"
+
+	async def update_resources(
+		self, role_id: str,
+		resources_to_set: Optional[list] = None,
+		resources_to_add: Optional[list] = None,
+		resources_to_remove: Optional[list] = None
+	):
+		match = self.RoleIdRegex.match(role_id)
+		if match is None:
+			L.warning("Invalid role_id: {}".format(role_id))
+			raise ValueError("Invalid role_id: '{}'".format(role_id))
+		tenant = match.group(1)
+
+		resources_to_assign = set().union(
+			resources_to_set or [],
+			resources_to_add or [],
+			resources_to_remove or []
+		)
+		if tenant != "*":
+			# TENANT role
+			# Resource "authz:superuser" cannot be assigned to a tenant role
+			if "authz:superuser" in resources_to_assign:
+				message = "Cannot assign resource 'authz:superuser' to a tenant role ({}).".format(role_id)
+				L.warning(message)
+				raise ValueError(message)
+
+		role_current = await self.StorageService.get(self.RoleCollection, role_id)
+		if role_current is not None:
+			version = role_current["_v"]
+		else:
+			version = 0
+		upsertor = self.StorageService.upsertor(
+			self.RoleCollection,
+			role_id,
+			version=version
+		)
+		if resources_to_set is not None:
+			resources_to_set = set(resources_to_set)
+			# Check if resource exists, otherwise raise KeyError
+			for res_id in resources_to_set:
+				try:
+					await self.ResourceService.get(res_id)
+				except KeyError:
+					message = "Unknown resource: '{}'".format(role_id)
+					L.warning(message)
+					raise KeyError(message)
+			upsertor.set("resources", list(resources_to_set))
+
+		# TODO: add and remove, check for duplicate entries
+		# if resources_to_add is not None:
+		# 	for res in resources_to_add:
+		# 		upsertor.push("resources", res)
+		# if resources_to_remove is not None:
+		# 	for res in resources_to_remove:
+		# 		upsertor.pull("resources", res)  # TODO: implement MongoUpsertor.pull()
+
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Resources assigned", struct_data={
+			'role': role_id,
+			'set': resources_to_set,
+			'add': resources_to_add,
+			'del': resources_to_remove
+		})
+		return "OK"
+
+	async def get_roles_by_credentials(self, credentials_id: str, tenant: str = None):
+		"""
+		Returns a list of roles assigned to the given `credentials_id`.
+		Includes roles that match the given `tenant` plus global roles.
+		"""
+		result = []
+		coll = await self.StorageService.collection(self.CredentialsRolesCollection)
+		async for obj in coll.find({
+			'c': credentials_id,
+			't': {"$in": [tenant, None]}
+		}):
+			result.append(obj["r"])
+		return result
+
+	async def set_roles(self, credentials_id: str, tenant_scope: set, roles: list):
+		"""
+		Assign `roles` list to a given `credentials_id` and unassign all current roles that are not listed in `roles`.
+		Only roles within the `tenant_scope` can be un/assigned.
+		"""
+		# Validate that requested credentials exist
+		try:
+			await self.CredentialService.get(credentials_id=credentials_id)
+		except KeyError:
+			message = "Credentials not found"
+			L.error(message, struct_data={"cid": credentials_id})
+			raise KeyError(message)
+
+		# Validate that requested credentials have access to roles' tenants
+		# Remove invalid tenants from the tenant scope
+		if self.TenantService.is_enabled():
+			cred_tenants = await self.TenantService.get_tenants(credentials_id)
+			unavailable_tenants = set()
+			for tenant in tenant_scope:
+				if tenant == "*":
+					continue
+				if tenant not in cred_tenants:
+					unavailable_tenants.add(tenant)
+			tenant_scope.difference_update(unavailable_tenants)
+		else:
+			# Tenant service is not enabled: Only global roles can be assigned
+			if tenant_scope != set("*"):
+				message = "Assigning tenant roles in tenantless mode"
+				L.error(message)
+				raise ValueError(message)
+
+		if len(tenant_scope) == 0:
+			message = "No valid tenants"
+			L.error(message)
+			raise ValueError(message)
+
+		# Validate all requested roles
+		roles_to_assign = set()
+		for role in roles:
+			# Validate by regex
+			match = self.RoleIdRegex.match(role)
+			if match is None:
+				message = "Invalid role id"
+				L.warning(message, struct_data={
+					"role": role
+				})
+				raise ValueError(message)
+
+			# Validate by current tenant scope
+			role_tenant = match.group(1)
+			if role_tenant not in tenant_scope:
+				# Role is outside current tenant scope
+				if role_tenant == "*":
+					# "*" is not in scope, so global roles are simply ignored without raising an error
+					continue
+				# Roles from unexpected tenant raise error
+				message = "Role doesn't match requested tenants"
+				L.warning(message, struct_data={
+					"role": role,
+					"tenants": list(tenant_scope)
+				})
+				raise ValueError(message)
+
+			# Validate that role exists
+			try:
+				await self.get(role_id=role)
+			except KeyError:
+				message = "Role not found"
+				L.error(message, struct_data={"role": role})
+				raise KeyError(message)
+
+			roles_to_assign.add(role)
+
+		# Get current roles
+		tenant_query = [None if tenant == "*" else tenant for tenant in tenant_scope]
+		coll = await self.StorageService.collection(self.CredentialsRolesCollection)
+
+		# {"t": {"$in": [None]}} matches entries with the "t" field missing, i.e. global roles
+		# {"t": {"$in": ["tenant-1", None]}} matches both global roles and "tenant-1" roles
+		query = {"c": credentials_id, "t": {"$in": tenant_query}}
+
+		# Unassign roles that are not among the requested roles
+		assignments_to_remove = []
+		async for obj in coll.find(query):
+			if obj['r'] not in roles_to_assign:
+				assignments_to_remove.append(obj['_id'])
+			else:
+				# The role is already assigned
+				roles_to_assign.remove(obj['r'])
+
+		if len(assignments_to_remove) > 0:
+			await coll.delete_many({'_id': {'$in': assignments_to_remove}})
+
+		# Assign new roles
+		for role in roles_to_assign:
+			crid = "{} {}".format(credentials_id, role)
+			upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=crid)
+			upsertor.set("c", credentials_id)
+			upsertor.set("r", role)
+
+			rgm = self.RoleIdRegex.match(role)
+			tenant = rgm.group(1)
+			if tenant != "*":
+				upsertor.set("t", tenant)
+			await upsertor.execute()
+
+		L.log(asab.LOG_NOTICE, "Roles assigned", struct_data={
+			"cid": credentials_id,
+			"tenants": list(tenant_scope),
+			"assigned": list(roles_to_assign),
+			"unassigned": [assignment.split(" ")[-1] for assignment in assignments_to_remove]
+		})
+
+	async def list_role_assignments(self, role_id, page: int = 0, limit: int = None):
+		"""
+		List all role assignments of a specified role
+		"""
+		collection = self.StorageService.Database[self.CredentialsRolesCollection]
+		query_filter = {"r": role_id}
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		assignments = []
+		async for assignment in cursor:
+			assignments.append(assignment)
+
+		return {
+			"data": assignments,
+			"count": await collection.count_documents(query_filter)
+		}
+
+	async def delete_role_assignments(self, role_id):
+		"""
+		Delete all role assignments of a specified role
+		"""
+		collection = await self.StorageService.collection(self.CredentialsRolesCollection)
+
+		result = await collection.delete_many({'r': role_id})
+		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
+			"role_id": role_id,
+			"deleted_count": result.deleted_count
+		})

@@ -1,0 +1,49 @@
+version: '3'
+services:
+
+  # Database for SeaCat Auth
+  seacat-auth-mongo:
+    image: mongo
+    volumes:
+      - /data/mongodb:/data/db
+      - ./log:/log
+    networks:
+      - seacatauthnet
+
+  # Nginx reverse-proxy
+  seacat-auth-nginx:
+    image: nginx
+    depends_on:
+      - seacat-auth-svc
+    ports:
+      - 80:80/tcp
+      - 443:443/tcp
+    volumes:
+      - ./nginx-conf:/etc/nginx/conf.d
+      - ./log:/log
+      - ./seacat-auth-webui:/seacat-auth-webui
+      - ./seacat-webui:/seacat-webui
+    networks:
+      - seacatauthnet
+
+  # SeaCat Auth microservice
+  seacat-auth-svc:
+    environment:
+      # Provisioning mode switch
+      # Set to 1 or TRUE to activate provisioning mode
+      - SEACAT_AUTH_PROVISIONING=0
+    build:
+      # Adjust location or switch for pre-built image
+      context: ../..
+      dockerfile: Dockerfile
+    depends_on:
+      - seacat-auth-mongo
+    volumes:
+      - ./seacatauth-conf:/conf
+      - ./log:/log
+    networks:
+      - seacatauthnet
+
+networks:
+  seacatauthnet:
+    driver: bridge
