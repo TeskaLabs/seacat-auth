@@ -1,0 +1,274 @@
+import logging
+from typing import Optional
+
+import aiohttp.web
+import asab.storage.mongodb
+import asab.storage.exceptions
+
+from .abc import EditableTenantsProviderABC
+
+#
+
+L = logging.getLogger(__name__)
+
+#
+
+
+class MongoDBTenantProvider(EditableTenantsProviderABC):
+
+	Type = "mongodb"
+
+	ConfigDefaults = {
+		'tenant_collection': 't',
+		'assign_collection': 'ct',
+	}
+
+	def __init__(self, app, provider_id, config_section_name):
+		super().__init__(provider_id, config_section_name)
+
+		self.App = app
+		self.MongoDBStorageService = asab.storage.mongodb.StorageService(
+			app,
+			"seacatauth.tenant.mongodb.{}.storage".format(provider_id),
+			config_section_name=config_section_name
+		)
+
+		self.TenantsCollection = self.Config['tenant_collection']
+		self.AssignCollection = self.Config['assign_collection']
+
+
+	async def iterate(self, page: int = 1, limit: int = None):
+		collection = await self.MongoDBStorageService.collection(self.TenantsCollection)
+
+		filter = {}
+		cursor = collection.find(filter)
+
+		cursor.sort("_id", 1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		async for tenant in cursor:
+			yield tenant
+
+
+	async def count(self, filter=None) -> int:
+		coll = await self.MongoDBStorageService.collection(self.TenantsCollection)
+		if filter is None:
+			filter = {}
+		return await coll.count_documents(filter=filter)
+
+
+	async def create(self, tenant_id: str, creator_id: str = None) -> Optional[str]:
+		u = self.MongoDBStorageService.upsertor(self.TenantsCollection, obj_id=tenant_id, version=0)
+		if creator_id is not None:
+			u.set("created_by", creator_id)
+		try:
+			tenant_id = await u.execute()
+		except asab.storage.exceptions.DuplicateError:
+			raise aiohttp.web.HTTPConflict()
+		L.log(asab.LOG_NOTICE, "Tenant created", struct_data={"tenant": tenant_id})
+		return tenant_id
+
+
+	async def set_value(self, tenant_id: str, key: str, value: str) -> Optional[str]:
+		tenant = await self.get(tenant_id)
+		u = self.MongoDBStorageService.upsertor(
+			self.TenantsCollection,
+			obj_id=tenant_id,
+			version=tenant["_v"]
+		)
+		u.set("data.{}".format(key), value)
+		tenant_id = await u.execute()
+
+		L.log(asab.LOG_NOTICE, "Tenant data updated", struct_data={"tenant": tenant_id})
+		return "OK"
+
+
+	async def unset_value(self, tenant_id: str, key: str) -> Optional[str]:
+		tenant = await self.get(tenant_id)
+		u = self.MongoDBStorageService.upsertor(
+			self.TenantsCollection,
+			obj_id=tenant_id,
+			version=tenant["_v"]
+		)
+		u.unset("data.{}".format(key))
+		tenant_id = await u.execute()
+
+		L.log(asab.LOG_NOTICE, "Tenant data updated", struct_data={"tenant": tenant_id})
+		return "OK"
+
+
+	async def delete(self, tenant_id: str) -> Optional[bool]:
+		"""
+		Delete tenant. Also delete all its roles and assignments.
+		"""
+
+		# Unassign and delete tenant roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		tenant_roles = (await role_svc.list(tenant=tenant_id))["data"]
+		for role in tenant_roles:
+			role_id = role["_id"]
+
+			# Skip global roles
+			if role_id.startswith("*/"):
+				continue
+
+			# Delete role
+			try:
+				await role_svc.delete(role_id)
+			except KeyError:
+				# Role has probably been improperly deleted before; continue
+				L.error("Role not found", struct_data={
+					"role_id": role_id
+				})
+				continue
+
+		# Unassign tenant from credentials
+		await self.delete_tenant_assignments(tenant_id)
+
+		# Delete tenant
+		await self.MongoDBStorageService.delete(self.TenantsCollection, tenant_id)
+		L.log(asab.LOG_NOTICE, "Tenant deleted", struct_data={"tenant": tenant_id})
+		return True
+
+
+	async def get(self, tenant_id) -> Optional[dict]:
+		# Fetch the tenant from a Mongo
+		tenant = await self.MongoDBStorageService.get(
+			self.TenantsCollection,
+			# bson.ObjectId(tenant_id)
+			tenant_id
+		)
+
+		return tenant
+
+
+	# async def register(self, register_info, credentials_id):
+	# 	tenant_provider = self.TenantService.get_provider()
+
+	# 	# tenant
+	# 	if 'tenant' in register_info:
+	# 		tenant = register_info.get('tenant')
+	# 	elif 'tenant' in register_info['features']:
+	# 		tenant = register_info["request"].get("tenant")
+	# 		tenant_result = await tenant_provider.create_tenant(tenant)
+	# 		if tenant_result is None:
+	# 			print("Tenant already exists.")
+	# 			return
+	# 	else:
+	# 		L.warning("Register info does not contain tenant name.")
+	# 		return
+
+	# 	# tenant assignment
+	# 	tenant_assignment = await tenant_provider.assign_tenant(credentials_id, tenant)
+	# 	return tenant_assignment
+
+
+	async def iterate_assigned(self, credatials_id: str, page: int = 10, limit: int = None):
+		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
+
+		filter = {'c': credatials_id}
+		cursor = collection.find(filter)
+
+		cursor.sort('_id', 1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		async for obj in cursor:
+			yield obj
+
+
+	async def set_tenants(self, credentials_id: str, tenant_ids: list):
+		# TODO: make this superuser-only
+		# TODO: implement assign_tenant() and unassign_tenant() methods+endpoints for single-tenant assignments
+		"""
+		Perform bulk tenant un/assignment to specified credentials_id.
+		Assign all tenants listed in `tenant_ids` and unassign all tenants not listed in `tenant_ids`.
+		"""
+		# Check if credentials are valid
+		try:
+			cred_svc = self.App.get_service("seacatauth.CredentialsService")
+			await cred_svc.detail(credentials_id)
+		except KeyError:
+			message = "Credentials not found"
+			L.error(message, struct_data={"cid": credentials_id})
+			raise KeyError(message)
+
+		tenant_ids = set(tenant_ids)
+
+		# Gather assigned tenants that are not in the list
+		assignments_to_delete = []
+		tenants_to_unassign = set()
+		coll = await self.MongoDBStorageService.collection(self.AssignCollection)
+		async for obj in coll.find({'c': credentials_id}):
+			if obj['t'] not in tenant_ids:
+				assignments_to_delete.append(obj['_id'])
+				tenants_to_unassign.add(obj['t'])
+			else:
+				# The tenant is already assigned
+				tenant_ids.remove(obj['t'])
+
+		if len(assignments_to_delete) > 0:
+			# Unassign roles
+			role_svc = self.App.get_service("seacatauth.RoleService")
+			await role_svc.set_roles(
+				credentials_id,
+				tenant_scope=tenants_to_unassign,
+				roles=[]
+			)
+			# Unassign tenants
+			await coll.delete_many({'_id': {'$in': assignments_to_delete}})
+
+		# Assign new tenants
+		for tenant_id in tenant_ids:
+
+			# TODO: Validate that tenant_id exist
+			# # check if tenant is valid
+			# tenant = await tenant_provider.detail_tenant(tenant_id)
+			# if tenant is None:
+			# 	return aiohttp.web.HTTPBadRequest(reason="Tenant not found.")
+
+			taid = "{} {}".format(credentials_id, tenant_id)
+
+			upsertor = self.MongoDBStorageService.upsertor(self.AssignCollection, obj_id=taid)
+			upsertor.set("c", credentials_id)
+			upsertor.set("t", tenant_id)
+
+			try:
+				await upsertor.execute()
+			except asab.storage.exceptions.DuplicateError:
+				pass
+
+		return True
+
+
+	async def list_tenant_assignments(self, tenant, page: int = 0, limit: int = None):
+		query_filter = {'t': tenant}
+		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		assignments = []
+		async for assignment in cursor:
+			assignments.append(assignment)
+
+		return {
+			"data": assignments,
+			"count": await collection.count_documents(query_filter)
+		}
+
+
+	async def delete_tenant_assignments(self, tenant):
+		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
+		result = await collection.delete_many({"t": tenant})
+
+		L.log(asab.LOG_NOTICE, "Tenant unassigned", struct_data={
+			"tenant": tenant,
+			"deleted_count": result.deleted_count
+		})

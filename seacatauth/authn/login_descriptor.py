@@ -1,0 +1,122 @@
+import logging
+import typing
+
+from seacatauth.authn.login_factors import LoginFactorABC
+
+#
+
+L = logging.getLogger(__name__)
+
+#
+
+
+class LoginDescriptor:
+	"""
+	A LoginDescriptor represents one complete login option.
+	To get authenticated, one must pass all the factors in a chosen login descriptor.
+	"""
+	@classmethod
+	def build(cls, authn_svc, descriptor_config):
+		ldid = descriptor_config.pop("id")
+		label = descriptor_config.pop("label")
+		factors_config = descriptor_config.pop("factors")
+		data = descriptor_config
+
+		if len(factors_config) == 0:
+			message = "No login factors specified in descriptor"
+			L.error(message, struct_data={"ldid": ldid})
+			raise ValueError(message)
+
+		if not isinstance(factors_config[0], list):
+			# There is only one OR-group. Nest it to preserve schema.
+			factors_config = [factors_config]
+
+		# There are several OR-groups of login factors
+		factor_groups = []
+		for config_group in factors_config:
+			group = []
+			for config in config_group:
+				factor = authn_svc.get_login_factor(config["id"])
+				if factor is None:
+					factor = authn_svc.create_login_factor(config)
+				group.append(factor)
+			factor_groups.append(group)
+
+		return LoginDescriptor(ldid, label, factor_groups, data)
+
+	def __init__(self, id, label, factors, data):
+		self.ID: str = id
+		self.Label: typing.Union[str, dict] = label
+		self.Data: dict = data
+		self.FactorGroups: typing.List[typing.List[LoginFactorABC]] = factors
+
+	def __repr__(self):
+		return "LoginDescriptor[{}]".format(
+			str({
+				"id": self.ID,
+				"label": self.Label,
+				"factors": self.FactorGroups,
+				**self.Data
+			})
+		)
+
+	async def login_prologue(self, login_data, login_preferences=None):
+		"""
+		Checks the eligibility of this LoginDescriptor's login factors and
+		returns either a new LoginDescriptor with only one LoginFactor group,
+		or None if no LoginFactor group is eligible.
+
+		:param login_data: Contains "credentials_id" and other login information that may be needed by login factors.
+		:param login_preferences: List of preferred LoginDescriptor ID's.
+		"""
+		# If URL login preferences are specified, check if descriptor id is listed there
+		if login_preferences is not None and self.ID not in login_preferences:
+			return None
+
+		# Check eligible login factors
+		for group in self.FactorGroups:
+			# For a group to pass, all factors in the group must be eligible
+			for factor in group:
+				if not await factor.is_eligible(login_data):
+					break
+			else:
+				# Once an eligible group is found, the search stops and the group is passed in the result
+				eligible_factor_group = group
+				break
+		else:
+			# No eligible group was found
+			return None
+
+		return LoginDescriptor(
+			id=self.ID,
+			label=self.Label,
+			factors=[eligible_factor_group],
+			data=self.Data
+		)
+
+	async def authenticate(self, login_session, request_data):
+		"""
+		Checks if the login session is authenticated with all of this LoginDescriptor's factors
+		"""
+		# At the authentication stage, there should be exactly one factor group
+		assert len(self.FactorGroups) == 1
+		for factor in self.FactorGroups[0]:
+			if (await factor.authenticate(login_session, request_data)) is False:
+				return False
+		return True
+
+	def serialize(self):
+		"""
+		Used in HTTP JSON responses.
+		"""
+		assert len(self.FactorGroups) == 1
+		return {
+			"id": self.ID,
+			"label": self.Label,
+			"factors": [
+				factor.serialize()
+				for group in self.FactorGroups
+				for factor in group
+			],
+			**self.Data
+		}
