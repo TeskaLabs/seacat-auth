@@ -1,4 +1,5 @@
 import logging
+from json import JSONDecodeError
 
 import asab
 import asab.web.rest
@@ -20,7 +21,8 @@ class ResourceHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/resource", self.list)
 		web_app.router.add_get("/resource/{resource_id}", self.get)
-		web_app.router.add_put("/resource/{resource_id}", self.create)
+		web_app.router.add_post("/resource/{resource_id}", self.create)
+		web_app.router.add_put("/resource/{resource_id}", self.update)
 
 	async def list(self, request):
 		# TODO: filtering by module
@@ -39,7 +41,41 @@ class ResourceHandler(object):
 	@access_control("authz:superuser")
 	async def create(self, request):
 		resource_id = request.match_info["resource_id"]
-		data = await self.ResourceService.create(resource_id)
+
+		# Get description if present
+		try:
+			json_data = await request.json()
+			description = json_data.get("description")
+		except JSONDecodeError:
+			description = None
+
+		data = await self.ResourceService.create(resource_id, description)
+		status = 200 if data["result"] == "OK" else 400
+		return asab.web.rest.json_response(
+			request,
+			status=status,
+			data=data,
+		)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": ["description"],
+		"additionalProperties": False,
+		"properties": {
+			"description": {
+				"type": "string",
+			},
+		}
+	})
+	@access_control("authz:superuser")
+	async def update(self, request, *, json_data):
+		"""
+		Update resource description
+		"""
+		resource_id = request.match_info["resource_id"]
+		description = json_data["description"]
+		data = await self.ResourceService.update_description(resource_id, description)
 		status = 200 if data["result"] == "OK" else 400
 		return asab.web.rest.json_response(
 			request,
