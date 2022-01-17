@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 
 import asab.storage.exceptions
 
@@ -68,21 +69,24 @@ class ResourceService(asab.Service):
 		}
 
 
-	async def get(self, resource_id):
+	async def get(self, resource_id: str):
 		data = await self.StorageService.get(self.ResourceCollection, resource_id)
 		data["result"] = "OK"
 		return data
 
 
-	async def create(self, resource_id):
+	async def create(self, resource_id: str, description: str = None):
 		if self.ResourceIdRegex.match(resource_id) is None:
-			L.warning("Invalid ID format", struct_data={"resource_id": resource_id})
+			L.error("Invalid ID format", struct_data={"resource_id": resource_id})
 			return {
 				"result": "ERROR",
 				"message": "Invalid resource ID",
 			}
 
 		upsertor = self.StorageService.upsertor(self.ResourceCollection, obj_id=resource_id)
+
+		if description is not None:
+			upsertor.set("description", description)
 
 		try:
 			await upsertor.execute()
@@ -92,6 +96,37 @@ class ResourceService(asab.Service):
 			return {
 				"result": "CONFLICT",
 				"message": "Resource already exists",
+			}
+
+		return {"result": "OK"}
+
+
+	async def update_description(self, resource_id: str, description: typing.Union[str, None]):
+		if self.ResourceIdRegex.match(resource_id) is None:
+			L.error("Invalid ID format", struct_data={"resource_id": resource_id})
+			return {
+				"result": "ERROR",
+				"message": "Invalid resource ID",
+			}
+
+		upsertor = self.StorageService.upsertor(self.ResourceCollection, obj_id=resource_id)
+
+		if description is not None:
+			upsertor.set("description", description)
+		else:
+			upsertor.unset("description")
+
+		try:
+			await upsertor.execute()
+			L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={
+				"resource_id": resource_id,
+				"description": description,
+			})
+		except KeyError:
+			L.error("Resource not found", struct_data={"resource_id": resource_id})
+			return {
+				"result": "NOT-FOUND",
+				"message": "Resource '{}' not found".format(resource_id),
 			}
 
 		return {"result": "OK"}
