@@ -31,6 +31,8 @@ class TenantHandler(object):
 
 		web_app.router.add_get('/tenant_assign/{credentials_id}', self.get_tenants_by_credentials)
 		web_app.router.add_put('/tenant_assign/{credentials_id}', self.set_tenants)
+		web_app.router.add_put('/tenant_assign/{tenant}/{credentials_id}', self.assign_tenant)
+		web_app.router.add_delete('/tenant_assign/{tenant}/{credentials_id}', self.unassign_tenant)
 
 		web_app.router.add_get('/public/tenant_propose', self.propose_tenant)
 
@@ -194,6 +196,34 @@ class TenantHandler(object):
 			request,
 			data=resp_data,
 			status=200
+		)
+
+
+	@access_control("authz:tenant:admin")
+	async def assign_tenant(self, request, *, tenant):
+		data = await self.TenantService.assign_tenant(
+			request.match_info["credentials_id"],
+			tenant,
+		)
+
+		return asab.web.rest.json_response(
+			request,
+			data=data,
+			status=200 if data["result"] == "OK" else 400
+		)
+
+
+	@access_control("authz:tenant:admin")
+	async def unassign_tenant(self, request, *, tenant):
+		data = await self.TenantService.unassign_tenant(
+			request.match_info["credentials_id"],
+			tenant,
+		)
+
+		return asab.web.rest.json_response(
+			request,
+			data=data,
+			status=200 if data["result"] == "OK" else 400
 		)
 
 

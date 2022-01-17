@@ -47,9 +47,21 @@ class TenantService(asab.Service):
 		return result
 
 
+	# TODO: Refactor this using new assign_tenant and unassign_tenant methods
 	async def set_tenants(self, credentials_id: str, tenant_ids: list):
 		assert(self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		return await self.TenantsProvider.set_tenants(credentials_id, tenant_ids)
+
+
+	async def assign_tenant(self, credentials_id: str, tenant: list):
+		assert (self.is_enabled())
+		# TODO: Possibly validate tenant and credentials here
+		return await self.TenantsProvider.assign_tenant(credentials_id, tenant)
+
+
+	async def unassign_tenant(self, credentials_id: str, tenant: list):
+		assert (self.is_enabled())
+		return await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 
 
 	def is_enabled(self):
