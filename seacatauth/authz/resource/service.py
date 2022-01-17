@@ -18,33 +18,58 @@ class ResourceService(asab.Service):
 	ResourceIdRegex = re.compile(r"^((?:[a-zA-Z0-9_-]+:)*[a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)$")
 	# TODO: gather these system resources automatically
 	BuiltinResources = [
-		"seacat:access",
-		"authz:superuser",
-		"authz:tenant:admin",
-		"authz:credentials:admin",
+		{
+			"id": "seacat:access",
+			"description": "Grants access to Seacat API and Seacat WebUI.",
+		},
+		{
+			"id": "authz:superuser",
+			"description": "Grants superuser access, including the access to all tenants.",
+		},
+		{
+			"id": "authz:tenant:admin",
+			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
+		},
+		{
+			"id": "authz:credentials:admin",
+			"description": "Grants rights for credentials administration. Enables creating and updating credentials.",
+		},
 	]
+
 
 	def __init__(self, app, service_name="seacatauth.ResourceService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
+
 	async def initialize(self, app):
 		await super().initialize(app)
 		await self._ensure_builtin_resources()
 
+
 	async def _ensure_builtin_resources(self):
 		"""
 		Check if all builtin resources exist. Create them if they don't.
+		Update their descriptions if they are outdated.
 		"""
-		for res_id in self.BuiltinResources:
-			L.info("Checking for builtin resource '{}'".format(res_id))
+		for resource_config in self.BuiltinResources:
+			resource_id = resource_config["id"]
+			resource_description = resource_config.get("description")
+
+			L.info("Checking for builtin resource '{}'".format(resource_id))
 			try:
-				await self.get(res_id)
+				db_resource = await self.get(resource_id)
 			except KeyError:
-				await self.create(res_id)
+				await self.create(resource_id, resource_description)
+				continue
 			except Exception as e:
-				L.error("Cannot create builtin resource '{}': {}".format(res_id, e))
+				L.error("Cannot create builtin resource '{}'".format(resource_id))
 				raise e
+
+			# Update resource description
+			if resource_description is not None and db_resource.get("description") != resource_description:
+				await self.update_description(resource_id, resource_description)
+
 
 	async def list(self, page: int = 0, limit: int = None):
 		collection = self.StorageService.Database[self.ResourceCollection]
