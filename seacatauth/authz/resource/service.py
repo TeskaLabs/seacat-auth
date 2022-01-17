@@ -101,20 +101,28 @@ class ResourceService(asab.Service):
 		return {"result": "OK"}
 
 
-	async def update_description(self, resource_id: str, description: typing.Union[str, None]):
-		if self.ResourceIdRegex.match(resource_id) is None:
-			L.error("Invalid ID format", struct_data={"resource_id": resource_id})
+	async def update_description(self, resource_id: str, description: str):
+		try:
+			resource = await self.get(resource_id)
+		except KeyError:
+			L.error("Resource not found", struct_data={"resource_id": resource_id})
 			return {
-				"result": "ERROR",
-				"message": "Invalid resource ID",
+				"result": "NOT-FOUND",
+				"message": "Resource '{}' not found".format(resource_id),
 			}
 
-		upsertor = self.StorageService.upsertor(self.ResourceCollection, obj_id=resource_id)
+		upsertor = self.StorageService.upsertor(
+			self.ResourceCollection,
+			obj_id=resource_id,
+			version=resource["_v"]
+		)
 
-		if description is not None:
-			upsertor.set("description", description)
-		else:
+		assert description is not None
+
+		if description == "":
 			upsertor.unset("description")
+		else:
+			upsertor.set("description", description)
 
 		try:
 			await upsertor.execute()
