@@ -31,8 +31,8 @@ class TenantHandler(object):
 
 		web_app.router.add_get('/tenant_assign/{credentials_id}', self.get_tenants_by_credentials)
 		web_app.router.add_put('/tenant_assign/{credentials_id}', self.set_tenants)
-		web_app.router.add_put('/tenant_assign/{tenant}/{credentials_id}', self.assign_tenant)
-		web_app.router.add_delete('/tenant_assign/{tenant}/{credentials_id}', self.unassign_tenant)
+		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
+		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
 
 		web_app.router.add_get('/public/tenant_propose', self.propose_tenant)
 
@@ -174,28 +174,35 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'properties': {
-			'tenants': {
-				'type': 'array',
+		"type": "object",
+		"required": [
+			"tenants",
+		],
+		"properties": {
+			"tenants": {
+				"type": "array",
 				"items": {
 					"type": "string",
 				},
 			},
 		}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def set_tenants(self, request, *, json_data):
-		await self.TenantService.set_tenants(
-			request.match_info["credentials_id"],
-			json_data['tenants'],
+		"""
+		Helper method for bulk tenant un/assignment
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		data = await self.TenantService.set_tenants(
+			session=request.Session,
+			credentials_id=credentials_id,
+			tenants=json_data["tenants"]
 		)
 
-		resp_data = {"result": "OK"}
 		return asab.web.rest.json_response(
 			request,
-			data=resp_data,
-			status=200
+			data=data,
+			status=200 if data["result"] == "OK" else 400
 		)
 
 
