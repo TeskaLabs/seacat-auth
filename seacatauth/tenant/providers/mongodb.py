@@ -248,17 +248,6 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		"""
 		Assign tenant to credentials
 		"""
-		# Check if credentials exist
-		try:
-			cred_svc = self.App.get_service("seacatauth.CredentialsService")
-			await cred_svc.detail(credentials_id)
-		except KeyError:
-			message = "Credentials not found"
-			L.error(message, struct_data={"cid": credentials_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": message,
-			}
 
 		# Check if tenant exists
 		try:
