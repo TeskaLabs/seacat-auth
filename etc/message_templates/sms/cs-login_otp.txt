@@ -1,0 +1,1 @@
+Prihlaseni do aplikace {{ app_name }} dokoncite kodem {{ otp }}.

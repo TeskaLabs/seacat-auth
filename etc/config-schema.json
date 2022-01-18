@@ -1,0 +1,789 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "The root schema",
+    "description": "The root schema comprises the entire JSON document.",
+    "default": {},
+    "examples": [
+        {
+            "general": {
+                "registration_encrypted": "no",
+                "public_api_base_url": "http://localhost:3000",
+                "auth_webui_base_url": "http://localhost:3000",
+                "include": "/conf/secret.conf"
+            },
+            "asab:storage": {
+                "type": "mongodb",
+                "mongodb_uri": "mongodb://localhost:27017",
+                "mongodb_database": "auth"
+            },
+            "logging:file": {
+                "path": "/log/seacat-auth.log"
+            },
+            "seacatauth:credentials:mongodb:ext": {
+                "mongodb_uri": "mongodb://localhost:27017",
+                "mongodb_database": "auth",
+                "tenants": "yes",
+                "register": "no",
+                "registration_features": "username email phone password",
+                "creation_features": "username email phone passwordlink"
+            },
+            "seacatauth:communication": {
+                "default_locale": "en",
+                "template_path": "/conf/message_templates",
+                "app_name": "SeaCat Auth"
+            },
+            "seacatauth:communication:email:smtp": {
+                "sender_email_address": "testjuzr@seznam.cz",
+                "user": "user@email.info",
+                "password": "password",
+                "host": "smtp.seznam.cz",
+                "ssl": "yes",
+                "starttls": "no"
+            },
+            "seacatauth:communication:sms:smsbranacz": {
+                "login": "username",
+                "password": "password"
+            },
+            "seacatauth:authentication": {
+                "descriptor_file": "/conf/login-descriptors.json",
+                "login_attempts": 10,
+                "login_session_expiration": "5 m"
+            },
+            "seacatauth:provisioning": {
+                "env_variable_name": "SEACAT_AUTH_PROVISIONING",
+                "superuser_name": "superuser",
+                "superrole_id": "*/provisioning-superrole",
+                "credentials_provider_id": "provisioning"
+            },
+            "seacatauth:cookie": {
+                "name": "SeaCatSCI",
+                "domain": "localhost"
+            },
+            "web": {
+                "listen": "0.0.0.0 8081",
+                "cors": "*",
+                "preflightpaths": "/*"
+            },
+            "sessions": {
+                "expiration": 3600
+            },
+            "roles": {
+                "roles_file": "/conf/roles.json"
+            },
+            "password_change": {
+                "expiration": "3 d"
+            }
+        }
+    ],
+    "required": [
+        "general",
+        "asab:storage",
+        "seacatauth:credentials:mongodb:ext",
+        "web"
+    ],
+    "properties": {
+        "general": {
+            "$id": "#/properties/general",
+            "type": "object",
+            "title": "The general schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "registration_encrypted": "no",
+                    "public_api_base_url": "http://localhost:3000",
+                    "auth_webui_base_url": "http://localhost:3000",
+                    "include": "/conf/secret.conf"
+                }
+            ],
+            "required": [
+                "public_api_base_url",
+                "auth_webui_base_url"
+            ],
+            "properties": {
+                "registration_encrypted": {
+                    "$id": "#/properties/general/properties/registration_encrypted",
+                    "type": "string",
+                    "title": "The registration_encrypted schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "no"
+                    ]
+                },
+                "public_api_base_url": {
+                    "$id": "#/properties/general/properties/public_api_base_url",
+                    "type": "string",
+                    "title": "The public_api_base_url schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "http://localhost:3000"
+                    ]
+                },
+                "auth_webui_base_url": {
+                    "$id": "#/properties/general/properties/auth_webui_base_url",
+                    "type": "string",
+                    "title": "The auth_webui_base_url schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "http://localhost:3000"
+                    ]
+                },
+                "include": {
+                    "$id": "#/properties/general/properties/include",
+                    "type": "string",
+                    "title": "The include schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "/conf/secret.conf"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "asab:storage": {
+            "$id": "#/properties/asab%3Astorage",
+            "type": "object",
+            "title": "The asab:storage schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "type": "mongodb",
+                    "mongodb_uri": "mongodb://localhost:27017",
+                    "mongodb_database": "auth"
+                }
+            ],
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "type": {
+                    "$id": "#/properties/asab%3Astorage/properties/type",
+                    "type": "string",
+                    "title": "The type schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "mongodb"
+                    ]
+                },
+                "mongodb_uri": {
+                    "$id": "#/properties/asab%3Astorage/properties/mongodb_uri",
+                    "type": "string",
+                    "title": "The mongodb_uri schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "mongodb://localhost:27017"
+                    ]
+                },
+                "mongodb_database": {
+                    "$id": "#/properties/asab%3Astorage/properties/mongodb_database",
+                    "type": "string",
+                    "title": "The mongodb_database schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "auth"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "logging:file": {
+            "$id": "#/properties/logging%3Afile",
+            "type": "object",
+            "title": "The logging:file schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "path": "/log/seacat-auth.log"
+                }
+            ],
+            "required": [
+                "path"
+            ],
+            "properties": {
+                "path": {
+                    "$id": "#/properties/logging%3Afile/properties/path",
+                    "type": "string",
+                    "title": "The path schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "/log/seacat-auth.log"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:credentials:mongodb:ext": {
+            "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext",
+            "type": "object",
+            "title": "The seacatauth:credentials:mongodb:ext schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "mongodb_uri": "mongodb://localhost:27017",
+                    "mongodb_database": "auth",
+                    "tenants": "yes",
+                    "register": "no",
+                    "registration_features": "username email phone password",
+                    "creation_features": "username email phone passwordlink"
+                }
+            ],
+            "required": [
+                "mongodb_uri",
+                "mongodb_database",
+                "tenants",
+                "register",
+                "creation_features"
+            ],
+            "properties": {
+                "mongodb_uri": {
+                    "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext/properties/mongodb_uri",
+                    "type": "string",
+                    "title": "The mongodb_uri schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "mongodb://localhost:27017"
+                    ]
+                },
+                "mongodb_database": {
+                    "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext/properties/mongodb_database",
+                    "type": "string",
+                    "title": "The mongodb_database schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "auth"
+                    ]
+                },
+                "tenants": {
+                    "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext/properties/tenants",
+                    "type": "string",
+                    "title": "The tenants schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "yes"
+                    ]
+                },
+                "register": {
+                    "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext/properties/register",
+                    "type": "string",
+                    "title": "The register schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "no"
+                    ]
+                },
+                "registration_features": {
+                    "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext/properties/registration_features",
+                    "type": "string",
+                    "title": "The registration_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "username email phone password"
+                    ]
+                },
+                "creation_features": {
+                    "$id": "#/properties/seacatauth%3Acredentials%3Amongodb%3Aext/properties/creation_features",
+                    "type": "string",
+                    "title": "The creation_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "username email phone passwordlink"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:communication": {
+            "$id": "#/properties/seacatauth%3Acommunication",
+            "type": "object",
+            "title": "The seacatauth:communication schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "default_locale": "en",
+                    "template_path": "/conf/message_templates",
+                    "app_name": "SeaCat Auth"
+                }
+            ],
+            "required": [
+                "default_locale",
+                "template_path",
+                "app_name"
+            ],
+            "properties": {
+                "default_locale": {
+                    "$id": "#/properties/seacatauth%3Acommunication/properties/default_locale",
+                    "type": "string",
+                    "title": "The default_locale schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "en"
+                    ]
+                },
+                "template_path": {
+                    "$id": "#/properties/seacatauth%3Acommunication/properties/template_path",
+                    "type": "string",
+                    "title": "The template_path schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "/conf/message_templates"
+                    ]
+                },
+                "app_name": {
+                    "$id": "#/properties/seacatauth%3Acommunication/properties/app_name",
+                    "type": "string",
+                    "title": "The app_name schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "SeaCat Auth"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:communication:email:smtp": {
+            "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp",
+            "type": "object",
+            "title": "The seacatauth:communication:email:smtp schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "sender_email_address": "testjuzr@seznam.cz",
+                    "user": "user@email.info",
+                    "password": "password",
+                    "host": "smtp.seznam.cz",
+                    "ssl": "yes",
+                    "starttls": "no"
+                }
+            ],
+            "required": [
+                "sender_email_address",
+                "user",
+                "password",
+                "host",
+                "ssl",
+                "starttls"
+            ],
+            "properties": {
+                "sender_email_address": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp/properties/sender_email_address",
+                    "type": "string",
+                    "title": "The sender_email_address schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "testjuzr@seznam.cz"
+                    ]
+                },
+                "user": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp/properties/user",
+                    "type": "string",
+                    "title": "The user schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "user@email.info"
+                    ]
+                },
+                "password": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp/properties/password",
+                    "type": "string",
+                    "title": "The password schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "password"
+                    ]
+                },
+                "host": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp/properties/host",
+                    "type": "string",
+                    "title": "The host schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "smtp.seznam.cz"
+                    ]
+                },
+                "ssl": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp/properties/ssl",
+                    "type": "string",
+                    "title": "The ssl schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "yes"
+                    ]
+                },
+                "starttls": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Aemail%3Asmtp/properties/starttls",
+                    "type": "string",
+                    "title": "The starttls schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "no"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:communication:sms:smsbranacz": {
+            "$id": "#/properties/seacatauth%3Acommunication%3Asms%3Asmsbranacz",
+            "type": "object",
+            "title": "The seacatauth:communication:sms:smsbranacz schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "login": "username",
+                    "password": "password"
+                }
+            ],
+            "required": [
+                "login",
+                "password"
+            ],
+            "properties": {
+                "login": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Asms%3Asmsbranacz/properties/login",
+                    "type": "string",
+                    "title": "The login schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "username"
+                    ]
+                },
+                "password": {
+                    "$id": "#/properties/seacatauth%3Acommunication%3Asms%3Asmsbranacz/properties/password",
+                    "type": "string",
+                    "title": "The password schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "password"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:authentication": {
+            "$id": "#/properties/seacatauth%3Aauthentication",
+            "type": "object",
+            "title": "The seacatauth:authentication schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "descriptor_file": "/conf/login-descriptors.json",
+                    "login_attempts": 10,
+                    "login_session_expiration": "5 m"
+                }
+            ],
+            "required": [
+                "descriptor_file",
+                "login_attempts",
+                "login_session_expiration"
+            ],
+            "properties": {
+                "descriptor_file": {
+                    "$id": "#/properties/seacatauth%3Aauthentication/properties/descriptor_file",
+                    "type": "string",
+                    "title": "The descriptor_file schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "/conf/login-descriptors.json"
+                    ]
+                },
+                "login_attempts": {
+                    "$id": "#/properties/seacatauth%3Aauthentication/properties/login_attempts",
+                    "type": "integer",
+                    "title": "The login_attempts schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": 0,
+                    "examples": [
+                        10
+                    ]
+                },
+                "login_session_expiration": {
+                    "$id": "#/properties/seacatauth%3Aauthentication/properties/login_session_expiration",
+                    "type": "string",
+                    "title": "The login_session_expiration schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "5 m"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:provisioning": {
+            "$id": "#/properties/seacatauth%3Aprovisioning",
+            "type": "object",
+            "title": "The seacatauth:provisioning schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "env_variable_name": "SEACAT_AUTH_PROVISIONING",
+                    "superuser_name": "superuser",
+                    "superrole_id": "*/provisioning-superrole",
+                    "credentials_provider_id": "provisioning"
+                }
+            ],
+            "required": [
+                "env_variable_name",
+                "superuser_name",
+                "superrole_id",
+                "credentials_provider_id"
+            ],
+            "properties": {
+                "env_variable_name": {
+                    "$id": "#/properties/seacatauth%3Aprovisioning/properties/env_variable_name",
+                    "type": "string",
+                    "title": "The env_variable_name schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "SEACAT_AUTH_PROVISIONING"
+                    ]
+                },
+                "superuser_name": {
+                    "$id": "#/properties/seacatauth%3Aprovisioning/properties/superuser_name",
+                    "type": "string",
+                    "title": "The superuser_name schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "superuser"
+                    ]
+                },
+                "superrole_id": {
+                    "$id": "#/properties/seacatauth%3Aprovisioning/properties/superrole_id",
+                    "type": "string",
+                    "title": "The superrole_id schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "*/provisioning-superrole"
+                    ]
+                },
+                "credentials_provider_id": {
+                    "$id": "#/properties/seacatauth%3Aprovisioning/properties/credentials_provider_id",
+                    "type": "string",
+                    "title": "The credentials_provider_id schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "provisioning"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "seacatauth:cookie": {
+            "$id": "#/properties/seacatauth%3Acookie",
+            "type": "object",
+            "title": "The seacatauth:cookie schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "name": "SeaCatSCI",
+                    "domain": "localhost"
+                }
+            ],
+            "required": [
+                "name",
+                "domain"
+            ],
+            "properties": {
+                "name": {
+                    "$id": "#/properties/seacatauth%3Acookie/properties/name",
+                    "type": "string",
+                    "title": "The name schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "SeaCatSCI"
+                    ]
+                },
+                "domain": {
+                    "$id": "#/properties/seacatauth%3Acookie/properties/domain",
+                    "type": "string",
+                    "title": "The domain schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "localhost"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "web": {
+            "$id": "#/properties/web",
+            "type": "object",
+            "title": "The web schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "listen": "0.0.0.0 8081",
+                    "cors": "*",
+                    "preflightpaths": "/*"
+                }
+            ],
+            "required": [
+                "listen",
+                "cors",
+                "preflightpaths"
+            ],
+            "properties": {
+                "listen": {
+                    "$id": "#/properties/web/properties/listen",
+                    "type": "string",
+                    "title": "The listen schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "0.0.0.0 8081"
+                    ]
+                },
+                "cors": {
+                    "$id": "#/properties/web/properties/cors",
+                    "type": "string",
+                    "title": "The cors schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "*"
+                    ]
+                },
+                "preflightpaths": {
+                    "$id": "#/properties/web/properties/preflightpaths",
+                    "type": "string",
+                    "title": "The preflightpaths schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "/*"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "sessions": {
+            "$id": "#/properties/sessions",
+            "type": "object",
+            "title": "The sessions schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "expiration": 3600
+                }
+            ],
+            "required": [
+                "expiration"
+            ],
+            "properties": {
+                "expiration": {
+                    "$id": "#/properties/sessions/properties/expiration",
+                    "type": "integer",
+                    "title": "The expiration schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": 0,
+                    "examples": [
+                        3600
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "roles": {
+            "$id": "#/properties/roles",
+            "type": "object",
+            "title": "The roles schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "roles_file": "/conf/roles.json"
+                }
+            ],
+            "required": [
+                "roles_file"
+            ],
+            "properties": {
+                "roles_file": {
+                    "$id": "#/properties/roles/properties/roles_file",
+                    "type": "string",
+                    "title": "The roles_file schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "/conf/roles.json"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "password_change": {
+            "$id": "#/properties/password_change",
+            "type": "object",
+            "title": "The password_change schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "expiration": "3 d"
+                }
+            ],
+            "required": [
+                "expiration"
+            ],
+            "properties": {
+                "expiration": {
+                    "$id": "#/properties/password_change/properties/expiration",
+                    "type": "string",
+                    "pattern": "^[0-9]+(\\.[0-9]+)? ([yYmMwWdDhs]|ms)$",
+                    "title": "The expiration schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "3 d"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        }
+    },
+    "additionalProperties": true
+}
