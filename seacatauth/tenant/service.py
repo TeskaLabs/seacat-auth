@@ -83,12 +83,13 @@ class TenantService(asab.Service):
 			if rbac_svc.has_resource_access(session.Authz, tenant, ["authz:tenant:admin"]) != "OK":
 				message = "Not authorized for tenant un/assignment"
 				L.error(message, struct_data={
-					"cid": session.CredentialsID,
+					"cid": session.CredentialsId,
 					"tenant": tenant
 				})
 				return {
 					"result": "NOT-AUTHORIZED",
 					"message": message,
+					"error_data": {"tenant": tenant},
 				}
 
 		failed_count = 0
