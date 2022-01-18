@@ -24,6 +24,8 @@ class RolesHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
 		web_app.router.add_put('/roles/{tenant}/{credentials_id}', self.set_roles)
+		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
+		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
 	@access_control()
 	async def get_roles_by_credentials(self, request, *, tenant):
@@ -96,4 +98,36 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(
 			request,
 			data=resp_data,
+		)
+
+
+	@access_control("authz:tenant:admin")
+	async def assign_role(self, request, *, tenant):
+		credentials_id = request.match_info["credentials_id"]
+		role_name = request.match_info["role_name"]
+		role_id = "{}/{}".format(tenant, role_name)
+		data = await self.RoleService.assign_role(
+			request.match_info["credentials_id"],
+			tenant,
+		)
+
+		return asab.web.rest.json_response(
+			request,
+			data=data,
+			status=200 if data["result"] == "OK" else 400
+		)
+
+
+	@access_control("authz:tenant:admin")
+	async def unassign_role(self, request, *, tenant):
+		credentials_id = request.match_info["credentials_id"]
+		data = await self.RoleService.unassign_tenant(
+			request.match_info["credentials_id"],
+			tenant,
+		)
+
+		return asab.web.rest.json_response(
+			request,
+			data=data,
+			status=200 if data["result"] == "OK" else 400
 		)
