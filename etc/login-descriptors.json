@@ -1,0 +1,9 @@
+[
+	{
+		"id": "default",
+		"label": "Use recommended login.",
+		"factors": [
+			{"id": "password", "type": "password"}
+		]
+	}
+]
