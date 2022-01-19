@@ -244,6 +244,75 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		return True
 
 
+	async def assign_tenant(self, credentials_id: str, tenant: str):
+		"""
+		Assign tenant to credentials
+		"""
+
+		# Check if tenant exists
+		try:
+			await self.get(tenant)
+		except KeyError:
+			message = "Tenant not found"
+			L.error(message, struct_data={"tenant": tenant})
+			return {
+				"result": "NOT-FOUND",
+				"message": message,
+			}
+
+		assignment_id = "{} {}".format(credentials_id, tenant)
+		upsertor = self.MongoDBStorageService.upsertor(self.AssignCollection, obj_id=assignment_id)
+		upsertor.set("c", credentials_id)
+		upsertor.set("t", tenant)
+
+		try:
+			await upsertor.execute()
+		except asab.storage.exceptions.DuplicateError:
+			message = "Credentials is already assigned to this tenant"
+			L.error(message, struct_data={"cid": credentials_id, "tenant": tenant})
+			return {
+				"result": "ALREADY-EXISTS",
+				"message": message,
+			}
+
+		L.log(asab.LOG_NOTICE, "Tenant successfully assigned to credentials", struct_data={
+			"cid": credentials_id,
+			"tenant": tenant,
+		})
+		return {"result": "OK"}
+
+
+	async def unassign_tenant(self, credentials_id: str, tenant: str):
+		"""
+		Unassign credentials from tenant
+		"""
+		# Unassign tenant roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		await role_svc.set_roles(
+			credentials_id,
+			tenant_scope={tenant},
+			roles=[]
+		)
+
+		# Unassign the tenant
+		assignment_id = "{} {}".format(credentials_id, tenant)
+		try:
+			await self.MongoDBStorageService.delete(self.AssignCollection, obj_id=assignment_id)
+		except KeyError:
+			message = "Credentials is not assigned to this tenant"
+			L.error(message, struct_data={"cid": credentials_id, "tenant": tenant})
+			return {
+				"result": "NOT-FOUND",
+				"message": message,
+			}
+
+		L.log(asab.LOG_NOTICE, "Tenant successfully unassigned from credentials", struct_data={
+			"cid": credentials_id,
+			"tenant": tenant,
+		})
+		return {"result": "OK"}
+
+
 	async def list_tenant_assignments(self, tenant, page: int = 0, limit: int = None):
 		query_filter = {'t': tenant}
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
