@@ -103,12 +103,27 @@ class RolesHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def assign_role(self, request, *, tenant):
-		credentials_id = request.match_info["credentials_id"]
-		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant, role_name)
+		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
+		if tenant == "*":
+			# Assigning global roles requires superuser
+			if not self.RBACService.is_superuser(request.Session.Authz):
+				message = "Missing permissions to un/assign global role"
+				L.warning(message, struct_data={
+					"agent_cid": request.Session.CredentialsId,
+					"role": role_id,
+				})
+				return asab.web.rest.json_response(
+					request,
+					data={
+						"result": "FORBIDDEN",
+						"message": message
+					},
+					status=403
+				)
+
 		data = await self.RoleService.assign_role(
-			request.match_info["credentials_id"],
-			tenant,
+			credentials_id=request.match_info["credentials_id"],
+			role_id=role_id
 		)
 
 		return asab.web.rest.json_response(
@@ -120,10 +135,27 @@ class RolesHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def unassign_role(self, request, *, tenant):
-		credentials_id = request.match_info["credentials_id"]
-		data = await self.RoleService.unassign_tenant(
-			request.match_info["credentials_id"],
-			tenant,
+		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
+		if tenant == "*":
+			# Unassigning global roles requires superuser
+			if not self.RBACService.is_superuser(request.Session.Authz):
+				message = "Missing permissions to un/assign global role"
+				L.warning(message, struct_data={
+					"agent_cid": request.Session.CredentialsId,
+					"role": role_id,
+				})
+				return asab.web.rest.json_response(
+					request,
+					data={
+						"result": "FORBIDDEN",
+						"message": message
+					},
+					status=403
+				)
+
+		data = await self.RoleService.assign_role(
+			credentials_id=request.match_info["credentials_id"],
+			role_id=role_id
 		)
 
 		return asab.web.rest.json_response(
