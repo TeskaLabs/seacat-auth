@@ -2,8 +2,12 @@
 
 ## Release candidate
 
+### Fixes
+- Fixed permissions for tenant assignment (#2, PLUM Sprint 210114)
+
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
+- Endpoints for simple tenant un/assignment (#2, PLUM Sprint 210114)
 
 ---
 
