@@ -60,7 +60,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'push' }}
 
     steps:
     - uses: actions/checkout@v2
