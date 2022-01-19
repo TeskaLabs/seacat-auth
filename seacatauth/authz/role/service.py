@@ -8,11 +8,11 @@ import asab.storage.exceptions
 
 L = logging.getLogger(__name__)
 
+
 #
 
 
 class RoleService(asab.Service):
-
 	"""
 	Role object schema:
 	{
@@ -31,6 +31,7 @@ class RoleService(asab.Service):
 		self.CredentialService = app.get_service("seacatauth.CredentialsService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RBACService = self.App.get_service("seacatauth.RBACService")
 
 	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
 		collection = self.StorageService.Database[self.RoleCollection]
@@ -101,10 +102,10 @@ class RoleService(asab.Service):
 		return "OK"
 
 	async def update_resources(
-		self, role_id: str,
-		resources_to_set: Optional[list] = None,
-		resources_to_add: Optional[list] = None,
-		resources_to_remove: Optional[list] = None
+			self, role_id: str,
+			resources_to_set: Optional[list] = None,
+			resources_to_add: Optional[list] = None,
+			resources_to_remove: Optional[list] = None
 	):
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
@@ -312,6 +313,65 @@ class RoleService(asab.Service):
 			"data": assignments,
 			"count": await collection.count_documents(query_filter)
 		}
+
+	async def assign_role(self, credentials_id: str, role_id: str):
+		tenant, _ = role_id.split("/", 1)
+
+		# Check if credentials exist
+		try:
+			await self.CredentialService.detail(credentials_id)
+		except KeyError:
+			message = "Credentials not found"
+			L.warning(message, struct_data={"cid": credentials_id})
+			return {
+				"result": "NOT-FOUND",
+				"message": message,
+			}
+
+		# Check if role exists
+		try:
+			await self.get(role_id)
+		except KeyError:
+			message = "Role not found"
+			L.warning(message, struct_data={"role": role_id})
+			return {
+				"result": "NOT-FOUND",
+				"message": message,
+			}
+
+		await self._do_assign_role(credentials_id, role_id)
+
+
+	async def _do_assign_role(self, credentials_id: str, role_id: str):
+		tenant, _ = role_id.split("/", 1)
+		assignment_id = "{} {}".format(credentials_id, role_id)
+
+		upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=assignment_id)
+		upsertor.set("c", credentials_id)
+		upsertor.set("r", role_id)
+		if tenant != "*":
+			upsertor.set("t", tenant)
+
+		await upsertor.execute()
+
+		return {"result": "OK"}
+
+
+	async def unassign_role(self, credentials_id: str, role_id: str):
+		assignment_id = "{} {}".format(credentials_id, role_id)
+
+		try:
+			await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
+		except KeyError:
+			message = "Credentials is not assigned to this role"
+			L.warning(message, struct_data={"cid": credentials_id, "role": role_id})
+			return {
+				"result": "NOT-FOUND",
+				"message": message,
+			}
+
+		return {"result": "OK"}
+
 
 	async def delete_role_assignments(self, role_id):
 		"""
