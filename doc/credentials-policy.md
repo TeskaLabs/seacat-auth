@@ -39,7 +39,7 @@ Their **policy** options are:
 The fields `email` and `phone` have an additional **context**: `editable_by`.
 Its **policy** options are:
 - `nobody`: The field is not editable, not even by a superuser.
-- `admin_only`: The field is editable only by credentials admin (i.e. a user with `authz:credentials:admin` resource).
+- `admin_only`: The field is editable only by a superuser.
 - `anybody`: The field is editable by anyone. This also makes it possible to update the field in one's own credentials.
 
 
