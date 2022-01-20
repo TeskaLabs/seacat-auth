@@ -339,7 +339,7 @@ class RoleService(asab.Service):
 				"message": message,
 			}
 
-		await self._do_assign_role(credentials_id, role_id)
+		return await self._do_assign_role(credentials_id, role_id)
 
 
 	async def _do_assign_role(self, credentials_id: str, role_id: str):
@@ -352,8 +352,20 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			upsertor.set("t", tenant)
 
-		await upsertor.execute()
+		try:
+			await upsertor.execute()
+		except asab.storage.exceptions.DuplicateError:
+			message = "Role already assigned to these credentials"
+			L.warning(message, struct_data={"cid": credentials_id, "role": role_id})
+			return {
+				"result": "ALREADY-EXISTS",
+				"message": message,
+			}
 
+		L.log(asab.LOG_NOTICE, "Role assigned", struct_data={
+			"cid": credentials_id,
+			"role": role_id,
+		})
 		return {"result": "OK"}
 
 
@@ -363,13 +375,17 @@ class RoleService(asab.Service):
 		try:
 			await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
 		except KeyError:
-			message = "Credentials is not assigned to this role"
+			message = "Credentials are not assigned to this role"
 			L.warning(message, struct_data={"cid": credentials_id, "role": role_id})
 			return {
 				"result": "NOT-FOUND",
 				"message": message,
 			}
 
+		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
+			"cid": credentials_id,
+			"role": role_id,
+		})
 		return {"result": "OK"}
 
 
