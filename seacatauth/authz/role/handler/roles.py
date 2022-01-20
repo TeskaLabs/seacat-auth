@@ -16,10 +16,10 @@ L = logging.getLogger(__name__)
 
 
 class RolesHandler(object):
-	def __init__(self, app, rbac_svc):
+	def __init__(self, app, role_svc):
 		self.App = app
-		self.RBACService = rbac_svc
-		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.RoleService = role_svc
+		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
@@ -153,7 +153,7 @@ class RolesHandler(object):
 					status=403
 				)
 
-		data = await self.RoleService.assign_role(
+		data = await self.RoleService.unassign_role(
 			credentials_id=request.match_info["credentials_id"],
 			role_id=role_id
 		)
