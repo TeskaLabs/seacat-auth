@@ -46,12 +46,14 @@ class RoleService(asab.Service):
 			cursor.limit(limit)
 
 		roles = []
+		count = await collection.count_documents(query_filter)
 		async for role_dict in cursor:
 			roles.append(role_dict)
 
 		return {
+			"result": "OK",
+			"count": count,
 			"data": roles,
-			"count": await collection.count_documents(query_filter)
 		}
 
 	async def get(self, role_id: str):

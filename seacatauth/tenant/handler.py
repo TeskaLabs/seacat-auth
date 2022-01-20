@@ -81,7 +81,7 @@ class TenantHandler(object):
 		tenant = await provider.get(tenant_id)
 		return asab.web.rest.json_response(request, data=tenant)
 
-	access_control("authz:superuser")
+	@access_control("authz:superuser")
 	async def create(self, request, *, credentials_id):
 		tenant = await request.json()
 		provider = self.TenantService.get_provider()
