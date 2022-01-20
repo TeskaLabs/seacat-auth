@@ -2,6 +2,10 @@
 
 ## Release candidate
 
+### Breaking changes
+
+- Remove `authz:credentials:admin` resource (#5, PLUM Sprint 210114)
+
 ### Fixes
 - Fixed permissions for tenant assignment (#2, PLUM Sprint 210114)
 - Remove default list limits for roles and resources (#4, PLUM Sprint 210114)
@@ -10,6 +14,9 @@
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
 - Endpoints for simple tenant un/assignment (#2, PLUM Sprint 210114)
+
+### Refactoring
+- Remove `authz:credentials:admin` resource (#5, PLUM Sprint 210114)
 
 ---
 
