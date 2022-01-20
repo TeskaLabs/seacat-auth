@@ -15,7 +15,8 @@ class RBACService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.RBACService"):
 		super().__init__(app, service_name)
 
-	def is_superuser(self, authz: dict):
+	@staticmethod
+	def is_superuser(authz: dict):
 		global_resources = set(
 			resource
 			for role in authz["*"].values()
@@ -23,9 +24,10 @@ class RBACService(asab.Service):
 		)
 		return "authz:superuser" in global_resources
 
-	def has_resource_access(self, authz: dict, tenant: typing.Union[str, None], requested_resources: list):
+	@staticmethod
+	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list):
 		# Superuser passes without further checks
-		if self.is_superuser(authz):
+		if RBACService.is_superuser(authz):
 			return "OK"
 
 		if tenant == "*":
