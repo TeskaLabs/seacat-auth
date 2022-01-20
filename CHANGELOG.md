@@ -5,6 +5,7 @@
 ### Fixes
 - Fixed permissions for tenant assignment (#2, PLUM Sprint 210114)
 - Remove default list limits for roles and resources (#4, PLUM Sprint 210114)
+- Fix access check in create tenant (#4, PLUM Sprint 210114)
 
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
