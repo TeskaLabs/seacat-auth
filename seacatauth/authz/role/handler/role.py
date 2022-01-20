@@ -33,7 +33,7 @@ class RoleHandler(object):
 	async def list_all(self, request):
 		# TODO: global superuser only
 		page = int(request.query.get('p', 1)) - 1
-		limit = int(request.query.get('i', 10))
+		limit = int(request.query.get('i', None))
 		result = await self.RoleService.list(None, page, limit)
 		return asab.web.rest.json_response(
 			request, result
