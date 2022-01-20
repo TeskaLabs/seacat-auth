@@ -102,10 +102,10 @@ class RoleService(asab.Service):
 		return "OK"
 
 	async def update_resources(
-			self, role_id: str,
-			resources_to_set: Optional[list] = None,
-			resources_to_add: Optional[list] = None,
-			resources_to_remove: Optional[list] = None
+		self, role_id: str,
+		resources_to_set: Optional[list] = None,
+		resources_to_add: Optional[list] = None,
+		resources_to_remove: Optional[list] = None
 	):
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
