@@ -25,7 +25,7 @@ class ResourceHandler(object):
 	async def list(self, request):
 		# TODO: filtering by module
 		page = int(request.query.get('p', 1)) - 1
-		limit = int(request.query.get('i', 10))
+		limit = int(request.query.get('i', None))
 		resources = await self.ResourceService.list(page, limit)
 		return asab.web.rest.json_response(request, resources)
 
