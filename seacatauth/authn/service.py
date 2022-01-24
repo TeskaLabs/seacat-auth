@@ -52,6 +52,7 @@ class AuthenticationService(asab.Service):
 		self.ResourceService = app.get_service('seacatauth.ResourceService')
 		self.AuditService = app.get_service('seacatauth.AuditService')
 		self.CommunicationService = app.get_service('seacatauth.CommunicationService')
+		self.MetricsService = app.get_service('asab.MetricsService')
 
 		self.LoginAttempts = asab.Config.getint("seacatauth:authentication", "login_attempts")
 		self.LoginSessionExpiration = asab.Config.getseconds("seacatauth:authentication", "login_session_expiration")
@@ -78,6 +79,9 @@ class AuthenticationService(asab.Service):
 
 		# TODO: introduce LoginSession providers
 		self.LoginSessions = {}
+
+		# Metrics - login counters
+		self.FailCounter = self.MetricsService.create_counter("login_failed", tags={"help": "Counts failed logins."}, init_values={"logins": 0})
 
 		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)
 
