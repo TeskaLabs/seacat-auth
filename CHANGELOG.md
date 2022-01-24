@@ -13,7 +13,8 @@
 
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
-- Endpoints for simple tenant un/assignment (#2, PLUM Sprint 210114)
+- Endpoints for single tenant un/assignment (#2, PLUM Sprint 210114)
+- Endpoints for single role un/assignment (#3, PLUM Sprint 210114)
 
 ### Refactoring
 - Remove `authz:credentials:admin` resource (#5, PLUM Sprint 210114)

@@ -17,10 +17,9 @@ L = logging.getLogger(__name__)
 
 
 class RoleHandler(object):
-	def __init__(self, app, rbac_svc):
-		self.RBACService = rbac_svc
-		self.RoleService = app.get_service("seacatauth.RoleService")
+	def __init__(self, app, role_svc):
 		self.App = app
+		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/role", self.list_all)

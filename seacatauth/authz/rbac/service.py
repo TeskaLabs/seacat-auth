@@ -16,14 +16,18 @@ class RBACService(asab.Service):
 		super().__init__(app, service_name)
 
 	@staticmethod
-	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list):
-		# Superuser passes without further checks
+	def is_superuser(authz: dict):
 		global_resources = set(
 			resource
-			for resources in authz["*"].values()
-			for resource in resources
+			for role in authz["*"].values()
+			for resource in role
 		)
-		if "authz:superuser" in global_resources:
+		return "authz:superuser" in global_resources
+
+	@staticmethod
+	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list):
+		# Superuser passes without further checks
+		if RBACService.is_superuser(authz):
 			return "OK"
 
 		if tenant == "*":
