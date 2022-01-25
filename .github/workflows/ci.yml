@@ -3,12 +3,20 @@ name: CI
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
   workflow_dispatch:
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:  
+    - name: Debug
+      id: debug
+      run: echo "TAGS ${GITHUB_REF/refs\/tags\//}"
+      
   flake8:
     runs-on: ubuntu-latest
     strategy:
@@ -60,11 +68,11 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name != 'pull_request' }}
 
     steps:
     - uses: actions/checkout@v2
-      
+    
     - name: docker login
       env:
         DOCKER_USER: ${{ secrets.DOCKER_USER }} 
