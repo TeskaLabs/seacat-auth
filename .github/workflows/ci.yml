@@ -2,10 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches:
+      - main
+    tags:
+      - 'v*'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
   workflow_dispatch:
 
@@ -13,9 +16,21 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:  
-    - name: Debug
-      id: debug
-      run: echo "TAGS ${GITHUB_REF/refs\/tags\//}"
+    - uses: actions/checkout@v2
+    
+    - name: Docker Metadata action
+      uses: docker/metadata-action@v3
+      id: meta
+      with:
+          images: name/app
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+    - name: Print tags
+      id: print
+      run: echo "${{ steps.meta.outputs.tags }}\n${{ steps.meta.outputs.labels }}"
       
   flake8:
     runs-on: ubuntu-latest
