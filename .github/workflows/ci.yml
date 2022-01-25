@@ -13,25 +13,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  debug:
-    runs-on: ubuntu-latest
-    steps:  
-    - uses: actions/checkout@v2
-    
-    - name: Docker Metadata action
-      uses: docker/metadata-action@v3
-      id: meta
-      with:
-          images: name/app
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-    - name: Print tags
-      id: print
-      run: echo "${{ steps.meta.outputs.tags }}\n${{ steps.meta.outputs.labels }}"
-      
   flake8:
     runs-on: ubuntu-latest
     strategy:
@@ -88,14 +69,24 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
+    - name: Docker Metadata action
+      uses: docker/metadata-action@v3
+      id: meta
+      with:
+          images:  teskalabs/seacat-auth
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{raw}}
+    
     - name: docker login
       env:
         DOCKER_USER: ${{ secrets.DOCKER_USER }} 
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}  
       run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       
-    - name: Build master
-      run: docker build . --file ./Dockerfile --tag teskalabs/seacat-auth:latest    
-     
-    - name: Push master
-      run: docker push teskalabs/seacat-auth:latest
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
