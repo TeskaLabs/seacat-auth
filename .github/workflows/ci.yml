@@ -74,8 +74,8 @@ jobs:
       id: meta
       with:
           images:  teskalabs/seacat-auth
-          flavor: latest=true
           tags: |
+            type=raw,value=latest
             type=ref,event=tag
             type=semver,pattern={{raw}}
     
