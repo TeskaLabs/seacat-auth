@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.1.1
 
 ### Breaking changes
 
