@@ -33,8 +33,10 @@ class CookieService(asab.Service):
 		if self.RootCookieDomain is None:
 			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
 			self.RootCookieDomain = ".{}".format(fragments.netloc)
-			L.warning("""Cookie domain is not specified. Assuming '{}' (inferred from Auth WebUI base URL). 
-			It is recommended to specify cookie domain explicitly in Seacat Auth configuration.""".replace("\t", ""))
+			L.warning("""Cookie domain is not specified. 
+				Assuming your cookie domain is '{}' (inferred from Auth WebUI base URL). 
+				It is recommended to specify cookie domain explicitly in your Seacat Auth configuration file.
+			""".replace("\t", "").format(self.RootCookieDomain))
 
 		# Configure cookies for application domains
 		# TODO: Allow different cookie name for each domain
@@ -63,10 +65,10 @@ class CookieService(asab.Service):
 	@staticmethod
 	def _validate_cookie_domain(domain):
 		if domain in ("", None):
-			L.error("Cookie domain not specified or empty")
+			L.warning("Cookie domain not specified or empty")
 			return None
 		if not domain.isascii():
-			L.error("Cookie domain can contain only ASCII characters.", struct_data={"domain": domain})
+			L.warning("Cookie domain can contain only ASCII characters.", struct_data={"domain": domain})
 			return None
 		return domain
 
