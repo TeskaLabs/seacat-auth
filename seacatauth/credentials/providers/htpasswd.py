@@ -98,7 +98,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		return False
 
 
-	async def count(self, filtr: None) -> int:
+	async def count(self, filtr=None) -> int:
 		if filtr is None:
 			return len(self.HT.users())
 
