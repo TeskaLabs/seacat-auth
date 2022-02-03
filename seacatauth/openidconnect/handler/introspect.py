@@ -8,7 +8,6 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-from ...session.adapter import SessionAdapter
 from ...generic import add_to_header
 
 #
@@ -27,7 +26,8 @@ class TokenIntrospectionHandler(object):
 	def __init__(self, app, oidc_svc, credentials_svc):
 		self.CredentialsService = credentials_svc
 		self.OpenIdConnectService = oidc_svc
-		self.SessionService = app.get_service('seacatauth.SessionService')
+		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/openidconnect/introspect', self.introspect)
@@ -71,7 +71,7 @@ class TokenIntrospectionHandler(object):
 
 
 	async def introspect_nginx(self, request):
-		'''
+		"""
 		Non-standard version of RFC7662 chapter 2.Introspection Endpoint that is usable with Nginx auth_request module.
 
 		Based on:
@@ -115,16 +115,9 @@ class TokenIntrospectionHandler(object):
 				}
 
 		}
-		'''
-		query = request.query
-		verify = query.get("verify", "")
-		what = query.getall('add', [])
-		authorization_bytes = await request.read()
+		"""
+		fields_to_add = request.query.getall("add", [])
 
-		requested_tenant = request.headers.get("X-Tenant")
-
-		authorized = False
-		session = {}
 		headers = {}
 
 		# Authorize request
@@ -138,19 +131,27 @@ class TokenIntrospectionHandler(object):
 		# TODO: check if user is in a "limited" session (for setting up 2nd factor only)
 		#   if so: fail
 
-		# check the tenant
-		assigned_tenants = {tenant for tenant in session.Authz.keys() if tenant != "*"}
-		if "tenant" in verify:
-			if requested_tenant not in assigned_tenants:
-				L.warning(
-					"Credentials not authorized for tenant.",
-					struct_data={
-						'cid': credentials_id,
-						'tenant': requested_tenant
-					}
-				)
-				headers['WWW-Authenticate'] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
-				return aiohttp.web.HTTPUnauthorized(headers=headers)
+		requested_tenant = None
+		requested_resources = set()
+		verify = request.query.get("verify")
+		if verify is not None:
+			verify = verify.split(" ")
+
+			if "resources" in verify:
+				requested_resources.update(request.headers.get("X-Resources").split(" "))
+
+			if "tenant" in verify:
+				requested_tenant = request.headers.get("X-Tenant")
+				requested_resources.add("tenant:access")
+
+			if self.RBACService.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
+				L.warning("Credentials not authorized for tenant or resource.", struct_data={
+					"cid": session.CredentialsId,
+					"tenant": requested_tenant,
+					"resources": " ".join(requested_resources),
+				})
+				headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
+				return aiohttp.web.HTTPForbidden(headers=headers)
 
 		# Extend session expiration
 		await self.SessionService.touch(session)
@@ -158,7 +159,7 @@ class TokenIntrospectionHandler(object):
 		# add headers
 		headers = await add_to_header(
 			headers=headers,
-			what=what,
+			what=fields_to_add,
 			session=session,
 			credentials_service=self.CredentialsService,
 			requested_tenant=requested_tenant
