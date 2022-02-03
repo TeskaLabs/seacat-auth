@@ -22,6 +22,7 @@ class CookieHandler(object):
 		self.CookieService = cookie_svc
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_svc
+		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		self.CookiePattern = re.compile(
 			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
@@ -63,11 +64,35 @@ class CookieHandler(object):
 		```
 		"""
 
+		# Authorize request
+		# Use custom authorization since it must use cookie, not the authn header
 		session = await self.CookieService.get_session_by_sci(request)
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
 			delete_cookie(self.App, response)
 			return response
+
+		# Check tenant+resource access
+		requested_tenant = None
+		requested_resources = set()
+		verify = request.query.get("verify")
+		if verify is not None:
+			verify = verify.split(" ")
+
+			if "resources" in verify:
+				requested_resources.update(request.headers.get("X-Resources").split(" "))
+
+			if "tenant" in verify:
+				requested_tenant = request.headers.get("X-Tenant")
+				requested_resources.add("tenant:access")
+
+			if self.RBACService.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
+				L.warning("Credentials not authorized for tenant or resource.", struct_data={
+					"cid": session.CredentialsId,
+					"tenant": requested_tenant,
+					"resources": " ".join(requested_resources),
+				})
+				return aiohttp.web.HTTPForbidden()
 
 		# Extend session expiration
 		await self.SessionService.touch(session)
@@ -91,7 +116,8 @@ class CookieHandler(object):
 			headers,
 			request.query.getall('add', []),
 			session,
-			self.CredentialsService
+			self.CredentialsService,
+			requested_tenant=requested_tenant
 		)
 
 		return aiohttp.web.HTTPOk(headers=headers)
