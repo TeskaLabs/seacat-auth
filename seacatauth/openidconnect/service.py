@@ -59,18 +59,9 @@ class OpenIdConnectService(asab.Service):
 		return session_id
 
 
-	async def get_session_from_authorization(self, request):
-		"""
-		Find session by token in the authorization header
-		"""
-		# Get authorization header
-		authorization = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
-		if authorization is None:
-			L.info("Access Token not provided in the header")
-			return None
-
+	async def get_session_from_bearer_token(self, bearer_token: str):
 		# Extract the access token
-		am = self.AuthorizationHeaderRg.match(authorization)
+		am = self.AuthorizationHeaderRg.match(bearer_token)
 		if am is None:
 			L.warning("Access Token is invalid")
 			return None
@@ -90,6 +81,19 @@ class OpenIdConnectService(asab.Service):
 			return None
 
 		return session
+
+
+	async def get_session_from_authorization_header(self, request):
+		"""
+		Find session by token in the authorization header
+		"""
+		# Get authorization header
+		authorization_bytes = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
+		if authorization_bytes is None:
+			L.info("Access Token not provided in the header")
+			return None
+
+		return await self.get_session_from_bearer_token(authorization_bytes)
 
 	def refresh_token(self, refresh_token, client_id, client_secret, scope):
 		# TODO: this is not implemented
