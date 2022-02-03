@@ -31,7 +31,7 @@ def api_auth_middleware_factory(app):
 		try:
 			# Authorize by OAuth Bearer token
 			# (Authorization by cookie is not allowed for API access)
-			request.Session = await oidc_service.get_session_from_authorization(request)
+			request.Session = await oidc_service.get_session_from_authorization_header(request)
 		except KeyError:
 			request.Session = None
 
@@ -78,7 +78,7 @@ def public_auth_middleware_factory(app):
 		"""
 		# Authorize by OAuth Bearer token
 		try:
-			request.Session = await oidc_service.get_session_from_authorization(request)
+			request.Session = await oidc_service.get_session_from_authorization_header(request)
 		except KeyError:
 			request.Session = None
 

@@ -127,22 +127,12 @@ class TokenIntrospectionHandler(object):
 		session = {}
 		headers = {}
 
-		# get session
-		if authorization_bytes.startswith(b'Bearer '):
-			access_token = base64.urlsafe_b64decode(authorization_bytes[7:])
-			try:
-				session = await self.SessionService.get_by(SessionAdapter.FNOAuth2AccessToken, access_token)
-				credentials_id = session.CredentialsId
-				authorized = True
-			except KeyError:
-				L.warning("Session not found", struct_data={
-					"at": access_token, "headers": dict(request.headers)
-				})
-		else:
-			L.warning("Bearer token not provided in request", struct_data={"headers": dict(request.headers)})
-
-		if not authorized:
-			headers['WWW-Authenticate'] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
+		# Authorize request
+		# Use custom authorization since the auth bytes must be read from the request body, not the header
+		authorization_bytes = await request.read()
+		session = await self.OpenIdConnectService.get_session_from_bearer_token(authorization_bytes.decode("ascii"))
+		if session is None:
+			headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
 			return aiohttp.web.HTTPUnauthorized(headers=headers)
 
 		# TODO: check if user is in a "limited" session (for setting up 2nd factor only)
