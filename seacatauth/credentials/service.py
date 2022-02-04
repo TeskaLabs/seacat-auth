@@ -94,10 +94,11 @@ class CredentialsService(asab.Service):
 
 		
 	async def _on_tick_metric(self, event_name):
-		count = 0
+		tasks = []
 		for order, provider in self.Providers:
-			count += await provider.count()
-		self.CredentialsGauge.set("credentials", count)
+			tasks.append(provider.count())
+		counts = await asyncio.gather(*tasks)
+		self.CredentialsGauge.set("credentials", sum(counts))
 
 
 	def _prepare_ident_fields(self, ident_config):
