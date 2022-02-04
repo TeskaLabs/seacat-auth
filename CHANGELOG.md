@@ -11,6 +11,7 @@
 ### Features
 - Metrics counting failed and successful logins added (#6, PLUM Sprint 210128)
 - Resource description (#1, PLUM Sprint 210114)
+- Resource check in introspection (#8, PLUM Sprint 210128)
 
 ---
 
