@@ -72,7 +72,7 @@ class SessionService(asab.Service):
 
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
-		self.SessionGauge = self.MetricsService.create_gauge("active_sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
+		self.SessionGauge = self.MetricsService.create_gauge("active_sessions", tags={"help": "Counts active sessions.", "unit": "sessions", "default_label":"SeaCatAuth Metrics"}, init_values={"sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
 
 
