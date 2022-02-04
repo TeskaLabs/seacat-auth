@@ -89,7 +89,7 @@ class CredentialsService(asab.Service):
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
 		self.Providers = providers
-		self.CredentialsGauge = self.MetricsService.create_gauge("credentials", tags={"help": "Counts credentials."}, init_values={"credentials": 0})
+		self.CredentialsGauge = self.MetricsService.create_gauge("credentials", tags={"help": "Counts credentials.", "unit": "users", "default_label":"SeaCatAuth Metrics"}, init_values={"credentials": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
 
 		
