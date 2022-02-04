@@ -64,6 +64,9 @@ class CookieHandler(object):
 		```
 		"""
 
+		attributes_to_add = request.query.getall("add", [])
+		attributes_to_verify = request.query.getall("verify", [])
+
 		# Authorize request
 		# Use custom authorization since it must use cookie, not the authn header
 		session = await self.CookieService.get_session_by_sci(request)
@@ -75,14 +78,11 @@ class CookieHandler(object):
 		# Check tenant+resource access
 		requested_tenant = None
 		requested_resources = set()
-		verify = request.query.get("verify")
-		if verify is not None:
-			verify = verify.split(" ")
-
-			if "resources" in verify:
+		if len(attributes_to_verify) > 0:
+			if "resources" in attributes_to_verify:
 				requested_resources.update(request.headers.get("X-Resources").split(" "))
 
-			if "tenant" in verify:
+			if "tenant" in attributes_to_verify:
 				requested_tenant = request.headers.get("X-Tenant")
 				requested_resources.add("tenant:access")
 
@@ -114,7 +114,7 @@ class CookieHandler(object):
 		# Add requested X-Headers
 		headers = await add_to_header(
 			headers,
-			request.query.getall('add', []),
+			attributes_to_add,
 			session,
 			self.CredentialsService,
 			requested_tenant=requested_tenant
