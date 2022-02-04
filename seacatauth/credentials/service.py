@@ -98,7 +98,11 @@ class CredentialsService(asab.Service):
 		for order, provider in self.Providers:
 			tasks.append(provider.count())
 		counts = await asyncio.gather(*tasks)
-		self.CredentialsGauge.set("credentials", sum(counts))
+		total = 0
+		for count in counts:
+			if count != -1:
+				total += count
+		self.CredentialsGauge.set("credentials", total)
 
 
 	def _prepare_ident_fields(self, ident_config):
