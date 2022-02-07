@@ -1,6 +1,7 @@
 import base64
 import http.cookies
 import re
+import urllib.parse
 
 import aiohttp
 import logging
@@ -29,6 +30,13 @@ class CookieService(asab.Service):
 		self.RootCookieDomain = self._validate_cookie_domain(
 			asab.Config.get("seacatauth:cookie", "domain", fallback=None)
 		)
+		if self.RootCookieDomain is None:
+			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
+			self.RootCookieDomain = ".{}".format(fragments.netloc)
+			L.warning("""Cookie domain is not specified.
+				Assuming your cookie domain is '{}' (inferred from Auth WebUI base URL).
+				It is recommended to specify cookie domain explicitly in your Seacat Auth configuration file.
+			""".replace("\t", "").format(self.RootCookieDomain))
 
 		# Configure cookies for application domains
 		# TODO: Allow different cookie name for each domain
@@ -44,6 +52,8 @@ class CookieService(asab.Service):
 
 			redirect_uri = section.get("redirect_uri", asab.Config.get("general", "auth_webui_base_url"))
 			domain = self._validate_cookie_domain(section.get("domain"))
+			if domain is None:
+				raise ValueError("Application cookie domain must be specified.")
 
 			self.ApplicationCookies[domain_id] = {
 				"redirect_uri": redirect_uri,
@@ -55,9 +65,11 @@ class CookieService(asab.Service):
 	@staticmethod
 	def _validate_cookie_domain(domain):
 		if domain in ("", None):
-			raise ValueError("Cookie domain not specified or empty")
+			L.warning("Cookie domain not specified or empty")
+			return None
 		if not domain.isascii():
-			raise ValueError("Cookie domain can contain only ASCII characters. Got '{}'".format(domain))
+			L.warning("Cookie domain can contain only ASCII characters.", struct_data={"domain": domain})
+			return None
 		return domain
 
 

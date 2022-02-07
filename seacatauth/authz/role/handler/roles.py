@@ -16,14 +16,16 @@ L = logging.getLogger(__name__)
 
 
 class RolesHandler(object):
-	def __init__(self, app, rbac_svc):
+	def __init__(self, app, role_svc):
 		self.App = app
-		self.RBACService = rbac_svc
-		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.RoleService = role_svc
+		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
 		web_app.router.add_put('/roles/{tenant}/{credentials_id}', self.set_roles)
+		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
+		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
 	@access_control()
 	async def get_roles_by_credentials(self, request, *, tenant):
@@ -96,4 +98,68 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(
 			request,
 			data=resp_data,
+		)
+
+
+	@access_control("authz:tenant:admin")
+	async def assign_role(self, request, *, tenant):
+		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
+		if tenant == "*":
+			# Assigning global roles requires superuser
+			if not self.RBACService.is_superuser(request.Session.Authz):
+				message = "Missing permissions to un/assign global role"
+				L.warning(message, struct_data={
+					"agent_cid": request.Session.CredentialsId,
+					"role": role_id,
+				})
+				return asab.web.rest.json_response(
+					request,
+					data={
+						"result": "FORBIDDEN",
+						"message": message
+					},
+					status=403
+				)
+
+		data = await self.RoleService.assign_role(
+			credentials_id=request.match_info["credentials_id"],
+			role_id=role_id
+		)
+
+		return asab.web.rest.json_response(
+			request,
+			data=data,
+			status=200 if data["result"] == "OK" else 400
+		)
+
+
+	@access_control("authz:tenant:admin")
+	async def unassign_role(self, request, *, tenant):
+		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
+		if tenant == "*":
+			# Unassigning global roles requires superuser
+			if not self.RBACService.is_superuser(request.Session.Authz):
+				message = "Missing permissions to un/assign global role"
+				L.warning(message, struct_data={
+					"agent_cid": request.Session.CredentialsId,
+					"role": role_id,
+				})
+				return asab.web.rest.json_response(
+					request,
+					data={
+						"result": "FORBIDDEN",
+						"message": message
+					},
+					status=403
+				)
+
+		data = await self.RoleService.unassign_role(
+			credentials_id=request.match_info["credentials_id"],
+			role_id=role_id
+		)
+
+		return asab.web.rest.json_response(
+			request,
+			data=data,
+			status=200 if data["result"] == "OK" else 400
 		)

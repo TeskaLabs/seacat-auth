@@ -5,15 +5,37 @@
 ### Breaking changes
 - Resource creation endpoint now accepts POST requests (#1, PLUM Sprint 210114)
 
+### Refactoring
+- Detailed error messages for cookie domain and session AES key config (#7, PLUM Sprint 210128)
+
+### Features
+- Metrics counting failed and successful logins added (#6, PLUM Sprint 210128)
+- Resource description (#1, PLUM Sprint 210114)
+
+---
+
+
+## v22.1.1
+
+### Breaking changes
+
+- Remove `authz:credentials:admin` resource (#5, PLUM Sprint 210114)
+
 ### Fixes
 - Fixed permissions for tenant assignment (#2, PLUM Sprint 210114)
+- Remove default list limits for roles and resources (#4, PLUM Sprint 210114)
+- Fix access check in create tenant (#4, PLUM Sprint 210114)
 
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
-- Resource description (#1, PLUM Sprint 210114)
-- Endpoints for simple tenant un/assignment (#2, PLUM Sprint 210114)
+- Endpoints for single tenant un/assignment (#2, PLUM Sprint 210114)
+- Endpoints for single role un/assignment (#3, PLUM Sprint 210114)
+
+### Refactoring
+- Remove `authz:credentials:admin` resource (#5, PLUM Sprint 210114)
 
 ---
+
 
 ## v22.1
 
@@ -35,6 +57,7 @@
 
 ---
 
+
 ## v21.12.1
 
 ### Features
@@ -44,6 +67,7 @@
 - Remove default limit from tenant search (!210, PLUM Sprint 211203)
 
 ---
+
 
 ## v21.12
 
@@ -71,6 +95,7 @@
 
 ---
 
+
 ## v21.11
 
 ### Breaking changes
@@ -95,6 +120,7 @@
 - Separate web container for public endpoints (!190, PLUM Sprint 211011)
 
 ---
+
 
 ## v21.10
 
@@ -124,6 +150,7 @@
 - Last login and available factors now in userinfo response (!181, PLUM Sprint 210910)
 
 ---
+
 
 ## 21.08.00
 
@@ -158,6 +185,7 @@
 - Allow session touch extension to be either a ratio or absolute duration (!171, PLUM Sprint 210827)
 
 ---
+
 
 ## 21.07.00
 

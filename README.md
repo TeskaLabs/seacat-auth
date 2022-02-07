@@ -84,6 +84,8 @@ There are two separate Web UIs (user interfaces):
 
 The whole site installation can be dockerized and deployed using docker-compose, see [the documentation](./doc/docker/README.md).
 
+[Docker image is available from DockerHub](https://hub.docker.com/r/teskalabs/seacat-auth)
+
 #### Nginx
 
 Nginx is used to forward requests coming from outside of the environment to protected locations.

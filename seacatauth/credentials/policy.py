@@ -150,7 +150,7 @@ class CredentialsPolicy:
 			return self.RBACService.has_resource_access(
 				authz,
 				tenant="*",
-				requested_resources=["authz:credentials:admin"],
+				requested_resources=["authz:superuser"],
 			) == "OK"
 
 		policy = self.UpdatePolicy.get(attribute)
@@ -167,7 +167,7 @@ class CredentialsPolicy:
 			return self.RBACService.has_resource_access(
 				authz,
 				tenant="*",
-				requested_resources=["authz:credentials:admin"],
+				requested_resources=["authz:superuser"],
 			) == "OK"
 
 		# TODO: Check configurable resource-based policy
