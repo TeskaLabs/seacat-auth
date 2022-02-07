@@ -2,11 +2,15 @@
 
 ## Release candidate
 
+### Breaking changes
+- Resource creation endpoint now accepts POST requests (#1, PLUM Sprint 210114)
+
 ### Refactoring
 - Detailed error messages for cookie domain and session AES key config (#7, PLUM Sprint 210128)
 
 ### Features
 - Metrics counting failed and successful logins added (#6, PLUM Sprint 210128)
+- Resource description (#1, PLUM Sprint 210114)
 
 ---
 
