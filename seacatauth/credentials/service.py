@@ -88,21 +88,26 @@ class CredentialsService(asab.Service):
 
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
+		self.TaskService = app.get_service('asab.TaskService')
 		self.Providers = providers
-		self.CredentialsGauge = self.MetricsService.create_gauge("credentials", tags={"help": "Counts credentials.", "unit": "users", "default_label":"SeaCatAuth Metrics"}, init_values={"credentials": 0})
+		self.CredentialGauges = {}
+		for order, provider in self.Providers:
+			self.CredentialGauges[provider] = self.MetricsService.create_gauge(provider.ProviderID, tags={"help": "Counts credentials.", "unit": "users", "default_label": "SeaCatAuth_Metrics"}, init_values={"credentials": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
 
-		
-	async def _on_tick_metric(self, event_name):
-		tasks = []
+
+	def _on_tick_metric(self, event_name):
+		self.TaskService.schedule(self._metrics_task())
+
+
+	async def _metrics_task(self):
 		for order, provider in self.Providers:
-			tasks.append(provider.count())
-		counts = await asyncio.gather(*tasks)
-		total = 0
-		for count in counts:
-			if count != -1:
-				total += count
-		self.CredentialsGauge.set("credentials", total)
+			total = await provider.count()
+			if total == -1:
+				continue
+			else:
+				gauge = self.CredentialGauges.get(provider)
+				gauge.set("credentials", total)
 
 
 	def _prepare_ident_fields(self, ident_config):

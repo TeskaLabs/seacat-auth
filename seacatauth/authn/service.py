@@ -81,8 +81,8 @@ class AuthenticationService(asab.Service):
 		self.LoginSessions = {}
 
 		# Metrics - login counters
-		self.LoginFailedCounter = self.MetricsService.create_counter("login_failed", tags={"help": "Counts failed logins.", "unit": "logins", "default_label":"SeaCatAuth Metrics"}, init_values={"logins": 0})
-		self.LoginSuccessCounter = self.MetricsService.create_counter("login_success", tags={"help": "Counts successful logins.", "unit": "logins", "default_label":"SeaCatAuth Metrics"}, init_values={"logins": 0})
+		self.LoginFailedCounter = self.MetricsService.create_counter("login_failed", tags={"help": "Counts failed logins.", "unit": "logins", "default_label": "SeaCatAuth_Metrics"}, init_values={"logins": 0})
+		self.LoginSuccessCounter = self.MetricsService.create_counter("login_success", tags={"help": "Counts successful logins.", "unit": "logins", "default_label": "SeaCatAuth_Metrics"}, init_values={"logins": 0})
 
 		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)
 
