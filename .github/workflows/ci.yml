@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+    tags:
+      - 'v*'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
   workflow_dispatch:
 
@@ -60,19 +64,31 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name != 'pull_request' }}
 
     steps:
     - uses: actions/checkout@v2
+    
+    - name: Docker Metadata action
+      uses: docker/metadata-action@v3
+      id: meta
+      with:
+          images:  teskalabs/seacat-auth
+          tags: |
+            type=raw,value=latest
+            type=ref,event=tag
+            type=semver,pattern={{raw}}
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USER }} 
+        password: ${{ secrets.DOCKER_PASSWORD }}  
       
-    - name: docker login
-      env:
-        DOCKER_USER: ${{ secrets.DOCKER_USER }} 
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}  
-      run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      
-    - name: Build master
-      run: docker build . --file ./Dockerfile --tag teskalabs/seacat-auth:latest    
-     
-    - name: Push master
-      run: docker push teskalabs/seacat-auth:latest
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}

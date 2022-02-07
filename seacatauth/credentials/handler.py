@@ -274,7 +274,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(CREATE_CREDENTIALS)
-	@access_control("authz:credentials:admin")
+	@access_control("authz:tenant:admin")
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials.
@@ -306,7 +306,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CREDENTIALS)
-	@access_control("authz:credentials:admin")
+	@access_control("authz:superuser")
 	async def update_credentials(self, request, *, json_data):
 		"""
 		Update credentials.
@@ -562,7 +562,7 @@ class CredentialsHandler(object):
 			'expiration': {'type': 'number'},
 		}
 	})
-	@access_control("authz:credentials:admin")
+	@access_control("authz:tenant:admin")
 	async def init_password_change(self, request, *, json_data):
 		"""
 		Directly creates a password reset request. This should be called by admin only.

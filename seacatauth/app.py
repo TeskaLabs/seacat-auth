@@ -5,6 +5,7 @@ import asab
 import asab.web
 import asab.web.rest
 import asab.storage
+import asab.metrics
 
 from . import middleware
 
@@ -25,6 +26,7 @@ class SeaCatAuthApplication(asab.Application):
 		# Load modules
 		self.add_module(asab.web.Module)
 		self.add_module(asab.storage.Module)
+		self.add_module(asab.metrics.Module)
 
 		# Locate web service
 		self.WebService = self.get_service("asab.WebService")
@@ -37,6 +39,11 @@ class SeaCatAuthApplication(asab.Application):
 		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 		self.PublicWebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
+
+		# Api service
+		from asab.api import ApiService
+		self.ApiService = ApiService(self)
+		self.ApiService.initialize_web(self.WebContainer)
 
 		from .audit import AuditService
 		self.AuditService = AuditService(self)

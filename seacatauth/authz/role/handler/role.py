@@ -17,10 +17,9 @@ L = logging.getLogger(__name__)
 
 
 class RoleHandler(object):
-	def __init__(self, app, rbac_svc):
-		self.RBACService = rbac_svc
-		self.RoleService = app.get_service("seacatauth.RoleService")
+	def __init__(self, app, role_svc):
 		self.App = app
+		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/role", self.list_all)
@@ -30,10 +29,13 @@ class RoleHandler(object):
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_resources)
 
+	@access_control("authz:superuser")
 	async def list_all(self, request):
-		# TODO: global superuser only
 		page = int(request.query.get('p', 1)) - 1
-		limit = int(request.query.get('i', 10))
+		limit = request.query.get('i', None)
+		if limit is not None:
+			limit = int(limit)
+
 		result = await self.RoleService.list(None, page, limit)
 		return asab.web.rest.json_response(
 			request, result
@@ -42,7 +44,10 @@ class RoleHandler(object):
 	@access_control()
 	async def list(self, request, *, tenant):
 		page = int(request.query.get('p', 1)) - 1
-		limit = int(request.query.get('i', 10))
+		limit = request.query.get('i', None)
+		if limit is not None:
+			limit = int(limit)
+
 		result = await self.RoleService.list(tenant, page, limit)
 		return asab.web.rest.json_response(request, result)
 
