@@ -7,6 +7,7 @@
 
 ### Features
 - Metrics counting failed and successful logins added (#6, PLUM Sprint 210128)
+- Metrics counting active sessions and credentials per provider added (#9, PLUM Sprint 210128)
 
 ---
 
@@ -25,7 +26,10 @@
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
 - Endpoints for simple tenant un/assignment (#2, PLUM Sprint 210114)
-- Login success/fail counters (#6, PLUM Sprint 220114)
+- Endpoints for single role un/assignment (#3, PLUM Sprint 210114)
+
+### Refactoring
+- Remove `authz:credentials:admin` resource (#5, PLUM Sprint 210114)
 
 ---
 
