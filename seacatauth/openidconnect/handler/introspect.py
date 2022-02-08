@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-from ...generic import add_to_header
+from ...generic import nginx_introspection
 
 #
 
@@ -69,6 +69,13 @@ class TokenIntrospectionHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	async def authenticate_request(self, request):
+		authorization_bytes = await request.read()
+		return await self.OpenIdConnectService.get_session_from_bearer_token(
+			authorization_bytes.decode("ascii")
+		)
+
+
 	async def introspect_nginx(self, request):
 		"""
 		Non-standard version of RFC7662 chapter 2.Introspection Endpoint that is usable with Nginx auth_request module.
@@ -115,48 +122,17 @@ class TokenIntrospectionHandler(object):
 
 		}
 		"""
-		attributes_to_add = request.query.getall("add", [])
-		attributes_to_verify = request.query.getall("verify", [])
-		requested_resources = set(request.query.getall("resource", []))
 
-		headers = {}
-
-		# Authorize request
-		# Use custom authorization since the auth bytes must be read from the request body, not the header
-		authorization_bytes = await request.read()
-		session = await self.OpenIdConnectService.get_session_from_bearer_token(authorization_bytes.decode("ascii"))
-		if session is None:
-			headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# TODO: check if user is in a "limited" session (for setting up 2nd factor only)
-		#   if so: fail
-
-		requested_tenant = None
-		if "tenant" in attributes_to_verify:
-			requested_tenant = request.headers.get("X-Tenant")
-			requested_resources.add("tenant:access")
-
-		if len(requested_resources) > 0:
-			if self.RBACService.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
-				L.warning("Credentials not authorized for tenant or resource.", struct_data={
-					"cid": session.CredentialsId,
-					"tenant": requested_tenant,
-					"resources": " ".join(requested_resources),
-				})
-				headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
-				return aiohttp.web.HTTPForbidden(headers=headers)
-
-		# Extend session expiration
-		await self.SessionService.touch(session)
-
-		# add headers
-		headers = await add_to_header(
-			headers=headers,
-			what=attributes_to_add,
-			session=session,
-			credentials_service=self.CredentialsService,
-			requested_tenant=requested_tenant
+		response = await nginx_introspection(
+			request,
+			self.authenticate_request,
+			self.CredentialsService,
+			self.SessionService,
+			self.RBACService
 		)
 
-		return aiohttp.web.HTTPOk(headers=headers)
+		if response.status_code != 200:
+			response.headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
+			return response
+
+		return response

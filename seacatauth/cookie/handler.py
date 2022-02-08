@@ -4,7 +4,7 @@ import re
 import aiohttp
 import aiohttp.web
 
-from ..generic import add_to_header
+from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
 
 #
@@ -38,6 +38,10 @@ class CookieHandler(object):
 		web_app_public.router.add_get('/cookie/entry/{domain_id}', self.cookie_request)
 
 
+	async def authenticate_request(self, request):
+		return await self.CookieService.get_session_by_sci(request)
+
+
 	async def nginx(self, request):
 		"""
 		Validate the session cookie and exchange it for a Bearer token.
@@ -64,61 +68,28 @@ class CookieHandler(object):
 		```
 		"""
 
-		attributes_to_add = request.query.getall("add", [])
-		attributes_to_verify = request.query.getall("verify", [])
-		requested_resources = set(request.query.getall("resource", []))
-
-		# Authorize request
-		# Use custom authorization since it must use cookie, not the authn header
-		session = await self.CookieService.get_session_by_sci(request)
-		if session is None:
-			response = aiohttp.web.HTTPUnauthorized()
-			delete_cookie(self.App, response)
+		response = await nginx_introspection(
+			request,
+			self.authenticate_request,
+			self.CredentialsService,
+			self.SessionService,
+			self.RBACService
+		)
+		if response.status_code != 200:
 			return response
 
-		# Check tenant+resource access
-		requested_tenant = None
-
-		if "tenant" in attributes_to_verify:
-			requested_tenant = request.headers.get("X-Tenant")
-			requested_resources.add("tenant:access")
-
-		if len(requested_resources) > 0:
-			if self.RBACService.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
-				L.warning("Credentials not authorized for tenant or resource.", struct_data={
-					"cid": session.CredentialsId,
-					"tenant": requested_tenant,
-					"resources": " ".join(requested_resources),
-				})
-				return aiohttp.web.HTTPForbidden()
-
-		# Extend session expiration
-		await self.SessionService.touch(session)
-
-		# Add Bearer token to Authorization header
-		headers = {
-			aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2['access_token'])
-		}
-
 		# Delete SeaCat cookie from Cookie header unless "keepcookie" param is passed in query
+		# TODO: Move this to generic.nginx_introspection
+		#    (issue: dependency on self.CookiePattern)
 		keep_cookie = request.query.get("keepcookie", None)
 		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE)
 
 		if keep_cookie is None:
 			cookie_string = self.CookiePattern.sub("", cookie_string)
 
-		headers[aiohttp.hdrs.COOKIE] = cookie_string
+		response.headers[aiohttp.hdrs.COOKIE] = cookie_string
 
-		# Add requested X-Headers
-		headers = await add_to_header(
-			headers,
-			attributes_to_add,
-			session,
-			self.CredentialsService,
-			requested_tenant=requested_tenant
-		)
-
-		return aiohttp.web.HTTPOk(headers=headers)
+		return response
 
 
 	async def cookie_request(self, request):
