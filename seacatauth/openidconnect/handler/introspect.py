@@ -117,6 +117,7 @@ class TokenIntrospectionHandler(object):
 		"""
 		attributes_to_add = request.query.getall("add", [])
 		attributes_to_verify = request.query.getall("verify", [])
+		requested_resources = set(request.query.getall("resource", []))
 
 		headers = {}
 
@@ -132,15 +133,11 @@ class TokenIntrospectionHandler(object):
 		#   if so: fail
 
 		requested_tenant = None
-		requested_resources = set()
-		if len(attributes_to_verify) > 0:
-			if "resources" in attributes_to_verify:
-				requested_resources.update(request.headers.get("X-Resources").split(" "))
+		if "tenant" in attributes_to_verify:
+			requested_tenant = request.headers.get("X-Tenant")
+			requested_resources.add("tenant:access")
 
-			if "tenant" in attributes_to_verify:
-				requested_tenant = request.headers.get("X-Tenant")
-				requested_resources.add("tenant:access")
-
+		if len(requested_resources) > 0:
 			if self.RBACService.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
 				L.warning("Credentials not authorized for tenant or resource.", struct_data={
 					"cid": session.CredentialsId,
