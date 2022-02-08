@@ -3,7 +3,7 @@ import logging
 
 import aiohttp.web
 
-from ..generic import add_to_header
+from ..generic import nginx_introspection
 from ..session import SessionAdapter
 
 #
@@ -29,6 +29,67 @@ class M2MIntrospectHandler(object):
 		# Public aliases
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post('/m2m/nginx', self.nginx)
+
+
+	async def authenticate_request(self, request):
+		# Get credentials from request
+		authorization_bytes = await request.read()
+
+		# Get Basic auth credentials
+		if authorization_bytes.startswith(b'Basic '):
+			username_password = base64.urlsafe_b64decode(authorization_bytes[len(b'Basic '):]).decode("ascii")
+			username, password = username_password.split(":", 1)
+		else:
+			L.warning("Basic auth token not provided in request", struct_data={"headers": dict(request.headers)})
+			return None
+
+		# Locate credentials
+		credentials_id = await self.CredentialsService.locate(username, stop_at_first=True)
+		provider = self.CredentialsService.get_provider(credentials_id)
+
+		# Check if machine credentials
+		if provider.Type != "m2m":
+			L.warning("Authn method not available for given credentials", struct_data={
+				"headers": dict(request.headers)
+			})
+			return None
+
+		# Authenticate request
+		authenticated = await provider.authenticate(
+			credentials_id,
+			{"password": password}
+		)
+		if not authenticated:
+			L.warning("Basic authentication failed", struct_data={
+				"headers": dict(request.headers)
+			})
+			return None
+
+		# Find session object
+		try:
+			session = await self.SessionService.get_by(SessionAdapter.FNCredentialsId, credentials_id)
+		except KeyError:
+			session = None
+
+		if session is None:
+			# No session for given credentials exists; create a new one
+			access_ips = [request.remote]
+			ff = request.headers.get("X-Forwarded-For")
+			if ff is not None:
+				access_ips.extend(ff.split(", "))
+			session = await self.AuthnService.m2m_login(
+				credentials_id,
+				login_descriptor=None,
+				session_expiration=None,  # TODO: Short expiration
+				from_info=access_ips
+			)
+			if session is None:
+				L.warning("M2M login failed", struct_data={
+					"cid": credentials_id
+				})
+				return None
+
+		return session
 
 
 	async def nginx(self, request):
@@ -59,94 +120,17 @@ class M2MIntrospectHandler(object):
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth
-		query = request.query
-		verify = query.get("verify", "")
-		what = query.getall("add", [])
 
-		# Get credentials from request
-		authorization_bytes = await request.read()
-		requested_tenant = request.headers.get("X-Tenant")
-
-		headers = {
-			"WWW-Authenticate": 'Basic realm="{}"'.format(self.BasicRealm)
-		}
-
-		# Get Basic auth credentials
-		if authorization_bytes.startswith(b'Basic '):
-			username_password = base64.urlsafe_b64decode(authorization_bytes[len(b'Basic '):]).decode("ascii")
-			username, password = username_password.split(":", 1)
-		else:
-			L.warning("Basic auth token not provided in request", struct_data={"headers": dict(request.headers)})
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(username, stop_at_first=True)
-		provider = self.CredentialsService.get_provider(credentials_id)
-
-		# Check if machine credentials
-		if provider.Type != "m2m":
-			L.warning("Authn method not available for given credentials", struct_data={"headers": dict(request.headers)})
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# Authenticate request
-		authenticated = await provider.authenticate(
-			credentials_id,
-			{"password": password}
-		)
-		if not authenticated:
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# Find session object
-		try:
-			session = await self.SessionService.get_by(SessionAdapter.FNCredentialsId, credentials_id)
-		except KeyError:
-			session = None
-
-		if session is None:
-			# No session for given credentials exists; create a new one
-			access_ips = [request.remote]
-			ff = request.headers.get("X-Forwarded-For")
-			if ff is not None:
-				access_ips.extend(ff.split(", "))
-			session = await self.AuthnService.m2m_login(
-				credentials_id,
-				login_descriptor=None,
-				session_expiration=None,  # TODO: Short expiration
-				from_info=access_ips
-			)
-			if session is None:
-				return aiohttp.web.HTTPUnauthorized(headers=headers)
-		else:
-			# Session exists for given credentials
-			# Extend session expiration
-			await self.SessionService.touch(session)
-
-		# Check tenant access
-		if "tenant" in verify:
-			if self.RBACService.has_resource_access(
-				request.Session.Authz,
-				requested_tenant,
-				["authz:tenant:admin"]
-			) != "OK":
-				L.warning(
-					"Credentials not authorized for tenant.",
-					struct_data={
-						"cid": credentials_id,
-						"tenant": requested_tenant
-					}
-				)
-				return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# Replace Basic auth token with Bearer token in Authorization header
-		headers[aiohttp.hdrs.AUTHORIZATION] = "Bearer {}".format(session.OAuth2['access_token'])
-
-		# Add HTTP headers
-		headers = await add_to_header(
-			headers=headers,
-			what=what,
-			session=session,
-			credentials_service=self.CredentialsService,
-			requested_tenant=requested_tenant
+		response = await nginx_introspection(
+			request,
+			self.authenticate_request,
+			self.CredentialsService,
+			self.SessionService,
+			self.RBACService
 		)
 
-		return aiohttp.web.HTTPOk(headers=headers)
+		if response.status_code != 200:
+			response.headers["WWW-Authenticate"] = 'Basic realm="{}"'.format(self.BasicRealm)
+			return response
+
+		return response
