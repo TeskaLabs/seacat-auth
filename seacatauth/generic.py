@@ -1,18 +1,26 @@
 import random
+import logging
+import aiohttp.web
+
+#
+
+L = logging.getLogger(__name__)
+
+#
 
 
-async def add_to_header(headers, what, session, credentials_service, requested_tenant=None):
-	'''
+async def add_to_header(headers, attributes_to_add, session, credentials_service, requested_tenant=None):
+	"""
 	Prepare a common header with:
 	* X-Credentials: htpasswd:id:foobar
 	* X-Username: foobar
 	* X-Tenants: tenant1 tenant2 tenant3
 	* X-Roles: role1 role2 role3
 	* X-Resources: resource1 resource2 resource3
-	'''
+	"""
 
 	# obtain username to append add in headers
-	if "credentials" in what:
+	if "credentials" in attributes_to_add:
 		credentials = await credentials_service.get(session.CredentialsId)
 		headers["X-Credentials"] = credentials["_id"]
 		v = credentials.get("username")
@@ -20,13 +28,13 @@ async def add_to_header(headers, what, session, credentials_service, requested_t
 			headers["X-Username"] = v
 
 	# Obtain assigned tenants from session object
-	if "tenants" in what:
+	if "tenants" in attributes_to_add:
 		tenants = [tenant for tenant in session.Authz.keys() if tenant != "*"]
 		if len(tenants) > 0:
 			headers["X-Tenants"] = " ".join(tenants)
 
 	# Obtain assigned roles from session object
-	if "roles" in what:
+	if "roles" in attributes_to_add:
 		# Add only global roles if no tenant was requested
 		if requested_tenant is None:
 			roles = session.Authz["*"].keys()
@@ -35,7 +43,7 @@ async def add_to_header(headers, what, session, credentials_service, requested_t
 		headers["X-Roles"] = " ".join(roles)
 
 	# Obtain assigned resources from session object
-	if "resources" in what:
+	if "resources" in attributes_to_add:
 		if requested_tenant is None:
 			resources = session.Authz["*"].values()
 		else:
@@ -43,7 +51,7 @@ async def add_to_header(headers, what, session, credentials_service, requested_t
 		headers["X-Resources"] = " ".join(set(sum(resources, [])))
 
 	# Obtain login factors from session object
-	if "factors" in what:
+	if "factors" in attributes_to_add:
 		if session.LoginDescriptor is not None:
 			factors = [
 				factor["id"]
@@ -53,11 +61,60 @@ async def add_to_header(headers, what, session, credentials_service, requested_t
 			headers["X-Login-Factors"] = " ".join(factors)
 
 	# Obtain login descriptor IDs from session object
-	if "ldid" in what:
+	if "ldid" in attributes_to_add:
 		if session.LoginDescriptor is not None:
 			headers["X-Login-Descriptor"] = session.LoginDescriptor["id"]
 
 	return headers
+
+
+async def nginx_introspection(request, authenticate, credentials_service, session_service, rbac_service):
+	"""
+
+	"""
+	# Authenticate request, get session
+	session = await authenticate(request)
+	if session is None:
+		return aiohttp.web.HTTPUnauthorized()
+
+	# TODO: Check if the session is "restricted" (for setting up 2nd factor only)
+	#   if so: fail
+
+	attributes_to_add = request.query.getall("add", [])
+	attributes_to_verify = request.query.getall("verify", [])
+	requested_resources = set(request.query.getall("resource", []))
+
+	requested_tenant = None
+	if "tenant" in attributes_to_verify:
+		raise NotImplementedError("Tenant check not implemented in introspection")
+
+	if len(requested_resources) > 0:
+		if rbac_service.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
+			L.warning("Credentials not authorized for tenant or resource.", struct_data={
+				"cid": session.CredentialsId,
+				"tenant": requested_tenant,
+				"resources": " ".join(requested_resources),
+			})
+			return aiohttp.web.HTTPForbidden()
+
+	# Extend session expiration
+	await session_service.touch(session)
+
+	# Set the authorization header
+	headers = {
+		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2['access_token'])
+	}
+
+	# Add headers
+	headers = await add_to_header(
+		headers=headers,
+		attributes_to_add=attributes_to_add,
+		session=session,
+		credentials_service=credentials_service,
+		requested_tenant=requested_tenant
+	)
+
+	return aiohttp.web.HTTPOk(headers=headers)
 
 
 def generate_ergonomic_token(length: int):
