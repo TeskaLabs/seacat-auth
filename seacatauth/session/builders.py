@@ -11,6 +11,7 @@ L = logging.getLogger(__name__)
 
 
 def credentials_session_builder(identity_id):
+	# TODO: Include username, email, phone, maybe _c and _m
 	yield (SessionAdapter.FNCredentialsId, identity_id)
 
 
