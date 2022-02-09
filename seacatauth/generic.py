@@ -79,6 +79,8 @@ async def nginx_introspection(
 	rbac_service: asab.Service
 ):
 	"""
+	Helper function for different types of nginx introspection (Cookie, OAuth token, Basic auth).
+
 	Authenticates the introspection request and responds with 200 if successful or with 401 if not.
 	Optionally checks for resources. Missing resource access results in 403 response.
 	Optionally adds session attributes (username, tenants etc.) to X-headers.
