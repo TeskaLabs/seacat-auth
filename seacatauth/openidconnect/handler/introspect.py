@@ -1,15 +1,10 @@
-import base64
 import urllib
 import logging
-
-import aiohttp
-import aiohttp.web
 
 import asab
 import asab.web.rest
 
-from ...session.adapter import SessionAdapter
-from ...generic import add_to_header
+from ...generic import nginx_introspection
 
 #
 
@@ -27,7 +22,8 @@ class TokenIntrospectionHandler(object):
 	def __init__(self, app, oidc_svc, credentials_svc):
 		self.CredentialsService = credentials_svc
 		self.OpenIdConnectService = oidc_svc
-		self.SessionService = app.get_service('seacatauth.SessionService')
+		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/openidconnect/introspect', self.introspect)
@@ -70,8 +66,15 @@ class TokenIntrospectionHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	async def authenticate_request(self, request):
+		authorization_bytes = await request.read()
+		return await self.OpenIdConnectService.get_session_from_bearer_token(
+			authorization_bytes.decode("ascii")
+		)
+
+
 	async def introspect_nginx(self, request):
-		'''
+		"""
 		Non-standard version of RFC7662 chapter 2.Introspection Endpoint that is usable with Nginx auth_request module.
 
 		Based on:
@@ -104,7 +107,6 @@ class TokenIntrospectionHandler(object):
 					internal;
 					proxy_method          POST;
 					proxy_set_body        "$http_authorization";
-					proxy_set_header      X-Request-URI "$request_uri";
 					proxy_pass            http://localhost:8080/openidconnect/introspect/nginx;
 
 					proxy_cache           token_responses;     # Enable caching
@@ -115,63 +117,18 @@ class TokenIntrospectionHandler(object):
 				}
 
 		}
-		'''
-		query = request.query
-		verify = query.get("verify", "")
-		what = query.getall('add', [])
-		authorization_bytes = await request.read()
+		"""
 
-		requested_tenant = request.headers.get("X-Tenant")
-
-		authorized = False
-		session = {}
-		headers = {}
-
-		# get session
-		if authorization_bytes.startswith(b'Bearer '):
-			access_token = base64.urlsafe_b64decode(authorization_bytes[7:])
-			try:
-				session = await self.SessionService.get_by(SessionAdapter.FNOAuth2AccessToken, access_token)
-				credentials_id = session.CredentialsId
-				authorized = True
-			except KeyError:
-				L.warning("Session not found", struct_data={
-					"at": access_token, "headers": dict(request.headers)
-				})
-		else:
-			L.warning("Bearer token not provided in request", struct_data={"headers": dict(request.headers)})
-
-		if not authorized:
-			headers['WWW-Authenticate'] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# TODO: check if user is in a "limited" session (for setting up 2nd factor only)
-		#   if so: fail
-
-		# check the tenant
-		assigned_tenants = {tenant for tenant in session.Authz.keys() if tenant != "*"}
-		if "tenant" in verify:
-			if requested_tenant not in assigned_tenants:
-				L.warning(
-					"Credentials not authorized for tenant.",
-					struct_data={
-						'cid': credentials_id,
-						'tenant': requested_tenant
-					}
-				)
-				headers['WWW-Authenticate'] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
-				return aiohttp.web.HTTPUnauthorized(headers=headers)
-
-		# Extend session expiration
-		await self.SessionService.touch(session)
-
-		# add headers
-		headers = await add_to_header(
-			headers=headers,
-			what=what,
-			session=session,
-			credentials_service=self.CredentialsService,
-			requested_tenant=requested_tenant
+		response = await nginx_introspection(
+			request,
+			self.authenticate_request,
+			self.CredentialsService,
+			self.SessionService,
+			self.RBACService
 		)
 
-		return aiohttp.web.HTTPOk(headers=headers)
+		if response.status_code != 200:
+			response.headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
+			return response
+
+		return response

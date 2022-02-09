@@ -1,9 +1,7 @@
 import base64
 import logging
 
-import aiohttp.web
-
-from ..generic import add_to_header
+from ..generic import nginx_introspection
 from ..session import SessionAdapter
 
 #
@@ -31,45 +29,9 @@ class M2MIntrospectHandler(object):
 		web_app_public.router.add_post('/m2m/nginx', self.nginx)
 
 
-	async def nginx(self, request):
-		"""
-		Authenticate M2M call
-
-		If introspection is successful, Basic auth header is replaced with Bearer token.
-
-		Example Nginx setup:
-		```nginx
-		# Protected location
-		location /protected-api {
-			auth_request /_m2m_introspect;
-			auth_request_set      $authorization $upstream_http_authorization;
-			proxy_set_header      Authorization $authorization;
-			proxy_pass            http://protected-api:8080
-		}
-
-		# Introspection endpoint
-		location = /_m2m_introspect {
-			internal;
-			proxy_method          POST;
-			proxy_set_header      X-Request-URI "$request_uri";
-			proxy_set_body        "$http_authorization";
-			proxy_pass            http://seacat-auth-svc:8081/m2m/nginx;
-		}
-		```
-		"""
-		# TODO: API key auth
-		# TODO: Certificate auth
-		query = request.query
-		verify = query.get("verify", "")
-		what = query.getall("add", [])
-
+	async def authenticate_request(self, request):
 		# Get credentials from request
 		authorization_bytes = await request.read()
-		requested_tenant = request.headers.get("X-Tenant")
-
-		headers = {
-			"WWW-Authenticate": 'Basic realm="{}"'.format(self.BasicRealm)
-		}
 
 		# Get Basic auth credentials
 		if authorization_bytes.startswith(b'Basic '):
@@ -77,7 +39,7 @@ class M2MIntrospectHandler(object):
 			username, password = username_password.split(":", 1)
 		else:
 			L.warning("Basic auth token not provided in request", struct_data={"headers": dict(request.headers)})
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
+			return None
 
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(username, stop_at_first=True)
@@ -85,8 +47,10 @@ class M2MIntrospectHandler(object):
 
 		# Check if machine credentials
 		if provider.Type != "m2m":
-			L.warning("Authn method not available for given credentials", struct_data={"headers": dict(request.headers)})
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
+			L.warning("Authn method not available for given credentials", struct_data={
+				"headers": dict(request.headers)
+			})
+			return None
 
 		# Authenticate request
 		authenticated = await provider.authenticate(
@@ -94,7 +58,10 @@ class M2MIntrospectHandler(object):
 			{"password": password}
 		)
 		if not authenticated:
-			return aiohttp.web.HTTPUnauthorized(headers=headers)
+			L.warning("Basic authentication failed", struct_data={
+				"headers": dict(request.headers)
+			})
+			return None
 
 		# Find session object
 		try:
@@ -115,38 +82,52 @@ class M2MIntrospectHandler(object):
 				from_info=access_ips
 			)
 			if session is None:
-				return aiohttp.web.HTTPUnauthorized(headers=headers)
-		else:
-			# Session exists for given credentials
-			# Extend session expiration
-			await self.SessionService.touch(session)
+				L.warning("M2M login failed", struct_data={
+					"cid": credentials_id
+				})
+				return None
 
-		# Check tenant access
-		if "tenant" in verify:
-			if self.RBACService.has_resource_access(
-				request.Session.Authz,
-				requested_tenant,
-				["authz:tenant:admin"]
-			) != "OK":
-				L.warning(
-					"Credentials not authorized for tenant.",
-					struct_data={
-						"cid": credentials_id,
-						"tenant": requested_tenant
-					}
-				)
-				return aiohttp.web.HTTPUnauthorized(headers=headers)
+		return session
 
-		# Replace Basic auth token with Bearer token in Authorization header
-		headers[aiohttp.hdrs.AUTHORIZATION] = "Bearer {}".format(session.OAuth2['access_token'])
 
-		# Add HTTP headers
-		headers = await add_to_header(
-			headers=headers,
-			what=what,
-			session=session,
-			credentials_service=self.CredentialsService,
-			requested_tenant=requested_tenant
+	async def nginx(self, request):
+		"""
+		Authenticate M2M call
+
+		If introspection is successful, Basic auth header is replaced with Bearer token.
+
+		Example Nginx setup:
+		```nginx
+		# Protected location
+		location /protected-api {
+			auth_request /_m2m_introspect;
+			auth_request_set      $authorization $upstream_http_authorization;
+			proxy_set_header      Authorization $authorization;
+			proxy_pass            http://protected-api:8080
+		}
+
+		# Introspection endpoint
+		location = /_m2m_introspect {
+			internal;
+			proxy_method          POST;
+			proxy_set_body        "$http_authorization";
+			proxy_pass            http://seacat-auth-svc:8081/m2m/nginx;
+		}
+		```
+		"""
+		# TODO: API key auth
+		# TODO: Certificate auth
+
+		response = await nginx_introspection(
+			request,
+			self.authenticate_request,
+			self.CredentialsService,
+			self.SessionService,
+			self.RBACService
 		)
 
-		return aiohttp.web.HTTPOk(headers=headers)
+		if response.status_code != 200:
+			response.headers["WWW-Authenticate"] = 'Basic realm="{}"'.format(self.BasicRealm)
+			return response
+
+		return response
