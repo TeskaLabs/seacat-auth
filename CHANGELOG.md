@@ -4,6 +4,7 @@
 
 ### Breaking changes
 - Resource creation endpoint now accepts POST requests (#1, PLUM Sprint 210114)
+- Tenant check disabled in introspection (#8, PLUM Sprint 210114)
 
 ### Refactoring
 - Detailed error messages for cookie domain and session AES key config (#7, PLUM Sprint 210128)
