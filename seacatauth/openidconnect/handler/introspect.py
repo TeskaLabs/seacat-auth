@@ -1,9 +1,6 @@
 import urllib
 import logging
 
-import aiohttp
-import aiohttp.web
-
 import asab
 import asab.web.rest
 
@@ -110,7 +107,6 @@ class TokenIntrospectionHandler(object):
 					internal;
 					proxy_method          POST;
 					proxy_set_body        "$http_authorization";
-					proxy_set_header      X-Request-URI "$request_uri";
 					proxy_pass            http://localhost:8080/openidconnect/introspect/nginx;
 
 					proxy_cache           token_responses;     # Enable caching

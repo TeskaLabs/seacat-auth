@@ -45,6 +45,7 @@ class CookieHandler(object):
 	async def nginx(self, request):
 		"""
 		Validate the session cookie and exchange it for a Bearer token.
+		Optionally check for resource access.
 		Add requested user info to headers.
 
 		Example Nginx setup:
@@ -61,9 +62,8 @@ class CookieHandler(object):
 		location = /_cookie_introspect {
 			internal;
 			proxy_method          POST;
-			proxy_set_header      X-Request-URI "$request_uri";
 			proxy_set_body        "$http_authorization";
-			proxy_pass            http://seacat-auth-svc:8081/cookie/nginx?add=credentials;
+			proxy_pass            http://seacat-auth-svc:8081/cookie/nginx?add=credentials&resource=my-app:access;
 		}
 		```
 		"""
@@ -76,6 +76,7 @@ class CookieHandler(object):
 			self.RBACService
 		)
 		if response.status_code != 200:
+			delete_cookie(self.App, response)
 			return response
 
 		# Delete SeaCat cookie from Cookie header unless "keepcookie" param is passed in query

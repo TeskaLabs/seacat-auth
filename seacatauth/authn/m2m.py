@@ -1,8 +1,6 @@
 import base64
 import logging
 
-import aiohttp.web
-
 from ..generic import nginx_introspection
 from ..session import SessionAdapter
 
@@ -112,7 +110,6 @@ class M2MIntrospectHandler(object):
 		location = /_m2m_introspect {
 			internal;
 			proxy_method          POST;
-			proxy_set_header      X-Request-URI "$request_uri";
 			proxy_set_body        "$http_authorization";
 			proxy_pass            http://seacat-auth-svc:8081/m2m/nginx;
 		}
