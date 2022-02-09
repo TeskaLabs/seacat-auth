@@ -1,6 +1,9 @@
 import random
 import logging
+import typing
+
 import aiohttp.web
+import asab
 
 #
 
@@ -68,10 +71,19 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 	return headers
 
 
-async def nginx_introspection(request, authenticate, credentials_service, session_service, rbac_service):
+async def nginx_introspection(
+	request: aiohttp.web.Request,
+	authenticate: typing.Callable,
+	credentials_service: asab.Service,
+	session_service: asab.Service,
+	rbac_service: asab.Service
+):
+	"""
+	Authenticates the introspection request and responds with 200 if successful or with 401 if not.
+	Optionally checks for resources. Missing resource access results in 403 response.
+	Optionally adds session attributes (username, tenants etc.) to X-headers.
 	"""
 
-	"""
 	# Authenticate request, get session
 	session = await authenticate(request)
 	if session is None:
