@@ -5,9 +5,11 @@
 ### Breaking changes
 - Resource creation endpoint now accepts POST requests (#1, PLUM Sprint 210114)
 - Tenant check disabled in introspection (#8, PLUM Sprint 210114)
+- "Set tenant data" call now uses a single PUT call ([#11](pull/11), PLUM Sprint 210114)
 
 ### Refactoring
 - Detailed error messages for cookie domain and session AES key config (#7, PLUM Sprint 210128)
+- Set tenant data object with a PUT call ([#11](pull/11), PLUM Sprint 210114)
 
 ### Features
 - Metrics counting failed and successful logins added (#6, PLUM Sprint 210128)
