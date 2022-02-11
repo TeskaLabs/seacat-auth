@@ -23,8 +23,7 @@ class TenantHandler(object):
 		web_app.router.add_get('/tenant', self.list)
 		web_app.router.add_get('/tenants', self.search)
 		web_app.router.add_get('/tenant/{tenant}', self.get)
-		web_app.router.add_put('/tenant/{tenant}/{key}', self.set_value)
-		web_app.router.add_delete('/tenant/{tenant}/{key}', self.unset_value)
+		web_app.router.add_put('/tenant/{tenant}/data', self.set_data)
 
 		web_app.router.add_post('/tenant', self.create)
 		web_app.router.add_delete('/tenant/{tenant}', self.delete)
@@ -140,28 +139,22 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"properties": {
-			"value": {"type": "string"}
-		}
+		"patternProperties": {
+			"^.+$": {"anyOf": [
+				{"type": "string"},
+				{"type": "number"},
+				{"type": "boolean"},
+				{"type": "null"},
+			]}
+		},
+		"additionalProperties": False,
 	})
 	@access_control("authz:tenant:admin")
-	async def set_value(self, request, *, json_data, tenant):
-		key = request.match_info["key"]
-		value = json_data["value"]
-
+	async def set_data(self, request, *, json_data, tenant):
 		provider = self.TenantService.get_provider()
-		result = await provider.set_value(tenant, key, value)
-
+		result = await provider.set_data(tenant, json_data)
 		return asab.web.rest.json_response(request, {"result": result})
 
-	@access_control("authz:tenant:admin")
-	async def unset_value(self, request, *, tenant):
-		key = request.match_info["key"]
-
-		provider = self.TenantService.get_provider()
-		result = await provider.unset_value(tenant, key)
-
-		return asab.web.rest.json_response(request, {"result": result})
 
 	@access_control("authz:superuser")
 	async def delete(self, request, *, tenant):
