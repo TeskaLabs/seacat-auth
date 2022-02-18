@@ -72,7 +72,8 @@ class SessionService(asab.Service):
 
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
-		self.SessionGauge = self.MetricsService.create_gauge("active_sessions", tags={"help": "Counts active sessions.", "unit": "sessions", "default_label": "SeaCatAuth_Metrics"}, init_values={"sessions": 0})
+		self.TaskService = app.get_service('asab.TaskService')
+		self.SessionGauge = self.MetricsService.create_gauge("sca_active_sessions", tags={"help": "Counts active sessions.", "unit": "sessions"}, init_values={"active_sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
 
 
@@ -83,9 +84,12 @@ class SessionService(asab.Service):
 	async def _on_tick(self, event_name):
 		await self.delete_expired_sessions()
 
-	async def _on_tick_metric(self, event_name):
+	def _on_tick_metric(self, event_name):
+		self.TaskService.schedule(self._metrics_task())
+
+	async def _metrics_task(self):
 		session_count = await self.count_sessions()
-		self.SessionGauge.set("sessions", session_count)
+		self.SessionGauge.set("active_sessions", session_count)
 
 
 	async def delete_expired_sessions(self):
