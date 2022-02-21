@@ -82,9 +82,9 @@ class AuthenticationService(asab.Service):
 
 		# Metrics - login counters
 		self.LoginCounter = self.MetricsService.create_counter(
-			"sca_login",
-			tags={"help": "Counts successful and failed logins per minute.", "unit": "logins_per_minute"},
-			init_values={"successful_logins": 0, "failed_logins": 0}
+			"logins",
+			tags={"help": "Counts successful and failed logins per minute.", "unit": "events_per_minute"},
+			init_values={"successful": 0, "failed": 0}
 		)
 
 		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)

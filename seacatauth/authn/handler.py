@@ -186,7 +186,7 @@ class AuthenticationHandler(object):
 				"cid": login_session.CredentialsId
 			})
 
-			self.AuthenticationService.LoginCounter.add('failed_logins', 1)
+			self.AuthenticationService.LoginCounter.add('failed', 1)
 
 			return asab.web.rest.json_response(
 				request,
@@ -211,7 +211,7 @@ class AuthenticationHandler(object):
 
 		set_cookie(self.App, response, session)
 
-		self.AuthenticationService.LoginCounter.add('successful_logins', 1)
+		self.AuthenticationService.LoginCounter.add('successful', 1)
 
 		return response
 
