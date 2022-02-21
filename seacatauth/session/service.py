@@ -73,7 +73,7 @@ class SessionService(asab.Service):
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
 		self.TaskService = app.get_service('asab.TaskService')
-		self.SessionGauge = self.MetricsService.create_gauge("sca_active_sessions", tags={"help": "Counts active sessions.", "unit": "sessions"}, init_values={"active_sessions": 0})
+		self.SessionGauge = self.MetricsService.create_gauge("sessions", tags={"help": "Counts active sessions.", "unit": "sessions"}, init_values={"sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
 
 
@@ -89,7 +89,7 @@ class SessionService(asab.Service):
 
 	async def _metrics_task(self):
 		session_count = await self.count_sessions()
-		self.SessionGauge.set("active_sessions", session_count)
+		self.SessionGauge.set("sessions", session_count)
 
 
 	async def delete_expired_sessions(self):

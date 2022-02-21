@@ -1,0 +1,23 @@
+# TYPE web_requests_events_per_minute gauge
+# UNIT web_requests_events_per_minute events_per_minute
+# HELP web_requests_events_per_minute Counts requests to asab endpoints.
+web_requests_events_per_minute{method="GET",path="/role/default-tenant",status="200"} 2
+web_requests_events_per_minute{method="GET",path="/resource",status="200"} 1
+web_requests_events_per_minute{method="GET",path="/session",status="200"} 1
+web_requests_events_per_minute{method="GET",path="/tenants",status="200"} 1
+web_requests_events_per_minute{method="GET",path="/asab/v1/metrics",status="200"} 1
+# TYPE sessions_sessions gauge
+# UNIT sessions_sessions sessions
+# HELP sessions_sessions Counts active sessions.
+sessions_sessions{value_name="sessions"} 2
+# TYPE credentials_users gauge
+# UNIT credentials_users users
+# HELP credentials_users Counts credentials per provider.
+credentials_users{value_name="provider1"} 4
+credentials_users{value_name="provider2"} 0
+# TYPE logins_events_per_minute gauge
+# UNIT logins_events_per_minute events_per_minute
+# HELP logins_events_per_minute Counts successful and failed logins per minute.
+logins_events_per_minute{value_name="successful"} 1
+logins_events_per_minute{value_name="failed"} 1
+# EOF

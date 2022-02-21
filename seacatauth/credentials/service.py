@@ -91,7 +91,7 @@ class CredentialsService(asab.Service):
 		self.TaskService = app.get_service('asab.TaskService')
 		self.Providers = providers
 		self.CredentialsGauge = self.MetricsService.create_gauge(
-			"sca_credentials",
+			"credentials",
 			tags={"help": "Counts credentials per provider.", "unit": "users"},
 			init_values={provider.ProviderID: 0 for _, provider in self.Providers}
 		)
