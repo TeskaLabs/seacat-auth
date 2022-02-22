@@ -83,7 +83,7 @@ class AuthenticationService(asab.Service):
 		# Metrics - login counters
 		self.LoginCounter = self.MetricsService.create_counter(
 			"logins",
-			tags={"help": "Counts successful and failed logins per minute.", "unit": "events_per_minute"},
+			tags={"help": "Counts successful and failed logins per minute.", "unit": "epm"},
 			init_values={"successful": 0, "failed": 0}
 		)
 

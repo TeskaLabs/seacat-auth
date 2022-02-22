@@ -92,7 +92,7 @@ class CredentialsService(asab.Service):
 		self.Providers = providers
 		self.CredentialsGauge = self.MetricsService.create_gauge(
 			"credentials",
-			tags={"help": "Counts credentials per provider.", "unit": "users"},
+			tags={"help": "Counts credentials per provider."},
 			init_values={provider.ProviderID: 0 for _, provider in self.Providers}
 		)
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
