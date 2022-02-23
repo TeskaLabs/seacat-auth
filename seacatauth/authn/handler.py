@@ -256,25 +256,3 @@ class AuthenticationHandler(object):
 
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
-
-	async def webauthn(self, request):
-		# TODO: refactor and make this endpoint more general (initiate_factor or something)
-		# Decode JSON request
-		lsid = request.match_info["lsid"]
-		login_session = self.AuthenticationService.LoginSessions.get(lsid)
-		if login_session is None:
-			L.error("Login session not found.", struct_data={"lsid": lsid})
-			raise aiohttp.web.HTTPUnauthorized()
-
-		json_body = login_session.decrypt(await request.read())
-
-		# Initiate SMS login
-		success = False
-		factor_id = json_body.get("factor_id")
-		if factor_id is not None:
-			sms_factor = self.AuthenticationService.get_login_factor(factor_id)
-			if sms_factor is not None:
-				success = await sms_factor.send_otp(login_session)
-
-		body = {"result": "OK" if success is True else "FAILED"}
-		return aiohttp.web.Response(body=login_session.encrypt(body))
