@@ -1,9 +1,7 @@
-import datetime
-
-import pyotp
+import base64
 import logging
+import cryptography.hazmat.primitives.hashes
 
-import asab
 import asab.storage
 
 #
@@ -13,119 +11,136 @@ L = logging.getLogger(__name__)
 #
 
 
-class OTPService(asab.Service):
-	def __init__(self, app, service_name="seacatauth.OTPService"):
+class WebAuthnService(asab.Service):
+	ChallengeCollection = "wa"
+
+	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
+		self.StorageService = app.get_service("asab.StorageService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
-		self.Issuer = asab.Config.get("seacatauth:otp", "issuer")
-		self.SecretExpiration = datetime.timedelta(
-			seconds=asab.Config.getseconds("seacatauth:otp", "setup_expiration")
-		)
 
-		# Temporary storage for otp secrets that haven't been activated yet
-		self.Secrets = {}
+		self.RelyingPartyName = "Seacat Auth"  # TODO: Config
+		self.RelyingPartyId = "localhost:8080"  # TODO: Public webui domain
+		self.ChallengeTimeout = 60 * 1000  # TODO: Config
 
-		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
-	async def _on_tick(self, event_name):
-		self.delete_expired_secrets()
+	async def _create_registration_challenge(self, credentials_id) -> str:
+		raise NotImplementedError("WebAuthnService._create_registration_challenge")
 
-	async def get_totp(self, session, credentials_id):
+
+	async def _get_registration_challenge(self, credentials_id) -> str:
+		raise NotImplementedError("WebAuthnService._get_registration_challenge")
+
+
+	async def _create_authentication_challenge(self, credentials_id) -> str:
+		raise NotImplementedError("WebAuthnService._create_authentication_challenge")
+
+
+	async def _get_authentication_challenge(self, credentials_id) -> str:
+		raise NotImplementedError("WebAuthnService._get_authentication_challenge")
+
+
+	async def get_registration_options(self, credentials_id):
 		"""
-		Returns the status of TOTP setting.
-		If not activated, it also generates and returns a new TOTP secret.
+		Prologue to adding WebAuthn to a credentials
+		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is not None and len(secret) > 0:
-			return {
-				"result": "OK",
-				"active": True
-			}
 
-		# generate secret and store in memory
-		secret = pyotp.random_base32()
-		self.Secrets[session.SessionId] = {
-			"secret": secret,
-			"expires": datetime.datetime.utcnow() + self.SecretExpiration
+		credentials = await self.CredentialsService.get(credentials_id)
+
+		challenge = await self._create_registration_challenge(credentials_id)
+
+		options = {
+			"challenge": challenge,
+			"relying_party": {
+				"name": self.RelyingPartyName,
+				"id": self.RelyingPartyId,
+			},
+			"user": {
+				"id": credentials_id,
+				"name": credentials.get("email"),
+				"displayName": credentials.get("username"),
+				# "icon": icon,  # Optional: URL to user icon
+			},
+			"parameters": [
+				# Supported algorithms
+				{"type": "public-key", "alg": cryptography.hazmat.primitives.hashes.SHA256},
+				{"type": "public-key", "alg": cryptography.hazmat.primitives.hashes.SHA384},
+				{"type": "public-key", "alg": cryptography.hazmat.primitives.hashes.SHA512},
+			],
+			"timeout": self.ChallengeTimeout,
+			"credential_exclude_list": [],
+			"attestation": "direct",
 		}
 
-		username = credentials["username"]
-
-		url = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name=self.Issuer)
-
-		response = {
-			"result": "OK",
-			"active": False,
-			"url": url,
-			"username": username,
-			"issuer": self.Issuer,
-			"secret": secret
-		}
-		return response
+		return options
 
 
-	async def set_totp(self, session, credentials_id, otp):
+	async def register(self, credentials_id, client_data, attestation_object=None):
 		"""
-		Activates TOTP for the current user, provided that a TOTP secret is already set.
-		Requires entering the generated OTP to succeed.
+		Add WebAuthn public key to a credentials
+		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is not None and len(secret) > 0:
-			# TOTP is already enabled
-			return {"result": "FAILED"}
 
-		secret = self.Secrets.get(session.SessionId)["secret"]
-		if secret is None:
-			# TOTP secret has not been initialized
-			return {"result": "FAILED"}
+		credentials = await self.CredentialsService.get(credentials_id)
 
-		totp = pyotp.TOTP(secret)
-		if totp.verify(otp) is False:
-			# TOTP secret does not match
-			return {"result": "FAILED"}
+		assert client_data["type"] == "webauthn.create"
 
-		# Store secret in credentials object
-		provider = self.CredentialsService.get_provider(credentials_id)
-		await provider.update(credentials_id, {"__totp": secret})
+		assert client_data["challenge"] == await self._get_registration_challenge(credentials_id)
 
-		# Delete secret from memory
-		del self.Secrets[session.SessionId]
+		assert client_data["origin"] == self.RelyingPartyId
+
+		# TODO: Verify attestation_object
+		#   - verify the auth data hash
+		#   - check that the user is verified
+
+		public_key = attestation_object.get("public_key")
+
+		# TODO: Update user credentials with the public_key
 
 		return {"result": "OK"}
 
 
-	async def unset_totp(self, credentials_id):
+	async def get_authentication_options(self, credentials_id):
 		"""
-		Deactivates TOTP for the current user and erases the secret.
+		Prologue to adding WebAuthn to a credentials
+		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is None or len(secret) == 0:
-			# TOTP is not active
-			return {"result": "FAILED"}
 
-		provider = self.CredentialsService.get_provider(credentials_id)
-		await provider.update(credentials_id, {
-			"__totp": ""
-		})
+		challenge = await self._create_authentication_challenge(credentials_id)
+
+		options = {
+			"challenge": challenge,
+			"timeout": self.ChallengeTimeout,
+			"allow_credentials": [
+				{"type": "public-key", "id": base64.urlsafe_b64encode(credentials_id)}
+			],
+		}
+
+		return options
+
+
+	def _verify_authentication(self, credentials, authenticator_data, signature):
+		raise NotImplementedError("WebAuthnService._verify_authentication")
+
+
+	async def authenticate(self, credentials_id, client_data, authenticator_data, signature=None):
+		"""
+		Verify that the user has access to saved WebAuthn credentials
+		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
+		"""
+
+		credentials = await self.CredentialsService.get(credentials_id)
+
+		assert client_data["type"] == "webauthn.get"
+
+		assert client_data["challenge"] == await self._get_authentication_challenge(credentials_id)
+
+		assert client_data["origin"] == self.RelyingPartyId
+
+		# TODO: Verify authenticator_data hash
+
+		# TODO: Verify the authenticator_data + signature
+		self._verify_authentication(credentials, authenticator_data, signature)
 
 		return {"result": "OK"}
-
-	def delete_expired_secrets(self):
-		secrets_to_delete = []
-		now = datetime.datetime.utcnow()
-		for sid, data in self.Secrets.items():
-			if data["expires"] < now:
-				secrets_to_delete.append(sid)
-		for sid in secrets_to_delete:
-			del self.Secrets[sid]
-
-
-def authn_totp(dbcred, credentials):
-	try:
-		totp = pyotp.TOTP(dbcred['__totp'])
-		return totp.verify(credentials['totp'])
-	except KeyError:
-		return False
