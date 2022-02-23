@@ -107,6 +107,7 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
 
+		# TODO: Authentication will use the main login-prologue challenge instead
 		challenge = await self._create_authentication_challenge(credentials_id)
 
 		options = {
@@ -118,10 +119,6 @@ class WebAuthnService(asab.Service):
 		}
 
 		return options
-
-
-	def _verify_authentication(self, credentials, authenticator_data, signature):
-		raise NotImplementedError("WebAuthnService._verify_authentication")
 
 
 	async def authenticate(self, credentials_id, client_data, authenticator_data, signature=None):
@@ -144,3 +141,7 @@ class WebAuthnService(asab.Service):
 		self._verify_authentication(credentials, authenticator_data, signature)
 
 		return {"result": "OK"}
+
+
+	def _verify_authentication(self, credentials, authenticator_data, signature):
+		raise NotImplementedError("WebAuthnService._verify_authentication")
