@@ -46,37 +46,45 @@ class UserInfoHandler(object):
 			return self.error_response("invalid_session", "The access token is invalid/expired.")
 
 		# # if authorized get provider for this identity
+
+		userinfo = await self.build_userinfo(
+			session,
+			tenant=request.query.get("tenant", "*")
+		)
+		if userinfo["result"] == "CREDENTIALS-NOT-FOUND":
+			return self.error_response("invalid_credentials", "Invalid credentials.")
+
+		return asab.web.rest.json_response(request, userinfo)
+
+
+	async def build_userinfo(self, session, tenant=None):
+		userinfo = {
+			"result": "OK",
+			"iss": self.OpenIdConnectService.Issuer,
+			"sub": session.CredentialsId,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
+		}
+
 		try:
 			credentials = await self.CredentialsService.get(session.CredentialsId, include=frozenset(["__totp"]))
-
 		except KeyError:
-			L.warning("Invalid credetials", struct_data={'sid': session.CredentialsId})
-			return self.error_response("invalid_credentials", "Invalid credentials.")
-
-		except Exception:
-			L.exception("Invalid credetials")
-			return self.error_response("invalid_credentials", "Invalid credentials.")
-
-		# TODO: OpenID Connect Core 1.0, chapter 5.1. Standard Claims
-		userinfo = {
-			'sub': session.CredentialsId,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-		}
+			L.error("Credentials not found", struct_data={"cid": session.CredentialsId})
+			return {"result": "CREDENTIALS-NOT-FOUND"}
 
 		v = credentials.get("username")
 		if v is not None:
-			userinfo['preferred_username'] = v
+			userinfo["preferred_username"] = v
 
 		v = credentials.get("email")
 		if v is not None:
-			userinfo['email'] = v
+			userinfo["email"] = v
 
 		v = credentials.get("phone")
 		if v is not None:
-			userinfo['phone_number'] = v
+			userinfo["phone_number"] = v
 
 		v = credentials.get("_m")
 		if v is not None:
-			userinfo['updated_at'] = v
+			userinfo["updated_at"] = v
 
 		v = credentials.get("__totp")
 		# TODO: Use OTPService or TOTPFactor to get this information
@@ -98,13 +106,13 @@ class UserInfoHandler(object):
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
 
-		userinfo['exp'] = "{}Z".format(session.Expiration.isoformat())
+		userinfo["exp"] = "{}Z".format(session.Expiration.isoformat())
 
-		userinfo['available_factors'] = session.AvailableFactors
+		userinfo["available_factors"] = session.AvailableFactors
 
 		if session.LoginDescriptor is not None:
-			userinfo['ldid'] = session.LoginDescriptor["id"]
-			userinfo['factors'] = [
+			userinfo["ldid"] = session.LoginDescriptor["id"]
+			userinfo["factors"] = [
 				factor["id"]
 				for factor
 				in session.LoginDescriptor["factors"]
@@ -124,17 +132,14 @@ class UserInfoHandler(object):
 			tenants = [t for t in session.Authz.keys() if t != "*"]
 			if tenants is not None:
 				userinfo["tenants"] = tenants
-		else:
-			tenants = None
 
-		query_tenant = request.query.get("tenant", "*")
 		# If tenant is missing or unknown, consider only global roles and resources
-		if query_tenant not in session.Authz:
-			L.warning("Request for unknown tenant '{}', defaulting to '*'.".format(query_tenant))
-			query_tenant = "*"
+		if tenant not in session.Authz:
+			L.warning("Request for unknown tenant '{}', defaulting to '*'.".format(tenant))
+			tenant = "*"
 
 		# Include "roles" and "resources" sections, with items relevant to query_tenant
-		session_roles = session.Authz.get(query_tenant)
+		session_roles = session.Authz.get(tenant)
 		if session_roles is not None:
 			roles = []
 			resources = set()
@@ -147,7 +152,7 @@ class UserInfoHandler(object):
 				userinfo["resources"] = list(resources)
 		else:
 			L.error(
-				"Tenant '{}' not found in session.Authz.".format(query_tenant),
+				"Tenant '{}' not found in session.Authz.".format(tenant),
 				struct_data={
 					"sid": session.SessionId,
 					"cid": session.CredentialsId,
@@ -155,8 +160,7 @@ class UserInfoHandler(object):
 				}
 			)
 
-		return asab.web.rest.json_response(request, userinfo)
-
+		return userinfo
 
 	def error_response(self, error, error_description):
 		"""
