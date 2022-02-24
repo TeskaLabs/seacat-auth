@@ -7,6 +7,7 @@ import logging
 import asab
 
 import aiohttp.web
+import urllib.parse
 
 from ..session import SessionAdapter
 
@@ -36,6 +37,11 @@ class OpenIdConnectService(asab.Service):
 		super().__init__(app, service_name)
 		self.SessionService = app.get_service('seacatauth.SessionService')
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
+		self.Issuer = asab.Config.get("openidconnect", "issuer")
+		if self.Issuer is None:
+			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
+			L.warning("OAuth2 issuer not specified. Assuming '{}'".format(fragments.netloc))
+			self.Issuer = fragments.netloc
 
 		# A map of authorization codes to sessions
 		# TODO: Expiration of these
