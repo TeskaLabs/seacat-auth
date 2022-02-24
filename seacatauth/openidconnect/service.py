@@ -41,7 +41,7 @@ class OpenIdConnectService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
-		self.Issuer = asab.Config.get("openidconnect", "issuer")
+		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
 		if self.Issuer is None:
 			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
 			L.warning("OAuth2 issuer not specified. Assuming '{}'".format(fragments.netloc))
