@@ -16,13 +16,8 @@ L = logging.getLogger(__name__)
 class UserInfoHandler(object):
 
 
-	def __init__(self, app, oidc_svc, credentials_svc, session_svc, tenant_service, role_service):
+	def __init__(self, app, oidc_svc):
 		self.OpenIdConnectService = oidc_svc
-		self.CredentialsService = credentials_svc
-		self.SessionService = session_svc
-		self.TenantService = tenant_service
-		self.RoleService = role_service
-		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
 		# The Client sends the UserInfo Request using either HTTP GET or HTTP POST.
@@ -47,7 +42,7 @@ class UserInfoHandler(object):
 
 		# # if authorized get provider for this identity
 
-		userinfo = await self.build_userinfo(
+		userinfo = await self.OpenIdConnectService.build_userinfo(
 			session,
 			tenant=request.query.get("tenant", "*")
 		)
@@ -56,111 +51,6 @@ class UserInfoHandler(object):
 
 		return asab.web.rest.json_response(request, userinfo)
 
-
-	async def build_userinfo(self, session, tenant=None):
-		userinfo = {
-			"result": "OK",
-			"iss": self.OpenIdConnectService.Issuer,
-			"sub": session.CredentialsId,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-		}
-
-		try:
-			credentials = await self.CredentialsService.get(session.CredentialsId, include=frozenset(["__totp"]))
-		except KeyError:
-			L.error("Credentials not found", struct_data={"cid": session.CredentialsId})
-			return {"result": "CREDENTIALS-NOT-FOUND"}
-
-		v = credentials.get("username")
-		if v is not None:
-			userinfo["preferred_username"] = v
-
-		v = credentials.get("email")
-		if v is not None:
-			userinfo["email"] = v
-
-		v = credentials.get("phone")
-		if v is not None:
-			userinfo["phone_number"] = v
-
-		v = credentials.get("_m")
-		if v is not None:
-			userinfo["updated_at"] = v
-
-		v = credentials.get("__totp")
-		# TODO: Use OTPService or TOTPFactor to get this information
-		if v is not None and len(v) > 0:
-			userinfo["totp_set"] = True
-
-		# TODO: last password change
-
-		# Get last successful and failed login times
-		try:
-			last_login = await self.AuditService.get_last_logins(session.CredentialsId)
-		except Exception as e:
-			last_login = None
-			L.warning("Could not fetch last logins: {}".format(e))
-
-		if last_login is not None:
-			if "fat" in last_login:
-				userinfo["last_failed_login"] = last_login["fat"]
-			if "sat" in last_login:
-				userinfo["last_successful_login"] = last_login["sat"]
-
-		userinfo["exp"] = "{}Z".format(session.Expiration.isoformat())
-
-		userinfo["available_factors"] = session.AvailableFactors
-
-		if session.LoginDescriptor is not None:
-			userinfo["ldid"] = session.LoginDescriptor["id"]
-			userinfo["factors"] = [
-				factor["id"]
-				for factor
-				in session.LoginDescriptor["factors"]
-			]
-
-		# List enabled external login providers
-		accounts = credentials.get("external_login")
-		if accounts is not None:
-			userinfo["external_login_enabled"] = [
-				account_type
-				for account_type, account_id in accounts.items()
-				if len(account_id) > 0
-			]
-
-		if self.TenantService.is_enabled():
-			# Include "tenants" section, list ALL of user's tenants (excluding "*")
-			tenants = [t for t in session.Authz.keys() if t != "*"]
-			if tenants is not None:
-				userinfo["tenants"] = tenants
-
-		# If tenant is missing or unknown, consider only global roles and resources
-		if tenant not in session.Authz:
-			L.warning("Request for unknown tenant '{}', defaulting to '*'.".format(tenant))
-			tenant = "*"
-
-		# Include "roles" and "resources" sections, with items relevant to query_tenant
-		session_roles = session.Authz.get(tenant)
-		if session_roles is not None:
-			roles = []
-			resources = set()
-			for session_role, session_resources in session_roles.items():
-				roles.append(session_role)
-				resources.update(session_resources)
-			if len(roles) > 0:
-				userinfo["roles"] = roles
-			if len(resources) > 0:
-				userinfo["resources"] = list(resources)
-		else:
-			L.error(
-				"Tenant '{}' not found in session.Authz.".format(tenant),
-				struct_data={
-					"sid": session.SessionId,
-					"cid": session.CredentialsId,
-					"authz": session.Authz.keys()
-				}
-			)
-
-		return userinfo
 
 	def error_response(self, error, error_description):
 		"""
