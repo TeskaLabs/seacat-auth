@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.8
 
 ### Breaking changes
 - Resource creation endpoint now accepts POST requests (#1, PLUM Sprint 210114)
