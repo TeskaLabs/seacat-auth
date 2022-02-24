@@ -3,6 +3,11 @@ import urllib.parse
 import datetime
 
 import aiohttp.web
+import base64
+import json
+import hmac
+import hashlib
+import secrets
 
 import asab
 import asab.web.rest
@@ -98,12 +103,39 @@ class TokenHandler(object):
 
 		expires_in = int((session.Expiration - datetime.datetime.utcnow()).total_seconds())
 
+		# TODO: Handle datetimes systematically
+		class DateTimeEncoder(json.JSONEncoder):
+			def default(self, z):
+				if isinstance(z, datetime.datetime):
+					return "{}Z".format(z.isoformat())
+				else:
+					return super().default(z)
+
+		# TODO: Tenant-specific token (session)
+		tenant = None
+		header = {
+			"alg": "HS256",
+			"typ": "JWT"
+		}
+		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
+		secret_key = secrets.token_urlsafe(32)
+		total_params = "{}.{}".format(
+			base64.urlsafe_b64encode(json.dumps(header).encode("ascii")).decode("utf-8").replace("=", ""),
+			base64.urlsafe_b64encode(json.dumps(payload, cls=DateTimeEncoder).encode("ascii")).decode("utf-8").replace("=", "")
+		)
+		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
+		id_token = "{}.{}".format(
+			total_params,
+			base64.urlsafe_b64encode(signature.encode("ascii")).decode("utf-8").replace("=", "")
+		)
+
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
-			"access_token": session.OAuth2['access_token'],
-			"refresh_token": session.OAuth2['refresh_token'],
-			"token_id": session.OAuth2['token_id'],
+			"scope": session.OAuth2["scope"],
+			"access_token": session.OAuth2["access_token"],
+			"refresh_token": session.OAuth2["refresh_token"],
+			"id_token": id_token,
 			"expires_in": expires_in,
 		}
 
