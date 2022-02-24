@@ -92,7 +92,7 @@ class SessionAdapter:
 				self.OAuth2['refresh_token'] = base64.urlsafe_b64encode(v).decode('ascii')
 			v = o.pop('S')
 			if v is not None:
-				self.OAuth2['scope'] = base64.urlsafe_b64encode(v).decode('ascii')
+				self.OAuth2['scope'] = v
 
 		else:
 			self.OAuth2 = None
