@@ -117,6 +117,12 @@ class TokenHandler(object):
 			"alg": "HS256",
 			"typ": "JWT"
 		}
+		# TODO: ID token should always contain info about "what happened during authentication"
+		#   User info is optional and should be included (or not) based on scope
+		# TODO: Add "aud" (audience) and "azp" (authorized party) fields
+		#   "aud indicates who is allowed to consume it, and azp indicates who is allowed to present it"
+		#   (https://bitbucket.org/openid/connect/issues/973/)
+		# TODO: Add "iat" field (access token issue timestamp)
 		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
 		secret_key = secrets.token_urlsafe(32)
 		total_params = "{}.{}".format(
