@@ -11,13 +11,25 @@ import secrets
 
 import asab
 import asab.web.rest
-import asab.web.rest.json
+
+from seacatauth.session import SessionAdapter
 
 #
 
 L = logging.getLogger(__name__)
 
 #
+
+
+class _DateTimeEncoder(json.JSONEncoder):
+	def default(self, z):
+		if isinstance(z, datetime.datetime):
+			if z.tzinfo is not None and z.tzinfo.utcoffset(z) is not None:
+				return z.isoformat()
+			else:
+				return "{}Z".format(z.isoformat())
+		else:
+			return super().default(z)
 
 
 class TokenHandler(object):
@@ -108,6 +120,12 @@ class TokenHandler(object):
 		tenant = None
 		id_token = await self._build_id_token(session, tenant)
 
+		# Save the ID token in the session object
+		await self.SessionService.update_session(
+			session_id,
+			session_builders=[[(SessionAdapter.FNOAuth2IdToken, id_token.encode())]]
+		)
+
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
@@ -140,7 +158,7 @@ class TokenHandler(object):
 				json.dumps(header).encode("ascii")
 			).decode("utf-8").replace("=", ""),
 			payload=base64.urlsafe_b64encode(
-				json.dumps(payload, cls=asab.web.rest.json.JSONDumper).encode("ascii")
+				json.dumps(payload, cls=_DateTimeEncoder).encode("ascii")
 			).decode("utf-8").replace("=", "")
 		)
 		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
