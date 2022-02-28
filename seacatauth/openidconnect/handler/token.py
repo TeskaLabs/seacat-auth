@@ -11,6 +11,7 @@ import secrets
 
 import asab
 import asab.web.rest
+import asab.web.rest.json
 
 #
 
@@ -103,37 +104,9 @@ class TokenHandler(object):
 
 		expires_in = int((session.Expiration - datetime.datetime.utcnow()).total_seconds())
 
-		# TODO: Handle datetimes systematically
-		class DateTimeEncoder(json.JSONEncoder):
-			def default(self, z):
-				if isinstance(z, datetime.datetime):
-					return "{}Z".format(z.isoformat())
-				else:
-					return super().default(z)
-
 		# TODO: Tenant-specific token (session)
 		tenant = None
-		header = {
-			"alg": "HS256",
-			"typ": "JWT"
-		}
-		# TODO: ID token should always contain info about "what happened during authentication"
-		#   User info is optional and should be included (or not) based on scope
-		# TODO: Add "aud" (audience) and "azp" (authorized party) fields
-		#   "aud indicates who is allowed to consume it, and azp indicates who is allowed to present it"
-		#   (https://bitbucket.org/openid/connect/issues/973/)
-		# TODO: Add "iat" field (access token issue timestamp)
-		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
-		secret_key = secrets.token_urlsafe(32)
-		total_params = "{}.{}".format(
-			base64.urlsafe_b64encode(json.dumps(header).encode("ascii")).decode("utf-8").replace("=", ""),
-			base64.urlsafe_b64encode(json.dumps(payload, cls=DateTimeEncoder).encode("ascii")).decode("utf-8").replace("=", "")
-		)
-		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
-		id_token = "{}.{}".format(
-			total_params,
-			base64.urlsafe_b64encode(signature.encode("ascii")).decode("utf-8").replace("=", "")
-		)
+		id_token = await self._build_id_token(session, tenant)
 
 		# 3.1.3.3.  Successful Token Response
 		body = {
@@ -146,6 +119,39 @@ class TokenHandler(object):
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
+
+
+	async def _build_id_token(self, session, tenant=None):
+		"""
+		Wrap authentication data and userinfo in a JWT token
+		"""
+		header = {
+			"alg": "HS256",
+			"typ": "JWT"
+		}
+		# TODO: ID token should always contain info about "what happened during authentication"
+		#   User info is optional and should be included (or not) based on SCOPE
+		# TODO: Add "aud" (audience) and "azp" (authorized party) fields
+		#   "aud indicates who is allowed to consume the token, and azp indicates who is allowed to present it"
+		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
+		secret_key = secrets.token_urlsafe(32)
+		total_params = "{header}.{payload}".format(
+			header=base64.urlsafe_b64encode(
+				json.dumps(header).encode("ascii")
+			).decode("utf-8").replace("=", ""),
+			payload=base64.urlsafe_b64encode(
+				json.dumps(payload, cls=asab.web.rest.json.JSONDumper).encode("ascii")
+			).decode("utf-8").replace("=", "")
+		)
+		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
+		id_token = "{total_params}.{signature}".format(
+			total_params=total_params,
+			signature=base64.urlsafe_b64encode(
+				signature.encode("ascii")
+			).decode("utf-8").replace("=", "")
+		)
+
+		return id_token
 
 
 	async def token_request_batman(self, request, qs_data):

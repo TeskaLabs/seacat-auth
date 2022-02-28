@@ -1,3 +1,4 @@
+import datetime
 import re
 import time
 import base64
@@ -120,6 +121,8 @@ class OpenIdConnectService(asab.Service):
 			"result": "OK",
 			"iss": self.Issuer,
 			"sub": session.CredentialsId,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
+			"exp": session.Expiration,
+			"iat": datetime.datetime.utcnow(),
 		}
 
 		try:
@@ -163,8 +166,6 @@ class OpenIdConnectService(asab.Service):
 				userinfo["last_failed_login"] = last_login["fat"]
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
-
-		userinfo["exp"] = "{}Z".format(session.Expiration.isoformat())
 
 		userinfo["available_factors"] = session.AvailableFactors
 
