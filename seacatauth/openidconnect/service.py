@@ -220,4 +220,3 @@ class OpenIdConnectService(asab.Service):
 			)
 
 		return userinfo
-
