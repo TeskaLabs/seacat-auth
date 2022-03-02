@@ -12,4 +12,4 @@ def oauth2_session_builder(oauth2_data):
 	yield (SessionAdapter.FNOAuth2Scope, scope)
 	yield (SessionAdapter.FNOAuth2AccessToken, secrets.token_bytes(token_length))
 	yield (SessionAdapter.FNOAuth2RefreshToken, secrets.token_bytes(token_length))
-	yield (SessionAdapter.FNOAuth2IdToken, secrets.token_bytes(token_length))  # TODO: Not sure about this one ...
+	yield (SessionAdapter.FNOAuth2IdToken, secrets.token_bytes(token_length))
