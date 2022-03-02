@@ -1,5 +1,8 @@
 import aiohttp.web
 import asab
+import logging
+
+L = logging.getLogger(__name__)
 
 
 def app_middleware_factory(app):
@@ -30,6 +33,15 @@ def private_auth_middleware_factory(app):
 
 		Metrics endpoint can be accessed with simple authorization using configured bearer token requesting the Private WebContainer directly.
 
+		SeaCat configuration example:
+		[asab:metrics]
+		target=prometheus
+
+		[asab:metrics:prometheus]
+
+		[asab:metrics:auth]
+		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO
+
 		Prometheus configuration example:
 		scrape_configs:
 			- job_name: 'seacat'
@@ -40,27 +52,13 @@ def private_auth_middleware_factory(app):
 				authorization:
 				- credentials: xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO
 		"""
-		asab.Config.add_defaults(
-			{
-				"asab:metrics:auth": {
-					"bearer": "xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO"
-				}
-			}
-		)
+
 		try:
 			# Authorize by OAuth Bearer token
 			# (Authorization by cookie is not allowed for API access)
 			request.Session = await oidc_service.get_session_from_authorization_header(request)
 		except KeyError:
 			request.Session = None
-
-		# Metrics
-		if (
-			request.path.endswith("/asab/v1/metrics")
-			and request.method == "GET"
-		):
-			if request.headers.get("Authorization") == asab.Config.get("asab:metrics:auth", "bearer"):
-				return await handler(request)
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
 			return rbac_svc.has_resource_access(request.Session.Authz, tenant, [resource]) == "OK"
@@ -87,6 +85,15 @@ def private_auth_middleware_factory(app):
 				return await handler(request)
 			# Grant access the the bearer of `authorization_resource`
 			if authorization_resource in resources:
+				return await handler(request)
+
+		# TODO authorization should be demanded on the handler level based on @accesscontrol
+		# Metrics
+		if request.path == "/asab/v1/metrics":
+			if "asab:metrics:auth" in asab.Config.sections():
+				if request.headers.get("Authorization") == "Bearer " + asab.Config.get("asab:metrics:auth", "bearer"):
+					return await handler(request)
+			if "asab:metrics:auth" not in asab.Config.sections():
 				return await handler(request)
 
 		raise aiohttp.web.HTTPUnauthorized()

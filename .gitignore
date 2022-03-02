@@ -51,3 +51,4 @@ etc/
 
 docker/log/*.log
 docker/mongo-data
+.vscode
