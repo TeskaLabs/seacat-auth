@@ -1,8 +1,5 @@
 import aiohttp.web
 import asab
-import logging
-
-L = logging.getLogger(__name__)
 
 
 def app_middleware_factory(app):
