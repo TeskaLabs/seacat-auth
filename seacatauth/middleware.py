@@ -15,7 +15,7 @@ def app_middleware_factory(app):
 	return app_middleware
 
 
-def api_auth_middleware_factory(app):
+def private_auth_middleware_factory(app):
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	require_authentication = asab.Config.getboolean("seacat:api", "require_authentication")
 	authorization_resource = asab.Config.get("seacat:api", "authorization_resource")
@@ -27,13 +27,40 @@ def api_auth_middleware_factory(app):
 		"""
 		Authenticate and authorize all incoming requests.
 		Raise HTTP 401 if authentication or authorization fails.
+
+		Metrics endpoint can be accessed with simple authorization using configured bearer token requesting the Private WebContainer directly.
+
+		Prometheus configuration example:
+		scrape_configs:
+			- job_name: 'seacat'
+				metrics_path: '/asab/v1/metrics'
+				scrape_interval: 10s
+				static_configs:
+				- targets: ['seacat-auth-svc:8082']
+				authorization:
+				- credentials: xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO
 		"""
+		asab.Config.add_defaults(
+			{
+				"asab:metrics:auth": {
+					"bearer": "xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO"
+				}
+			}
+		)
 		try:
 			# Authorize by OAuth Bearer token
 			# (Authorization by cookie is not allowed for API access)
 			request.Session = await oidc_service.get_session_from_authorization_header(request)
 		except KeyError:
 			request.Session = None
+
+		# Metrics
+		if (
+			request.path.endswith("/asab/v1/metrics")
+			and request.method == "GET"
+		):
+			if request.headers.get("Authorization") == asab.Config.get("asab:metrics:auth", "bearer"):
+				return await handler(request)
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
 			return rbac_svc.has_resource_access(request.Session.Authz, tenant, [resource]) == "OK"
