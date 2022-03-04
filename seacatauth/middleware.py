@@ -15,7 +15,7 @@ def app_middleware_factory(app):
 	return app_middleware
 
 
-def api_auth_middleware_factory(app):
+def private_auth_middleware_factory(app):
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	require_authentication = asab.Config.getboolean("seacat:api", "require_authentication")
 	authorization_resource = asab.Config.get("seacat:api", "authorization_resource")
@@ -27,7 +27,14 @@ def api_auth_middleware_factory(app):
 		"""
 		Authenticate and authorize all incoming requests.
 		Raise HTTP 401 if authentication or authorization fails.
+
+		ASAB api endpoints can be accessed with simple authorization using configured bearer token requesting the Private WebContainer directly.
+
+		SeaCat configuration example:
+		[asab:api:auth]
+		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-Z0
 		"""
+
 		try:
 			# Authorize by OAuth Bearer token
 			# (Authorization by cookie is not allowed for API access)
@@ -60,6 +67,16 @@ def api_auth_middleware_factory(app):
 				return await handler(request)
 			# Grant access the the bearer of `authorization_resource`
 			if authorization_resource in resources:
+				return await handler(request)
+
+		# TODO authorization should be demanded on the handler level based on @accesscontrol
+		if request.path.startswith("/asab/v1"):
+			if "asab:api:auth" in asab.Config.sections():
+				if request.headers.get("Authorization") == "Bearer " + asab.Config.get("asab:api:auth", "bearer"):
+					return await handler(request)
+				else:
+					raise aiohttp.web.HTTPUnauthorized()
+			else:
 				return await handler(request)
 
 		raise aiohttp.web.HTTPUnauthorized()
