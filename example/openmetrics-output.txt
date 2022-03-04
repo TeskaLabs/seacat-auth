@@ -1,14 +1,56 @@
+# TYPE web_requests_duration_max gauge
+# HELP web_requests_duration_max Counts maximum request duration to asab endpoints per minute.
+web_requests_duration_max{method="GET",path="/asab/v1/metrics",status="401"} 0.0020290470274630934
+web_requests_duration_max{method="GET",path="/seacat/api/seacat_auth/asab/v1/metrics",status="401"} 0.0023587009927723557
+web_requests_duration_max{method="GET",path="/openidconnect/authorize",status="404"} 0.0010774509864859283
+web_requests_duration_max{method="GET",path="/openidconnect/userinfo",status="401"} 0.0010337300191167742
+web_requests_duration_max{method="GET",path="/public/features",status="200"} 0.0010925370152108371
+web_requests_duration_max{method="PUT",path="/public/login.prologue",status="200"} 0.03154857299523428
+web_requests_duration_max{method="PUT",path="/public/login/A2Bva5HC8NrsbGbQ9KJhk11RPjgp5Mtu3cYzzKWsx-E",status="200"} 0.2586233739857562
+web_requests_duration_max{method="GET",path="/openidconnect/authorize",status="302"} 0.006733179994625971
+web_requests_duration_max{method="POST",path="/openidconnect/token",status="200"} 0.006756785995094106
+web_requests_duration_max{method="GET",path="/openidconnect/userinfo",status="200"} 0.011570850008865818
+# TYPE web_requests_duration_min gauge
+# HELP web_requests_duration_min Counts minimal request duration to asab endpoints per minute.
+web_requests_duration_min{method="GET",path="/asab/v1/metrics",status="401"} 0.0013955819886177778
+web_requests_duration_min{method="GET",path="/seacat/api/seacat_auth/asab/v1/metrics",status="401"} 0.0021125790080986917
+web_requests_duration_min{method="GET",path="/openidconnect/authorize",status="404"} 0.0010774509864859283
+web_requests_duration_min{method="GET",path="/openidconnect/userinfo",status="401"} 0.0010337300191167742
+web_requests_duration_min{method="GET",path="/public/features",status="200"} 0.0010925370152108371
+web_requests_duration_min{method="PUT",path="/public/login.prologue",status="200"} 0.03154857299523428
+web_requests_duration_min{method="PUT",path="/public/login/A2Bva5HC8NrsbGbQ9KJhk11RPjgp5Mtu3cYzzKWsx-E",status="200"} 0.2586233739857562
+web_requests_duration_min{method="GET",path="/openidconnect/authorize",status="302"} 0.006733179994625971
+web_requests_duration_min{method="POST",path="/openidconnect/token",status="200"} 0.006756785995094106
+web_requests_duration_min{method="GET",path="/openidconnect/userinfo",status="200"} 0.009707329008961096
 # TYPE web_requests_epm gauge
 # UNIT web_requests_epm epm
-# HELP web_requests_epm Counts requests to asab endpoints.
-web_requests_epm{method="GET",path="/tenants",status="200"} 1
-web_requests_epm{method="GET",path="/resource",status="200"} 4
-web_requests_epm{method="GET",path="/role/default-tenant",status="200"} 3
-web_requests_epm{method="GET",path="/session",status="200"} 1
-web_requests_epm{method="GET",path="/asab/v1/metrics",status="200"} 1
+# HELP web_requests_epm Counts requests to asab endpoints as events per minute.
+web_requests_epm{method="GET",path="/asab/v1/metrics",status="401"} 6
+web_requests_epm{method="GET",path="/seacat/api/seacat_auth/asab/v1/metrics",status="401"} 2
+web_requests_epm{method="GET",path="/openidconnect/authorize",status="404"} 1
+web_requests_epm{method="GET",path="/openidconnect/userinfo",status="401"} 1
+web_requests_epm{method="GET",path="/public/features",status="200"} 1
+web_requests_epm{method="PUT",path="/public/login.prologue",status="200"} 1
+web_requests_epm{method="PUT",path="/public/login/A2Bva5HC8NrsbGbQ9KJhk11RPjgp5Mtu3cYzzKWsx-E",status="200"} 1
+web_requests_epm{method="GET",path="/openidconnect/authorize",status="302"} 1
+web_requests_epm{method="POST",path="/openidconnect/token",status="200"} 1
+web_requests_epm{method="GET",path="/openidconnect/userinfo",status="200"} 4
+# TYPE web_requests_duration_seconds gauge
+# UNIT web_requests_duration_seconds seconds
+# HELP web_requests_duration_seconds Counts total requests duration to asab endpoints per minute.
+web_requests_duration_seconds{method="GET",path="/asab/v1/metrics",status="401"} 0.010358046041801572
+web_requests_duration_seconds{method="GET",path="/seacat/api/seacat_auth/asab/v1/metrics",status="401"} 0.004471280000871047
+web_requests_duration_seconds{method="GET",path="/openidconnect/authorize",status="404"} 0.0010774509864859283
+web_requests_duration_seconds{method="GET",path="/openidconnect/userinfo",status="401"} 0.0010337300191167742
+web_requests_duration_seconds{method="GET",path="/public/features",status="200"} 0.0010925370152108371
+web_requests_duration_seconds{method="PUT",path="/public/login.prologue",status="200"} 0.03154857299523428
+web_requests_duration_seconds{method="PUT",path="/public/login/A2Bva5HC8NrsbGbQ9KJhk11RPjgp5Mtu3cYzzKWsx-E",status="200"} 0.2586233739857562
+web_requests_duration_seconds{method="GET",path="/openidconnect/authorize",status="302"} 0.006733179994625971
+web_requests_duration_seconds{method="POST",path="/openidconnect/token",status="200"} 0.006756785995094106
+web_requests_duration_seconds{method="GET",path="/openidconnect/userinfo",status="200"} 0.043813932046759874
 # TYPE sessions gauge
 # HELP sessions Counts active sessions.
-sessions{value_name="sessions"} 2
+sessions{value_name="sessions"} 1
 # TYPE credentials gauge
 # HELP credentials Counts credentials per provider.
 credentials{value_name="provider1"} 4
@@ -16,6 +58,6 @@ credentials{value_name="provider2"} 0
 # TYPE logins_epm gauge
 # UNIT logins_epm epm
 # HELP logins_epm Counts successful and failed logins per minute.
-logins_epm{value_name="successful"} 0
+logins_epm{value_name="successful"} 1
 logins_epm{value_name="failed"} 0
 # EOF
