@@ -28,7 +28,7 @@ class SessionHandler(object):
 
 
 	async def session_logout(self, request):
-		session = await self.OpenIdConnectService.get_session_from_authorization(request)
+		session = await self.OpenIdConnectService.get_session_from_authorization_header(request)
 		if session is None:
 			return aiohttp.web.HTTPNotFound()
 
