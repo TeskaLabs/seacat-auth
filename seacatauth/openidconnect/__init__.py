@@ -35,13 +35,7 @@ class OpenIdConnectModule(asab.Module):
 		)
 
 		self.TokenHandler = TokenHandler(app, self.OpenIdConnectService)
-		self.UserInfoHandler = UserInfoHandler(
-			app, self.OpenIdConnectService,
-			self.CredentialsService,
-			self.SessionService,
-			self.TenantService,
-			self.RoleService
-		)
+		self.UserInfoHandler = UserInfoHandler(app, self.OpenIdConnectService)
 		self.TokenIntrospectionHandler = TokenIntrospectionHandler(
 			app,
 			self.OpenIdConnectService,
