@@ -257,7 +257,9 @@ class AuthenticationService(asab.Service):
 		]
 
 		# TODO: if 'openid' in scope
-		oauth2_data = {}
+		oauth2_data = {
+			"scope": ["openid"]  # TODO: Get actual scope
+		}
 		builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
@@ -315,7 +317,9 @@ class AuthenticationService(asab.Service):
 		]
 
 		# TODO: if 'openid' in scope
-		oauth2_data = {}
+		oauth2_data = {
+			"scope": ["openid"]  # TODO: Get actual scope
+		}
 		builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(

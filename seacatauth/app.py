@@ -125,7 +125,7 @@ class SeaCatAuthApplication(asab.Application):
 		self.add_module(OpenIdConnectModule)
 
 		# Depends on: OpenIDService
-		self.WebContainer.WebApp.middlewares.append(middleware.api_auth_middleware_factory(self))
+		self.WebContainer.WebApp.middlewares.append(middleware.private_auth_middleware_factory(self))
 		self.PublicWebContainer.WebApp.middlewares.append(middleware.public_auth_middleware_factory(self))
 
 		from .otp import OTPHandler, OTPService
