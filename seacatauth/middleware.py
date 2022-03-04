@@ -28,26 +28,11 @@ def private_auth_middleware_factory(app):
 		Authenticate and authorize all incoming requests.
 		Raise HTTP 401 if authentication or authorization fails.
 
-		Metrics endpoint can be accessed with simple authorization using configured bearer token requesting the Private WebContainer directly.
+		ASAB api endpoints can be accessed with simple authorization using configured bearer token requesting the Private WebContainer directly.
 
 		SeaCat configuration example:
-		[asab:metrics]
-		target=prometheus
-
-		[asab:metrics:prometheus]
-
-		[asab:metrics:auth]
-		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO
-
-		Prometheus configuration example:
-		scrape_configs:
-			- job_name: 'seacat'
-				metrics_path: '/asab/v1/metrics'
-				scrape_interval: 10s
-				static_configs:
-				- targets: ['seacat-auth-svc:8082']
-				authorization:
-				- credentials: xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-ZO
+		[asab:api:auth]
+		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-Z0
 		"""
 
 		try:
@@ -85,12 +70,13 @@ def private_auth_middleware_factory(app):
 				return await handler(request)
 
 		# TODO authorization should be demanded on the handler level based on @accesscontrol
-		# Metrics
-		if request.path == "/asab/v1/metrics":
-			if "asab:metrics:auth" in asab.Config.sections():
-				if request.headers.get("Authorization") == "Bearer " + asab.Config.get("asab:metrics:auth", "bearer"):
+		if request.path.startswith("/asab/v1"):
+			if "asab:api:auth" in asab.Config.sections():
+				if request.headers.get("Authorization") == "Bearer " + asab.Config.get("asab:api:auth", "bearer"):
 					return await handler(request)
-			if "asab:metrics:auth" not in asab.Config.sections():
+				else:
+					raise aiohttp.web.HTTPUnauthorized()
+			else:
 				return await handler(request)
 
 		raise aiohttp.web.HTTPUnauthorized()
