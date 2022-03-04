@@ -3,15 +3,33 @@ import urllib.parse
 import datetime
 
 import aiohttp.web
+import base64
+import json
+import hmac
+import hashlib
+import secrets
 
 import asab
 import asab.web.rest
+
+from seacatauth.session import SessionAdapter
 
 #
 
 L = logging.getLogger(__name__)
 
 #
+
+
+class _DateTimeEncoder(json.JSONEncoder):
+	def default(self, z):
+		if isinstance(z, datetime.datetime):
+			if z.tzinfo is not None and z.tzinfo.utcoffset(z) is not None:
+				return z.isoformat()
+			else:
+				return "{}Z".format(z.isoformat())
+		else:
+			return super().default(z)
 
 
 class TokenHandler(object):
@@ -98,16 +116,60 @@ class TokenHandler(object):
 
 		expires_in = int((session.Expiration - datetime.datetime.utcnow()).total_seconds())
 
+		# TODO: Tenant-specific token (session)
+		tenant = None
+		id_token = await self._build_id_token(session, tenant)
+
+		# Save the ID token in the session object
+		await self.SessionService.update_session(
+			session_id,
+			session_builders=[[(SessionAdapter.FNOAuth2IdToken, id_token.encode())]]
+		)
+
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
-			"access_token": session.OAuth2['access_token'],
-			"refresh_token": session.OAuth2['refresh_token'],
-			"token_id": session.OAuth2['token_id'],
+			"scope": session.OAuth2["scope"],
+			"access_token": session.OAuth2["access_token"],
+			"refresh_token": session.OAuth2["refresh_token"],
+			"id_token": id_token,
 			"expires_in": expires_in,
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
+
+
+	async def _build_id_token(self, session, tenant=None):
+		"""
+		Wrap authentication data and userinfo in a JWT token
+		"""
+		header = {
+			"alg": "HS256",
+			"typ": "JWT"
+		}
+		# TODO: ID token should always contain info about "what happened during authentication"
+		#   User info is optional and should be included (or not) based on SCOPE
+		# TODO: Add "aud" (audience) and "azp" (authorized party) fields
+		#   "aud indicates who is allowed to consume the token, and azp indicates who is allowed to present it"
+		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
+		secret_key = secrets.token_urlsafe(32)
+		total_params = "{header}.{payload}".format(
+			header=base64.urlsafe_b64encode(
+				json.dumps(header).encode("ascii")
+			).decode("utf-8").replace("=", ""),
+			payload=base64.urlsafe_b64encode(
+				json.dumps(payload, cls=_DateTimeEncoder).encode("ascii")
+			).decode("utf-8").replace("=", "")
+		)
+		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
+		id_token = "{total_params}.{signature}".format(
+			total_params=total_params,
+			signature=base64.urlsafe_b64encode(
+				signature.encode("ascii")
+			).decode("utf-8").replace("=", "")
+		)
+
+		return id_token
 
 
 	async def token_request_batman(self, request, qs_data):
