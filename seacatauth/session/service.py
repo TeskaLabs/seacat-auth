@@ -70,6 +70,12 @@ class SessionService(asab.Service):
 		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
 		app.PubSub.subscribe("Application.run!", self._on_start)
 
+		# Metrics
+		self.MetricsService = app.get_service('asab.MetricsService')
+		self.TaskService = app.get_service('asab.TaskService')
+		self.SessionGauge = self.MetricsService.create_gauge("sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
+		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
+
 
 	async def _on_start(self, event_name):
 		await self.delete_expired_sessions()
@@ -77,6 +83,13 @@ class SessionService(asab.Service):
 
 	async def _on_tick(self, event_name):
 		await self.delete_expired_sessions()
+
+	def _on_tick_metric(self, event_name):
+		self.TaskService.schedule(self._metrics_task())
+
+	async def _metrics_task(self):
+		session_count = await self.count_sessions()
+		self.SessionGauge.set("sessions", session_count)
 
 
 	async def delete_expired_sessions(self):
@@ -202,6 +215,15 @@ class SessionService(asab.Service):
 			'data': sessions,
 			'count': await collection.count_documents(query_filter)
 		}
+
+
+	async def count_sessions(self, query_filter=None):
+		collection = self.StorageService.Database[self.SessionCollection]
+
+		if query_filter is None:
+			query_filter = {}
+
+		return await collection.count_documents(query_filter)
 
 
 	async def touch(self, session: SessionAdapter, expiration: int = None):

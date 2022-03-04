@@ -86,6 +86,31 @@ class CredentialsService(asab.Service):
 			self.register(provider)
 
 
+		# Metrics
+		self.MetricsService = app.get_service('asab.MetricsService')
+		self.TaskService = app.get_service('asab.TaskService')
+		self.Providers = providers
+		self.CredentialsGauge = self.MetricsService.create_gauge(
+			"credentials",
+			tags={"help": "Counts credentials per provider."},
+			init_values={provider.ProviderID: 0 for _, provider in self.Providers}
+		)
+		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
+
+
+	def _on_tick_metric(self, event_name):
+		self.TaskService.schedule(self._metrics_task())
+
+
+	async def _metrics_task(self):
+		for _, provider in self.Providers:
+			total = await provider.count()
+			if total == -1:
+				continue
+			else:
+				self.CredentialsGauge.set(provider.ProviderID, total)
+
+
 	def _prepare_ident_fields(self, ident_config):
 		ident_fields = {}
 		for field in re.split(r"\s+", ident_config):
