@@ -25,12 +25,13 @@ class SessionAdapter:
 	FNAvailableFactors = 'AF'
 
 	FNOAuth2AccessToken = 'oa.Ta'
-	FNOAuth2TokenId = 'oa.Ti'
+	FNOAuth2IdToken = 'oa.Ti'
 	FNOAuth2RefreshToken = 'oa.Tr'
+	FNOAuth2Scope = 'oa.S'
 
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
-		FNOAuth2TokenId,
+		FNOAuth2IdToken,
 		FNOAuth2AccessToken,
 		FNOAuth2RefreshToken,
 		FNCookieSessionId,
@@ -85,10 +86,13 @@ class SessionAdapter:
 				self.OAuth2['access_token'] = base64.urlsafe_b64encode(v).decode('ascii')
 			v = o.pop('Ti')
 			if v is not None:
-				self.OAuth2['token_id'] = base64.urlsafe_b64encode(v).decode('ascii')
+				self.OAuth2['id_token'] = base64.urlsafe_b64encode(v).decode('ascii')
 			v = o.pop('Tr')
 			if v is not None:
 				self.OAuth2['refresh_token'] = base64.urlsafe_b64encode(v).decode('ascii')
+			v = o.pop('S')
+			if v is not None:
+				self.OAuth2['scope'] = v
 
 		else:
 			self.OAuth2 = None
