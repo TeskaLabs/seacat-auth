@@ -4,6 +4,10 @@
 
 ### Features
 - ID token contains JWT-encrypted userinfo data (#13, PLUM Sprint 220225)
+- Metrics counting active sessions and credentials per provider added (#9, PLUM Sprint 220225)
+
+### Refactoring
+- Custom authentication for metrics endpoint (#14, PLUM Sprint 220225)
 
 ---
 
@@ -23,7 +27,6 @@
 - Metrics counting failed and successful logins added (#6, PLUM Sprint 210128)
 - Resource description (#1, PLUM Sprint 210114)
 - Resource check in introspection (#8, PLUM Sprint 210128)
-- Metrics counting active sessions and credentials per provider added (#9, PLUM Sprint 210128)
 
 
 ---
@@ -42,7 +45,7 @@
 
 ### Features
 - Cookie authentication in multi-domain setting (!219, PLUM Sprint 211217)
-- Endpoints for simple tenant un/assignment (#2, PLUM Sprint 210114)
+- Endpoints for single tenant un/assignment (#2, PLUM Sprint 210114)
 - Endpoints for single role un/assignment (#3, PLUM Sprint 210114)
 
 ### Refactoring
