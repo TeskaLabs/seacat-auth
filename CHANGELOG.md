@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.10
 
 ### Features
 - ID token contains JWT-encrypted userinfo data (#13, PLUM Sprint 220225)
