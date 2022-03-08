@@ -43,6 +43,9 @@ class M2MIntrospectHandler(object):
 
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(username, stop_at_first=True)
+		if credentials_id is None:
+			L.warning("Credentials not found", struct_data={"username": username})
+			return None
 		provider = self.CredentialsService.get_provider(credentials_id)
 
 		# Check if machine credentials
