@@ -81,6 +81,10 @@ class CredentialsPolicy:
 		self.CreationPolicy = {}
 		self.RegistrationPolicy = {}
 		self.UpdatePolicy = {}
+		self.M2MCreationPolicy = {
+			"username": {"creation": "required"},
+			"password": {"creation": "required"},  # At this moment password is the only login option
+		}
 
 		self._load_policy(policy_file)
 
@@ -138,6 +142,9 @@ class CredentialsPolicy:
 
 	def validate_creation_data(self, creation_data: dict):
 		return self._validate_credentials_data(creation_data, self.CreationPolicy)
+
+	def validate_m2m_creation_data(self, creation_data: dict):
+		return self._validate_credentials_data(creation_data, self.M2MCreationPolicy)
 
 	def validate_registration_data(self, registration_data: dict):
 		return self._validate_credentials_data(registration_data, self.RegistrationPolicy)
