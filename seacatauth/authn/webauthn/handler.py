@@ -1,3 +1,4 @@
+import json
 import logging
 
 import asab.web
@@ -38,8 +39,54 @@ class WebAuthnHandler(object):
 		response = await self.WebAuthnService.get_registration_options(credentials_id)
 		return asab.web.rest.json_response(request, response)
 
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": [
+			"id",
+			"rawId",
+			"response",
+			"type",
+		],
+		"properties": {
+			"id": {
+				# Credentials ID
+				"type": "string"
+			},
+			"rawId": {
+				# The ID again, but in binary form
+				"type": "string"
+			},
+			"response": {
+				# The actual WebAuthn login data
+				"type": "object",
+				"required": [
+					"clientDataJSON",
+					"attestationObject",
+				],
+				"properties": {
+					"clientDataJSON": {"type": "string"},
+					"attestationObject": {"type": "string"},
+				}
+			},
+			"type": {
+				"type": "string",
+				"enum": ["public-key"],
+			},
+		}
+	})
 	@access_control()
 	async def register(self, request, *, json_data, credentials_id):
-		# TODO: Get attestation object
-		response = await self.WebAuthnService.register(credentials_id, json_data)
+		# Verify that the request CID matches the session CID
+		assert credentials_id == json_data["id"]
+
+		# The value SHOULD be a member of PublicKeyCredentialType but client platforms MUST ignore unknown values,
+		# ignoring any PublicKeyCredentialParameters with an unknown type.
+		# Currently one credential type is defined, namely "public-key".
+		assert json_data["type"] == "public-key"
+
+		# Parse the client data
+		client_data = json.loads(json_data["response"]["clientDataJSON"])
+		attestation_object = client_data["attestationObject"]
+
+		response = await self.WebAuthnService.register(credentials_id, client_data, attestation_object)
 		return asab.web.rest.json_response(request, response)
