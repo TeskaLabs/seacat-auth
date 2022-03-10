@@ -1,6 +1,12 @@
 import base64
+import hashlib
 import logging
-import cryptography.hazmat.primitives.hashes
+import secrets
+import struct
+
+import cbor2
+
+import cose.algorithms
 
 import asab.storage
 
@@ -19,17 +25,26 @@ class WebAuthnService(asab.Service):
 		self.StorageService = app.get_service("asab.StorageService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
+		# TODO: Expire and delete challenges
+		self._RegistrationChallenges = {}
+		self._AuthenticationChallenges = {}
+
 		self.RelyingPartyName = "Seacat Auth"  # TODO: Config
 		self.RelyingPartyId = "localhost:8080"  # TODO: Public webui domain
 		self.ChallengeTimeout = 60 * 1000  # TODO: Config
+		self.SupportedAlgorithms = [
+			cose.algorithms.Es256
+		]
 
 
 	async def _create_registration_challenge(self, credentials_id) -> str:
-		raise NotImplementedError("WebAuthnService._create_registration_challenge")
-
+		challenge = secrets.token_urlsafe(32)
+		challenge_hash = hashlib.md5(challenge).hexdigest()
+		self._RegistrationChallenges[credentials_id] = challenge_hash
+		return challenge
 
 	async def _get_registration_challenge(self, credentials_id) -> str:
-		raise NotImplementedError("WebAuthnService._get_registration_challenge")
+		return self._RegistrationChallenges.get(credentials_id)
 
 
 	async def _create_authentication_challenge(self, credentials_id) -> str:
@@ -52,7 +67,7 @@ class WebAuthnService(asab.Service):
 
 		options = {
 			"challenge": challenge,
-			"relying_party": {
+			"rp": {
 				"name": self.RelyingPartyName,
 				"id": self.RelyingPartyId,
 			},
@@ -60,17 +75,16 @@ class WebAuthnService(asab.Service):
 				"id": credentials_id,
 				"name": credentials.get("email"),
 				"displayName": credentials.get("username"),
-				# "icon": icon,  # Optional: URL to user icon
 			},
-			"parameters": [
-				# Supported algorithms
-				{"type": "public-key", "alg": cryptography.hazmat.primitives.hashes.SHA256},
-				{"type": "public-key", "alg": cryptography.hazmat.primitives.hashes.SHA384},
-				{"type": "public-key", "alg": cryptography.hazmat.primitives.hashes.SHA512},
+			"pubKeyCredParams": [
+				{"alg": algorithm.identifier, "type": "public-key"}
+				for algorithm in self.SupportedAlgorithms
 			],
+			"authenticatorSelection": {
+				"authenticatorAttachment": "cross-platform",
+			},
 			"timeout": self.ChallengeTimeout,
-			"credential_exclude_list": [],
-			"attestation": "direct",
+			"attestation": "direct"
 		}
 
 		return options
@@ -82,21 +96,53 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
 
-		credentials = await self.CredentialsService.get(credentials_id)
+		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
+		if credentials.get("__webauthn") is not None:
+			# WebAuthn key already exists for these credentials
+			raise ValueError("WebAuthn key already exists for these credentials")
 
+		# Verify that the correct operation was performed
 		assert client_data["type"] == "webauthn.create"
 
+		# Verify that the challenge has not been changed
 		assert client_data["challenge"] == await self._get_registration_challenge(credentials_id)
 
+		# Verify the origin
 		assert client_data["origin"] == self.RelyingPartyId
 
-		# TODO: Verify attestation_object
-		#   - verify the auth data hash
-		#   - check that the user is verified
+		decoded_attestation_object = cbor2.decoder.loads(attestation_object)
+		decoded_attestation_object_example = {
+			"authData": ...,
+			"fmt": "fido-u2f",
+			"attStmt": {
+				"sig": ...,
+				"x5c": ...,
+			},
+		}
 
-		public_key = attestation_object.get("public_key")
+		assert decoded_attestation_object["fmt"] == "fido-u2f"
 
-		# TODO: Update user credentials with the public_key
+		# auth-data
+		# https://w3c.github.io/webauthn/#authenticator-data
+		auth_data = decoded_attestation_object["authData"]
+		(
+			rp_id_hash,
+			flags,
+			signature_counter,
+			aaguid,
+			cid_length
+		) = struct.unpack(">32s1sI16sH", auth_data[:55])
+		credential_id = auth_data[55:55 + cid_length]
+		public_key = auth_data[55 + cid_length:]
+
+		# TODO: Unpack flags
+		# TODO: Check that the user is verified
+
+		# TODO: Validate the auth data hash
+
+		# Update user credentials with the public_key
+		provider = self.CredentialsService.get_provider(credentials_id)
+		provider.update(credentials_id, {"__webauthn": public_key})
 
 		return {"result": "OK"}
 
