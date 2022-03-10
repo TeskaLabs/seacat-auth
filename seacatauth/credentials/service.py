@@ -336,7 +336,7 @@ class CredentialsService(asab.Service):
 			"credentials_id": credentials_id,
 		}
 
-
+	# TODO: Implement editing for M2M credentials
 	async def update_credentials(self, credentials_id: str, update_dict: dict, session: SessionAdapter = None):
 		"""
 		Validate the input data in the update dict according to active policies
