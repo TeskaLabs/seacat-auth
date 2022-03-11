@@ -5,6 +5,8 @@
 ### Breaking changes
 
 ### Fixes
+- Handle nonexisting provider in M2M introspection (#15, PLUM Sprint 220225)
+- Fixed creation policy for M2M provider (#15, PLUM Sprint 220225)
 
 ### Features
 
