@@ -302,7 +302,10 @@ class CredentialsService(asab.Service):
 			}
 
 		# Only update fields allowed by creation policy
-		validated_data = self.Policy.validate_creation_data(credentials_data)
+		if provider.Type == "m2m":
+			validated_data = self.Policy.validate_m2m_creation_data(credentials_data)
+		else:
+			validated_data = self.Policy.validate_creation_data(credentials_data)
 		if validated_data is None:
 			L.error("Update failed: Data does not comply with update policy", struct_data={
 				"provider_id": provider.ProviderID,
@@ -333,7 +336,7 @@ class CredentialsService(asab.Service):
 			"credentials_id": credentials_id,
 		}
 
-
+	# TODO: Implement editing for M2M credentials
 	async def update_credentials(self, credentials_id: str, update_dict: dict, session: SessionAdapter = None):
 		"""
 		Validate the input data in the update dict according to active policies
@@ -362,7 +365,10 @@ class CredentialsService(asab.Service):
 
 		# Get provider
 		provider = self.get_provider(credentials_id)
-		if not isinstance(provider, EditableCredentialsProviderABC):
+		if (
+			not isinstance(provider, EditableCredentialsProviderABC)
+			or provider.Type == "m2m"  # M2M credentials do not support editing for now
+		):
 			L.error("Update failed: Provider does not support editing", struct_data={
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
@@ -410,6 +416,17 @@ class CredentialsService(asab.Service):
 		info = provider.get_info()
 
 		if not provider.Editable:
+			return info
+
+		# Use different policy for M2M providers
+		# TODO: Systematic solution
+		if provider.Type == "m2m":
+			info["creation"] = [
+				{
+					"type": field,
+					"policy": policy,
+				} for field, policy in self.Policy.M2MCreationPolicy.items()
+			]
 			return info
 
 		# Add edit/creation policies if provider is editable
