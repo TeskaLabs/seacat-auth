@@ -6,13 +6,17 @@ import asab
 
 from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
-from ..audit import AuditCode
-from ..session import credentials_session_builder
-from ..session import authz_session_builder
-from ..session import cookie_session_builder
-from ..session import login_descriptor_session_builder
-from ..session import available_factors_session_builder
 from .login_session import LoginSession
+from ..audit import AuditCode
+
+from ..session import (
+	session_type_builder,
+	credentials_session_builder,
+	authz_session_builder,
+	cookie_session_builder,
+	login_descriptor_session_builder,
+	available_factors_session_builder,
+)
 from ..openidconnect.session import oauth2_session_builder
 
 #
@@ -245,6 +249,7 @@ class AuthenticationService(asab.Service):
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
 		builders = [
+			session_type_builder("root"),
 			credentials_session_builder(login_session.CredentialsId),
 			await authz_session_builder(
 				tenant_service=self.TenantService,

@@ -10,6 +10,11 @@ L = logging.getLogger(__name__)
 #
 
 
+def session_type_builder(session_type):
+	assert session_type in frozenset(["root", "openidconnect", "m2m"])
+	yield (SessionAdapter.FNSessionType, session_type)
+
+
 def credentials_session_builder(identity_id):
 	# TODO: Include username, email, phone, maybe _c and _m
 	yield (SessionAdapter.FNCredentialsId, identity_id)
