@@ -2,6 +2,7 @@ from .service import SessionService
 from .handler import SessionHandler
 from .adapter import SessionAdapter
 
+from .builders import session_type_builder
 from .builders import credentials_session_builder
 from .builders import authz_session_builder
 from .builders import cookie_session_builder
@@ -12,6 +13,7 @@ __all__ = [
 	"SessionService",
 	"SessionHandler",
 	"SessionAdapter",
+	"session_type_builder",
 	"credentials_session_builder",
 	"authz_session_builder",
 	"cookie_session_builder",

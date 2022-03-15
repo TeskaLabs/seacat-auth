@@ -10,9 +10,11 @@ L = logging.getLogger(__name__)
 
 
 class SessionAdapter:
-	'''
+	"""
 	Light object that represent a momentary view on the persisted session
-	'''
+	"""
+
+	FNSessionType = "t"
 
 	FNTenants = 'Tn'
 	FNRoles = 'Rl'
@@ -48,6 +50,7 @@ class SessionAdapter:
 		self.Expiration = session_dict.pop('exp')
 		self.MaxExpiration = session_dict.pop('max_exp', None)
 		self.TouchExtension = session_dict.pop('touch_ext', None)
+		self.Type = session_dict.pop(self.FNSessionType)
 
 		self.CredentialsId = session_dict.pop(self.FNCredentialsId, None)
 		self.Authz = session_dict.pop(self.FNAuthz, None)
@@ -105,12 +108,13 @@ class SessionAdapter:
 
 	def get_rest(self):
 		d = {
-			'_id': self.SessionId,
-			'_v': self.Version,
-			'_c': "{}Z".format(self.CreatedAt.isoformat()),
-			'_m': "{}Z".format(self.ModifiedAt.isoformat()),
-			'expiration': "{}Z".format(self.Expiration.isoformat()),
-			'login_descriptor': self.LoginDescriptor,
+			"_id": self.SessionId,
+			"_v": self.Version,
+			"_c": "{}Z".format(self.CreatedAt.isoformat()),
+			"_m": "{}Z".format(self.ModifiedAt.isoformat()),
+			"expiration": "{}Z".format(self.Expiration.isoformat()),
+			"login_descriptor": self.LoginDescriptor,
+			"type": self.Type,
 		}
 
 		# TODO: Backward compatibility. Remove once WebUI adapts to the "_fields" above.
@@ -139,9 +143,10 @@ class SessionAdapter:
 
 
 	def __repr__(self):
-		return("<{} sid:{} c:{} m:{} exp:{} cred:{} authz:{} ld:{} sci:{} {} {}>".format(
+		return("<{} sid:{} t:{} c:{} m:{} exp:{} cred:{} authz:{} ld:{} sci:{} {} {}>".format(
 			self.__class__.__name__,
 			self.SessionId,
+			self.Type,
 			self.CreatedAt,
 			self.ModifiedAt,
 			self.Expiration,
