@@ -79,36 +79,46 @@ class AuthorizeHandler(object):
 
 
 	async def authorize(self, request, request_parameters):
-		'''
+		"""
 		https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
 
 		3.1.2.1.  Authentication Request
-		'''
+		"""
 
-		# Get the scope
-		scope = request_parameters.get('scope')
-		if scope is None:
-			L.warning("Request doesn't specify any scope")
-			return aiohttp.web.HTTPBadRequest()
+		# Check the presence of required parameters
+		for parameter in frozenset(["scope", "client_id", "response_type", "redirect_uri"]):
+			if parameter not in request_parameters:
+				L.warning("Missing required parameter: {}".format(parameter), struct_data={"url": request.url})
+				return self.reply_with_authentication_error(
+					request,
+					request_parameters,
+					"invalid_request",
+					"Missing required parameter: {}".format(parameter),
+				)
 
-		scope = frozenset(x.strip() for x in scope.split(' '))
-
-		# Dispatch the request based on `response_type`
-		# ... aka select the proper flow
-		response_type = request_parameters.get('response_type')
-		if response_type is None:
-			L.warning("Request doesn't specify any response type")
-			return aiohttp.web.HTTPBadRequest()
+		# Select the proper flow based on response_type
+		response_type = request_parameters["response_type"]
 
 		# Authentication Code Flow
-		elif response_type == 'code':
-			return await self.authentication_code_flow(request, scope, request_parameters)
+		if response_type == "code":
+			return await self.authentication_code_flow(
+				request,
+				scope=frozenset(request_parameters["scope"].split(" ")),
+				client_id=request_parameters["client_id"],
+				redirect_uri=request_parameters["redirect_uri"],
+				request_parameters=request_parameters
+			)
 
-		L.warning("Unknown response type '{}' requested".format(response_type))
-		return aiohttp.web.HTTPBadRequest()
+		L.warning("Unknown response type: {}".format(response_type))
+		return self.reply_with_authentication_error(
+			request,
+			request_parameters,
+			"invalid_request",
+			"Invalid response_type: {}".format(response_type),
+		)
 
 
-	async def authentication_code_flow(self, request, scope, request_parameters):
+	async def authentication_code_flow(self, request, scope, client_id, redirect_uri, request_parameters):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 
@@ -116,21 +126,34 @@ class AuthorizeHandler(object):
 		"""
 
 		# OpenID Connect requests MUST contain the openid scope value.
-		if 'openid' not in scope:
-			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope), "headers": dict(request.headers)})
-			return self.reply_with_authentication_error(request, request_parameters, "invalid_scope")
+		if "openid" not in scope:
+			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope)})
+			return self.reply_with_authentication_error(
+				request,
+				request_parameters,
+				"invalid_scope",
+				"Scope must contain 'openid'",
+			)
 
-		redirect_uri = request_parameters.get('redirect_uri')
-		if redirect_uri is None:
-			L.warning("Redirect URI not specified", struct_data={
-				"headers": dict(request.headers),
-				"url": request.url
-			})
-			return self.reply_with_authentication_error(request, request_parameters, "invalid_request_uri")
+		# TODO: Properly validate client_id
+		if len(client_id) == 0:
+			L.warning("Invalid client ID", struct_data={"client_id": client_id})
+			return self.reply_with_authentication_error(request, request_parameters, "invalid_client")
+
+		# TODO: Validate the client's permission to requested scope and redirect_uri
 
 		session = request.Session
 
 		prompt = request_parameters.get("prompt")
+		if prompt not in frozenset([None, "none", "login", "select_account"]):
+			L.warning("Invalid parameter value for prompt", struct_data={"prompt": prompt})
+			return self.reply_with_authentication_error(
+				request,
+				request_parameters,
+				"invalid_request",
+				"Invalid parameter value for prompt: {}".format(prompt),
+			)
+
 		if prompt == "login":
 			L.log(asab.LOG_NOTICE, "Login prompt requested", struct_data={
 				"headers": dict(request.headers),
@@ -207,8 +230,8 @@ class AuthorizeHandler(object):
 			delete_cookie(self.App, response)
 			return response
 
-
-		# We are authenticated !
+		# We are authenticated!
+		# TODO: Create a new child session with the requested scope
 
 		if session.OAuth2 is None:
 			L.warning("The session has not been created with OpenId/OAuth2 in scope.")
@@ -365,15 +388,19 @@ class AuthorizeHandler(object):
 		return response
 
 
-	def reply_with_authentication_error(self, request, request_parameters, error: str):
+	def reply_with_authentication_error(self, request, request_parameters, error: str, error_description: str = None):
 		"""
 		3.1.2.6.  Authentication Error Response
 		"""
 		qs = request_parameters.copy()
-		qs['error'] = error
+		qs["error"] = error
+		if error_description is not None:
+			qs["error_description"] = error_description
+
 		qs_encoded = urllib.parse.urlencode(qs)
 
 		if self.PublicApiBaseUrl is not None:
+			# TODO: Use the /message page on frontend
 			redirect = "{public_base_url}{path}?{qs}".format(
 				public_base_url=self.PublicApiBaseUrl,
 				path=request.path,
