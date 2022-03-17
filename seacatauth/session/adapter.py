@@ -14,7 +14,11 @@ class SessionAdapter:
 	Light object that represent a momentary view on the persisted session
 	"""
 
-	FNSessionType = "t"
+	FNSessionType = "T"
+	FNParentSessionId = "PS"
+	FNExpiration = "exp"
+	FNMaxExpiration = "max_exp"
+	FNTouchExtension = "touch_ext"
 
 	FNTenants = 'Tn'
 	FNRoles = 'Rl'
@@ -30,6 +34,7 @@ class SessionAdapter:
 	FNOAuth2IdToken = 'oa.Ti'
 	FNOAuth2RefreshToken = 'oa.Tr'
 	FNOAuth2Scope = 'oa.S'
+	FNOAuth2ClientId = 'oa.Ci'
 
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
@@ -47,10 +52,12 @@ class SessionAdapter:
 		self.Version = session_dict.pop('_v')
 		self.CreatedAt = session_dict.pop('_c')
 		self.ModifiedAt = session_dict.pop('_m')
-		self.Expiration = session_dict.pop('exp')
-		self.MaxExpiration = session_dict.pop('max_exp', None)
-		self.TouchExtension = session_dict.pop('touch_ext', None)
+
 		self.Type = session_dict.pop(self.FNSessionType)
+		self.ParentSession = session_dict.pop(self.FNParentSessionId, None)
+		self.Expiration = session_dict.pop(self.FNExpiration)
+		self.MaxExpiration = session_dict.pop(self.FNMaxExpiration, None)
+		self.TouchExtension = session_dict.pop(self.FNTouchExtension, None)
 
 		self.CredentialsId = session_dict.pop(self.FNCredentialsId, None)
 		self.Authz = session_dict.pop(self.FNAuthz, None)
