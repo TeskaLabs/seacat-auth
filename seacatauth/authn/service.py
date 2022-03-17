@@ -313,15 +313,10 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id)
 		]
 
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": ["openid"]  # TODO: Get actual scope
-		}
-		builders.append(oauth2_session_builder(oauth2_data))
-
 		session = await self.SessionService.create_session(
-			builders,
+			session_type="m2m",
 			expiration=session_expiration,
+			session_builders=builders,
 		)
 		L.log(
 			asab.LOG_NOTICE,
