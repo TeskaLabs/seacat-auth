@@ -16,7 +16,6 @@ from ..session import (
 	authz_session_builder,
 	cookie_session_builder,
 	login_descriptor_session_builder,
-	available_factors_session_builder,
 )
 from .session import oauth2_session_builder
 
