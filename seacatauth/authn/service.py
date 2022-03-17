@@ -16,7 +16,6 @@ from ..session import (
 	login_descriptor_session_builder,
 	available_factors_session_builder,
 )
-from ..openidconnect.session import oauth2_session_builder
 
 #
 
