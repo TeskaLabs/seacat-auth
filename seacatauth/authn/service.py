@@ -10,7 +10,6 @@ from .login_session import LoginSession
 from ..audit import AuditCode
 
 from ..session import (
-	session_type_builder,
 	credentials_session_builder,
 	authz_session_builder,
 	cookie_session_builder,
@@ -249,7 +248,6 @@ class AuthenticationService(asab.Service):
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
 		builders = [
-			session_type_builder("root"),
 			credentials_session_builder(login_session.CredentialsId),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
@@ -261,15 +259,10 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, login_session.CredentialsId)
 		]
 
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": ["openid"]  # TODO: Get actual scope
-		}
-		builders.append(oauth2_session_builder(oauth2_data))
-
 		session = await self.SessionService.create_session(
-			builders,
-			expiration=login_session.Data.get('requested_session_expiration'),
+			session_type="root",
+			expiration=login_session.Data.get("requested_session_expiration"),
+			session_builders=builders,
 		)
 		L.log(
 			asab.LOG_NOTICE,
