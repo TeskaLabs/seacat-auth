@@ -54,7 +54,7 @@ class SessionAdapter:
 		self.ModifiedAt = session_dict.pop('_m')
 
 		self.Type = session_dict.pop(self.FNSessionType)
-		self.ParentSession = session_dict.pop(self.FNParentSessionId, None)
+		self.ParentSessionId = session_dict.pop(self.FNParentSessionId, None)
 		self.Expiration = session_dict.pop(self.FNExpiration)
 		self.MaxExpiration = session_dict.pop(self.FNMaxExpiration, None)
 		self.TouchExtension = session_dict.pop(self.FNTouchExtension, None)

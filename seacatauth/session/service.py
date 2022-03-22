@@ -289,7 +289,6 @@ class SessionService(asab.Service):
 
 	async def delete(self, session_id):
 		# Delete all child sessions first
-		# TODO: Prevent recursion
 		query_filter = {SessionAdapter.FNParentSessionId: session_id}
 		sessions = (await self.list(query_filter=query_filter))["data"]
 		for session in sessions:
