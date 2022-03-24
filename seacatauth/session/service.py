@@ -292,7 +292,7 @@ class SessionService(asab.Service):
 		query_filter = {SessionAdapter.FNParentSessionId: session_id}
 		sessions = (await self.list(query_filter=query_filter))["data"]
 		for session in sessions:
-			await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session.SessionId))
+			await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session["_id"]))
 
 		# Delete the session itself
 		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
