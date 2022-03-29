@@ -110,25 +110,21 @@ class TenantHandler(object):
 		if credentials_id is not None:
 			# Assign the tenant to the user who created it
 			try:
-				tenants = await self.TenantService.get_tenants(credentials_id)
-				tenants.append(tenant_id)
-				await self.TenantService.set_tenants(credentials_id, tenants)
+				await self.TenantService.assign_tenant(credentials_id, tenant_id)
 			except Exception as e:
 				L.error("Error assigning tenant", struct_data={
 					"cid": credentials_id,
 					"tenant": tenant_id,
-					"error": type(e).__name__
+					"reason": "{}: {}".format(type(e).__name__, e)
 				})
+			# Assign the tenant admin role to the user
 			try:
-				# Assign the role to the user
-				roles = await role_service.get_roles_by_credentials(credentials_id, tenant_id)
-				roles.append(role_id)
-				await role_service.set_roles(credentials_id, {tenant_id}, roles)
+				await role_service.assign_role(credentials_id, role_id)
 			except Exception as e:
 				L.error("Error assigning role", struct_data={
 					"cid": credentials_id,
 					"role": role_id,
-					"error": type(e).__name__
+					"reason": "{}: {}".format(type(e).__name__, e)
 				})
 
 		return asab.web.rest.json_response(
