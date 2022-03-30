@@ -44,7 +44,7 @@ class TenantService(asab.Service):
 			return {
 				"result": "INVALID-VALUE",
 				"uuid": euid,
-				"message": "Tenant ID must consist only of characters 'a-z0-9._-', " +
+				"message": "Tenant ID must consist only of characters 'a-z0-9._-', "
 					"start with a letter, and be between 3 and 32 characters long.",
 			}
 
