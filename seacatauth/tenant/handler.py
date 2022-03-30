@@ -1,6 +1,5 @@
 import logging
 
-import aiohttp.web
 import asab.web.rest
 
 from ..decorators import access_control
@@ -75,8 +74,7 @@ class TenantHandler(object):
 
 	async def get(self, request):
 		tenant_id = request.match_info.get("tenant")
-		provider = self.TenantService.get_provider()
-		tenant = await provider.get(tenant_id)
+		tenant = await self.TenantService.get_tenant(tenant_id)
 		return asab.web.rest.json_response(request, data=tenant)
 
 

@@ -33,6 +33,10 @@ class TenantService(asab.Service):
 		self.TenantsProvider = provider
 
 
+	async def get_tenant(self, tenant_id: str):
+		return await self.TenantsProvider.get(tenant_id)
+
+
 	async def create_tenant(self, tenant_id: str, creator_id: str = None):
 		if not self.TenantNameRegex.match(tenant_id):
 			euid = uuid.uuid4()
@@ -208,13 +212,13 @@ class TenantService(asab.Service):
 		return {"result": "OK"}
 
 
-	async def assign_tenant(self, credentials_id: str, tenant: list):
+	async def assign_tenant(self, credentials_id: str, tenant: str):
 		assert (self.is_enabled())
 		# TODO: Possibly validate tenant and credentials here
 		return await self.TenantsProvider.assign_tenant(credentials_id, tenant)
 
 
-	async def unassign_tenant(self, credentials_id: str, tenant: list):
+	async def unassign_tenant(self, credentials_id: str, tenant: str):
 		assert (self.is_enabled())
 		return await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 
