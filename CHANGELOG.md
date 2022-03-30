@@ -12,6 +12,7 @@
 ### Features
 
 ### Refactoring
+- Fallback values in ident translation response (#18, PLUM Sprint 220325)
 
 ---
 
