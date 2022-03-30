@@ -80,17 +80,25 @@ class TenantHandler(object):
 		tenant = await provider.get(tenant_id)
 		return asab.web.rest.json_response(request, data=tenant)
 
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"properties": {
+			"id": {"type": "string"},
+		},
+		"required": ["id"],
+		"additionalProperties": False,
+	})
 	@access_control("authz:superuser")
-	async def create(self, request, *, credentials_id):
-		tenant = await request.json()
-		provider = self.TenantService.get_provider()
-		tenant_id = tenant['id']
+	async def create(self, request, *, credentials_id, json_data):
+		tenant_id = json_data["id"]
 
 		# Create tenant
-		tenant_id = await provider.create(tenant_id, creator_id=credentials_id)
+		result = await self.TenantService.create_tenant(tenant_id, creator_id=credentials_id)
+		if result["result"] != "OK":
+			return asab.web.rest.json_response(request, data=result, status=400)
 
-		if tenant_id is None:
-			raise aiohttp.web.HTTPServerError()
+		tenant_id = result["id"]
 
 		# TODO: configurable name
 		role_id = "{}/admin".format(tenant_id)
@@ -129,7 +137,7 @@ class TenantHandler(object):
 
 		return asab.web.rest.json_response(
 			request,
-			data={"result": "OK", "tenant": tenant_id},
+			data=result,
 			status=200
 		)
 
