@@ -15,7 +15,6 @@ L = logging.getLogger(__name__)
 class TenantHandler(object):
 
 	def __init__(self, app, tenant_svc):
-		self.App = app
 		self.TenantService = tenant_svc
 		self.NameProposerService = app.get_service("seacatauth.NameProposerService")
 
@@ -95,50 +94,11 @@ class TenantHandler(object):
 
 		# Create tenant
 		result = await self.TenantService.create_tenant(tenant_id, creator_id=credentials_id)
-		if result["result"] != "OK":
-			return asab.web.rest.json_response(request, data=result, status=400)
-
-		tenant_id = result["id"]
-
-		# TODO: configurable name
-		role_id = "{}/admin".format(tenant_id)
-		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
-
-		try:
-			# Create admin role in tenant
-			await role_service.create(role_id)
-			# Assign "authz:tenant:admin" resource
-			await role_service.update_resources(role_id, resources_to_set=["authz:tenant:admin"])
-		except Exception as e:
-			L.error("Error creating role", struct_data={
-				"role": role_id,
-				"error": type(e).__name__
-			})
-
-		if credentials_id is not None:
-			# Assign the tenant to the user who created it
-			try:
-				await self.TenantService.assign_tenant(credentials_id, tenant_id)
-			except Exception as e:
-				L.error("Error assigning tenant", struct_data={
-					"cid": credentials_id,
-					"tenant": tenant_id,
-					"reason": "{}: {}".format(type(e).__name__, e)
-				})
-			# Assign the tenant admin role to the user
-			try:
-				await role_service.assign_role(credentials_id, role_id)
-			except Exception as e:
-				L.error("Error assigning role", struct_data={
-					"cid": credentials_id,
-					"role": role_id,
-					"reason": "{}: {}".format(type(e).__name__, e)
-				})
 
 		return asab.web.rest.json_response(
 			request,
 			data=result,
-			status=200
+			status=200 if result["result"] == "OK" else 400
 		)
 
 	@asab.web.rest.json_schema_handler({
