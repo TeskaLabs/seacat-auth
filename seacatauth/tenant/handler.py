@@ -155,9 +155,8 @@ class TenantHandler(object):
 	})
 	@access_control("authz:tenant:admin")
 	async def set_data(self, request, *, json_data, tenant):
-		provider = self.TenantService.get_provider()
-		result = await provider.set_data(tenant, json_data)
-		return asab.web.rest.json_response(request, {"result": result})
+		result = await self.TenantService.set_tenant_data(tenant, json_data)
+		return asab.web.rest.json_response(request, data=result)
 
 
 	@access_control("authz:superuser")
@@ -165,9 +164,8 @@ class TenantHandler(object):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
 		"""
-		provider = self.TenantService.get_provider()
-		await provider.delete(tenant)
-		return asab.web.rest.json_response(request, data={"result": "OK"})
+		result = await self.TenantService.delete_tenant(tenant)
+		return asab.web.rest.json_response(request, data=result)
 
 
 	@asab.web.rest.json_schema_handler({
