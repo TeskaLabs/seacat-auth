@@ -3,6 +3,7 @@
 ## Release candidate
 
 ### Breaking changes
+- Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
 
 ### Fixes
 - Handle nonexisting provider in M2M introspection (#15, PLUM Sprint 220225)
@@ -13,6 +14,7 @@
 
 ### Refactoring
 - Fallback values in ident translation response (#18, PLUM Sprint 220325)
+- Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
 
 ---
 
