@@ -61,6 +61,45 @@ class TenantService(asab.Service):
 				"uuid": euid,
 			}
 
+		# TODO: configurable name
+		role_id = "{}/admin".format(tenant_id)
+		role_service = self.App.get_service("seacatauth.RoleService")
+
+		if creator_id is not None:
+			# Assign the tenant to the user who created it
+			try:
+				await self.assign_tenant(creator_id, tenant_id)
+			except Exception as e:
+				L.error("Error assigning tenant", struct_data={
+					"cid": creator_id,
+					"tenant": tenant_id,
+					"reason": "{}: {}".format(type(e).__name__, e)
+				})
+
+		try:
+			# Create admin role in tenant
+			await role_service.create(role_id)
+			# Assign "authz:tenant:admin" resource
+			await role_service.update_resources(role_id, resources_to_set=["authz:tenant:admin"])
+			role_created = True
+		except Exception as e:
+			role_created = False
+			L.error("Error creating role:", struct_data={
+				"role": role_id,
+				"error": "{}: {}".format(type(e).__name__, str(e))
+			})
+
+		if creator_id is not None and role_created is True:
+			# Assign the tenant admin role to the user
+			try:
+				await role_service.assign_role(creator_id, role_id)
+			except Exception as e:
+				L.error("Error assigning role", struct_data={
+					"cid": creator_id,
+					"role": role_id,
+					"reason": "{}: {}".format(type(e).__name__, e)
+				})
+
 		return {
 			"result": "OK",
 			"id": tenant_id,
