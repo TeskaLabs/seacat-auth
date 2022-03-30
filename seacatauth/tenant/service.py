@@ -13,7 +13,7 @@ L = logging.getLogger(__name__)
 
 
 class TenantService(asab.Service):
-	TenantNameRegex = re.compile("^[a-zA-Z][a-zA-Z0-9._-]{2,31}$")
+	TenantNameRegex = re.compile("^[a-z][a-z0-9._-]{2,31}$")
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
@@ -44,7 +44,8 @@ class TenantService(asab.Service):
 			return {
 				"result": "INVALID-VALUE",
 				"uuid": euid,
-				"message": "Tenant ID must match the pattern '{}'".format(self.TenantNameRegex.pattern),
+				"message": "Tenant ID must consist only of characters 'a-z0-9._-', " +
+					"start with a letter, and be between 3 and 32 characters long.",
 			}
 
 		try:
