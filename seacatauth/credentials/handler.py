@@ -42,7 +42,8 @@ class CredentialsHandler(object):
 		web_app = app.WebContainer.WebApp
 
 		web_app.router.add_get('/credentials', self.list_credentials)
-		web_app.router.add_put('/usernames', self.get_usernames_from_ids)
+		web_app.router.add_put('/idents', self.get_idents_from_ids)
+		web_app.router.add_put('/usernames', self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
 		web_app.router.add_get('/locate', self.locate_credentials)
 		web_app.router.add_get('/credentials/{credentials_id}', self.get_credentials)
 
@@ -242,18 +243,24 @@ class CredentialsHandler(object):
 			"type": "string"
 		}
 	})
-	async def get_usernames_from_ids(self, request, *, json_data):
+	async def get_idents_from_ids(self, request, *, json_data):
 		result_data = {}
 		failed_ids = []
 		for cred_id in json_data:
 			try:
 				cred_obj = await self.CredentialsService.get(cred_id)
-				result_data[cred_id] = cred_obj.get("username")
 			except KeyError:
 				failed_ids.append(cred_id)
+				continue
+			ident = cred_obj.get("username") \
+				or cred_obj.get("email") \
+				or cred_obj.get("phone") \
+				or cred_id
+			result_data[cred_id] = ident
+
 		if len(failed_ids) > 0:
 			L.warning("Credentials not found", struct_data={
-				"cid": failed_ids
+				"cids": failed_ids
 			})
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
