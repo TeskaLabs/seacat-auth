@@ -1,4 +1,6 @@
 import logging
+import re
+import uuid
 
 import asab
 import asab.storage.exceptions
@@ -11,7 +13,7 @@ L = logging.getLogger(__name__)
 
 
 class TenantService(asab.Service):
-
+	TenantNameRegex = re.compile("^[a-zA-Z][a-zA-Z0-9._-]{2,31}$")
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
@@ -29,6 +31,40 @@ class TenantService(asab.Service):
 			raise RuntimeError("Unsupported tenant provider '{}'".format(provider_type))
 
 		self.TenantsProvider = provider
+
+
+	async def create_tenant(self, tenant_id: str, creator_id: str = None):
+		if not self.TenantNameRegex.match(tenant_id):
+			euid = uuid.uuid4()
+			L.error("Cannot create tenant: Invalid ID", struct_data={"t": tenant_id, "uuid": euid})
+			return {
+				"result": "INVALID-VALUE",
+				"uuid": euid,
+				"message": "Tenant ID must match the pattern '{}'".format(self.TenantNameRegex.pattern),
+			}
+
+		try:
+			tenant_id = await self.TenantsProvider.create(tenant_id, creator_id)
+		except asab.storage.exceptions.DuplicateError:
+			euid = uuid.uuid4()
+			L.error("Cannot create tenant: ID already exists", struct_data={"t": tenant_id, "uuid": euid})
+			return {
+				"result": "CONFLICT",
+				"uuid": euid,
+				"message": "A tenant with the name '{}' already exists.".format(tenant_id),
+			}
+
+		if tenant_id is None:
+			euid = uuid.uuid4()
+			return {
+				"result": "FAILED",
+				"uuid": euid,
+			}
+
+		return {
+			"result": "OK",
+			"id": tenant_id,
+		}
 
 
 	def get_provider(self):

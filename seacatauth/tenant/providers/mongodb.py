@@ -1,7 +1,6 @@
 import logging
 from typing import Optional
 
-import aiohttp.web
 import asab.storage.mongodb
 import asab.storage.exceptions
 
@@ -63,10 +62,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		u = self.MongoDBStorageService.upsertor(self.TenantsCollection, obj_id=tenant_id, version=0)
 		if creator_id is not None:
 			u.set("created_by", creator_id)
-		try:
-			tenant_id = await u.execute()
-		except asab.storage.exceptions.DuplicateError:
-			raise aiohttp.web.HTTPConflict()
+		tenant_id = await u.execute()
 		L.log(asab.LOG_NOTICE, "Tenant created", struct_data={"tenant": tenant_id})
 		return tenant_id
 
