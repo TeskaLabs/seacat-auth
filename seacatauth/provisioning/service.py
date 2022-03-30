@@ -38,17 +38,6 @@ class ProvisioningService(asab.Service):
 	async def initialize(self, app):
 		await super().initialize(app)
 
-		# Check if provisioning tenant exists
-		tenant_provider = self.TenantService.get_provider()
-		try:
-			provider_exists = (await tenant_provider.get(self.TenantID)) is not None
-		except KeyError:
-			provider_exists = False
-
-		# Create provisioning tenant
-		if not provider_exists:
-			await tenant_provider.create(self.TenantID)
-
 		# Create provisioning credentials provider
 		self.CredentialsService.create_dict_provider(self.CredentialsProviderID)
 		existing_providers = list(self.CredentialsService.CredentialProviders.keys())
@@ -66,8 +55,18 @@ class ProvisioningService(asab.Service):
 		})
 		L.log(asab.LOG_NOTICE, _provisioning_intro_message.format(username=self.SuperuserName, password=password))
 
+		# Check if provisioning tenant exists
+		try:
+			tenant_exists = (await self.TenantService.get_tenant(self.TenantID)) is not None
+		except KeyError:
+			tenant_exists = False
+
+		# Create provisioning tenant
+		if not tenant_exists:
+			await self.TenantService.create_tenant(self.TenantID)
+
 		# Assign tenant to provisioning user
-		await tenant_provider.set_tenants(self.SuperuserID, [self.TenantID])
+		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
 
 		# Create superuser role
 		assert (await self.RoleService.create(self.SuperroleID) == "OK")
