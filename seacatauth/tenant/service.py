@@ -67,6 +67,28 @@ class TenantService(asab.Service):
 		}
 
 
+	async def set_tenant_data(self, tenant_id: str, data: dict):
+		result = await self.TenantsProvider.set_data(tenant_id, data)
+		return {"result": result}
+
+
+	async def delete_tenant(self, tenant_id: str):
+		try:
+			result = await self.TenantsProvider.delete(tenant_id)
+		except KeyError:
+			euid = uuid.uuid4()
+			L.error("Cannot delete tenant: ID not found", struct_data={"t": tenant_id, "uuid": euid})
+			return {
+				"result": "NOT-FOUND",
+				"uuid": euid,
+			}
+
+		if result is True:
+			return {"result": "OK"}
+		else:
+			return {"result": "FAILED"}
+
+
 	def get_provider(self):
 		'''
 		This method can return None when a 'tenant' feature is not enabled.
