@@ -1,7 +1,6 @@
 import logging
 from typing import Optional
 
-import aiohttp.web
 import asab.storage.mongodb
 import asab.storage.exceptions
 
@@ -63,10 +62,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		u = self.MongoDBStorageService.upsertor(self.TenantsCollection, obj_id=tenant_id, version=0)
 		if creator_id is not None:
 			u.set("created_by", creator_id)
-		try:
-			tenant_id = await u.execute()
-		except asab.storage.exceptions.DuplicateError:
-			raise aiohttp.web.HTTPConflict()
+		tenant_id = await u.execute()
 		L.log(asab.LOG_NOTICE, "Tenant created", struct_data={"tenant": tenant_id})
 		return tenant_id
 
@@ -164,70 +160,6 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 		async for obj in cursor:
 			yield obj
-
-
-	async def set_tenants(self, credentials_id: str, tenant_ids: list):
-		# TODO: make this superuser-only
-		# TODO: implement assign_tenant() and unassign_tenant() methods+endpoints for single-tenant assignments
-		"""
-		Perform bulk tenant un/assignment to specified credentials_id.
-		Assign all tenants listed in `tenant_ids` and unassign all tenants not listed in `tenant_ids`.
-		"""
-		# Check if credentials are valid
-		try:
-			cred_svc = self.App.get_service("seacatauth.CredentialsService")
-			await cred_svc.detail(credentials_id)
-		except KeyError:
-			message = "Credentials not found"
-			L.error(message, struct_data={"cid": credentials_id})
-			raise KeyError(message)
-
-		tenant_ids = set(tenant_ids)
-
-		# Gather assigned tenants that are not in the list
-		assignments_to_delete = []
-		tenants_to_unassign = set()
-		coll = await self.MongoDBStorageService.collection(self.AssignCollection)
-		async for obj in coll.find({'c': credentials_id}):
-			if obj['t'] not in tenant_ids:
-				assignments_to_delete.append(obj['_id'])
-				tenants_to_unassign.add(obj['t'])
-			else:
-				# The tenant is already assigned
-				tenant_ids.remove(obj['t'])
-
-		if len(assignments_to_delete) > 0:
-			# Unassign roles
-			role_svc = self.App.get_service("seacatauth.RoleService")
-			await role_svc.set_roles(
-				credentials_id,
-				tenant_scope=tenants_to_unassign,
-				roles=[]
-			)
-			# Unassign tenants
-			await coll.delete_many({'_id': {'$in': assignments_to_delete}})
-
-		# Assign new tenants
-		for tenant_id in tenant_ids:
-
-			# TODO: Validate that tenant_id exist
-			# # check if tenant is valid
-			# tenant = await tenant_provider.detail_tenant(tenant_id)
-			# if tenant is None:
-			# 	return aiohttp.web.HTTPBadRequest(reason="Tenant not found.")
-
-			taid = "{} {}".format(credentials_id, tenant_id)
-
-			upsertor = self.MongoDBStorageService.upsertor(self.AssignCollection, obj_id=taid)
-			upsertor.set("c", credentials_id)
-			upsertor.set("t", tenant_id)
-
-			try:
-				await upsertor.execute()
-			except asab.storage.exceptions.DuplicateError:
-				pass
-
-		return True
 
 
 	async def assign_tenant(self, credentials_id: str, tenant: str):

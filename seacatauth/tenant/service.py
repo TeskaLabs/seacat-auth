@@ -1,4 +1,6 @@
 import logging
+import re
+import uuid
 
 import asab
 import asab.storage.exceptions
@@ -11,7 +13,7 @@ L = logging.getLogger(__name__)
 
 
 class TenantService(asab.Service):
-
+	TenantNameRegex = re.compile("^[a-z][a-z0-9._-]{2,31}$")
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
@@ -29,6 +31,107 @@ class TenantService(asab.Service):
 			raise RuntimeError("Unsupported tenant provider '{}'".format(provider_type))
 
 		self.TenantsProvider = provider
+
+
+	async def get_tenant(self, tenant_id: str):
+		return await self.TenantsProvider.get(tenant_id)
+
+
+	async def create_tenant(self, tenant_id: str, creator_id: str = None):
+		if not self.TenantNameRegex.match(tenant_id):
+			euid = uuid.uuid4()
+			L.error("Cannot create tenant: Invalid ID", struct_data={"t": tenant_id, "uuid": euid})
+			return {
+				"result": "INVALID-VALUE",
+				"uuid": euid,
+				"message":
+					"Tenant ID must consist only of characters 'a-z0-9._-', "
+					"start with a letter, and be between 3 and 32 characters long.",
+			}
+
+		try:
+			tenant_id = await self.TenantsProvider.create(tenant_id, creator_id)
+		except asab.storage.exceptions.DuplicateError:
+			euid = uuid.uuid4()
+			L.error("Cannot create tenant: ID already exists", struct_data={"t": tenant_id, "uuid": euid})
+			return {
+				"result": "CONFLICT",
+				"uuid": euid,
+				"message": "A tenant with the name '{}' already exists.".format(tenant_id),
+			}
+
+		if tenant_id is None:
+			euid = uuid.uuid4()
+			return {
+				"result": "FAILED",
+				"uuid": euid,
+			}
+
+		# TODO: configurable name
+		role_id = "{}/admin".format(tenant_id)
+		role_service = self.App.get_service("seacatauth.RoleService")
+
+		if creator_id is not None:
+			# Assign the tenant to the user who created it
+			try:
+				await self.assign_tenant(creator_id, tenant_id)
+			except Exception as e:
+				L.error("Error assigning tenant", struct_data={
+					"cid": creator_id,
+					"tenant": tenant_id,
+					"reason": "{}: {}".format(type(e).__name__, e)
+				})
+
+		try:
+			# Create admin role in tenant
+			await role_service.create(role_id)
+			# Assign "authz:tenant:admin" resource
+			await role_service.update_resources(role_id, resources_to_set=["authz:tenant:admin"])
+			role_created = True
+		except Exception as e:
+			role_created = False
+			L.error("Error creating role:", struct_data={
+				"role": role_id,
+				"error": "{}: {}".format(type(e).__name__, str(e))
+			})
+
+		if creator_id is not None and role_created is True:
+			# Assign the tenant admin role to the user
+			try:
+				await role_service.assign_role(creator_id, role_id)
+			except Exception as e:
+				L.error("Error assigning role", struct_data={
+					"cid": creator_id,
+					"role": role_id,
+					"reason": "{}: {}".format(type(e).__name__, e)
+				})
+
+		return {
+			"result": "OK",
+			"id": tenant_id,
+		}
+
+
+	async def set_tenant_data(self, tenant_id: str, data: dict):
+		result = await self.TenantsProvider.set_data(tenant_id, data)
+		return {"result": result}
+
+
+	async def delete_tenant(self, tenant_id: str):
+		try:
+			result = await self.TenantsProvider.delete(tenant_id)
+		except KeyError:
+			euid = uuid.uuid4()
+			L.error("Cannot delete tenant: ID not found", struct_data={"t": tenant_id, "uuid": euid})
+			return {
+				"result": "NOT-FOUND",
+				"uuid": euid,
+			}
+
+		if result is True:
+			return {"result": "OK"}
+		else:
+			return {"result": "FAILED"}
 
 
 	def get_provider(self):
@@ -111,13 +214,13 @@ class TenantService(asab.Service):
 		return {"result": "OK"}
 
 
-	async def assign_tenant(self, credentials_id: str, tenant: list):
+	async def assign_tenant(self, credentials_id: str, tenant: str):
 		assert (self.is_enabled())
 		# TODO: Possibly validate tenant and credentials here
 		return await self.TenantsProvider.assign_tenant(credentials_id, tenant)
 
 
-	async def unassign_tenant(self, credentials_id: str, tenant: list):
+	async def unassign_tenant(self, credentials_id: str, tenant: str):
 		assert (self.is_enabled())
 		return await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 
