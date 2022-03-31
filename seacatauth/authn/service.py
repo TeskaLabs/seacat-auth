@@ -8,6 +8,7 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
+from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
@@ -246,7 +247,7 @@ class AuthenticationService(asab.Service):
 
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
-		builders = [
+		session_builders = [
 			credentials_session_builder(login_session.CredentialsId),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
@@ -258,10 +259,18 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, login_session.CredentialsId)
 		]
 
+		# TODO: Temporary solution. Root session should have no OAuth2 data.
+		#   Remove once ID token support is fully implemented.
+		oauth2_data = {
+			"scope": ["openid", "cookie"],
+			"client_id": None,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
 		session = await self.SessionService.create_session(
 			session_type="root",
 			expiration=login_session.Data.get("requested_session_expiration"),
-			session_builders=builders,
+			session_builders=session_builders,
 		)
 		L.log(
 			asab.LOG_NOTICE,
@@ -301,7 +310,7 @@ class AuthenticationService(asab.Service):
 		Direct authentication for M2M access (without login sessions)
 		This is NOT OpenIDConnect/OAuth2 compliant!
 		"""
-		builders = [
+		session_builders = [
 			credentials_session_builder(credentials_id),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
@@ -313,10 +322,18 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id)
 		]
 
+		# TODO: Temporary solution. Root session should have no OAuth2 data.
+		#   Remove once ID token support is fully implemented.
+		oauth2_data = {
+			"scope": ["openid"],
+			"client_id": None,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
 		session = await self.SessionService.create_session(
 			session_type="m2m",
 			expiration=session_expiration,
-			session_builders=builders,
+			session_builders=session_builders,
 		)
 		L.log(
 			asab.LOG_NOTICE,
