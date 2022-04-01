@@ -40,12 +40,25 @@ RUN apk add --no-cache --virtual buildenv \
     python-ldap \
     jinja2 \
     pyotp \
-    git+https://github.com/TeskaLabs/asab.git \
-&& apk del buildenv
+    git+https://github.com/TeskaLabs/asab.git@fix/manifest-typo
+# && apk del buildenv
 
-COPY seacatauth /app/seacatauth
-COPY seacatauth.py /app
-COPY ./CHANGELOG.md /CHANGELOG.md
+RUN mkdir -p /app/seacat-auth
+
+COPY ./seacatauth /app/seacat-auth/seacatauth
+COPY ./seacatauth.py /app/seacat-auth/seacatauth.py
+COPY ./CHANGELOG.md /app/seacat-auth/CHANGELOG.md
+
+WORKDIR /app/seacat-auth
+COPY .git /app/seacat-auth/.git
+
+# Create a MANIFEST.json in the working directory
+RUN asab-manifest.py ./MANIFEST.json
+
+RUN rm -rf .git
+
+# Remove build environment
+RUN apk del buildenv
 
 RUN set -ex \
   && mkdir /conf \
@@ -53,6 +66,6 @@ RUN set -ex \
 
 COPY etc/message_templates /app/etc/message_templates
 
-WORKDIR /app
+WORKDIR /app/seacat-auth
 
 CMD ["python3", "seacatauth.py", "-c", "/conf/seacatauth.conf"]
