@@ -40,7 +40,7 @@ RUN apk add --no-cache --virtual buildenv \
     python-ldap \
     jinja2 \
     pyotp \
-    git+https://github.com/TeskaLabs/asab.git@fix/manifest-typo \
+    git+https://github.com/TeskaLabs/asab.git \
 && apk del buildenv
 
 RUN mkdir -p /app/seacat-auth
