@@ -40,8 +40,8 @@ RUN apk add --no-cache --virtual buildenv \
     python-ldap \
     jinja2 \
     pyotp \
-    git+https://github.com/TeskaLabs/asab.git@fix/manifest-typo
-# && apk del buildenv
+    git+https://github.com/TeskaLabs/asab.git@fix/manifest-typo \
+&& apk del buildenv
 
 RUN mkdir -p /app/seacat-auth
 
@@ -53,12 +53,12 @@ WORKDIR /app/seacat-auth
 COPY .git /app/seacat-auth/.git
 
 # Create a MANIFEST.json in the working directory
-RUN asab-manifest.py ./MANIFEST.json
+RUN apk add --no-cache --virtual buildenv \
+    git \
+&& asab-manifest.py ./MANIFEST.json \
+&& apk del buildenv
 
 RUN rm -rf .git
-
-# Remove build environment
-RUN apk del buildenv
 
 RUN set -ex \
   && mkdir /conf \
