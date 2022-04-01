@@ -11,6 +11,7 @@
 - Automatic tenant and role assignment after tenant creation (#17, PLUM Sprint 220325)
 
 ### Features
+- Generate MANIFEST.json (#20, PLUM Sprint 220325)
 
 ### Refactoring
 - Fallback values in ident translation response (#18, PLUM Sprint 220325)

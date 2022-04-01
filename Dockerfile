@@ -43,16 +43,28 @@ RUN apk add --no-cache --virtual buildenv \
     git+https://github.com/TeskaLabs/asab.git \
 && apk del buildenv
 
-COPY seacatauth /app/seacatauth
-COPY seacatauth.py /app
-COPY ./CHANGELOG.md /CHANGELOG.md
+RUN mkdir -p /app/seacat-auth
+
+WORKDIR /app/seacat-auth
+
+COPY ./seacatauth    /app/seacat-auth/seacatauth
+COPY ./seacatauth.py /app/seacat-auth/seacatauth.py
+COPY ./CHANGELOG.md  /app/seacat-auth/CHANGELOG.md
+COPY ./.git          /app/seacat-auth/.git
+
+# Create MANIFEST.json in the working directory
+# The script requires git to be installed
+RUN apk add --no-cache --virtual buildenv \
+    git \
+&& asab-manifest.py ./MANIFEST.json \
+&& apk del buildenv
+
+RUN rm -rf /app/seacat-auth/.git
 
 RUN set -ex \
   && mkdir /conf \
   && touch /conf/seacatauth.conf
 
-COPY etc/message_templates /app/etc/message_templates
-
-WORKDIR /app
+COPY ./etc/message_templates /app/etc/message_templates
 
 CMD ["python3", "seacatauth.py", "-c", "/conf/seacatauth.conf"]
