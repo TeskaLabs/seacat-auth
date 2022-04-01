@@ -216,8 +216,11 @@ class AuthorizeHandler(object):
 				request, scope, request_parameters, root_session, factors_to_setup
 			)
 
-		# TODO: Create a new child session with the requested scope
 		requested_expiration = request_parameters.get("expiration")
+		if requested_expiration is not None:
+			requested_expiration = int(requested_expiration)
+
+		# TODO: Create a new child session with the requested scope
 		session = await self.OpenIdConnectService.create_oidc_session(root_session, client_id, scope, requested_expiration)
 
 		return await self.reply_with_successful_response(request, session, scope, redirect_uri, request_parameters)
