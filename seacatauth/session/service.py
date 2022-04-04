@@ -117,7 +117,7 @@ class SessionService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.SessionCollection)
 
 		# Set up required fields
-		if session_type not in frozenset(["root", "openidconnect", "m2m"]):
+		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie"]):
 			L.error("Unsupported session type", struct_data={"type": session_type})
 			return None
 		upsertor.set(SessionAdapter.FNSessionType, session_type)
@@ -157,7 +157,7 @@ class SessionService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Session created", struct_data={
 			"sid": session_id,
 			"type": session_type,
-			"parent": parent_session,
+			"parent_sid": parent_session.SessionId,
 		})
 		return await self.get(session_id)
 
