@@ -107,9 +107,8 @@ class CookieHandler(object):
 		Exchange authorization code for cookie and redirect afterwards.
 		"""
 		grant_type = request.query.get("grant_type")
-
 		if grant_type != "authorization_code":
-			L.warning("Grant type not supported", struct_data={"grant_type": grant_type})
+			L.error("Grant type not supported", struct_data={"grant_type": grant_type})
 			return aiohttp.web.HTTPBadRequest()
 
 		# Use the code to get session ID
@@ -130,10 +129,11 @@ class CookieHandler(object):
 			cookie_session_builder(),
 		]
 
-		# TODO: if 'openid' in scope
+		# TODO: Temporary solution. Root session should have no OAuth2 data.
+		#   Remove once ID token support is fully implemented.
 		oauth2_data = {
-			"scope": ["openid", "cookie"],
-			"client_id": request.query.get("client_id"),
+			"scope": None,
+			"client_id": None,
 		}
 		session_builders.append(oauth2_session_builder(oauth2_data))
 
@@ -142,7 +142,7 @@ class CookieHandler(object):
 			requested_expiration = int(requested_expiration)
 
 		session = await self.SessionService.create_session(
-			session_type="openidconnect",
+			session_type="cookie",
 			parent_session=root_session,
 			expiration=requested_expiration,
 			session_builders=session_builders,
