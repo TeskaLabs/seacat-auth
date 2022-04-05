@@ -32,7 +32,7 @@ class WebAuthnService(asab.Service):
 
 		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
 
-		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_id")
+		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
 		if self.RelyingPartyName is None:
 			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
 			self.RelyingPartyId = urllib.parse.urlparse(auth_webui_base_url).netloc
