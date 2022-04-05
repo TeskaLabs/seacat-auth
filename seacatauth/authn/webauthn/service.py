@@ -3,6 +3,7 @@ import hashlib
 import logging
 import secrets
 import struct
+import urllib.parse
 
 import cbor2
 
@@ -29,9 +30,14 @@ class WebAuthnService(asab.Service):
 		self._RegistrationChallenges = {}
 		self._AuthenticationChallenges = {}
 
-		self.RelyingPartyName = "Seacat Auth"  # TODO: Config
-		self.RelyingPartyId = "localhost:8080"  # TODO: Public webui domain
-		self.ChallengeTimeout = 60 * 1000  # TODO: Config
+		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
+
+		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_id")
+		if self.RelyingPartyName is None:
+			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			self.RelyingPartyId = urllib.parse.urlparse(auth_webui_base_url).netloc
+
+		self.ChallengeTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
 			cose.algorithms.Es256
 		]
