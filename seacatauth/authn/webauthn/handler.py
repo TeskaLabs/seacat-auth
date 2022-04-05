@@ -77,6 +77,8 @@ class WebAuthnHandler(object):
 	})
 	@access_control()
 	async def register(self, request, *, json_data, credentials_id):
+		import pprint
+		L.warning(f"\n🌻{pprint.pformat(json_data)}")
 		# Verify that the request CID matches the session CID
 		assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii")).decode("ascii")
 
