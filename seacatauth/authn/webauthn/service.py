@@ -35,7 +35,7 @@ class WebAuthnService(asab.Service):
 		self.RelyingPartyId = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
 		if self.RelyingPartyId is None:
 			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
-			self.RelyingPartyId = urllib.parse.urlparse(auth_webui_base_url).netloc
+			self.RelyingPartyId = urllib.parse.urlparse(auth_webui_base_url).hostname
 
 		self.ChallengeTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
