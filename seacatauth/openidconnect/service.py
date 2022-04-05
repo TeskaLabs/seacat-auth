@@ -125,7 +125,10 @@ class OpenIdConnectService(asab.Service):
 		}
 
 		try:
-			credentials = await self.CredentialsService.get(session.CredentialsId, include=frozenset(["__totp"]))
+			credentials = await self.CredentialsService.get(
+				session.CredentialsId,
+				include=frozenset(["__totp", "__webauthn"])
+			)
 		except KeyError:
 			L.error("Credentials not found", struct_data={"cid": session.CredentialsId})
 			return {"result": "CREDENTIALS-NOT-FOUND"}
@@ -150,6 +153,11 @@ class OpenIdConnectService(asab.Service):
 		# TODO: Use OTPService or TOTPFactor to get this information
 		if v is not None and len(v) > 0:
 			userinfo["totp_set"] = True
+
+		v = credentials.get("__webauthn")
+		# TODO: Use WebAuthnService or WebAuthnFactor to get this information
+		if v is not None and len(v) > 0:
+			userinfo["webauthn_set"] = True
 
 		# TODO: last password change
 
