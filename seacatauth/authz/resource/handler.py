@@ -1,4 +1,5 @@
 import logging
+import re
 from json import JSONDecodeError
 
 import asab
@@ -25,13 +26,21 @@ class ResourceHandler(object):
 		web_app.router.add_put("/resource/{resource_id}", self.update)
 
 	async def list(self, request):
-		# TODO: filtering by module
-		page = int(request.query.get('p', 1)) - 1
-		limit = request.query.get('i', None)
+		page = int(request.query.get("p", 1)) - 1
+		limit = request.query.get("i", None)
 		if limit is not None:
 			limit = int(limit)
 
-		resources = await self.ResourceService.list(page, limit)
+		# Filter by ID.startswith()
+		query_filter = request.query.get("f", None)
+		if query_filter is not None:
+			query_filter = {
+				"_id": re.compile("^{}".format(
+					re.escape(query_filter)
+				))
+			}
+
+		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
 
 	async def get(self, request):
