@@ -80,7 +80,7 @@ class WebAuthnHandler(object):
 		import pprint
 		L.warning(f"\n🌻JSON DATA {pprint.pformat(json_data)}")
 		# Verify that the request CID matches the session CID
-		assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii") + b"==").decode("ascii")
+		assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii") + b"==").decode()
 
 		# The value SHOULD be a member of PublicKeyCredentialType but client platforms MUST ignore unknown values,
 		# ignoring any PublicKeyCredentialParameters with an unknown type.
@@ -91,11 +91,11 @@ class WebAuthnHandler(object):
 		client_data = json.loads(
 			base64.urlsafe_b64decode(
 				json_data["response"]["clientDataJSON"].encode("ascii") + b"=="
-			).decode("ascii")
+			).decode()
 		)
 		attestation_object = base64.urlsafe_b64decode(
 			client_data["attestationObject"].encode("ascii") + b"=="
-		).decode("ascii")
+		).decode()
 
 		response = await self.WebAuthnService.register(credentials_id, client_data, attestation_object)
 		return asab.web.rest.json_response(request, response)
