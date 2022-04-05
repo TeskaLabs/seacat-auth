@@ -25,13 +25,13 @@ class WebAuthnHandler(object):
 		self.WebAuthnService = webauthn_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get('/public/webauthn-register-options', self.get_registration_options)
-		web_app.router.add_put('/public/webauthn-register', self.register)
+		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
+		web_app.router.add_put('/public/webauthn/register', self.register)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get('/public/webauthn-register-options', self.get_registration_options)
-		web_app_public.router.add_put('/public/webauthn-register', self.register)
+		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
+		web_app_public.router.add_put('/public/webauthn/register', self.register)
 
 
 	@access_control()
