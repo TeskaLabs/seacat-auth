@@ -39,7 +39,7 @@ class WebAuthnService(asab.Service):
 
 	async def _create_registration_challenge(self, credentials_id) -> str:
 		challenge = secrets.token_urlsafe(32)
-		challenge_hash = hashlib.md5(challenge).hexdigest()
+		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
 		self._RegistrationChallenges[credentials_id] = challenge_hash
 		return challenge
 
