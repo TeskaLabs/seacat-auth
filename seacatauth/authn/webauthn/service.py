@@ -104,6 +104,8 @@ class WebAuthnService(asab.Service):
 		Add WebAuthn public key to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
+		import pprint
+		L.warning(f"\n🌻CLIENT DATA {pprint.pformat(client_data)}")
 
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
 		if credentials.get("__webauthn") is not None:
@@ -120,6 +122,7 @@ class WebAuthnService(asab.Service):
 		assert client_data["origin"] == self.RelyingPartyId
 
 		decoded_attestation_object = cbor2.decoder.loads(attestation_object)
+		L.warning(f"\n🌻DECODED AO {pprint.pformat(decoded_attestation_object)}")
 		decoded_attestation_object_example = {
 			"authData": ...,
 			"fmt": "fido-u2f",
