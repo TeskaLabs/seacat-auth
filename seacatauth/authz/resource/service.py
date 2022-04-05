@@ -70,10 +70,11 @@ class ResourceService(asab.Service):
 				await self.update_description(resource_id, resource_description)
 
 
-	async def list(self, page: int = 0, limit: int = None):
+	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
 		collection = self.StorageService.Database[self.ResourceCollection]
 
-		query_filter = {}
+		if query_filter is None:
+			query_filter = {}
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
