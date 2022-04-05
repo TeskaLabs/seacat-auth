@@ -74,10 +74,45 @@ class ELKIntegration(asab.config.Configurable):
 		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 	async def _on_tick(self, event_name):
+		await self._initialize_elk_resources()
 		await self.sync_all()
 
 	async def initialize(self):
+		await self._initialize_elk_resources()
 		await self.sync_all()
+
+	async def _initialize_elk_resources(self):
+		"""
+		Fetches roles from ELK and creates a Seacat Auth resource for each one of them.
+		"""
+		# Fetch ELK roles
+		try:
+			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
+				async with session.get("{}/_xpack/security/role".format(self.URL)) as resp:
+					if resp.status != 200:
+						text = await resp.text()
+						L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
+						return
+					elk_roles_data = await resp.json()
+		except Exception as e:
+			L.error("Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)))
+			return
+
+		# Fetch SCA resources for the ELK module
+		existing_elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
+		existing_elk_resources = set(
+			resource["_id"]
+			for resource in existing_elk_resources["data"]
+		)
+
+		# Create resources that don't exist yet
+		for role in elk_roles_data.keys():
+			resource_id = "{}{}".format(self.ResourcePrefix, role)
+			if resource_id not in existing_elk_resources:
+				await self.ResourceService.create(
+					resource_id,
+					description="Grants access to ELK role '{}.".format(role)
+				)
 
 	async def sync_all(self):
 		elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
