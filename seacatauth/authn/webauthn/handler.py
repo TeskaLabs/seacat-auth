@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 
@@ -77,7 +78,7 @@ class WebAuthnHandler(object):
 	@access_control()
 	async def register(self, request, *, json_data, credentials_id):
 		# Verify that the request CID matches the session CID
-		assert credentials_id == json_data["id"]
+		assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii")).decode("ascii")
 
 		# The value SHOULD be a member of PublicKeyCredentialType but client platforms MUST ignore unknown values,
 		# ignoring any PublicKeyCredentialParameters with an unknown type.
@@ -85,8 +86,12 @@ class WebAuthnHandler(object):
 		assert json_data["type"] == "public-key"
 
 		# Parse the client data
-		client_data = json.loads(json_data["response"]["clientDataJSON"])
-		attestation_object = client_data["attestationObject"]
+		client_data = json.loads(
+			base64.urlsafe_b64decode(
+				json_data["response"]["clientDataJSON"].encode("ascii")
+			).decode("ascii")
+		)
+		attestation_object = base64.urlsafe_b64decode(client_data["attestationObject"].encode("ascii")).decode("ascii")
 
 		response = await self.WebAuthnService.register(credentials_id, client_data, attestation_object)
 		return asab.web.rest.json_response(request, response)
