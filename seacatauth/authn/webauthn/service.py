@@ -32,8 +32,8 @@ class WebAuthnService(asab.Service):
 
 		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
 
-		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
-		if self.RelyingPartyName is None:
+		self.RelyingPartyId = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
+		if self.RelyingPartyId is None:
 			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
 			self.RelyingPartyId = urllib.parse.urlparse(auth_webui_base_url).netloc
 
@@ -86,11 +86,12 @@ class WebAuthnService(asab.Service):
 				{"alg": algorithm.identifier, "type": "public-key"}
 				for algorithm in self.SupportedAlgorithms
 			],
-			"authenticatorSelection": {
-				"authenticatorAttachment": "cross-platform",
-			},
 			"timeout": self.ChallengeTimeout,
-			"attestation": "direct"
+			# Optional parameters
+			# "authenticatorSelection": {
+			# 	"authenticatorAttachment": "cross-platform",
+			# },
+			# "attestation": "direct"
 		}
 
 		return options
