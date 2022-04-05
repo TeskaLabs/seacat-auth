@@ -32,6 +32,8 @@ class WebAuthnService(asab.Service):
 
 		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
 
+		# RP ID must match host's domain name (without scheme, port or subpath)
+		# https://www.w3.org/TR/webauthn-2/#relying-party-identifier
 		self.RelyingPartyId = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
 		if self.RelyingPartyId is None:
 			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
