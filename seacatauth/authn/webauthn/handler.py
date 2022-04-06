@@ -39,8 +39,8 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def get_registration_options(self, request, *, credentials_id):
-		response = await self.WebAuthnService.get_registration_options(credentials_id)
-		return asab.web.rest.json_response(request, response)
+		options = await self.WebAuthnService.get_registration_options(credentials_id)
+		return asab.web.rest.json_response(request, {"result": "OK", "data": options})
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
