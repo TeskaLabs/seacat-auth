@@ -101,6 +101,6 @@ class WebAuthnHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 	@access_control()
-	async def remove_key(self, request, *, json_data, credentials_id):
+	async def remove_key(self, request, *, credentials_id):
 		response = await self.WebAuthnService.remove_key(credentials_id)
 		return asab.web.rest.json_response(request, response)
