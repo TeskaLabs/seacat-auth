@@ -125,7 +125,10 @@ class WebAuthnService(asab.Service):
 
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
 		if credentials.get("__webauthn") not in (None, ""):
-			raise ValueError("WebAuthn key already exists for these credentials")
+			return {
+				"result": "ALREADY-EXISTS",
+				"description": "WebAuthn key already registered for these credentials."
+			}
 
 		# Verify that the correct operation was performed
 		assert client_data["type"] == "webauthn.create"
@@ -181,8 +184,10 @@ class WebAuthnService(asab.Service):
 		# Update user credentials with the public_key
 		provider = self.CredentialsService.get_provider(credentials_id)
 		result = await provider.update(credentials_id, {"__webauthn": public_key})
-
-		return result
+		if result == "OK":
+			return {"result": result}
+		else:
+			return result
 
 
 	async def remove_key(self, credentials_id):
