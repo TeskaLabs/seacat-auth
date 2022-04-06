@@ -188,7 +188,10 @@ class WebAuthnService(asab.Service):
 	async def remove_key(self, credentials_id):
 		provider = self.CredentialsService.get_provider(credentials_id)
 		result = await provider.update(credentials_id, {"__webauthn": ""})
-		return result
+		if result == "OK":
+			return {"result": result}
+		else:
+			return result
 
 
 	async def get_authentication_options(self, credentials_id):
