@@ -124,8 +124,7 @@ class WebAuthnService(asab.Service):
 		"""
 
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
-		if credentials.get("__webauthn") is not None:
-			# WebAuthn key already exists for these credentials
+		if credentials.get("__webauthn") not in (None, ""):
 			raise ValueError("WebAuthn key already exists for these credentials")
 
 		# Verify that the correct operation was performed
@@ -222,9 +221,11 @@ class WebAuthnService(asab.Service):
 
 		assert client_data["type"] == "webauthn.get"
 
-		assert client_data["challenge"] == await self._verify_authentication_challenge(credentials_id)
+		challenge = base64.b64decode(client_data["challenge"].encode("ascii") + b"==").decode()
+		await self._verify_authentication_challenge(credentials_id, challenge)
 
-		assert client_data["origin"] == self.RelyingPartyId
+		origin_hostname = urllib.parse.urlparse(client_data["origin"]).hostname
+		assert origin_hostname == self.RelyingPartyId
 
 		# TODO: Verify authenticator_data hash
 
