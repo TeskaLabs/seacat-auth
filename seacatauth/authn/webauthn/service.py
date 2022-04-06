@@ -10,6 +10,7 @@ import cbor2
 import cose.algorithms
 
 import asab.storage
+import pprint
 
 #
 
@@ -51,16 +52,19 @@ class WebAuthnService(asab.Service):
 		self._RegistrationChallenges[credentials_id] = challenge_hash
 		return challenge
 
-	async def _get_registration_challenge(self, credentials_id) -> str:
-		return self._RegistrationChallenges.get(credentials_id)
-
+	async def _verify_registration_challenge(self, credentials_id, challenge) -> str:
+		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
+		return challenge_hash == self._RegistrationChallenges.get(credentials_id)
 
 	async def _create_authentication_challenge(self, credentials_id) -> str:
-		raise NotImplementedError("WebAuthnService._create_authentication_challenge")
+		challenge = secrets.token_urlsafe(32)
+		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
+		self._AuthenticationChallenges[credentials_id] = challenge_hash
+		return challenge
 
-
-	async def _get_authentication_challenge(self, credentials_id) -> str:
-		raise NotImplementedError("WebAuthnService._get_authentication_challenge")
+	async def _verify_authentication_challenge(self, credentials_id, challenge) -> str:
+		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
+		return challenge_hash == self._AuthenticationChallenges.get(credentials_id)
 
 
 	async def get_registration_options(self, credentials_id):
@@ -99,10 +103,24 @@ class WebAuthnService(asab.Service):
 		return options
 
 
-	async def register(self, credentials_id, client_data, attestation_object=None):
+	async def register_key(self, credentials_id, client_data, attestation_object=None):
 		"""
 		Add WebAuthn public key to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
+
+		client_data_example = {
+			'challenge': 'MEtoY3BPemkyaWJQeTByM2tLWE1pekdaa3U0OGRLVXZTNm51UUVmWXdxRQ',
+			'clientExtensions': {},
+			'hashAlgorithm': 'SHA-256',
+			'origin': 'https://localhost:3000',
+			'type': 'webauthn.create'
+		}
+
+		attestation_object_example = {
+			'attStmt': {},
+			'authData': b'I\x96\r\xe5\x88\x0e\x8cht4\x17\x0fdv`[\x8f\xe4\xae\xb9' ... ,
+			'fmt': 'none'
+		}
 		"""
 		import pprint
 		L.warning(f"\n🌻CLIENT DATA {pprint.pformat(client_data)}")
@@ -116,27 +134,25 @@ class WebAuthnService(asab.Service):
 		assert client_data["type"] == "webauthn.create"
 
 		# Verify that the challenge has not been changed
-		assert client_data["challenge"] == await self._get_registration_challenge(credentials_id)
+		challenge = base64.b64decode(client_data["challenge"].encode("ascii") + b"==").decode()
+		assert await self._verify_registration_challenge(credentials_id, challenge)
 
 		# Verify the origin
-		assert client_data["origin"] == self.RelyingPartyId
+		origin_hostname = urllib.parse.urlparse(client_data["origin"]).hostname
+		assert origin_hostname == self.RelyingPartyId
 
-		decoded_attestation_object = cbor2.decoder.loads(attestation_object)
-		L.warning(f"\n🌻DECODED AO {pprint.pformat(decoded_attestation_object)}")
-		decoded_attestation_object_example = {
-			"authData": ...,
-			"fmt": "fido-u2f",
-			"attStmt": {
-				"sig": ...,
-				"x5c": ...,
-			},
-		}
+		attestation_object = cbor2.decoder.loads(attestation_object)
 
-		assert decoded_attestation_object["fmt"] == "fido-u2f"
+		# TODO: Check attestation format
+		assert attestation_object["fmt"] in frozenset([
+			"packed", "tpm", "android-key", "android-safetynet", "none", "fido-u2f", "apple"
+		])
+
+		# TODO: Check attestation statement depending on the format
 
 		# auth-data
 		# https://w3c.github.io/webauthn/#authenticator-data
-		auth_data = decoded_attestation_object["authData"]
+		auth_data = attestation_object["authData"]
 		(
 			rp_id_hash,
 			flags,
@@ -147,16 +163,35 @@ class WebAuthnService(asab.Service):
 		credential_id = auth_data[55:55 + cid_length]
 		public_key = auth_data[55 + cid_length:]
 
-		# TODO: Unpack flags
-		# TODO: Check that the user is verified
+		# Unpack flags
+		flags = [bool(int(i)) for i in format(ord(flags), "08b")]
+		(
+			extension_data_included,
+			attested_credential_data_included,
+			_, _, _,  # Bits reserved for future use
+			user_verified,
+			_,  # Bit reserved for future use
+			user_present
+		) = flags
+
+		assert user_present
+
+		# TODO: User verification
+		# assert user_verified
 
 		# TODO: Validate the auth data hash
 
 		# Update user credentials with the public_key
 		provider = self.CredentialsService.get_provider(credentials_id)
-		provider.update(credentials_id, {"__webauthn": public_key})
+		result = await provider.update(credentials_id, {"__webauthn": public_key})
 
-		return {"result": "OK"}
+		return result
+
+
+	async def remove_key(self, credentials_id):
+		provider = self.CredentialsService.get_provider(credentials_id)
+		result = await provider.update(credentials_id, {"__webauthn": ""})
+		return result
 
 
 	async def get_authentication_options(self, credentials_id):
@@ -179,7 +214,7 @@ class WebAuthnService(asab.Service):
 		return options
 
 
-	async def authenticate(self, credentials_id, client_data, authenticator_data, signature=None):
+	async def authenticate_key(self, credentials_id, client_data, authenticator_data, signature=None):
 		"""
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
@@ -189,7 +224,7 @@ class WebAuthnService(asab.Service):
 
 		assert client_data["type"] == "webauthn.get"
 
-		assert client_data["challenge"] == await self._get_authentication_challenge(credentials_id)
+		assert client_data["challenge"] == await self._verify_authentication_challenge(credentials_id)
 
 		assert client_data["origin"] == self.RelyingPartyId
 

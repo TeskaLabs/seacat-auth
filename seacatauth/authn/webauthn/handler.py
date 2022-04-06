@@ -27,12 +27,14 @@ class WebAuthnHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
-		web_app.router.add_put('/public/webauthn/register', self.register)
+		web_app.router.add_put('/public/webauthn/register', self.register_key)
+		web_app.router.add_delete('/public/webauthn', self.remove_key)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
-		web_app_public.router.add_put('/public/webauthn/register', self.register)
+		web_app_public.router.add_put('/public/webauthn/register', self.register_key)
+		web_app_public.router.add_delete('/public/webauthn', self.remove_key)
 
 
 	@access_control()
@@ -76,11 +78,9 @@ class WebAuthnHandler(object):
 		}
 	})
 	@access_control()
-	async def register(self, request, *, json_data, credentials_id):
-		import pprint
-		L.warning(f"\n🌻JSON DATA {pprint.pformat(json_data)}")
+	async def register_key(self, request, *, json_data, credentials_id):
 		# Verify that the request CID matches the session CID
-		assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii") + b"==").decode()
+		# assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii") + b"==").decode()
 
 		# The value SHOULD be a member of PublicKeyCredentialType but client platforms MUST ignore unknown values,
 		# ignoring any PublicKeyCredentialParameters with an unknown type.
@@ -94,8 +94,13 @@ class WebAuthnHandler(object):
 			).decode()
 		)
 		attestation_object = base64.urlsafe_b64decode(
-			client_data["attestationObject"].encode("ascii") + b"=="
-		).decode()
+			json_data["response"]["attestationObject"].encode("ascii") + b"=="
+		)
 
-		response = await self.WebAuthnService.register(credentials_id, client_data, attestation_object)
+		response = await self.WebAuthnService.register_key(credentials_id, client_data, attestation_object)
+		return asab.web.rest.json_response(request, response)
+
+	@access_control()
+	async def remove_key(self, request, *, json_data, credentials_id):
+		response = await self.WebAuthnService.remove_key(credentials_id)
 		return asab.web.rest.json_response(request, response)
