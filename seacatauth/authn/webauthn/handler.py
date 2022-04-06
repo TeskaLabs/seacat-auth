@@ -98,9 +98,15 @@ class WebAuthnHandler(object):
 		)
 
 		response = await self.WebAuthnService.register_key(credentials_id, client_data, attestation_object)
-		return asab.web.rest.json_response(request, response)
+		return asab.web.rest.json_response(
+			request, response,
+			status=200 if response["result"] == "OK" else 400
+		)
 
 	@access_control()
 	async def remove_key(self, request, *, credentials_id):
 		response = await self.WebAuthnService.remove_key(credentials_id)
-		return asab.web.rest.json_response(request, response)
+		return asab.web.rest.json_response(
+			request, response,
+			status=200 if response["result"] == "OK" else 400
+		)
