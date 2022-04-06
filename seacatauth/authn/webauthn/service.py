@@ -122,8 +122,6 @@ class WebAuthnService(asab.Service):
 			'fmt': 'none'
 		}
 		"""
-		import pprint
-		L.warning(f"\n🌻CLIENT DATA {pprint.pformat(client_data)}")
 
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
 		if credentials.get("__webauthn") is not None:
