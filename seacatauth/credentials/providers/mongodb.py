@@ -215,6 +215,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if not credentials_id.startswith(self.Prefix):
 			raise KeyError("Credentials '{}' not found".format(credentials_id))
 
+		updated_fields = list(update.keys())
+
 		# Fetch the credentials from Mongo
 		credentials = await self.MongoDBStorageService.get(
 			self.CredentialsCollection,
@@ -249,6 +251,11 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if v is not None:
 			u.set("__totp", v)
 
+		# Update TOTP secret
+		v = update.pop("__webauthn", None)
+		if v is not None:
+			u.set("__webauthn", v)
+
 		# Update enforced factors
 		v = update.pop("enforce_factors", None)
 		if v is not None:
@@ -264,10 +271,15 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			if v is not None:
 				u.set(k, v)
 
-		assert(len(update) == 0)
+		if len(update) != 0:
+			raise KeyError("Unsupported credentials fields: {}".format(", ".join(update.keys())))
 
 		try:
 			await u.execute()
+			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+				"cid": credentials_id,
+				"fields": updated_fields,
+			})
 			result = "OK"
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
