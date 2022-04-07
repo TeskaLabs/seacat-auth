@@ -14,7 +14,8 @@ class ResourceService(asab.Service):
 
 	ResourceCollection = "rs"
 	# Resource name format: "{module}:{submodule}:..."
-	ResourceIdRegex = re.compile(r"^[a-z][a-z0-9:._-]{0,128}[a-z0-9]$")
+	ResourceNamePattern = r"[a-z][a-z0-9:._-]{0,128}[a-z0-9]"
+
 	# TODO: gather these system resources automatically
 	BuiltinResources = [
 		{
@@ -39,6 +40,7 @@ class ResourceService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.ResourceService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.ResourceIdRegex = re.compile("^{}$".format(self.ResourceNamePattern))
 
 
 	async def initialize(self, app):

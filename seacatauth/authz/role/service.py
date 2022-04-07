@@ -25,9 +25,7 @@ class RoleService(asab.Service):
 
 	RoleCollection = "r"
 	CredentialsRolesCollection = "cr"
-	RoleIdRegex = re.compile(
-		"^({}|\*)/([a-zA-Z_][a-zA-Z0-9_-]{{0,31}})$".format(TenantService.TenantNameRegex[1:-1])
-	)  # The format is always {tenant or "*"}/{role_name}!
+	RoleNamePattern = r"[a-zA-Z_][a-zA-Z0-9_-]{0,31}"
 
 	def __init__(self, app, service_name="seacatauth.RoleService"):
 		super().__init__(app, service_name)
@@ -36,6 +34,10 @@ class RoleService(asab.Service):
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = self.App.get_service("seacatauth.RBACService")
+		self.RoleIdRegex = re.compile("^({tenant}|\*)/({role})$".format(
+			tenant=TenantService.TenantNamePattern,
+			role=self.RoleNamePattern
+		))  # The format is always {tenant or "*"}/{role_name}!
 
 	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
 		collection = self.StorageService.Database[self.RoleCollection]
