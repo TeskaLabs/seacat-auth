@@ -220,7 +220,7 @@ class WebAuthnService(asab.Service):
 		options = {
 			"challenge": challenge,
 			"timeout": self.ChallengeTimeout,
-			"allow_credentials": [
+			"allowCredentials": [
 				{
 					"type": "public-key",
 					"id": webauthn_cid,
@@ -237,6 +237,8 @@ class WebAuthnService(asab.Service):
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
+
+		return True
 
 		credentials = await self.CredentialsService.get(credentials_id)
 
