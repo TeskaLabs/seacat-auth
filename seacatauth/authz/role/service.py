@@ -4,6 +4,8 @@ from typing import Optional
 
 import asab.storage.exceptions
 
+from ...tenant import TenantService
+
 #
 
 L = logging.getLogger(__name__)
@@ -23,7 +25,9 @@ class RoleService(asab.Service):
 
 	RoleCollection = "r"
 	CredentialsRolesCollection = "cr"
-	RoleIdRegex = re.compile(r"^([a-zA-Z0-9_-]+|\*)/([a-zA-Z0-9:_-]+)$")  # {tenant}/{role_name}
+	RoleIdRegex = re.compile(
+		"^({}|\*)/([a-zA-Z_][a-zA-Z0-9_-]{{0,31}})$".format(TenantService.TenantNameRegex[1:-1])
+	)  # The format is always {tenant or "*"}/{role_name}!
 
 	def __init__(self, app, service_name="seacatauth.RoleService"):
 		super().__init__(app, service_name)
