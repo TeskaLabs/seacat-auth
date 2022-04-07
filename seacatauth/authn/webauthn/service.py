@@ -212,8 +212,9 @@ class WebAuthnService(asab.Service):
 		Prologue to adding WebAuthn to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
-		credentials = self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
+		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
 		webauthn_cid = credentials.get("__webauthn.cid")
+		L.warning(f"\n🦷 {pprint.pformat(credentials)}")
 
 		# TODO: Authentication will use the main login-prologue challenge instead
 		challenge = await self._create_authentication_challenge(credentials_id)
