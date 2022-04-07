@@ -4,6 +4,7 @@
 
 ### Breaking changes
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
+- Usernames, roles and resources are validated before creation (#22, PLUM Sprint 220325)
 
 ### Fixes
 - Handle nonexisting provider in M2M introspection (#15, PLUM Sprint 220225)
@@ -16,6 +17,7 @@
 ### Refactoring
 - Fallback values in ident translation response (#18, PLUM Sprint 220325)
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
+- Validate usernames, roles and resources before creation (#22, PLUM Sprint 220325)
 
 ---
 
