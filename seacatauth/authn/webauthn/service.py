@@ -160,7 +160,7 @@ class WebAuthnService(asab.Service):
 			aaguid,
 			cid_length
 		) = struct.unpack(">32s1sI16sH", auth_data[:55])
-		credential_id = auth_data[55:55 + cid_length]
+		webauthn_cid = auth_data[55:55 + cid_length]
 		public_key = auth_data[55 + cid_length:]
 
 		# public_key is a CBOR-encoded object
@@ -186,7 +186,12 @@ class WebAuthnService(asab.Service):
 
 		# Update user credentials with the public_key
 		provider = self.CredentialsService.get_provider(credentials_id)
-		result = await provider.update(credentials_id, {"__webauthn": public_key})
+		result = await provider.update(credentials_id, {
+			"__webauthn": {
+				"key": public_key,
+				"cid": webauthn_cid,
+			}
+		})
 		if result == "OK":
 			return {"result": result}
 		else:
@@ -202,11 +207,13 @@ class WebAuthnService(asab.Service):
 			return result
 
 
-	async def get_authentication_options(self, credentials_id):
+	async def get_authentication_options(self, credentials_id: str):
 		"""
 		Prologue to adding WebAuthn to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
+		credentials = self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
+		webauthn_cid = credentials.get("__webauthn.cid")
 
 		# TODO: Authentication will use the main login-prologue challenge instead
 		challenge = await self._create_authentication_challenge(credentials_id)
@@ -215,7 +222,7 @@ class WebAuthnService(asab.Service):
 			"challenge": challenge,
 			"timeout": self.ChallengeTimeout,
 			"allow_credentials": [
-				{"type": "public-key", "id": base64.urlsafe_b64encode(credentials_id)}
+				{"type": "public-key", "id": webauthn_cid}
 			],
 		}
 
