@@ -224,7 +224,7 @@ class WebAuthnService(asab.Service):
 			"allowCredentials": [
 				{
 					"type": "public-key",
-					"id": base64.urlsafe_b64encode(webauthn_cid),
+					"id": base64.urlsafe_b64encode(webauthn_cid).decode(),
 					# "transports": ['usb', 'ble', 'nfc'],  # Optional
 				}
 			],
