@@ -30,10 +30,6 @@ class ResourceService(asab.Service):
 			"id": "authz:tenant:admin",
 			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
 		},
-		{
-			"id": "authz:credentials:admin",
-			"description": "Grants rights for credentials administration. Enables creating and updating credentials.",
-		},
 	]
 
 
@@ -105,8 +101,11 @@ class ResourceService(asab.Service):
 		if self.ResourceIdRegex.match(resource_id) is None:
 			L.error("Invalid ID format", struct_data={"resource_id": resource_id})
 			return {
-				"result": "ERROR",
-				"message": "Invalid resource ID",
+				"result": "INVALID-VALUE",
+				"message":
+					"Resource ID must consist only of characters 'a-z0-9.:_-', "
+					"start with a letter, end with a letter or digit, "
+					"and be between 2 and 128 characters long.",
 			}
 
 		upsertor = self.StorageService.upsertor(self.ResourceCollection, obj_id=resource_id)
