@@ -1,7 +1,9 @@
 import json
 import logging
-
+import re
 import fastjsonschema
+
+from .schemas import USERNAME_PATTERN
 
 #
 
@@ -116,6 +118,13 @@ class CredentialsPolicy:
 		for field, policy in policy.items():
 			value = credentials_data.pop(field, None)
 			if value is not None and len(value) > 0:
+				# TODO: Systematic value checking of other fields
+				if field == "username" and not re.fullmatch(USERNAME_PATTERN, value):
+					L.error(
+						"Cannot create credentials: Invalid username",
+						struct_data={"username": value}
+					)
+					return None
 				validated_data[field] = value
 			else:
 				# Field not provided
