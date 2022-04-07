@@ -213,6 +213,7 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
+		L.warning(f"\n🐱 {pprint.pformat(credentials['__webauthn'])}")
 		webauthn_cid = credentials["__webauthn"]["cid"]
 
 		challenge = await self._create_authentication_challenge(credentials_id)
@@ -223,7 +224,7 @@ class WebAuthnService(asab.Service):
 			"allowCredentials": [
 				{
 					"type": "public-key",
-					"id": webauthn_cid,
+					"id": base64.urlsafe_b64encode(webauthn_cid),
 					# "transports": ['usb', 'ble', 'nfc'],  # Optional
 				}
 			],
