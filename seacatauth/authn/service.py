@@ -29,6 +29,11 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 			[
 				# If TOTP is active, it should be required by default as a second factor
 				{'id': 'password', 'type': 'password'},
+				{'id': 'webauthn', 'type': 'webauthn'}
+			],
+			[
+				# If TOTP is active, it should be required by default as a second factor
+				{'id': 'password', 'type': 'password'},
 				{'id': 'totp', 'type': 'totp'}
 			],
 			[

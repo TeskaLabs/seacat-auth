@@ -163,6 +163,9 @@ class WebAuthnService(asab.Service):
 		credential_id = auth_data[55:55 + cid_length]
 		public_key = auth_data[55 + cid_length:]
 
+		# public_key is a CBOR-encoded object
+		# cbor2.decoder.loads(public_key)
+
 		# Unpack flags
 		flags = [bool(int(i)) for i in format(ord(flags), "08b")]
 		(
