@@ -13,8 +13,8 @@ L = logging.getLogger(__name__)
 class ResourceService(asab.Service):
 
 	ResourceCollection = "rs"
-	# Resource name format: "{module}:{submodule}:{...}:{resource_name}"
-	ResourceIdRegex = re.compile(r"^((?:[a-zA-Z0-9_-]+:)*[a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)$")
+	# Resource name format: "{module}:{submodule}:..."
+	ResourceIdRegex = re.compile(r"^[a-z][a-z0-9:._-]{0,128}[a-z0-9]$")
 	# TODO: gather these system resources automatically
 	BuiltinResources = [
 		{
