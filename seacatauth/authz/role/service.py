@@ -77,7 +77,14 @@ class RoleService(asab.Service):
 	async def create(self, role_id: str):
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
-			raise ValueError("Invalid role name: '{}'".format(role_id))
+			return {
+				"result": "INVALID-VALUE",
+				"message":
+					"Role ID must match the format {tenant_name}/{role_name}, "
+					"where {tenant_name} is either '*' or the name of an existing tenant "
+					"and {role_name} consists only of characters 'a-z0-9_-', "
+					"starts with a letter or underscore, and is between 1 and 32 characters long.",
+			}
 		tenant = match.group(1)
 
 		upsertor = self.StorageService.upsertor(
@@ -87,8 +94,15 @@ class RoleService(asab.Service):
 		upsertor.set("resources", [])
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
-		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "Role created", struct_data={'role_id': role_id})
+		try:
+			await upsertor.execute()
+			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
+		except asab.storage.exceptions.DuplicateError:
+			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
+			return {
+				"result": "CONFLICT",
+				"message": "Role '{}' already exists.".format(role_id)
+			}
 		return "OK"
 
 	async def delete(self, role_id: str):
