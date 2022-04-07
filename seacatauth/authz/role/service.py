@@ -34,7 +34,7 @@ class RoleService(asab.Service):
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = self.App.get_service("seacatauth.RBACService")
-		self.RoleIdRegex = re.compile("^({tenant}|\*)/({role})$".format(
+		self.RoleIdRegex = re.compile(r"^({tenant}|\*)/({role})$".format(
 			tenant=TenantService.TenantNamePattern,
 			role=self.RoleNamePattern
 		))  # The format is always {tenant or "*"}/{role_name}!
