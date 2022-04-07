@@ -233,16 +233,18 @@ class WebAuthnService(asab.Service):
 		challenge = await self._create_authentication_challenge(credentials_id)
 
 		options = {
-			"rpID": self.RelyingPartyId,
 			"challenge": challenge,
 			"timeout": self.ChallengeTimeout,
-			"allowCredentials": [
+			"rpId": self.RelyingPartyId,  # Optional
+			"allowCredentials": [  # Optional
 				{
 					"type": "public-key",
 					"id": webauthn_cid,
 					# "transports": ['usb', 'ble', 'nfc'],  # Optional
 				}
 			],
+			"userVerification": "preferred",  # Optional
+			# "extensions": ...,  # Optional
 		}
 
 		return options
