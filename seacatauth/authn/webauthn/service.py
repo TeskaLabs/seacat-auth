@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json
 import logging
 import secrets
 import struct
@@ -103,24 +104,10 @@ class WebAuthnService(asab.Service):
 		return options
 
 
-	async def register_key(self, credentials_id, client_data, attestation_object=None):
+	async def register_key(self, credentials_id: str, public_key_credential: dict):
 		"""
 		Add WebAuthn public key to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
-
-		client_data_example = {
-			'challenge': 'MEtoY3BPemkyaWJQeTByM2tLWE1pekdaa3U0OGRLVXZTNm51UUVmWXdxRQ',
-			'clientExtensions': {},
-			'hashAlgorithm': 'SHA-256',
-			'origin': 'https://localhost:3000',
-			'type': 'webauthn.create'
-		}
-
-		attestation_object_example = {
-			'attStmt': {},
-			'authData': b'I\x96\r\xe5\x88\x0e\x8cht4\x17\x0fdv`[\x8f\xe4\xae\xb9' ... ,
-			'fmt': 'none'
-		}
 		"""
 
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
@@ -129,6 +116,31 @@ class WebAuthnService(asab.Service):
 				"result": "ALREADY-EXISTS",
 				"description": "WebAuthn key already registered for these credentials."
 			}
+
+		assert public_key_credential["type"] == "public-key"
+
+		# Parse the client data
+		client_data = json.loads(
+			base64.urlsafe_b64decode(
+				public_key_credential["response"]["clientDataJSON"].encode("ascii") + b"=="
+			).decode()
+		)
+		# client_data_example = {
+		# 	'challenge': 'MEtoY3BPemkyaWJQeTByM2tLWE1pekdaa3U0OGRLVXZTNm51UUVmWXdxRQ',
+		# 	'clientExtensions': {},
+		# 	'hashAlgorithm': 'SHA-256',
+		# 	'origin': 'https://localhost:3000',
+		# 	'type': 'webauthn.create'
+		# }
+
+		attestation_object = base64.urlsafe_b64decode(
+			public_key_credential["response"]["attestationObject"].encode("ascii") + b"=="
+		)
+		# attestation_object_example = {
+		# 	'attStmt': {},
+		# 	'authData': b'I\x96\r\xe5\x88\x0e\x8cht4\x17\x0fdv`[\x8f\xe4\xae\xb9'...,
+		# 	'fmt': 'none'
+		# }
 
 		# Verify that the correct operation was performed
 		assert client_data["type"] == "webauthn.create"
@@ -163,6 +175,8 @@ class WebAuthnService(asab.Service):
 		webauthn_cid = auth_data[55:55 + cid_length]
 		public_key = auth_data[55 + cid_length:]
 
+		assert base64.urlsafe_b64encode(webauthn_cid + b'==') == public_key_credential["id"]
+
 		# public_key is a CBOR-encoded object
 		# cbor2.decoder.loads(public_key)
 
@@ -189,7 +203,7 @@ class WebAuthnService(asab.Service):
 		result = await provider.update(credentials_id, {
 			"__webauthn": {
 				"key": public_key,
-				"cid": webauthn_cid,
+				"cid": public_key_credential["id"],
 			}
 		})
 		if result == "OK":
@@ -213,7 +227,6 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
-		L.warning(f"\n🐱 {pprint.pformat(credentials['__webauthn'])}")
 		webauthn_cid = credentials["__webauthn"]["cid"]
 
 		challenge = await self._create_authentication_challenge(credentials_id)
@@ -233,7 +246,7 @@ class WebAuthnService(asab.Service):
 		return options
 
 
-	async def authenticate_key(self, credentials_id, client_data, authenticator_data, signature=None):
+	async def authenticate_key(self, credentials_id, public_key_credential):
 		"""
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
@@ -242,6 +255,23 @@ class WebAuthnService(asab.Service):
 		return True
 
 		credentials = await self.CredentialsService.get(credentials_id)
+
+		assert public_key_credential["type"] == "public-key"
+
+		client_data = json.loads(
+			base64.urlsafe_b64decode(
+				public_key_credential["response"]["clientDataJSON"].encode("ascii") + b"=="
+			).decode()
+		)
+		authenticator_data = base64.urlsafe_b64decode(
+			json_data["response"]["authenticatorData"].encode("ascii") + b"=="
+		)
+		signature = base64.urlsafe_b64decode(
+			json_data["response"]["signature"].encode("ascii") + b"=="
+		)
+		user_handle = base64.urlsafe_b64decode(
+			json_data["response"]["userHandle"].encode("ascii") + b"=="
+		)
 
 		assert client_data["type"] == "webauthn.get"
 

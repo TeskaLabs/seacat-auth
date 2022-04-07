@@ -79,25 +79,7 @@ class WebAuthnHandler(object):
 	})
 	@access_control()
 	async def register_key(self, request, *, json_data, credentials_id):
-		# Verify that the request CID matches the session CID
-		# assert credentials_id == base64.urlsafe_b64decode(json_data["id"].encode("ascii") + b"==").decode()
-
-		# The value SHOULD be a member of PublicKeyCredentialType but client platforms MUST ignore unknown values,
-		# ignoring any PublicKeyCredentialParameters with an unknown type.
-		# Currently one credential type is defined, namely "public-key".
-		assert json_data["type"] == "public-key"
-
-		# Parse the client data
-		client_data = json.loads(
-			base64.urlsafe_b64decode(
-				json_data["response"]["clientDataJSON"].encode("ascii") + b"=="
-			).decode()
-		)
-		attestation_object = base64.urlsafe_b64decode(
-			json_data["response"]["attestationObject"].encode("ascii") + b"=="
-		)
-
-		response = await self.WebAuthnService.register_key(credentials_id, client_data, attestation_object)
+		response = await self.WebAuthnService.register_key(credentials_id, public_key_credential=json_data)
 		return asab.web.rest.json_response(
 			request, response,
 			status=200 if response["result"] == "OK" else 400
