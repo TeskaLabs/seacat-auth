@@ -26,12 +26,7 @@ class WebAuthnFactor(LoginFactorABC):
 
 	async def authenticate(self, login_session, request_data) -> bool:
 		L.warning(f"\n🐱 {login_session.Data=}\n🐶 {request_data=}")
-		return True
+		public_key_credential = request_data.get("webauthn")
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
-		webauthn_svc.authenticate_key(
-			login_session.CredentialsId,
-			client_data=None,
-			authenticator_data=None,
-			signature=None
-		)
+		webauthn_svc.authenticate_key(login_session.CredentialsId, public_key_credential)
 		return False
