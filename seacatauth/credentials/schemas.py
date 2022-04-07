@@ -8,10 +8,6 @@ _FIELDS = {
 	"username": {
 		"type": "string",
 		"description": "Username",
-		"anyOf": [
-			{"pattern": USERNAME_PATTERN},
-			{"const": ""},
-		],
 	},
 	"email": {
 		"type": "string",
@@ -46,9 +42,6 @@ _FIELDS = {
 CREATE_CREDENTIALS = {
 	"type": "object",
 	"additionalProperties": False,
-	"required": [
-		"username"
-	],
 	"properties": {
 		field: schema
 		for field, schema in _FIELDS.items()
