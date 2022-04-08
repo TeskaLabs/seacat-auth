@@ -142,6 +142,9 @@ class GrafanaIntegration(asab.config.Configurable):
 				async with session.post('{}/api/admin/users'.format(self.URL), json=json) as resp:
 					if resp.status == 200:
 						pass
+					elif resp.status == 412:
+						# User already exists
+						return
 					else:
 						text = await resp.text()
 						L.warning(
