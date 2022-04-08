@@ -5,6 +5,7 @@ import aiohttp
 import asab.config
 
 #
+from seacatauth.authz import get_credentials_authz
 
 L = logging.getLogger(__name__)
 
@@ -15,6 +16,9 @@ L = logging.getLogger(__name__)
 #       That's to be done using PubSub mechanism
 
 # TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
+
+_GRAFANA_ADMIN_RESOURCE = "grafana:admin"
+_GRAFANA_USER_RESOURCE = "grafana:user"
 
 
 class GrafanaIntegration(asab.config.Configurable):
@@ -33,6 +37,9 @@ class GrafanaIntegration(asab.config.Configurable):
 	def __init__(self, batman_svc, config_section_name="batman:grafana", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
 		self.BatmanService = batman_svc
+		self.TenantService = self.BatmanService.App.get_service("seacatauth.TenantService")
+		self.RoleService = self.BatmanService.App.get_service("seacatauth.RoleService")
+		self.RBACService = self.BatmanService.App.get_service("seacatauth.RBACService")
 
 		username = self.Config.get('username')
 		password = self.Config.get('password')
@@ -64,18 +71,25 @@ class GrafanaIntegration(asab.config.Configurable):
 		username = cred.get('username')
 		if username is None:
 			# Be defensive
-			L.warning("Cannot create user '{}', no username".format(cred))
+			L.warning("Cannot create Grafana user: No username", struct_data={
+				"cid": cred["_id"]
+			})
 			return
 
 		if username in self.LocalUsers:
 			# Ignore users that are specified as local
 			return
 
-		# Check roles
-		roles_svc = self.BatmanService.App.get_service('seacatauth.RoleService')
-		roles = await roles_svc.get_roles_by_credentials(cred['_id'])
-		if "*/grafana:grafana_admin" not in roles and "*/grafana:grafana_user" not in roles:
-			L.warning("Cannot create user '{}', roles '{}', no admin rights".format(cred, roles))
+		# Get authz dict
+		authz = await get_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
+
+		# Grafana roles from SCA resources
+		# Use only global "*" roles for now
+		if not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) \
+			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]):
+			L.warning("Cannot create Grafana user: User has no Grafana resources", struct_data={
+				"cid": cred["_id"]
+			})
 			return
 
 		json = {
@@ -99,37 +113,47 @@ class GrafanaIntegration(asab.config.Configurable):
 			json['name'] = v
 
 		try:
-
 			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
 				async with session.post('{}/api/admin/users'.format(self.URL), json=json) as resp:
-					if resp.status == 200:
-
-						# Everything is alright here
-						if "*/grafana:grafana_admin" in roles:
-							response = await resp.json()
-							_id = response["id"]
-							async with session.put('{}/api/admin/users/{}/permissions'.format(self.URL, _id), json={
-								"isGrafanaAdmin": True
-							}) as resp_role:
-								if resp_role.status == 200:
-									pass
-								else:
-									text = await resp_role.text()
-									L.warning("Failed to update user permissions in Grafana:\n{}".format(text[:1000]))
-
-							# Update role
-							async with session.patch('{}/api/org/users/{}'.format(self.URL, _id), json={
-								"role": "Admin"
-							}) as resp_role:
-								if resp_role.status == 200:
-									pass
-								else:
-									text = await resp_role.text()
-									L.warning("Failed to update user roles in Grafana:\n{}".format(text[:1000]))
-
-					else:
+					if resp.status != 200:
 						text = await resp.text()
-						L.warning("Failed to create the user in Grafana:\n{}".format(text[:1000]))
+						L.warning(
+							"Failed to create user in Grafana:\n{}".format(text[:1000]),
+							struct_data={"cid": cred["_id"], "status": resp.status}
+						)
+						return
+
+					# Set admin role if Grafana admin resource is present
+					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]):
+						response = await resp.json()
+						_id = response["id"]
+						async with session.put("{}/api/admin/users/{}/permissions".format(self.URL, _id), json={
+							"isGrafanaAdmin": True
+						}) as resp_role:
+							if resp_role.status == 200:
+								pass
+							else:
+								text = await resp_role.text()
+								L.warning(
+									"Failed to update user permissions in Grafana:\n{}".format(text[:1000]),
+									struct_data={"cid": cred["_id"], "status": resp.status}
+								)
+
+						# Update role
+						async with session.patch("{}/api/org/users/{}".format(self.URL, _id), json={
+							"role": "Admin"
+						}) as resp_role:
+							if resp_role.status == 200:
+								pass
+							else:
+								text = await resp_role.text()
+								L.warning(
+									"Failed to update user roles in Grafana:\n{}".format(text[:1000]),
+									struct_data={"cid": cred["_id"], "status": resp.status}
+								)
 
 		except Exception as e:
-			L.exception("Error when communicating with Grafana: '{}'.".format(e))
+			L.error(
+				"Communication with Grafana produced {}: {}".format(type(e).__name__, str(e)),
+				struct_data={"cid": cred["_id"]}
+			)
