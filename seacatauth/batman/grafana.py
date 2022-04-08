@@ -105,10 +105,16 @@ class GrafanaIntegration(asab.config.Configurable):
 		# Use only global "*" roles for now
 		if not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) \
 			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]):
-			L.warning("Cannot create Grafana user: User has no Grafana resources", struct_data={
-				"cid": cred["_id"]
-			})
-			return
+			# TODO: BACK COMPAT
+			#   Use resources instead of roles! This will be removed
+			# >>>>>>>>>>>>>>
+			if "*/grafana:grafana_admin" not in authz.get("*", {}) \
+				and "*/grafana:grafana_user" not in authz.get("*", {}):
+				# <<<<<<<<<<<<<<<<<<<<<<<
+				L.warning("Cannot create Grafana user: User has no Grafana resources", struct_data={
+					"cid": cred["_id"]
+				})
+				return
 
 		json = {
 			'login': username,
@@ -142,7 +148,8 @@ class GrafanaIntegration(asab.config.Configurable):
 						return
 
 					# Set admin role if Grafana admin resource is present
-					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]):
+					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) \
+						or "*/grafana:grafana_admin" in authz.get("*", {}):  # TODO: BACK COMPAT, Use resources instead
 						response = await resp.json()
 						_id = response["id"]
 						async with session.put("{}/api/admin/users/{}/permissions".format(self.URL, _id), json={
