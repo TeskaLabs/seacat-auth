@@ -34,7 +34,17 @@ class TenantService(asab.Service):
 
 
 	async def get_tenant(self, tenant_id: str):
-		return await self.TenantsProvider.get(tenant_id)
+		try:
+			data = await self.TenantsProvider.get(tenant_id)
+		except KeyError:
+			return {
+				"result": "NOT-FOUND",
+				"message": "Tenant '{}' not found.".format(tenant_id)
+			}
+		return {
+			"result": "OK",
+			"data": data
+		}
 
 
 	async def create_tenant(self, tenant_id: str, creator_id: str = None):
