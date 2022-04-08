@@ -104,7 +104,7 @@ class GrafanaIntegration(asab.config.Configurable):
 		# Grafana roles from SCA resources
 		# Use only global "*" roles for now
 		if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) != "OK" \
-			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]) != "OK":
+			and self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]) != "OK":
 			# TODO: BACK COMPAT
 			#   Use resources instead of roles! This will be removed
 			# >>>>>>>>>>>>>>
