@@ -103,8 +103,8 @@ class GrafanaIntegration(asab.config.Configurable):
 
 		# Grafana roles from SCA resources
 		# Use only global "*" roles for now
-		if not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) \
-			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]):
+		if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) != "OK" \
+			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]) != "OK":
 			# TODO: BACK COMPAT
 			#   Use resources instead of roles! This will be removed
 			# >>>>>>>>>>>>>>
@@ -151,7 +151,7 @@ class GrafanaIntegration(asab.config.Configurable):
 						return
 
 					# Set admin role if Grafana admin resource is present
-					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) \
+					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) == "OK" \
 						or "*/grafana:grafana_admin" in authz.get("*", {}):  # TODO: BACK COMPAT, Use resources instead
 						response = await resp.json()
 						_id = response["id"]
