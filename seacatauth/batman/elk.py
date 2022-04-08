@@ -74,14 +74,14 @@ class ELKIntegration(asab.config.Configurable):
 		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 	async def _on_tick(self, event_name):
-		await self._initialize_elk_resources()
+		await self._initialize_resources()
 		await self.sync_all()
 
 	async def initialize(self):
-		await self._initialize_elk_resources()
+		await self._initialize_resources()
 		await self.sync_all()
 
-	async def _initialize_elk_resources(self):
+	async def _initialize_resources(self):
 		"""
 		Fetches roles from ELK and creates a Seacat Auth resource for each one of them.
 		"""

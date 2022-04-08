@@ -40,6 +40,7 @@ class GrafanaIntegration(asab.config.Configurable):
 		self.TenantService = self.BatmanService.App.get_service("seacatauth.TenantService")
 		self.RoleService = self.BatmanService.App.get_service("seacatauth.RoleService")
 		self.RBACService = self.BatmanService.App.get_service("seacatauth.RBACService")
+		self.ResourceService = self.BatmanService.App.get_service("seacatauth.ResourceService")
 
 		username = self.Config.get('username')
 		password = self.Config.get('password')
@@ -57,7 +58,24 @@ class GrafanaIntegration(asab.config.Configurable):
 	async def _on_tick(self, event_name):
 		await self.sync_all()
 
+	async def _initialize_resources(self):
+		try:
+			await self.ResourceService.get(_GRAFANA_ADMIN_RESOURCE)
+		except KeyError:
+			await self.ResourceService.create(
+				_GRAFANA_ADMIN_RESOURCE,
+				description="Grants admin access to Grafana."
+			)
+		try:
+			await self.ResourceService.get(_GRAFANA_USER_RESOURCE)
+		except KeyError:
+			await self.ResourceService.create(
+				_GRAFANA_USER_RESOURCE,
+				description="Grants user access to Grafana."
+			)
+
 	async def initialize(self):
+		await self._initialize_resources()
 		await self.sync_all()
 
 
