@@ -136,10 +136,13 @@ class GrafanaIntegration(asab.config.Configurable):
 		if v is not None:
 			json['name'] = v
 
+		# TODO: Check if user exists
 		try:
 			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
 				async with session.post('{}/api/admin/users'.format(self.URL), json=json) as resp:
-					if resp.status != 200:
+					if resp.status == 200:
+						pass
+					else:
 						text = await resp.text()
 						L.warning(
 							"Failed to create user in Grafana:\n{}".format(text[:1000]),
