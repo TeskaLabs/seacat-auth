@@ -62,7 +62,9 @@ class LoginSession(object):
 
 	def encrypt(self, plaintext: dict) -> bytes:
 		assert self.__shared_key is not None
-		plaintext = json.dumps(plaintext).encode('utf-8')
+		if isinstance(plaintext, dict):
+			plaintext = json.dumps(plaintext).encode('utf-8')
+
 		iv = secrets.token_bytes(12)
 
 		# Construct a Cipher object, with the key, iv, and additionally the
