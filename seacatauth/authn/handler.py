@@ -278,8 +278,4 @@ class AuthenticationHandler(object):
 
 		login_session.Data["webauthn"] = authentication_options
 
-		body = {
-			"result": "OK",
-			"data": authentication_options
-		}
-		return aiohttp.web.Response(body=login_session.encrypt(body))
+		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))
