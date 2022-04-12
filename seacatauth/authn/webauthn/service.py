@@ -154,6 +154,7 @@ class WebAuthnService(asab.Service):
 		assert origin_hostname == self.RelyingPartyId
 
 		attestation_object = cbor2.decoder.loads(attestation_object)
+		L.warning(f"\n🐞 ATT OBJ {pprint.pformat(attestation_object)}")
 
 		# TODO: Check attestation format
 		assert attestation_object["fmt"] in frozenset([
@@ -169,17 +170,7 @@ class WebAuthnService(asab.Service):
 			rp_id_hash,
 			flags,
 			signature_counter,
-			aaguid,
-			cid_length
-		) = struct.unpack(">32s1sI16sH", auth_data[:55])
-		webauthn_cid = auth_data[55:55 + cid_length]
-		public_key = auth_data[55 + cid_length:]
-
-		# Verify that the ids match
-		# assert base64.urlsafe_b64encode(webauthn_cid + b'==') == public_key_credential["id"]
-
-		# public_key is a CBOR-encoded object
-		# cbor2.decoder.loads(public_key)
+		) = struct.unpack(">32s1sI", auth_data[:37])
 
 		# Unpack flags
 		flags = [bool(int(i)) for i in format(ord(flags), "08b")]
@@ -192,19 +183,52 @@ class WebAuthnService(asab.Service):
 			user_present
 		) = flags
 
+		if attested_credential_data_included:
+			aaguid, cid_length = struct.unpack(">16sH", auth_data[37:55])
+			webauthn_cid = auth_data[55:55 + cid_length]
+			public_key = auth_data[55 + cid_length:]
+		else:
+			L.error("attested_credential_data_included is False")
+			return {"result": "FAILED"}
+
+		data = {
+			"rp_id_hash": rp_id_hash,
+			"signature_counter": signature_counter,
+			"aaguid": aaguid,
+			"cid_length": cid_length,
+			"webauthn_cid": webauthn_cid.hex(),
+			"public_key": public_key.hex()
+		}
+		L.warning(f"\n🐞 DATA {pprint.pformat(data)}")
+
+
+		# Verify that the ids match
+		# assert base64.urlsafe_b64encode(webauthn_cid + b'==') == public_key_credential["id"]
+
+		# public_key is a CBOR-encoded object
+		# cbor2.decoder.loads(public_key)
+
+
 		assert user_present
 
 		# TODO: User verification
 		# assert user_verified
 
 		# TODO: Validate the auth data hash
+		webauthn_cid_encoded = base64.urlsafe_b64encode(webauthn_cid)
+		L.warning(
+			f"\n🔑ID {public_key_credential['id']}\n🔑ID {public_key_credential['rawId']}"
+			f"\n🔑ID {webauthn_cid}"
+			f"\n🔑ID {webauthn_cid_encoded}"
+		)
 
 		# Update user credentials with the public_key
 		provider = self.CredentialsService.get_provider(credentials_id)
 		result = await provider.update(credentials_id, {
 			"__webauthn": {
 				"key": public_key,
-				"cid": public_key_credential["id"],
+				"cid": webauthn_cid,
+				# "cid": public_key_credential["id"],
 			}
 		})
 		if result == "OK":
@@ -232,6 +256,8 @@ class WebAuthnService(asab.Service):
 
 		challenge = await self._create_authentication_challenge(credentials_id)
 
+		L.warning(f"\n🔑ID {webauthn_cid.hex()}")
+
 		options = {
 			"challenge": challenge,
 			"timeout": self.ChallengeTimeout,
@@ -239,7 +265,7 @@ class WebAuthnService(asab.Service):
 			"allowCredentials": [  # Optional
 				{
 					"type": "public-key",
-					"id": webauthn_cid,
+					"id": webauthn_cid.hex(),
 					# "transports": ['usb', 'ble', 'nfc'],  # Optional
 				}
 			],
