@@ -276,12 +276,11 @@ class WebAuthnService(asab.Service):
 		return options
 
 
-	async def authenticate_key(self, credentials_id, public_key_credential):
+	async def authenticate_key(self, credentials_id, authentication_options, public_key_credential):
 		"""
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
-
 		return True
 
 		credentials = await self.CredentialsService.get(credentials_id)
@@ -294,16 +293,20 @@ class WebAuthnService(asab.Service):
 			).decode()
 		)
 		authenticator_data = base64.urlsafe_b64decode(
-			json_data["response"]["authenticatorData"].encode("ascii") + b"=="
+			public_key_credential["response"]["authenticatorData"].encode("ascii") + b"=="
 		)
 		signature = base64.urlsafe_b64decode(
-			json_data["response"]["signature"].encode("ascii") + b"=="
+			public_key_credential["response"]["signature"].encode("ascii") + b"=="
 		)
 		user_handle = base64.urlsafe_b64decode(
-			json_data["response"]["userHandle"].encode("ascii") + b"=="
+			public_key_credential["response"]["userHandle"].encode("ascii") + b"=="
 		)
 
 		assert client_data["type"] == "webauthn.get"
+
+		challenge = authentication_options.get("")
+		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
+		public_key = credentials["__webauthn"]["public_key"]
 
 		challenge = base64.b64decode(client_data["challenge"].encode("ascii") + b"==").decode()
 		await self._verify_authentication_challenge(credentials_id, challenge)
