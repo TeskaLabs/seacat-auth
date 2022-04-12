@@ -12,6 +12,8 @@ import cose.algorithms
 
 import asab.storage
 import pprint
+import webauthn
+import webauthn.helpers.structs
 
 #
 
@@ -46,6 +48,9 @@ class WebAuthnService(asab.Service):
 			cose.algorithms.Es256
 		]
 
+		# TODO: Dedicated collection for webauthn tokens
+		# TODO: Reg challenge = hash(session_id)
+
 
 	async def _create_registration_challenge(self, credentials_id) -> str:
 		challenge = secrets.token_urlsafe(32)
@@ -57,15 +62,14 @@ class WebAuthnService(asab.Service):
 		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
 		return challenge_hash == self._RegistrationChallenges.get(credentials_id)
 
-	async def _create_authentication_challenge(self, credentials_id) -> str:
-		challenge = secrets.token_urlsafe(32)
-		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
-		self._AuthenticationChallenges[credentials_id] = challenge_hash
+	async def _create_authentication_challenge(self, credentials_id) -> bytes:
+		challenge = secrets.token_bytes(32)
+		self._AuthenticationChallenges[credentials_id] = challenge
 		return challenge
 
-	async def _verify_authentication_challenge(self, credentials_id, challenge) -> str:
+	async def _verify_authentication_challenge(self, public_key, challenge, signature) -> bool:
 		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
-		return challenge_hash == self._AuthenticationChallenges.get(credentials_id)
+		return True
 
 
 	async def get_registration_options(self, credentials_id):
@@ -247,32 +251,25 @@ class WebAuthnService(asab.Service):
 
 
 	async def get_authentication_options(self, credentials_id: str):
-		"""
-		Prologue to adding WebAuthn to a credentials
-		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
-		"""
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
 		webauthn_cid = credentials["__webauthn"]["cid"]
+		allow_credentials = [
+			webauthn.helpers.structs.PublicKeyCredentialDescriptor(
+				id=webauthn_cid,
+				# transports=
+			)
+		]
 
-		challenge = await self._create_authentication_challenge(credentials_id)
+		options = webauthn.generate_authentication_options(
+			rp_id=self.RelyingPartyId,
+			challenge=await self._create_authentication_challenge(credentials_id),
+			timeout=self.ChallengeTimeout,
+			allow_credentials=allow_credentials,
+			user_verification=webauthn.helpers.structs.UserVerificationRequirement.PREFERRED
+		)
 
-		L.warning(f"\n🔑ID {webauthn_cid.hex()}")
-
-		options = {
-			"challenge": challenge,
-			"timeout": self.ChallengeTimeout,
-			"rpId": self.RelyingPartyId,  # Optional
-			"allowCredentials": [  # Optional
-				{
-					"type": "public-key",
-					"id": webauthn_cid.hex(),
-					# "transports": ['usb', 'ble', 'nfc'],  # Optional
-				}
-			],
-			"userVerification": "preferred",  # Optional
-			# "extensions": ...,  # Optional
-		}
-
+		options = webauthn.options_to_json(options)
+		L.warning(f"\n🔑AUTH OPTS {pprint.pformat(options)}")
 		return options
 
 
@@ -281,10 +278,6 @@ class WebAuthnService(asab.Service):
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
-		return True
-
-		credentials = await self.CredentialsService.get(credentials_id)
-
 		assert public_key_credential["type"] == "public-key"
 
 		client_data = json.loads(
@@ -304,12 +297,12 @@ class WebAuthnService(asab.Service):
 
 		assert client_data["type"] == "webauthn.get"
 
-		challenge = authentication_options.get("")
+		# Verify challenge
+		challenge = authentication_options.get("challenge")
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
 		public_key = credentials["__webauthn"]["public_key"]
 
-		challenge = base64.b64decode(client_data["challenge"].encode("ascii") + b"==").decode()
-		await self._verify_authentication_challenge(credentials_id, challenge)
+
 
 		origin_hostname = urllib.parse.urlparse(client_data["origin"]).hostname
 		assert origin_hostname == self.RelyingPartyId

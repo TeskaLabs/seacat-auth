@@ -40,6 +40,7 @@ RUN apk add --no-cache --virtual buildenv \
     python-ldap \
     jinja2 \
     pyotp \
+    webauthn \
     git+https://github.com/TeskaLabs/asab.git \
 && apk del buildenv
 
