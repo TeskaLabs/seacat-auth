@@ -1,7 +1,9 @@
 import base64
 import json
 import logging
+import pprint
 
+import aiohttp.web
 import asab.web
 import asab.web.rest
 
@@ -27,20 +29,21 @@ class WebAuthnHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
-		web_app.router.add_put('/public/webauthn/register', self.register_key)
-		web_app.router.add_delete('/public/webauthn', self.remove_key)
+		web_app.router.add_put('/public/webauthn/register', self.register_credential)
+		web_app.router.add_delete('/public/webauthn', self.remove_credential)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
-		web_app_public.router.add_put('/public/webauthn/register', self.register_key)
-		web_app_public.router.add_delete('/public/webauthn', self.remove_key)
+		web_app_public.router.add_put('/public/webauthn/register', self.register_credential)
+		web_app_public.router.add_delete('/public/webauthn', self.remove_credential)
 
 
 	@access_control()
-	async def get_registration_options(self, request, *, credentials_id):
-		options = await self.WebAuthnService.get_registration_options(credentials_id)
-		return asab.web.rest.json_response(request, {"result": "OK", "data": options})
+	async def get_registration_options(self, request):
+		options = await self.WebAuthnService.get_registration_options(request.Session)
+		return aiohttp.web.Response(body=options, content_type="application/json")
+		# return asab.web.rest.json_response(request, options)
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -78,17 +81,18 @@ class WebAuthnHandler(object):
 		}
 	})
 	@access_control()
-	async def register_key(self, request, *, json_data, credentials_id):
-		response = await self.WebAuthnService.register_key(credentials_id, public_key_credential=json_data)
+	async def register_credential(self, request, *, json_data):
+		response = await self.WebAuthnService.register_credential(request.Session, public_key_credential=json_data)
 		return asab.web.rest.json_response(
 			request, response,
 			status=200 if response["result"] == "OK" else 400
 		)
 
 	@access_control()
-	async def remove_key(self, request, *, credentials_id):
-		response = await self.WebAuthnService.remove_key(credentials_id)
+	async def remove_credential(self, request, *, credentials_id):
+		response = await self.WebAuthnService.delete_webauthn_credentials_by_user(credentials_id)
+		# response = await self.WebAuthnService.delete_webauthn_credential(webauthn_credential_id)
 		return asab.web.rest.json_response(
 			request, response,
-			status=200 if response["result"] == "OK" else 400
+			status={"result": "OK"}
 		)
