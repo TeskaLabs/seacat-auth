@@ -90,9 +90,8 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def remove_credential(self, request, *, credentials_id):
-		response = await self.WebAuthnService.delete_webauthn_credentials_by_user(credentials_id)
-		# response = await self.WebAuthnService.delete_webauthn_credential(webauthn_credential_id)
+		await self.WebAuthnService.delete_webauthn_credentials_by_user(credentials_id)
+		# await self.WebAuthnService.delete_webauthn_credential(webauthn_credential_id)
 		return asab.web.rest.json_response(
-			request, response,
-			status={"result": "OK"}
+			request, {"result": "OK"}
 		)

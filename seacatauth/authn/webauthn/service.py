@@ -145,7 +145,7 @@ class WebAuthnService(asab.Service):
 		result = await collection.delete_many(query_filter)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={
 			"cid": credentials_id,
-			"count": result.deleted_count()
+			"count": result.deleted_count
 		})
 
 
@@ -246,15 +246,6 @@ class WebAuthnService(asab.Service):
 		return {"result": "OK"}
 
 
-	async def remove_credential(self, credentials_id):
-		provider = self.CredentialsService.get_provider(credentials_id)
-		result = await provider.update(credentials_id, {"__webauthn": ""})
-		if result == "OK":
-			return {"result": result}
-		else:
-			return result
-
-
 	async def get_authentication_options(self, credentials_id: str):
 		# Only one WebAuthn key supported for now
 		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
@@ -303,6 +294,7 @@ class WebAuthnService(asab.Service):
 		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
 		wa_credential = wa_credentials[0]
 		public_key = wa_credential["pk"]
+		sign_count = wa_credential["sc"]
 
 		try:
 			verified_authentication = webauthn.verify_authentication_response(
@@ -311,20 +303,17 @@ class WebAuthnService(asab.Service):
 				expected_origin=self.Origin,
 				expected_rp_id=self.RelyingPartyId,
 				credential_public_key=public_key,
-				credential_current_sign_count=0,  # TODO: Get from mongo
+				credential_current_sign_count=sign_count,
 				require_user_verification=False,
 			)
-		except ... as e:
+		except ... as e:  # TODO!
 			L.warning("Login failed with {}: {}".format(type(e).__name__, str(e)))
 			return False
 
-		# TODO: Update count in mongo coll
-		verified_authentication.new_sign_count
-
-		verified_authentication.credential_id  # This will be mongo ID
+		# Update sign count in storage
+		await self.update_webauthn_credential(
+			base64.urlsafe_b64decode(verified_authentication.credential_id + b"=="),
+			sign_count=verified_authentication.new_sign_count
+		)
 
 		return True
-
-
-	def _verify_authentication(self, credentials, authenticator_data, signature):
-		raise NotImplementedError("WebAuthnService._verify_authentication")
