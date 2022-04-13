@@ -29,7 +29,7 @@ class WebAuthnFactor(LoginFactorABC):
 	async def authenticate(self, login_session, request_data) -> bool:
 		public_key_credential = request_data.get("webauthn")
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
-		return await webauthn_svc.authenticate_key(
+		return await webauthn_svc.authenticate_credential(
 			login_session.CredentialsId,
 			login_session.Data.get("webauthn"),
 			public_key_credential
