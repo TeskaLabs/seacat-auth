@@ -154,9 +154,9 @@ class OpenIdConnectService(asab.Service):
 		if v is not None and len(v) > 0:
 			userinfo["totp_set"] = True
 
-		v = credentials.get("__webauthn")
-		# TODO: Use WebAuthnService or WebAuthnFactor to get this information
-		if v is not None and len(v) > 0:
+		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
+		webauthn_credentials = await webauthn_svc.get_webauthn_credentials_by_user(session.CredentialsId)
+		if len(webauthn_credentials) > 0:
 			userinfo["webauthn_set"] = True
 
 		# TODO: last password change
