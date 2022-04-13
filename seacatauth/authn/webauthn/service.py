@@ -23,7 +23,7 @@ L = logging.getLogger(__name__)
 
 
 class WebAuthnService(asab.Service):
-	ChallengeCollection = "wa"
+	WebAuthnCredentialCollection = "wa"
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
@@ -36,51 +36,123 @@ class WebAuthnService(asab.Service):
 
 		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
 
+		self.Origin = asab.Config.get("seacatauth:webauthn", "origin", fallback=None)
+		if self.Origin is None:
+			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			parsed = urllib.parse.urlparse(auth_webui_base_url)
+			self.Origin = "{}://{}".format(parsed.scheme, parsed.netloc)
+
 		# RP ID must match host's domain name (without scheme, port or subpath)
 		# https://www.w3.org/TR/webauthn-2/#relying-party-identifier
 		self.RelyingPartyId = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
 		if self.RelyingPartyId is None:
-			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
-			self.RelyingPartyId = urllib.parse.urlparse(auth_webui_base_url).hostname
+			self.RelyingPartyId = urllib.parse.urlparse(self.Origin).hostname
 
 		self.ChallengeTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
 			cose.algorithms.Es256
 		]
 
-		# TODO: Dedicated collection for webauthn tokens
-		# TODO: Reg challenge = hash(session_id)
+
+	async def create_webauthn_credential(
+		self,
+		credentials_id: str,
+		webauthn_credential_id: bytes,
+		public_key: bytes,
+		name: str = None
+	):
+		# Get the serial number of this user's most recent webauthn credential
+		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
+		cursor = collection.find()
+		cursor.sort("sn", 1)
+		cursor.limit(1)
+		newest_wa_credential = await anext(cursor)
+		serial_number = newest_wa_credential.get("sn") + 1
+
+		if name is None:
+			name = "Key_{}".format(serial_number)
+
+		upsertor = self.StorageService.upsertor(self.WebAuthnCredentialCollection, obj_id=webauthn_credential_id)
+
+		upsertor.set("pk", public_key)
+		upsertor.set("cid", credentials_id)
+		upsertor.set("sc", 0)  # Sign counter
+		upsertor.set("sn", serial_number)
+		upsertor.set("name", name)
+
+		wcid = await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wcid": wcid})
 
 
-	async def _create_registration_challenge(self, credentials_id) -> str:
-		challenge = secrets.token_urlsafe(32)
-		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
-		self._RegistrationChallenges[credentials_id] = challenge_hash
-		return challenge
-
-	async def _verify_registration_challenge(self, credentials_id, challenge) -> str:
-		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
-		return challenge_hash == self._RegistrationChallenges.get(credentials_id)
-
-	async def _create_authentication_challenge(self, credentials_id) -> bytes:
-		challenge = secrets.token_bytes(32)
-		self._AuthenticationChallenges[credentials_id] = challenge
-		return challenge
-
-	async def _verify_authentication_challenge(self, public_key, challenge, signature) -> bool:
-		challenge_hash = hashlib.md5(challenge.encode()).hexdigest()
-		return True
+	async def get_webauthn_credential(self, webauthn_credential_id):
+		return await self.StorageService.get(self.WebAuthnCredentialCollection, webauthn_credential_id)
 
 
-	async def get_registration_options(self, credentials_id):
+	async def get_webauthn_credentials_by_user(self, credentials_id: str):
+		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
+
+		query_filter = {"cid": credentials_id}
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+
+		wa_credentials = []
+		async for resource_dict in cursor:
+			wa_credentials.append(resource_dict)
+
+		return wa_credentials
+
+
+	async def update_webauthn_credential(
+		self, webauthn_credential_id: bytes,
+		sign_count: int = None,
+		name: str = None
+	):
+		"""
+		Only allows updating the key name and the sign count (for now).
+		"""
+		wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
+
+		upsertor = self.StorageService.upsertor(
+			self.WebAuthnCredentialCollection,
+			obj_id=webauthn_credential_id,
+			version=wa_credential["_v"]
+		)
+
+		if sign_count is not None:
+			upsertor.set("sc", sign_count)
+
+		if name is not None:
+			upsertor.set("name", name)
+
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
+			"wcid": webauthn_credential_id,
+		})
+
+
+	async def delete_webauthn_credential(self, webauthn_credential_id: bytes):
+		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
+		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wcid": webauthn_credential_id})
+
+
+	def _get_registration_challenge(self, session) -> bytes:
+		return hashlib.md5(session.SessionId.encode("ascii")).digest()
+
+
+	async def _get_authentication_challenge(self) -> bytes:
+		return secrets.token_bytes(32)
+
+
+	async def get_registration_options(self, session):
 		"""
 		Prologue to adding WebAuthn to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
 
-		credentials = await self.CredentialsService.get(credentials_id)
+		credentials = await self.CredentialsService.get(session.CredentialsId)
 
-		challenge = await self._create_registration_challenge(credentials_id)
+		challenge = self._get_registration_challenge(session)
 
 		options = {
 			"challenge": challenge,
@@ -89,7 +161,7 @@ class WebAuthnService(asab.Service):
 				"id": self.RelyingPartyId,
 			},
 			"user": {
-				"id": credentials_id,
+				"id": session.CredentialsId,
 				"name": credentials.get("email"),
 				"displayName": credentials.get("username"),
 			},
@@ -108,13 +180,13 @@ class WebAuthnService(asab.Service):
 		return options
 
 
-	async def register_key(self, credentials_id: str, public_key_credential: dict):
+	async def register_key(self, session, public_key_credential: dict):
 		"""
 		Add WebAuthn public key to a credentials
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
 
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
+		credentials = await self.CredentialsService.get(session.CredentialsId, include=frozenset(["__webauthn"]))
 		if credentials.get("__webauthn") not in (None, ""):
 			return {
 				"result": "ALREADY-EXISTS",
@@ -151,7 +223,7 @@ class WebAuthnService(asab.Service):
 
 		# Verify that the challenge has not been changed
 		challenge = base64.b64decode(client_data["challenge"].encode("ascii") + b"==").decode()
-		assert await self._verify_registration_challenge(credentials_id, challenge)
+		assert challenge == self._get_registration_challenge(session)
 
 		# Verify the origin
 		origin_hostname = urllib.parse.urlparse(client_data["origin"]).hostname
@@ -226,9 +298,15 @@ class WebAuthnService(asab.Service):
 			f"\n🔑ID {webauthn_cid_encoded}"
 		)
 
+		await self.create_webauthn_credential(
+			session.CredentialsId,
+			webauthn_cid,
+			public_key,
+			name=public_key_credential.get("key_name")
+		)
 		# Update user credentials with the public_key
-		provider = self.CredentialsService.get_provider(credentials_id)
-		result = await provider.update(credentials_id, {
+		provider = self.CredentialsService.get_provider(session.CredentialsId)
+		result = await provider.update(session.CredentialsId, {
 			"__webauthn": {
 				"key": public_key,
 				"cid": webauthn_cid,
@@ -278,41 +356,47 @@ class WebAuthnService(asab.Service):
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
-		assert public_key_credential["type"] == "public-key"
+		response = public_key_credential["response"]
+		response["clientDataJSON"] = base64.urlsafe_b64decode(response["clientDataJSON"].encode("ascii") + b"==")
+		response["authenticatorData"] = base64.urlsafe_b64decode(response["authenticatorData"].encode("ascii") + b"==")
+		response["signature"] = base64.urlsafe_b64decode(response["signature"].encode("ascii") + b"==")
 
-		client_data = json.loads(
-			base64.urlsafe_b64decode(
-				public_key_credential["response"]["clientDataJSON"].encode("ascii") + b"=="
-			).decode()
-		)
-		authenticator_data = base64.urlsafe_b64decode(
-			public_key_credential["response"]["authenticatorData"].encode("ascii") + b"=="
-		)
-		signature = base64.urlsafe_b64decode(
-			public_key_credential["response"]["signature"].encode("ascii") + b"=="
-		)
-		user_handle = base64.urlsafe_b64decode(
-			public_key_credential["response"]["userHandle"].encode("ascii") + b"=="
+		authentication_credential = webauthn.helpers.structs.AuthenticationCredential(
+			id=base64.urlsafe_b64encode(public_key_credential["id"].encode("ascii")).decode("ascii").rstrip("="),
+			raw_id=public_key_credential["rawId"].encode("ascii"),
+			response=response,
 		)
 
-		assert client_data["type"] == "webauthn.get"
+		authentication_options = json.loads(authentication_options)
 
-		# Verify challenge
-		challenge = authentication_options.get("challenge")
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__webauthn"]))
-		public_key = credentials["__webauthn"]["public_key"]
+		L.warning(f"\n🧟 credentials {pprint.pformat(credentials)}")
+		L.warning(f"\n🔐 public_key_credential {pprint.pformat(public_key_credential)}")
+		L.warning(f"\n📲 authentication_options {pprint.pformat(authentication_options)}")
+		clientDataJSON = webauthn.helpers.parse_client_data_json(response["clientDataJSON"])
+		expected_challenge = authentication_options.get("challenge").encode("ascii")
+		L.warning(f"\n🌾 clientDataJSON {pprint.pformat(clientDataJSON)}")
+		L.warning(f"\n⛰ expected_challenge {pprint.pformat(expected_challenge)}")
+		try:
+			verified_authentication = webauthn.verify_authentication_response(
+				credential=authentication_credential,
+				expected_challenge=expected_challenge,
+				expected_origin=self.Origin,
+				expected_rp_id=self.RelyingPartyId,
+				credential_public_key=credentials["__webauthn"]["key"],
+				credential_current_sign_count=0,  # TODO: Get from mongo
+				require_user_verification=False,
+			)
+		except ... as e:
+			L.warning("Login failed with {}: {}".format(type(e).__name__, str(e)))
+			return False
 
+		# TODO: Update count in mongo coll
+		verified_authentication.new_sign_count
 
+		verified_authentication.credential_id  # This will be mongo ID
 
-		origin_hostname = urllib.parse.urlparse(client_data["origin"]).hostname
-		assert origin_hostname == self.RelyingPartyId
-
-		# TODO: Verify authenticator_data hash
-
-		# TODO: Verify the authenticator_data + signature
-		self._verify_authentication(credentials, authenticator_data, signature)
-
-		return {"result": "OK"}
+		return True
 
 
 	def _verify_authentication(self, credentials, authenticator_data, signature):
