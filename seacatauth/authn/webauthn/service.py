@@ -61,6 +61,9 @@ class WebAuthnService(asab.Service):
 		verified_registration,  # webauthn.registration.VerifiedRegistration
 		name: str = None
 	):
+		"""
+		Create database entry for a verified WebAuthn credential
+		"""
 		if name is None:
 			name = "key-{}".format(datetime.datetime.now().strftime("%y%m%d-%H%M%S"))
 		else:
@@ -87,10 +90,16 @@ class WebAuthnService(asab.Service):
 
 
 	async def get_webauthn_credential(self, webauthn_credential_id):
+		"""
+		Get WebAuthn credential detail by its ID
+		"""
 		return await self.StorageService.get(self.WebAuthnCredentialCollection, webauthn_credential_id)
 
 
 	async def get_webauthn_credentials_by_user(self, credentials_id: str):
+		"""
+		Get all WebAuthn credentials of a specified user
+		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
 		query_filter = {"cid": credentials_id}
@@ -112,7 +121,9 @@ class WebAuthnService(asab.Service):
 		last_login: datetime.datetime = None,
 	):
 		"""
-		Only allows updating the key name and the sign count (for now).
+		Update WebAuthn credential
+
+		Only allows updating key name, last login time and sign count (for now).
 		"""
 		wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
 
@@ -138,11 +149,17 @@ class WebAuthnService(asab.Service):
 
 
 	async def delete_webauthn_credential(self, webauthn_credential_id: bytes):
+		"""
+		Delete WebAuthn credential by its ID
+		"""
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id})
 
 
 	async def delete_webauthn_credentials_by_user(self, credentials_id: str):
+		"""
+		Delete all WebAuthn credentials of a specified user
+		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
 		query_filter = {"cid": credentials_id}
@@ -154,6 +171,9 @@ class WebAuthnService(asab.Service):
 
 
 	async def create_registration_challenge(self, session_id: str) -> bytes:
+		"""
+		Create and return WebAuthn registration challenge for the current session
+		"""
 		# Delete existing challenge
 		try:
 			await self.delete_registration_challenge(session_id)
@@ -176,11 +196,17 @@ class WebAuthnService(asab.Service):
 
 
 	async def get_registration_challenge(self, session_id: str) -> bytes:
+		"""
+		Get existing WebAuthn registration challenge for the current session
+		"""
 		challenge_obj = await self.StorageService.get(self.WebAuthnRegistrationChallengeCollection, session_id)
 		return challenge_obj["ch"]
 
 
 	async def delete_registration_challenge(self, session_id: str):
+		"""
+		Delete existing WebAuthn registration challenge for the current session
+		"""
 		await self.StorageService.delete(self.WebAuthnRegistrationChallengeCollection, session_id)
 		L.info("WebAuthn challenge deleted", struct_data={
 			"sid": session_id
@@ -188,6 +214,9 @@ class WebAuthnService(asab.Service):
 
 
 	async def delete_expired_challenges(self):
+		"""
+		Delete expired WebAuthn registration challenges
+		"""
 		collection = self.StorageService.Database[self.WebAuthnRegistrationChallengeCollection]
 
 		query_filter = {"exp": {"$lt": datetime.datetime.now()}}
@@ -199,10 +228,18 @@ class WebAuthnService(asab.Service):
 
 
 	async def create_authentication_challenge(self) -> bytes:
+		"""
+		Create and return WebAuthn authentication challenge
+		"""
 		return secrets.token_bytes(32)
 
 
 	async def get_registration_options(self, session):
+		"""
+		Get WebAuthn registration options
+
+		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialcreationoptions
+		"""
 		credentials = await self.CredentialsService.get(session.CredentialsId)
 		challenge = await self.create_registration_challenge(session.SessionId)
 		options = webauthn.generate_registration_options(
@@ -222,6 +259,11 @@ class WebAuthnService(asab.Service):
 
 
 	async def register_credential(self, session, public_key_credential: dict):
+		"""
+		Register a new WebAuthn credential
+
+		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
+		"""
 		try:
 			challenge = await self.get_registration_challenge(session.SessionId)
 		except KeyError:
@@ -261,6 +303,11 @@ class WebAuthnService(asab.Service):
 
 
 	async def get_authentication_options(self, credentials_id: str, timeout: int = None):
+		"""
+		Get WebAuthn authentication options
+
+		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrequestoptions
+		"""
 		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
 		allow_credentials = [
 			webauthn.helpers.structs.PublicKeyCredentialDescriptor(
@@ -286,7 +333,8 @@ class WebAuthnService(asab.Service):
 
 	async def authenticate_credential(self, credentials_id, authentication_options, public_key_credential):
 		"""
-		Verify that the user has access to saved WebAuthn credentials
+		Authenticate a WebAuthn credential
+
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
 		_normalize_webauthn_credential_response(public_key_credential)
