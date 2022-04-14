@@ -96,11 +96,14 @@ class WebAuthnHandler(object):
 	async def list_credentials(self, request, *, credentials_id):
 		wa_credentials = []
 		for credential in await self.WebAuthnService.get_webauthn_credentials_by_user(credentials_id):
-			wa_credentials.append({
+			wa_credential = {
 				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
 				"name": credential["name"],
 				"sign_count": credential["sc"],
-			})
+			}
+			if "ll" in credential:
+				wa_credential["last_login"] = credential["ll"]
+			wa_credentials.append(wa_credential)
 
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
