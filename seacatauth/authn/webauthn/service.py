@@ -1,15 +1,9 @@
 import base64
 import datetime
-import hashlib
 import json
 import logging
 import secrets
-import struct
 import urllib.parse
-
-import cbor2
-
-import cose.algorithms
 
 import asab.storage
 import pprint
@@ -45,12 +39,15 @@ class WebAuthnService(asab.Service):
 		# https://www.w3.org/TR/webauthn-2/#relying-party-identifier
 		self.RelyingPartyId = asab.Config.get("seacatauth:webauthn", "relying_party_id", fallback=None)
 		if self.RelyingPartyId is None:
-			self.RelyingPartyId = urllib.parse.urlparse(self.Origin).hostname
+			self.RelyingPartyId = str(urllib.parse.urlparse(self.Origin).hostname)
 
 		self.RegistrationTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
 			webauthn.helpers.structs.COSEAlgorithmIdentifier(-7)  # Es256
 		]
+
+		# TODO: Delete expired challenges
+		# TODO: AuthenticationTimeout = login session timeout
 
 
 	async def create_webauthn_credential(
@@ -227,7 +224,6 @@ class WebAuthnService(asab.Service):
 		)
 		verified_registration = webauthn.verify_registration_response(
 			credential=registration_credential,
-			# TODO: Weird
 			expected_challenge=base64.urlsafe_b64encode(challenge).rstrip(b"="),
 			expected_rp_id=self.RelyingPartyId,
 			expected_origin=self.Origin,
@@ -246,7 +242,7 @@ class WebAuthnService(asab.Service):
 		return {"result": "OK"}
 
 
-	async def get_authentication_options(self, credentials_id: str):
+	async def get_authentication_options(self, credentials_id: str, timeout: int = None):
 		# Only one WebAuthn key supported for now
 		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
 		wa_credential = wa_credentials[0]
@@ -259,10 +255,13 @@ class WebAuthnService(asab.Service):
 			)
 		]
 
+		if timeout is None:
+			timeout = self.RegistrationTimeout
+
 		options = webauthn.generate_authentication_options(
 			rp_id=self.RelyingPartyId,
 			challenge=await self.create_authentication_challenge(),
-			timeout=self.RegistrationTimeout,
+			timeout=timeout,
 			allow_credentials=allow_credentials,
 			user_verification=webauthn.helpers.structs.UserVerificationRequirement.PREFERRED
 		)
