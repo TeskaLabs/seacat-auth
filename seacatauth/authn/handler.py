@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import asab
@@ -272,9 +273,14 @@ class AuthenticationHandler(object):
 			body = {"result": "FAILED", "message": "Unsupported factor type."}
 			return aiohttp.web.Response(body=login_session.encrypt(body))
 
+		# Webauthn challenge timeout should be the same as the current login session timeout
+		timeout = (login_session.ExpiresAt - datetime.datetime.now()).total_seconds() * 1000
+
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
-		# TODO: Consider using LSID instead of cred ID
-		authentication_options = await webauthn_svc.get_authentication_options(login_session.CredentialsId)
+		authentication_options = await webauthn_svc.get_authentication_options(
+			login_session.CredentialsId,
+			timeout
+		)
 
 		login_session.Data["webauthn"] = authentication_options
 
