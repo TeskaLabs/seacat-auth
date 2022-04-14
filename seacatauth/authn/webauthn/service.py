@@ -59,8 +59,7 @@ class WebAuthnService(asab.Service):
 	async def create_webauthn_credential(
 		self,
 		credentials_id: str,
-		webauthn_credential_id: bytes,
-		public_key: bytes,
+		verified_registration,  # webauthn.registration.VerifiedRegistration
 		name: str = None
 	):
 		if name is None:
@@ -69,11 +68,19 @@ class WebAuthnService(asab.Service):
 			if self.KeyNameRegex.fullmatch(name) is None:
 				raise ValueError("Invalid WebAuthn credential name", {"name": name})
 
-		upsertor = self.StorageService.upsertor(self.WebAuthnCredentialCollection, obj_id=webauthn_credential_id)
+		upsertor = self.StorageService.upsertor(
+			self.WebAuthnCredentialCollection,
+			obj_id=verified_registration.credential_id
+		)
 
-		upsertor.set("pk", public_key)
+		upsertor.set("pk", verified_registration.credential_public_key)
 		upsertor.set("cid", credentials_id)
-		upsertor.set("sc", 0)  # Sign counter
+		upsertor.set("sc", verified_registration.sign_count)
+		upsertor.set("aa", verified_registration.aaguid)
+		upsertor.set("fmt", verified_registration.fmt.value)
+		upsertor.set("uv", verified_registration.user_verified)
+		upsertor.set("ct", verified_registration.credential_type.value)
+		upsertor.set("ao", verified_registration.attestation_object)
 		upsertor.set("name", name)
 
 		wcid = await upsertor.execute()
@@ -237,9 +244,8 @@ class WebAuthnService(asab.Service):
 
 		await self.create_webauthn_credential(
 			session.CredentialsId,
-			verified_registration.credential_id,
-			verified_registration.credential_public_key,
-			name=public_key_credential.get("key_name")
+			verified_registration,
+			name=public_key_credential.get("key_name"),
 		)
 
 		try:
