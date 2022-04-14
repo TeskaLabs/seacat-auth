@@ -2,14 +2,6 @@
 
 ## Release candidate
 
-### Features
-- ID token contains JWT-encrypted userinfo data (#13, PLUM Sprint 220225)
-
----
-
-
-## v22.8
-
 ### Breaking changes
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
 - Usernames, roles and resources are validated before creation (#22, PLUM Sprint 220325)
@@ -21,6 +13,7 @@
 
 ### Features
 - Generate MANIFEST.json (#20, PLUM Sprint 220325)
+- WebAuthn login (#12, PLUM Sprint 220408)
 
 ### Refactoring
 - Fallback values in ident translation response (#18, PLUM Sprint 220325)
