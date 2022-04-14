@@ -4,6 +4,7 @@ import json
 import logging
 import secrets
 import urllib.parse
+import re
 
 import asab.storage
 import pprint
@@ -46,8 +47,13 @@ class WebAuthnService(asab.Service):
 			webauthn.helpers.structs.COSEAlgorithmIdentifier(-7)  # Es256
 		]
 
-		# TODO: Delete expired challenges
-		# TODO: AuthenticationTimeout = login session timeout
+		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
+
+		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)
+
+
+	async def _on_tick(self, event_name):
+		await self.delete_expired_challenges()
 
 
 	async def create_webauthn_credential(
@@ -69,7 +75,10 @@ class WebAuthnService(asab.Service):
 			serial_number = 1
 
 		if name is None:
-			name = "Key_{}".format(serial_number)
+			name = "key_{}".format(serial_number)
+		else:
+			if self.KeyNameRegex.fullmatch(name) is None:
+				raise ValueError("Invalid WebAuthn credential name", {"name": name})
 
 		upsertor = self.StorageService.upsertor(self.WebAuthnCredentialCollection, obj_id=webauthn_credential_id)
 
@@ -103,7 +112,7 @@ class WebAuthnService(asab.Service):
 
 
 	async def update_webauthn_credential(
-		self, webauthn_credential_id: bytes,
+		self, webauthn_credential_id: bytes, *,
 		sign_count: int = None,
 		name: str = None
 	):
@@ -175,6 +184,20 @@ class WebAuthnService(asab.Service):
 
 	async def delete_registration_challenge(self, session_id: str):
 		await self.StorageService.delete(self.WebAuthnRegistrationChallengeCollection, session_id)
+		L.info("WebAuthn challenge deleted", struct_data={
+			"sid": session_id
+		})
+
+
+	async def delete_expired_challenges(self):
+		collection = self.StorageService.Database[self.WebAuthnRegistrationChallengeCollection]
+
+		query_filter = {"exp": {"$lt": datetime.datetime.now()}}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.info("Expired WebAuthn challenges deleted", struct_data={
+				"count": result.deleted_count
+			})
 
 
 	async def create_authentication_challenge(self) -> bytes:
@@ -236,6 +259,12 @@ class WebAuthnService(asab.Service):
 			verified_registration.credential_public_key,
 			name=public_key_credential.get("key_name")
 		)
+
+		try:
+			await self.delete_registration_challenge(session.SessionId)
+		except KeyError:
+			# Challenge expired in the meantime
+			pass
 
 		return {"result": "OK"}
 
