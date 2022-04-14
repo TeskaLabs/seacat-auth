@@ -212,14 +212,12 @@ class WebAuthnService(asab.Service):
 		except KeyError:
 			raise KeyError("Challenge does not exist or timed out", {"sid": session.SessionId})
 
-		response = public_key_credential["response"]
-		response["clientDataJSON"] = base64.urlsafe_b64decode(response["clientDataJSON"].encode("ascii") + b"==")
-		response["attestationObject"] = base64.urlsafe_b64decode(response["attestationObject"].encode("ascii") + b"==")
+		_normalize_webauthn_credential_response(public_key_credential)
 
 		registration_credential = webauthn.helpers.structs.RegistrationCredential(
-			id=base64.urlsafe_b64encode(public_key_credential["id"].encode("ascii")).decode("ascii").rstrip("="),
-			raw_id=public_key_credential["rawId"].encode("ascii"),
-			response=response,
+			id=public_key_credential["id"],
+			raw_id=public_key_credential["rawId"],
+			response=public_key_credential["response"],
 			# transports=public_key_credential["transports"],  # Optional
 		)
 		verified_registration = webauthn.verify_registration_response(
@@ -275,15 +273,12 @@ class WebAuthnService(asab.Service):
 		Verify that the user has access to saved WebAuthn credentials
 		https://www.w3.org/TR/webauthn/#sctn-verifying-assertion
 		"""
-		response = public_key_credential["response"]
-		response["clientDataJSON"] = base64.urlsafe_b64decode(response["clientDataJSON"].encode("ascii") + b"==")
-		response["authenticatorData"] = base64.urlsafe_b64decode(response["authenticatorData"].encode("ascii") + b"==")
-		response["signature"] = base64.urlsafe_b64decode(response["signature"].encode("ascii") + b"==")
+		_normalize_webauthn_credential_response(public_key_credential)
 
 		authentication_credential = webauthn.helpers.structs.AuthenticationCredential(
-			id=base64.urlsafe_b64encode(public_key_credential["id"].encode("ascii")).decode("ascii").rstrip("="),
-			raw_id=public_key_credential["rawId"].encode("ascii"),
-			response=response,
+			id=public_key_credential["id"],
+			raw_id=public_key_credential["rawId"],
+			response=public_key_credential["response"],
 		)
 
 		authentication_options = json.loads(authentication_options)
@@ -305,8 +300,8 @@ class WebAuthnService(asab.Service):
 				credential_current_sign_count=sign_count,
 				require_user_verification=False,
 			)
-		except ... as e:  # TODO!
-			L.warning("Login failed with {}: {}".format(type(e).__name__, str(e)))
+		except Exception as e:
+			L.warning("WebAuthn login failed with {}: {}".format(type(e).__name__, str(e)))
 			return False
 
 		# Update sign count in storage
@@ -316,3 +311,18 @@ class WebAuthnService(asab.Service):
 		)
 
 		return True
+
+
+def _normalize_webauthn_credential_response(public_key_credential):
+	"""
+	In-place modify the WebAuthn response so that it fits the webauthn library methods
+	"""
+	# Re-encode id, which has been automatically decoded in the handler
+	public_key_credential["id"] = base64.urlsafe_b64encode(
+		public_key_credential["id"].encode("ascii")).decode("ascii").rstrip("=")
+	public_key_credential["rawId"] = public_key_credential["rawId"].encode("ascii")
+
+	# Decode response params
+	response = public_key_credential["response"]
+	for field in ["clientDataJSON", "authenticatorData", "signature", "attestationObject"]:
+		response[field] = base64.urlsafe_b64decode(response[field].encode("ascii") + b"==")
