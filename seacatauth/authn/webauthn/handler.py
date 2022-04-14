@@ -101,6 +101,7 @@ class WebAuthnHandler(object):
 			wa_credentials.append({
 				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
 				"name": credential["name"],
+				"sign_count": credential["sc"],
 			})
 
 		return asab.web.rest.json_response(request, {
