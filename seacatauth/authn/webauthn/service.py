@@ -241,16 +241,12 @@ class WebAuthnService(asab.Service):
 
 
 	async def get_authentication_options(self, credentials_id: str, timeout: int = None):
-		# Only one WebAuthn key supported for now
 		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
-		wa_credential = wa_credentials[0]
-		wcid = wa_credential["_id"]
-
 		allow_credentials = [
 			webauthn.helpers.structs.PublicKeyCredentialDescriptor(
-				id=wcid,
-				# transports=
-			)
+				id=credential["_id"],
+				# transports=...,  # Optional
+			) for credential in wa_credentials
 		]
 
 		if timeout is None:
@@ -315,14 +311,15 @@ class WebAuthnService(asab.Service):
 
 def _normalize_webauthn_credential_response(public_key_credential):
 	"""
-	In-place modify the WebAuthn response so that it fits the webauthn library methods
+	Modify the WebAuthn response in-place so that it fits the webauthn library methods
 	"""
 	# Re-encode id, which has been automatically decoded in the handler
 	public_key_credential["id"] = base64.urlsafe_b64encode(
 		public_key_credential["id"].encode("ascii")).decode("ascii").rstrip("=")
 	public_key_credential["rawId"] = public_key_credential["rawId"].encode("ascii")
 
-	# Decode response params
+	# Decode response data
 	response = public_key_credential["response"]
 	for field in ["clientDataJSON", "authenticatorData", "signature", "attestationObject"]:
-		response[field] = base64.urlsafe_b64decode(response[field].encode("ascii") + b"==")
+		if field in response:
+			response[field] = base64.urlsafe_b64decode(response[field].encode("ascii") + b"==")
