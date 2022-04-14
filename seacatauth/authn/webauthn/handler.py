@@ -1,4 +1,5 @@
 import base64
+import binascii
 import logging
 
 import aiohttp.web
@@ -28,7 +29,6 @@ class WebAuthnHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
 		web_app.router.add_put('/public/webauthn/register', self.register_credential)
-		web_app.router.add_delete('/public/webauthn', self.remove_credential)
 		web_app.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
 		web_app.router.add_put('/public/webauthn/{wacid}', self.update_credential)
 		web_app.router.add_get('/public/webauthn', self.list_credentials)
@@ -37,7 +37,6 @@ class WebAuthnHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
 		web_app_public.router.add_put('/public/webauthn/register', self.register_credential)
-		web_app_public.router.add_delete('/public/webauthn', self.remove_credential)
 		web_app_public.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
 		web_app_public.router.add_put('/public/webauthn/{wacid}', self.update_credential)
 		web_app_public.router.add_get('/public/webauthn', self.list_credentials)
@@ -125,7 +124,12 @@ class WebAuthnHandler(object):
 	})
 	@access_control()
 	async def update_credential(self, request, *, json_data):
-		wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		try:
+			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		except ValueError:
+			# TODO: Use asab.exceptions.ValidationError instead
+			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+
 		await self.WebAuthnService.update_webauthn_credential(wacid, name=json_data["name"])
 		return asab.web.rest.json_response(
 			request, {"result": "OK"}
@@ -133,7 +137,12 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def remove_credential(self, request):
-		wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		try:
+			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		except ValueError:
+			# TODO: Use asab.exceptions.ValidationError instead
+			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+
 		await self.WebAuthnService.delete_webauthn_credential(wacid)
 		return asab.web.rest.json_response(
 			request, {"result": "OK"}

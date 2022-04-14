@@ -82,8 +82,8 @@ class WebAuthnService(asab.Service):
 		upsertor.set("ao", verified_registration.attestation_object)
 		upsertor.set("name", name)
 
-		wcid = await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wcid": wcid})
+		wacid = await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid})
 
 
 	async def get_webauthn_credential(self, webauthn_credential_id):
@@ -133,13 +133,13 @@ class WebAuthnService(asab.Service):
 
 		await upsertor.execute()
 		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
-			"wcid": webauthn_credential_id,
+			"wacid": webauthn_credential_id,
 		})
 
 
 	async def delete_webauthn_credential(self, webauthn_credential_id: bytes):
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wcid": webauthn_credential_id})
+		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id})
 
 
 	async def delete_webauthn_credentials_by_user(self, credentials_id: str):
