@@ -163,7 +163,7 @@ class RoleService(asab.Service):
 				try:
 					await self.ResourceService.get(res_id)
 				except KeyError:
-					message = "Unknown resource: '{}'".format(role_id)
+					message = "Unknown resource: '{}'".format(res_id)
 					L.warning(message)
 					raise KeyError(message)
 			upsertor.set("resources", list(resources_to_set))
