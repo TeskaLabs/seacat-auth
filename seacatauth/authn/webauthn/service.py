@@ -7,7 +7,6 @@ import urllib.parse
 import re
 
 import asab.storage
-import pprint
 import webauthn
 import webauthn.registration
 import webauthn.helpers.structs

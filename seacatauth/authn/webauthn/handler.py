@@ -1,7 +1,5 @@
 import base64
-import json
 import logging
-import pprint
 
 import aiohttp.web
 import asab.web
