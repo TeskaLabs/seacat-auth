@@ -267,7 +267,7 @@ class AuthenticationHandler(object):
 
 		json_body = login_session.decrypt(await request.read())
 
-		descriptor_id = json_body.get("descriptor_id")
+		# descriptor_id = json_body.get("descriptor_id")
 		factor_type = json_body.get("factor_type")
 		if factor_type != "webauthn":
 			body = {"result": "FAILED", "message": "Unsupported factor type."}
