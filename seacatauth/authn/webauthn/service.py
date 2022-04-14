@@ -108,7 +108,8 @@ class WebAuthnService(asab.Service):
 	async def update_webauthn_credential(
 		self, webauthn_credential_id: bytes, *,
 		sign_count: int = None,
-		name: str = None
+		name: str = None,
+		last_login: datetime.datetime = None,
 	):
 		"""
 		Only allows updating the key name and the sign count (for now).
@@ -126,6 +127,9 @@ class WebAuthnService(asab.Service):
 
 		if name is not None:
 			upsertor.set("name", name)
+
+		if last_login is not None:
+			upsertor.set("ll", last_login)
 
 		await upsertor.execute()
 		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
@@ -319,7 +323,8 @@ class WebAuthnService(asab.Service):
 		# Update sign count in storage
 		await self.update_webauthn_credential(
 			base64.urlsafe_b64decode(verified_authentication.credential_id + b"=="),
-			sign_count=verified_authentication.new_sign_count
+			sign_count=verified_authentication.new_sign_count,
+			last_login=datetime.datetime.now(),
 		)
 
 		return True
