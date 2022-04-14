@@ -63,19 +63,8 @@ class WebAuthnService(asab.Service):
 		public_key: bytes,
 		name: str = None
 	):
-		# Get the serial number of this user's most recent webauthn credential
-		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
-		cursor = collection.find()
-		cursor.sort("sn", 1)
-		cursor.limit(1)
-		async for wa_credential in cursor:
-			serial_number = wa_credential.get("sn") + 1
-			break
-		else:
-			serial_number = 1
-
 		if name is None:
-			name = "key_{}".format(serial_number)
+			name = "key-{}".format(datetime.datetime.now().strftime("%y%m%d-%H%M%S"))
 		else:
 			if self.KeyNameRegex.fullmatch(name) is None:
 				raise ValueError("Invalid WebAuthn credential name", {"name": name})
@@ -85,7 +74,6 @@ class WebAuthnService(asab.Service):
 		upsertor.set("pk", public_key)
 		upsertor.set("cid", credentials_id)
 		upsertor.set("sc", 0)  # Sign counter
-		upsertor.set("sn", serial_number)
 		upsertor.set("name", name)
 
 		wcid = await upsertor.execute()
