@@ -212,12 +212,6 @@ class WebAuthnService(asab.Service):
 
 
 	async def register_credential(self, session, public_key_credential: dict):
-		# TODO: Support multiple keys per user
-		# Only one webauthn key per user is allowed (for now)
-		wa_credentials = await self.get_webauthn_credentials_by_user(session.CredentialsId)
-		if len(wa_credentials) > 0:
-			raise ValueError("WebAuthn credential already registered for this user", {"cid": session.CredentialsId})
-
 		try:
 			challenge = await self.get_registration_challenge(session.SessionId)
 		except KeyError:
