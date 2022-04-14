@@ -31,12 +31,18 @@ class WebAuthnHandler(object):
 		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
 		web_app.router.add_put('/public/webauthn/register', self.register_credential)
 		web_app.router.add_delete('/public/webauthn', self.remove_credential)
+		web_app.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
+		web_app.router.add_put('/public/webauthn/{wacid}', self.update_credential)
+		web_app.router.add_get('/public/webauthn', self.list_credentials)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
 		web_app_public.router.add_put('/public/webauthn/register', self.register_credential)
 		web_app_public.router.add_delete('/public/webauthn', self.remove_credential)
+		web_app_public.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
+		web_app_public.router.add_put('/public/webauthn/{wacid}', self.update_credential)
+		web_app_public.router.add_get('/public/webauthn', self.list_credentials)
 
 
 	@access_control()
@@ -89,9 +95,44 @@ class WebAuthnHandler(object):
 		)
 
 	@access_control()
-	async def remove_credential(self, request, *, credentials_id):
-		await self.WebAuthnService.delete_webauthn_credentials_by_user(credentials_id)
-		# await self.WebAuthnService.delete_webauthn_credential(webauthn_credential_id)
+	async def list_credentials(self, request, *, credentials_id):
+		wa_credentials = []
+		for credential in await self.WebAuthnService.get_webauthn_credentials_by_user(credentials_id):
+			wa_credentials.append({
+				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
+				"name": credential["name"],
+			})
+
+		return asab.web.rest.json_response(request, {
+			"result": "OK",
+			"data": wa_credentials,
+			"count": len(wa_credentials),
+		})
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": [
+			"name",
+		],
+		"properties": {
+			"name": {
+				"type": "string",
+				"pattern": "^[a-z][a-z0-9._-]{0,128}[a-z0-9]$"
+			},
+		}
+	})
+	@access_control()
+	async def update_credential(self, request, *, json_data):
+		wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		await self.WebAuthnService.update_webauthn_credential(wacid, name=json_data["name"])
+		return asab.web.rest.json_response(
+			request, {"result": "OK"}
+		)
+
+	@access_control()
+	async def remove_credential(self, request):
+		wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		await self.WebAuthnService.delete_webauthn_credential(wacid)
 		return asab.web.rest.json_response(
 			request, {"result": "OK"}
 		)
