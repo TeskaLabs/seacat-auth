@@ -251,11 +251,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if v is not None:
 			u.set("__totp", v)
 
-		# Update TOTP secret
-		v = update.pop("__webauthn", None)
-		if v is not None:
-			u.set("__webauthn", v)
-
 		# Update enforced factors
 		v = update.pop("enforce_factors", None)
 		if v is not None:
