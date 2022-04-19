@@ -89,7 +89,7 @@ class GrafanaIntegration(asab.config.Configurable):
 		username = cred.get('username')
 		if username is None:
 			# Be defensive
-			L.warning("Cannot create Grafana user: No username", struct_data={
+			L.info("Cannot create Grafana user: No username", struct_data={
 				"cid": cred["_id"]
 			})
 			return

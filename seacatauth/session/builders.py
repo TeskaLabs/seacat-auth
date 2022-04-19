@@ -33,7 +33,7 @@ async def available_factors_session_builder(authentication_service, credentials_
 	for factor in authentication_service.LoginFactors.values():
 		if await factor.is_eligible({"credentials_id": credentials_id}):
 			factors.append(factor.ID)
-	return ((SessionAdapter.FNAvailableFactors, factors), )
+	return ((SessionAdapter.FNAvailableFactors, factors),)
 
 
 def cookie_session_builder():
