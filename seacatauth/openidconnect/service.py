@@ -11,6 +11,13 @@ import aiohttp.web
 import urllib.parse
 
 from ..session import SessionAdapter
+from ..session import (
+	credentials_session_builder,
+	authz_session_builder,
+	cookie_session_builder,
+	login_descriptor_session_builder,
+)
+from .session import oauth2_session_builder
 
 #
 
@@ -39,6 +46,7 @@ class OpenIdConnectService(asab.Service):
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
@@ -105,15 +113,47 @@ class OpenIdConnectService(asab.Service):
 
 		return await self.get_session_from_bearer_token(authorization_bytes)
 
+
 	def refresh_token(self, refresh_token, client_id, client_secret, scope):
 		# TODO: this is not implemented
 		L.error("refresh_token is not implemented", struct_data=[refresh_token, client_id, client_secret, scope])
 		raise aiohttp.web.HTTPNotImplemented()
 
+
 	def check_access_token(self, bearer_token):
 		# TODO: this is not implemented
 		L.error("check_access_token is not implemented", struct_data={"bearer": bearer_token})
 		raise aiohttp.web.HTTPNotImplemented()
+
+
+	async def create_oidc_session(self, root_session, client_id, scope, requested_expiration=None):
+		# TODO: Choose builders based on scope
+		session_builders = [
+			credentials_session_builder(root_session.CredentialsId),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=root_session.CredentialsId
+			),
+			login_descriptor_session_builder(root_session.LoginDescriptor),
+			cookie_session_builder(),
+		]
+
+		# TODO: if 'openid' in scope
+		oauth2_data = {
+			"scope": scope,
+			"client_id": client_id,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+		session = await self.SessionService.create_session(
+			session_type="openidconnect",
+			parent_session=root_session,
+			expiration=requested_expiration,
+			session_builders=session_builders,
+		)
+
+		return session
+
 
 	async def build_userinfo(self, session, tenant=None):
 		userinfo = {

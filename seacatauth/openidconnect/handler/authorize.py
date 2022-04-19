@@ -79,36 +79,46 @@ class AuthorizeHandler(object):
 
 
 	async def authorize(self, request, request_parameters):
-		'''
+		"""
 		https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
 
 		3.1.2.1.  Authentication Request
-		'''
+		"""
 
-		# Get the scope
-		scope = request_parameters.get('scope')
-		if scope is None:
-			L.warning("Request doesn't specify any scope")
-			return aiohttp.web.HTTPBadRequest()
+		# Check the presence of required parameters
+		for parameter in frozenset(["scope", "client_id", "response_type", "redirect_uri"]):
+			if parameter not in request_parameters:
+				L.warning("Missing required parameter: {}".format(parameter), struct_data={"url": request.url})
+				return self.reply_with_authentication_error(
+					request,
+					request_parameters,
+					"invalid_request",
+					"Missing required parameter: {}".format(parameter),
+				)
 
-		scope = frozenset(x.strip() for x in scope.split(' '))
-
-		# Dispatch the request based on `response_type`
-		# ... aka select the proper flow
-		response_type = request_parameters.get('response_type')
-		if response_type is None:
-			L.warning("Request doesn't specify any response type")
-			return aiohttp.web.HTTPBadRequest()
+		# Select the proper flow based on response_type
+		response_type = request_parameters["response_type"]
 
 		# Authentication Code Flow
-		elif response_type == 'code':
-			return await self.authentication_code_flow(request, scope, request_parameters)
+		if response_type == "code":
+			return await self.authentication_code_flow(
+				request,
+				scope=frozenset(request_parameters["scope"].split(" ")),
+				client_id=request_parameters["client_id"],
+				redirect_uri=request_parameters["redirect_uri"],
+				request_parameters=request_parameters
+			)
 
-		L.warning("Unknown response type '{}' requested".format(response_type))
-		return aiohttp.web.HTTPBadRequest()
+		L.warning("Unknown response type: {}".format(response_type))
+		return self.reply_with_authentication_error(
+			request,
+			request_parameters,
+			"invalid_request",
+			"Invalid response_type: {}".format(response_type),
+		)
 
 
-	async def authentication_code_flow(self, request, scope, request_parameters):
+	async def authentication_code_flow(self, request, scope, client_id, redirect_uri, request_parameters):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 
@@ -116,32 +126,50 @@ class AuthorizeHandler(object):
 		"""
 
 		# OpenID Connect requests MUST contain the openid scope value.
-		if 'openid' not in scope:
-			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope), "headers": dict(request.headers)})
-			return self.reply_with_authentication_error(request, request_parameters, "invalid_scope")
+		if "openid" not in scope:
+			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope)})
+			return self.reply_with_authentication_error(
+				request,
+				request_parameters,
+				"invalid_scope",
+				"Scope must contain 'openid'",
+			)
 
-		redirect_uri = request_parameters.get('redirect_uri')
-		if redirect_uri is None:
-			L.warning("Redirect URI not specified", struct_data={
-				"headers": dict(request.headers),
-				"url": request.url
-			})
-			return self.reply_with_authentication_error(request, request_parameters, "invalid_request_uri")
+		# TODO: Properly validate client_id
+		if len(client_id) == 0:
+			L.warning("Invalid client ID", struct_data={"client_id": client_id})
+			return self.reply_with_authentication_error(request, request_parameters, "invalid_client")
 
-		session = request.Session
+		# TODO: Validate the client's permission to requested scope and redirect_uri
+
+		root_session = request.Session
+
+		# Only root sessions can be used to obtain auth code
+		if root_session is not None and root_session.Type != "root":
+			L.warning("Session type must be 'root'", struct_data={"session_type": root_session.Type})
+			root_session = None
 
 		prompt = request_parameters.get("prompt")
+		if prompt not in frozenset([None, "none", "login", "select_account"]):
+			L.warning("Invalid parameter value for prompt", struct_data={"prompt": prompt})
+			return self.reply_with_authentication_error(
+				request,
+				request_parameters,
+				"invalid_request",
+				"Invalid parameter value for prompt: {}".format(prompt),
+			)
+
 		if prompt == "login":
 			L.log(asab.LOG_NOTICE, "Login prompt requested", struct_data={
 				"headers": dict(request.headers),
 				"url": request.url
 			})
 			# If 'login' prompt is requested, delete the active session and re-authenticate anyway
-			if session is not None:
-				await self.SessionService.delete(session.SessionId)
-				session = None
+			if root_session is not None:
+				await self.SessionService.delete(root_session.SessionId)
+				root_session = None
 
-		if session is None and prompt == "none":
+		if root_session is None and prompt == "none":
 			# We are NOT authenticated, but login prompt is unwanted
 			# TODO: The Authorization Server MUST NOT display any authentication or consent user interface pages.
 			# An error is returned if an End-User is not already authenticated or the Client does not have
@@ -153,7 +181,7 @@ class AuthorizeHandler(object):
 			})
 			return self.reply_with_authentication_error(request, request_parameters, "login_required")
 
-		if session is None or prompt == "select_account":
+		if root_session is None or prompt == "select_account":
 			# We are NOT authenticated or the user is switching accounts
 			#   >> Redirect to login and then back to this endpoint
 
@@ -166,53 +194,9 @@ class AuthorizeHandler(object):
 				})
 
 			# We are not authenticated, show 404 and provide the link to the login form
+			return await self.reply_with_redirect_to_login(request, request_parameters)
 
-			# Gather params which will be passed to the login page
-			login_query_params = []
-
-			# Gather params which will be passed to the after-login oidc/authorize call
-			authorize_query_params = []
-
-			for param, value in request_parameters.items():
-				if param in {"ldid", "expiration"}:
-					# Add session expiration
-					# Add login descriptors (there may be multiple)
-					login_query_params.append((param, value))
-				if param in {"response_type", "scope", "client_id", "redirect_uri", "state"}:
-					# Include all mandatory oidc/authorize params
-					authorize_query_params.append((param, value))
-
-			# Build the redirect URI back to this endpoint and add it to login params
-			authorize_redirect_uri = "{}{}?{}".format(
-				self.PublicApiBaseUrl,
-				request.path,
-				urllib.parse.urlencode(authorize_query_params)
-			)
-
-			login_query_params.append(("redirect_uri", authorize_redirect_uri))
-
-			login_url = "{}{}?{}".format(
-				self.AuthWebuiBaseUrl,
-				self.LoginPath,
-				urllib.parse.urlencode(login_query_params)
-			)
-			response = aiohttp.web.HTTPNotFound(
-				headers={
-					"Location": login_url,
-					"Refresh": '0;url=' + login_url,
-				},
-				content_type="text/html",
-				text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
-			)
-			delete_cookie(self.App, response)
-			return response
-
-
-		# We are authenticated !
-
-		if session.OAuth2 is None:
-			L.warning("The session has not been created with OpenId/OAuth2 in scope.")
-			return self.reply_with_authentication_error(request, request_parameters, "access_denied")
+		# We are authenticated!
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
@@ -220,18 +204,28 @@ class AuthorizeHandler(object):
 		#  (the policies can use oidc client-id and scope)
 
 		# Redirect to factor management page if (re)set of any factor is required
-		factors_to_setup = await self._get_factors_to_setup(session)
+		# TODO: Move this check to AuthenticationService.login, add "restricted" flag
+		factors_to_setup = await self._get_factors_to_setup(root_session)
 
 		if len(factors_to_setup) > 0:
 			L.warning(
 				"Auth factor setup required. Redirecting to setup.",
-				struct_data={"missing_factors": " ".join(factors_to_setup), "cid": session.CredentialsId}
+				struct_data={"missing_factors": " ".join(factors_to_setup), "cid": root_session.CredentialsId}
 			)
 			return await self.reply_with_factor_setup_redirect(
-				request, scope, request_parameters, session, factors_to_setup
+				request, scope, request_parameters, root_session, factors_to_setup
 			)
 
-		return await self.reply_with_successful_response(request, scope, request_parameters, session)
+		requested_expiration = request_parameters.get("expiration")
+		if requested_expiration is not None:
+			requested_expiration = int(requested_expiration)
+
+		state = request_parameters.get("state")
+
+		# TODO: Create a new child session with the requested scope
+		session = await self.OpenIdConnectService.create_oidc_session(root_session, client_id, scope, requested_expiration)
+
+		return await self.reply_with_successful_response(request, session, scope, redirect_uri, state)
 
 
 	async def _get_factors_to_setup(self, session):
@@ -254,7 +248,7 @@ class AuthorizeHandler(object):
 		return factors_to_setup
 
 
-	async def reply_with_successful_response(self, request, scope, request_parameters, session):
+	async def reply_with_successful_response(self, request, session, scope, redirect_uri, state=None):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 		3.1.2.5.  Successful Authentication Response
@@ -265,14 +259,14 @@ class AuthorizeHandler(object):
 		"""
 
 		# Prepare the redirect URL
-		url = urllib.parse.urlparse(request_parameters['redirect_uri'])
+		url = urllib.parse.urlparse(redirect_uri)
 		url_qs = urllib.parse.parse_qs(url.query)
 
-		if len(request_parameters.get('state', [])) > 0:
+		if state is not None:
 			# The OAuth 2.0 Authorization Framework, 4.1.2.  Authorization Response
 			# If the "state" parameter was present in the client authorization request,
 			# then use the exact value received from the client.
-			url_qs["state"] = request_parameters['state']
+			url_qs["state"] = state
 
 		# Add the Authorization Code into the session ...
 		if "cookie" not in scope:
@@ -299,9 +293,56 @@ class AuthorizeHandler(object):
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
 
-		if 'cookie' in request_parameters['scope']:
+		if 'cookie' in scope:
 			set_cookie(self.App, response, session)
 
+		return response
+
+
+	async def reply_with_redirect_to_login(self, request, request_parameters):
+		"""
+		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
+		Pass on the query parameters.
+		"""
+
+		# Gather params which will be passed to the login page
+		login_query_params = []
+
+		# Gather params which will be passed to the after-login oidc/authorize call
+		authorize_query_params = []
+
+		for param, value in request_parameters.items():
+			if param in {"ldid", "expiration"}:
+				# Add session expiration
+				# Add login descriptors (there may be multiple)
+				login_query_params.append((param, value))
+			if param in {"response_type", "scope", "client_id", "redirect_uri", "state"}:
+				# Include all mandatory oidc/authorize params
+				authorize_query_params.append((param, value))
+
+		# Build the redirect URI back to this endpoint and add it to login params
+		authorize_redirect_uri = "{}{}?{}".format(
+			self.PublicApiBaseUrl,
+			request.path,
+			urllib.parse.urlencode(authorize_query_params)
+		)
+
+		login_query_params.append(("redirect_uri", authorize_redirect_uri))
+
+		login_url = "{}{}?{}".format(
+			self.AuthWebuiBaseUrl,
+			self.LoginPath,
+			urllib.parse.urlencode(login_query_params)
+		)
+		response = aiohttp.web.HTTPNotFound(
+			headers={
+				"Location": login_url,
+				"Refresh": '0;url=' + login_url,
+			},
+			content_type="text/html",
+			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
+		)
+		delete_cookie(self.App, response)
 		return response
 
 
@@ -365,15 +406,19 @@ class AuthorizeHandler(object):
 		return response
 
 
-	def reply_with_authentication_error(self, request, request_parameters, error: str):
+	def reply_with_authentication_error(self, request, request_parameters, error: str, error_description: str = None):
 		"""
 		3.1.2.6.  Authentication Error Response
 		"""
 		qs = request_parameters.copy()
-		qs['error'] = error
+		qs["error"] = error
+		if error_description is not None:
+			qs["error_description"] = error_description
+
 		qs_encoded = urllib.parse.urlencode(qs)
 
 		if self.PublicApiBaseUrl is not None:
+			# TODO: Use the /message page on frontend
 			redirect = "{public_base_url}{path}?{qs}".format(
 				public_base_url=self.PublicApiBaseUrl,
 				path=request.path,

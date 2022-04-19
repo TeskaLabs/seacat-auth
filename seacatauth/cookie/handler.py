@@ -7,6 +7,15 @@ import aiohttp.web
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
 
+from ..openidconnect.session import oauth2_session_builder
+
+from ..session import (
+	credentials_session_builder,
+	authz_session_builder,
+	cookie_session_builder,
+	login_descriptor_session_builder,
+)
+
 #
 
 L = logging.getLogger(__name__)
@@ -98,16 +107,46 @@ class CookieHandler(object):
 		Exchange authorization code for cookie and redirect afterwards.
 		"""
 		grant_type = request.query.get("grant_type")
-
 		if grant_type != "authorization_code":
-			L.warning("Grant type not supported", struct_data={"grant_type": grant_type})
+			L.error("Grant type not supported", struct_data={"grant_type": grant_type})
 			return aiohttp.web.HTTPBadRequest()
 
 		# Use the code to get session ID
 		code = request.query.get("code")
-		session = await self.CookieService.get_session_by_authorization_code(code)
-		if session is None:
+		root_session = await self.CookieService.get_session_by_authorization_code(code)
+		if root_session is None:
 			return aiohttp.web.HTTPBadRequest()
+
+		# TODO: Choose builders based on scope
+		session_builders = [
+			credentials_session_builder(root_session.CredentialsId),
+			await authz_session_builder(
+				tenant_service=self.CookieService.TenantService,
+				role_service=self.CookieService.RoleService,
+				credentials_id=root_session.CredentialsId
+			),
+			login_descriptor_session_builder(root_session.LoginDescriptor),
+			cookie_session_builder(),
+		]
+
+		# TODO: Temporary solution. Root session should have no OAuth2 data.
+		#   Remove once ID token support is fully implemented.
+		oauth2_data = {
+			"scope": None,
+			"client_id": None,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		requested_expiration = request.query.get("expiration")
+		if requested_expiration is not None:
+			requested_expiration = int(requested_expiration)
+
+		session = await self.SessionService.create_session(
+			session_type="cookie",
+			parent_session=root_session,
+			expiration=requested_expiration,
+			session_builders=session_builders,
+		)
 
 		# Construct the response
 		# TODO: Dynamic redirect (instead of static URL from config)
