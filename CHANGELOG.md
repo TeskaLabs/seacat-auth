@@ -10,6 +10,7 @@
 - Handle nonexisting provider in M2M introspection (#15, PLUM Sprint 220225)
 - Fixed creation policy for M2M provider (#15, PLUM Sprint 220225)
 - Automatic tenant and role assignment after tenant creation (#17, PLUM Sprint 220325)
+- Remove regex validation for existing roles (#24, PLUM Sprint 220408)
 
 ### Features
 - Generate MANIFEST.json (#20, PLUM Sprint 220325)
