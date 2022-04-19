@@ -354,7 +354,7 @@ class CredentialsHandler(object):
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
 		"additionalProperties": False,
-		"required": "factors",
+		"required": ["factors"],
 		"properties": {
 			"factors": {
 				"type": "array",
