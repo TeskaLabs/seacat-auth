@@ -71,19 +71,10 @@ class RoleHandler(object):
 	async def create(self, request, *, tenant):
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		try:
-			result = await self.RoleService.create(role_id)
-		except ValueError:
-			L.log(asab.LOG_NOTICE, "Invalid role_id: {}".format(role_id))
-			raise aiohttp.web.HTTPBadRequest()
-		except KeyError:
-			L.log(asab.LOG_NOTICE, "Couldn't find role '{}'".format(role_id))
-			raise aiohttp.web.HTTPNotFound()
-		except asab.storage.exceptions.DuplicateError:
-			L.log(asab.LOG_NOTICE, "Couldn't create role '{}'; already exists".format(role_id))
-			raise aiohttp.web.HTTPConflict()
+		result = await self.RoleService.create(role_id)
 		return asab.web.rest.json_response(
-			request, result
+			request, result,
+			status=200 if result == "OK" else 400
 		)
 
 	@access_control("authz:tenant:admin")
