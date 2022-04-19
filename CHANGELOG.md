@@ -22,6 +22,7 @@
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
 - Validate usernames, roles and resources before creation (#22, PLUM Sprint 220325)
 - Batman uses resources for access control instead of roles (#21, PLUM Sprint 220408)
+- Introduce session types (#16, PLUM Sprint 220408)
 
 ---
 
