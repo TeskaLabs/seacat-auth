@@ -13,11 +13,12 @@ L = logging.getLogger(__name__)
 
 
 class TenantService(asab.Service):
-	TenantNameRegex = re.compile("^[a-z][a-z0-9._-]{2,31}$")
+	TenantNamePattern = r"[a-z][a-z0-9._-]{2,31}"
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
 		self.TenantsProvider = None
+		self.TenantNameRegex = re.compile("^{}$".format(self.TenantNamePattern))
 
 
 	def create_provider(self, provider_id, config_section_name):

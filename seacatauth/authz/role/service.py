@@ -4,6 +4,8 @@ from typing import Optional
 
 import asab.storage.exceptions
 
+from ...tenant import TenantService
+
 #
 
 L = logging.getLogger(__name__)
@@ -23,7 +25,7 @@ class RoleService(asab.Service):
 
 	RoleCollection = "r"
 	CredentialsRolesCollection = "cr"
-	RoleIdRegex = re.compile(r"^([a-zA-Z0-9_-]+|\*)/([a-zA-Z0-9:_-]+)$")  # {tenant}/{role_name}
+	RoleNamePattern = r"[a-zA-Z_][a-zA-Z0-9_-]{0,31}"
 
 	def __init__(self, app, service_name="seacatauth.RoleService"):
 		super().__init__(app, service_name)
@@ -32,6 +34,10 @@ class RoleService(asab.Service):
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = self.App.get_service("seacatauth.RBACService")
+		self.RoleIdRegex = re.compile(r"^({tenant}|\*)/({role})$".format(
+			tenant=TenantService.TenantNamePattern,
+			role=self.RoleNamePattern
+		))  # The format is always {tenant or "*"}/{role_name}!
 
 	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
 		collection = self.StorageService.Database[self.RoleCollection]
@@ -71,7 +77,14 @@ class RoleService(asab.Service):
 	async def create(self, role_id: str):
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
-			raise ValueError("Invalid role name: '{}'".format(role_id))
+			return {
+				"result": "INVALID-VALUE",
+				"message":
+					"Role ID must match the format {tenant_name}/{role_name}, "
+					"where {tenant_name} is either '*' or the name of an existing tenant "
+					"and {role_name} consists only of characters 'a-z0-9_-', "
+					"starts with a letter or underscore, and is between 1 and 32 characters long.",
+			}
 		tenant = match.group(1)
 
 		upsertor = self.StorageService.upsertor(
@@ -81,8 +94,15 @@ class RoleService(asab.Service):
 		upsertor.set("resources", [])
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
-		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "Role created", struct_data={'role_id': role_id})
+		try:
+			await upsertor.execute()
+			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
+		except asab.storage.exceptions.DuplicateError:
+			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
+			return {
+				"result": "CONFLICT",
+				"message": "Role '{}' already exists.".format(role_id)
+			}
 		return "OK"
 
 	async def delete(self, role_id: str):
@@ -143,7 +163,7 @@ class RoleService(asab.Service):
 				try:
 					await self.ResourceService.get(res_id)
 				except KeyError:
-					message = "Unknown resource: '{}'".format(role_id)
+					message = "Unknown resource: '{}'".format(res_id)
 					L.warning(message)
 					raise KeyError(message)
 			upsertor.set("resources", list(resources_to_set))

@@ -1,6 +1,9 @@
 # TODO: Handle schema building systematically in a dedicated class
 #   Connect with Policy class
 
+# Based on Unix usernames
+USERNAME_PATTERN = r"^[a-z_][a-z0-9_-]{0,31}$"
+
 _FIELDS = {
 	"username": {
 		"type": "string",
@@ -39,9 +42,6 @@ _FIELDS = {
 CREATE_CREDENTIALS = {
 	"type": "object",
 	"additionalProperties": False,
-	"required": [
-		"username"
-	],
 	"properties": {
 		field: schema
 		for field, schema in _FIELDS.items()
