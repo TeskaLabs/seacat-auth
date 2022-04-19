@@ -38,6 +38,10 @@ class ProvisioningService(asab.Service):
 	async def initialize(self, app):
 		await super().initialize(app)
 
+		# TODO: ResourceService should be already initialized by the app
+		resource_svc = app.get_service("seacatauth.ResourceService")
+		await resource_svc.initialize(app)
+
 		# Create provisioning credentials provider
 		self.CredentialsService.create_dict_provider(self.CredentialsProviderID)
 		existing_providers = list(self.CredentialsService.CredentialProviders.keys())

@@ -13,8 +13,9 @@ L = logging.getLogger(__name__)
 class ResourceService(asab.Service):
 
 	ResourceCollection = "rs"
-	# Resource name format: "{module}:{submodule}:{...}:{resource_name}"
-	ResourceIdRegex = re.compile(r"^((?:[a-zA-Z0-9_-]+:)*[a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)$")
+	# Resource name format: "{module}:{submodule}:..."
+	ResourceNamePattern = r"[a-z][a-z0-9:._-]{0,128}[a-z0-9]"
+
 	# TODO: gather these system resources automatically
 	BuiltinResources = [
 		{
@@ -29,16 +30,13 @@ class ResourceService(asab.Service):
 			"id": "authz:tenant:admin",
 			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
 		},
-		{
-			"id": "authz:credentials:admin",
-			"description": "Grants rights for credentials administration. Enables creating and updating credentials.",
-		},
 	]
 
 
 	def __init__(self, app, service_name="seacatauth.ResourceService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.ResourceIdRegex = re.compile("^{}$".format(self.ResourceNamePattern))
 
 
 	async def initialize(self, app):
@@ -103,8 +101,11 @@ class ResourceService(asab.Service):
 		if self.ResourceIdRegex.match(resource_id) is None:
 			L.error("Invalid ID format", struct_data={"resource_id": resource_id})
 			return {
-				"result": "ERROR",
-				"message": "Invalid resource ID",
+				"result": "INVALID-VALUE",
+				"message":
+					"Resource ID must consist only of characters 'a-z0-9.:_-', "
+					"start with a letter, end with a letter or digit, "
+					"and be between 2 and 128 characters long.",
 			}
 
 		upsertor = self.StorageService.upsertor(self.ResourceCollection, obj_id=resource_id)
