@@ -64,9 +64,6 @@ class RoleService(asab.Service):
 		}
 
 	async def get(self, role_id: str):
-		match = self.RoleIdRegex.match(role_id)
-		if match is None:
-			raise ValueError("Invalid role name: '{}'".format(role_id))
 		result = await self.StorageService.get(self.RoleCollection, role_id)
 		return result
 
@@ -109,10 +106,6 @@ class RoleService(asab.Service):
 		"""
 		Delete a role. Also remove all role assignments.
 		"""
-		match = self.RoleIdRegex.match(role_id)
-		if match is None:
-			raise ValueError("Invalid role name: '{}'".format(role_id))
-
 		# Unassign the role from all credentials
 		await self.delete_role_assignments(role_id)
 
@@ -127,11 +120,7 @@ class RoleService(asab.Service):
 		resources_to_add: Optional[list] = None,
 		resources_to_remove: Optional[list] = None
 	):
-		match = self.RoleIdRegex.match(role_id)
-		if match is None:
-			L.warning("Invalid role_id: {}".format(role_id))
-			raise ValueError("Invalid role_id: '{}'".format(role_id))
-		tenant = match.group(1)
+		tenant = self.get_tenant_from_role_id(role_id)
 
 		resources_to_assign = set().union(
 			resources_to_set or [],
@@ -239,16 +228,9 @@ class RoleService(asab.Service):
 		roles_to_assign = set()
 		for role in roles:
 			# Validate by regex
-			match = self.RoleIdRegex.match(role)
-			if match is None:
-				message = "Invalid role id"
-				L.warning(message, struct_data={
-					"role": role
-				})
-				raise ValueError(message)
+			role_tenant = self.get_tenant_from_role_id(role)
 
 			# Validate by current tenant scope
-			role_tenant = match.group(1)
 			if role_tenant not in tenant_scope:
 				# Role is outside current tenant scope
 				if role_tenant == "*":
@@ -335,7 +317,7 @@ class RoleService(asab.Service):
 		}
 
 	async def assign_role(self, credentials_id: str, role_id: str):
-		tenant, _ = role_id.split("/", 1)
+		self.get_tenant_from_role_id(role_id)
 
 		# Check if credentials exist
 		try:
@@ -363,7 +345,8 @@ class RoleService(asab.Service):
 
 
 	async def _do_assign_role(self, credentials_id: str, role_id: str):
-		tenant, _ = role_id.split("/", 1)
+		tenant = self.get_tenant_from_role_id(role_id)
+
 		assignment_id = "{} {}".format(credentials_id, role_id)
 
 		upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=assignment_id)
@@ -420,3 +403,17 @@ class RoleService(asab.Service):
 			"role_id": role_id,
 			"deleted_count": result.deleted_count
 		})
+
+
+	def get_tenant_from_role_id(self, role_id):
+		match = self.RoleIdRegex.match(role_id)
+		if match is not None:
+			tenant = match.group(1)
+		else:
+			L.warning(
+				"Role ID contains unallowed characters. "
+				"Consider deleting this role and creating a new one.",
+				struct_data={"role_id": role_id}
+			)
+			tenant, _ = role_id.split("/", 1)
+		return tenant
