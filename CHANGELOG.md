@@ -12,10 +12,12 @@
 
 ### Features
 - Generate MANIFEST.json (#20, PLUM Sprint 220325)
+- List resources call now accepts filter string (#21, PLUM Sprint 220408)
 
 ### Refactoring
 - Fallback values in ident translation response (#18, PLUM Sprint 220325)
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
+- Batman uses resources for access control instead of roles (#21, PLUM Sprint 220408)
 
 ---
 
