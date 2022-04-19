@@ -128,7 +128,7 @@ class ELKIntegration(asab.config.Configurable):
 		username = cred.get('username')
 		if username is None:
 			# Be defensive
-			L.warning("Cannot create user: No username", struct_data={"cid": cred["_id"]})
+			L.info("Cannot create user: No username", struct_data={"cid": cred["_id"]})
 			return
 
 		if username in self.LocalUsers:
