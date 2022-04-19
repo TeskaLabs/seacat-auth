@@ -154,11 +154,13 @@ class SessionService(asab.Service):
 
 		session_id = await upsertor.execute()
 
-		L.log(asab.LOG_NOTICE, "Session created", struct_data={
+		struct_data = {
 			"sid": session_id,
 			"type": session_type,
-			"parent_sid": parent_session.SessionId,
-		})
+		}
+		if parent_session is not None:
+			struct_data["parent_sid"] = parent_session.SessionId
+		L.log(asab.LOG_NOTICE, "Session created", struct_data=struct_data)
 		return await self.get(session_id)
 
 
