@@ -369,11 +369,18 @@ class WebAuthnService(asab.Service):
 		authentication_options = json.loads(authentication_options)
 		expected_challenge = authentication_options.get("challenge").encode("ascii")
 
-		# Only one WebAuthn key supported for now
-		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
-		wa_credential = wa_credentials[0]
+		wa_credential = await self.get_webauthn_credential(
+			base64.urlsafe_b64decode(public_key_credential["rawId"] + b"==")
+		)
 		public_key = wa_credential["pk"]
 		sign_count = wa_credential["sc"]
+
+		if credentials_id != wa_credential["cid"]:
+			L.error("WebAuthn login failed: Credentials ID does not match", struct_data={
+				"cid": credentials_id,
+				"wacid": wa_credential["_id"],
+			})
+			return False
 
 		try:
 			verified_authentication = webauthn.verify_authentication_response(
