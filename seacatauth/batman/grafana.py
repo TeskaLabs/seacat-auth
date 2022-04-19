@@ -111,9 +111,6 @@ class GrafanaIntegration(asab.config.Configurable):
 			if "*/grafana:grafana_admin" not in authz.get("*", {}) \
 				and "*/grafana:grafana_user" not in authz.get("*", {}):
 				# <<<<<<<<<<<<<<<<<<<<<<<
-				L.warning("Cannot create Grafana user: User has no Grafana resources", struct_data={
-					"cid": cred["_id"]
-				})
 				return
 
 		json = {
