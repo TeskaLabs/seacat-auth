@@ -116,6 +116,7 @@ class WebAuthnService(asab.Service):
 
 	async def update_webauthn_credential(
 		self, webauthn_credential_id: bytes, *,
+		credentials_id: str = None,
 		sign_count: int = None,
 		name: str = None,
 		last_login: datetime.datetime = None,
@@ -123,9 +124,18 @@ class WebAuthnService(asab.Service):
 		"""
 		Update WebAuthn credential
 
-		Only allows updating key name, last login time and sign count (for now).
+		Only allows updating key name, last login time and sign count.
+
+		If credentials_id is specified, ensure that it matches the database entry.
 		"""
 		wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
+
+		if credentials_id is not None:
+			if credentials_id != wa_credential["cid"]:
+				raise KeyError("WebAuthn credential not found", {
+					"wacid": webauthn_credential_id,
+					"cid": credentials_id
+				})
 
 		upsertor = self.StorageService.upsertor(
 			self.WebAuthnCredentialCollection,
@@ -148,10 +158,21 @@ class WebAuthnService(asab.Service):
 		})
 
 
-	async def delete_webauthn_credential(self, webauthn_credential_id: bytes):
+	async def delete_webauthn_credential(self, webauthn_credential_id: bytes, credentials_id: str = None):
 		"""
-		Delete WebAuthn credential by its ID
+		Delete WebAuthn credential by its ID.
+
+		If credentials_id is specified, ensure that it matches the database entry.
 		"""
+
+		if credentials_id is not None:
+			wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
+			if credentials_id != wa_credential["cid"]:
+				raise KeyError("WebAuthn credential not found", {
+					"wacid": webauthn_credential_id,
+					"cid": credentials_id
+				})
+
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id})
 

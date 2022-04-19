@@ -122,27 +122,44 @@ class WebAuthnHandler(object):
 		}
 	})
 	@access_control()
-	async def update_credential(self, request, *, json_data):
+	async def update_credential(self, request, *, json_data, credentials_id):
 		try:
 			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
 		except ValueError:
 			# TODO: Use asab.exceptions.ValidationError instead
 			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
 
-		await self.WebAuthnService.update_webauthn_credential(wacid, name=json_data["name"])
+		try:
+			await self.WebAuthnService.update_webauthn_credential(
+				wacid,
+				name=json_data["name"],
+				credentials_id=credentials_id
+			)
+		except KeyError:
+			raise KeyError("WebAuthn credential not found", {
+				"wacid": wacid,
+				"cid": credentials_id,
+			})
 		return asab.web.rest.json_response(
 			request, {"result": "OK"}
 		)
 
 	@access_control()
-	async def remove_credential(self, request):
+	async def remove_credential(self, request, *, credentials_id):
 		try:
 			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
 		except ValueError:
 			# TODO: Use asab.exceptions.ValidationError instead
 			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
 
-		await self.WebAuthnService.delete_webauthn_credential(wacid)
+		try:
+			await self.WebAuthnService.delete_webauthn_credential(wacid, credentials_id)
+		except KeyError:
+			raise KeyError("WebAuthn credential not found", {
+				"wacid": wacid,
+				"cid": credentials_id,
+			})
+
 		return asab.web.rest.json_response(
 			request, {"result": "OK"}
 		)
