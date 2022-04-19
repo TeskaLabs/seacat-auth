@@ -8,6 +8,8 @@ from .rbac.handler import RBACHandler
 from .resource.service import ResourceService
 from .resource.handler import ResourceHandler
 
+from .utils import get_credentials_authz
+
 __all__ = [
 	"RolesHandler",
 	"RoleService",
@@ -16,4 +18,5 @@ __all__ = [
 	"RBACHandler",
 	"ResourceService",
 	"ResourceHandler",
+	"get_credentials_authz",
 ]
