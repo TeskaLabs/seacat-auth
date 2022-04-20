@@ -155,7 +155,7 @@ class OpenIdConnectService(asab.Service):
 			userinfo["totp_set"] = True
 
 		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
-		webauthn_credentials = await webauthn_svc.get_webauthn_credentials_by_user(session.CredentialsId)
+		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(session.CredentialsId)
 		if len(webauthn_credentials) > 0:
 			userinfo["webauthn_set"] = True
 
