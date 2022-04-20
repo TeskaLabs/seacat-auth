@@ -95,28 +95,36 @@ class SessionService(asab.Service):
 	async def delete_expired_sessions(self):
 		expired = []
 		sessions = await self.list()
-		for s in sessions["data"]:
+		for session in sessions["data"]:
 			try:
-				if datetime.datetime.utcnow() > s["exp"]:
-					expired.append(s["_id"])
+				if datetime.datetime.utcnow() > session.get(SessionAdapter.FNExpiration):
+					expired.append(session["_id"])
 			except KeyError:
-				L.info("Session '{}' is missing exp.".format(s["_id"]))
+				L.error("Session is missing expiration", struct_data={"sid": session["_id"]})
 				continue
 
 		for sid in expired:
 			await self.delete(session_id=sid)
 
 
-	async def create_session(self, session_builders=None, *, expiration: float = None):
+	async def create_session(
+		self,
+		session_type: str,
+		parent_session: SessionAdapter = None,
+		expiration: float = None,
+		session_builders: list = None
+	):
 		upsertor = self.StorageService.upsertor(self.SessionCollection)
-		if session_builders is None:
-			session_builders = list()
-		for session_builder in session_builders:
-			for key, value in session_builder:
-				if key in SessionAdapter.SensitiveFields:
-					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-				upsertor.set(key, value)
 
+		# Set up required fields
+		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie"]):
+			L.error("Unsupported session type", struct_data={"type": session_type})
+			return None
+		upsertor.set(SessionAdapter.FNSessionType, session_type)
+		if parent_session is not None:
+			upsertor.set(SessionAdapter.FNParentSessionId, parent_session.SessionId)
+
+		# Set up expiration variables
 		if expiration is not None:
 			expiration = datetime.timedelta(seconds=expiration)
 			if expiration > self.MaximumAge:
@@ -131,20 +139,32 @@ class SessionService(asab.Service):
 		else:
 			touch_extension_seconds = self.TouchExtensionRatio * expiration.total_seconds()
 
-		upsertor.set("exp", expires)
-		upsertor.set("max_exp", max_expiration)
-		upsertor.set("touch_ext", touch_extension_seconds)
+		upsertor.set(SessionAdapter.FNExpiration, expires)
+		upsertor.set(SessionAdapter.FNMaxExpiration, max_expiration)
+		upsertor.set(SessionAdapter.FNTouchExtension, touch_extension_seconds)
+
+		# Add builder fields
+		if session_builders is None:
+			session_builders = list()
+		for session_builder in session_builders:
+			for key, value in session_builder:
+				if key in SessionAdapter.SensitiveFields:
+					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
+				upsertor.set(key, value)
 
 		session_id = await upsertor.execute()
 
-		L.log(asab.LOG_NOTICE, "Session created", struct_data={
-			'sid': session_id,
-			'exp': expires
-		})
+		struct_data = {
+			"sid": session_id,
+			"type": session_type,
+		}
+		if parent_session is not None:
+			struct_data["parent_sid"] = parent_session.SessionId
+		L.log(asab.LOG_NOTICE, "Session created", struct_data=struct_data)
 		return await self.get(session_id)
 
 
-	async def update_session(self, session_id, session_builders=[]):
+	async def update_session(self, session_id: str, session_builders: list):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
 		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
@@ -260,7 +280,7 @@ class SessionService(asab.Service):
 			session.SessionId,
 			version=version
 		)
-		upsertor.set("exp", expires)
+		upsertor.set(SessionAdapter.FNExpiration, expires)
 
 		try:
 			await upsertor.execute()
@@ -270,6 +290,13 @@ class SessionService(asab.Service):
 
 
 	async def delete(self, session_id):
+		# Delete all child sessions first
+		query_filter = {SessionAdapter.FNParentSessionId: session_id}
+		sessions = (await self.list(query_filter=query_filter))["data"]
+		for session in sessions:
+			await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session["_id"]))
+
+		# Delete the session itself
 		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
 		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={'sid': session_id})
 

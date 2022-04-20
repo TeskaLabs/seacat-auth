@@ -354,6 +354,7 @@ class CredentialsHandler(object):
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
 		"additionalProperties": False,
+		"required": ["factors"],
 		"properties": {
 			"factors": {
 				"type": "array",
@@ -370,7 +371,10 @@ class CredentialsHandler(object):
 
 		enforce_factors = json_data.get("factors")
 
-		# TODO: Check if requested factors can be enforced
+		# TODO: Implement and use LoginFactor.can_be_enforced() method
+		for factor in enforce_factors:
+			if factor not in frozenset(["totp", "smscode", "password"]):
+				raise ValueError("Login factor cannot be enforced", {"factor": factor})
 
 		result = await provider.update(credentials_id, {
 			"enforce_factors": enforce_factors

@@ -85,7 +85,6 @@ def private_auth_middleware_factory(app):
 
 
 def public_auth_middleware_factory(app):
-	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	cookie_service = app.get_service("seacatauth.CookieService")
 
 	@aiohttp.web.middleware
@@ -93,15 +92,9 @@ def public_auth_middleware_factory(app):
 		"""
 		Try to authenticate before accessing public endpoints.
 		"""
-		# Authorize by OAuth Bearer token
-		try:
-			request.Session = await oidc_service.get_session_from_authorization_header(request)
-		except KeyError:
-			request.Session = None
 
-		# Use cookie if Bearer token auth fails
-		if request.Session is None:
-			request.Session = await cookie_service.get_session_by_sci(request)
+		# Cookie-based authentication
+		request.Session = await cookie_service.get_session_by_sci(request)
 
 		return await handler(request)
 
