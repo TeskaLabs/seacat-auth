@@ -316,8 +316,9 @@ class RoleService(asab.Service):
 			"count": await collection.count_documents(query_filter)
 		}
 
+
 	async def assign_role(self, credentials_id: str, role_id: str):
-		self.get_tenant_from_role_id(role_id)
+		tenant = self.get_tenant_from_role_id(role_id)
 
 		# Check if credentials exist
 		try:
@@ -341,12 +342,10 @@ class RoleService(asab.Service):
 				"message": message,
 			}
 
-		return await self._do_assign_role(credentials_id, role_id)
+		return await self._do_assign_role(credentials_id, role_id, tenant)
 
 
-	async def _do_assign_role(self, credentials_id: str, role_id: str):
-		tenant = self.get_tenant_from_role_id(role_id)
-
+	async def _do_assign_role(self, credentials_id: str, role_id: str, tenant: str):
 		assignment_id = "{} {}".format(credentials_id, role_id)
 
 		upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=assignment_id)

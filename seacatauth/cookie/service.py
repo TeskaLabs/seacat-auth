@@ -24,6 +24,8 @@ class CookieService(asab.Service):
 		super().__init__(app, service_name)
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.TenantService = app.get_service("seacatauth.TenantService")
 
 		# Configure root cookie
 		self.CookieName = asab.Config.get("seacatauth:cookie", "name")

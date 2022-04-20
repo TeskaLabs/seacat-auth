@@ -1,8 +1,11 @@
 import re
 import logging
+import typing
 
 import aiohttp
 import asab.config
+
+from ..authz import get_credentials_authz
 
 #
 
@@ -18,9 +21,9 @@ L = logging.getLogger(__name__)
 
 
 class ELKIntegration(asab.config.Configurable):
-	'''
+	"""
 	Kibana / ElasticSearch user push compomnent
-	'''
+	"""
 
 	ConfigDefaults = {
 		'url': 'http://localhost:9200/',
@@ -31,6 +34,10 @@ class ELKIntegration(asab.config.Configurable):
 
 		'mapped_roles_prefixes': '*/elk:',  # Prefix of roles that will be transfered to Kibana
 
+		# Resources with this prefix will be mapped to Kibana users as roles
+		# E.g.: Resource "elk:kibana-analyst" will be mapped to role "kibana-analyst"
+		"resource_prefix": "elk:",
+
 		'managed_role': 'seacat_managed',  # 'flags' users in ElasticSearch/Kibana that is managed by us,
 		# There should be a role created in the ElasticSearch that grants no rights
 	}
@@ -39,12 +46,25 @@ class ELKIntegration(asab.config.Configurable):
 	def __init__(self, batman_svc, config_section_name="batman:elk", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
 		self.BatmanService = batman_svc
+		self.CredentialsService = self.BatmanService.App.get_service("seacatauth.CredentialsService")
+		self.TenantService = self.BatmanService.App.get_service("seacatauth.TenantService")
+		self.RoleService = self.BatmanService.App.get_service("seacatauth.RoleService")
+		self.ResourceService = self.BatmanService.App.get_service("seacatauth.ResourceService")
 
 		username = self.Config.get('username')
 		password = self.Config.get('password')
 		self.BasicAuth = aiohttp.BasicAuth(username, password)
 
 		self.URL = self.Config.get('url').rstrip('/')
+		self.ResourcePrefix = self.Config.get("resource_prefix")
+		self.ELKResourceRegex = re.compile("^{}".format(
+			re.escape(self.Config.get("resource_prefix"))
+		))
+		self.ELKSeacatFlagRole = self.Config.get("managed_role")
+
+		# TODO: Obsolete, back compat only. Use resources instead of roles.
+		#
+		self.RolePrefixes = re.split(r"\s+", self.Config.get("mapped_roles_prefixes"))
 
 		lu = re.split(r'\s+', self.Config.get('local_users'), flags=re.MULTILINE)
 		lu.append(username)
@@ -54,31 +74,66 @@ class ELKIntegration(asab.config.Configurable):
 		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 	async def _on_tick(self, event_name):
+		await self._initialize_resources()
 		await self.sync_all()
 
 	async def initialize(self):
+		await self._initialize_resources()
 		await self.sync_all()
 
+	async def _initialize_resources(self):
+		"""
+		Fetches roles from ELK and creates a Seacat Auth resource for each one of them.
+		"""
+		# Fetch ELK roles
+		try:
+			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
+				async with session.get("{}/_xpack/security/role".format(self.URL)) as resp:
+					if resp.status != 200:
+						text = await resp.text()
+						L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
+						return
+					elk_roles_data = await resp.json()
+		except Exception as e:
+			L.error("Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)))
+			return
+
+		# Fetch SCA resources for the ELK module
+		existing_elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
+		existing_elk_resources = set(
+			resource["_id"]
+			for resource in existing_elk_resources["data"]
+		)
+
+		# Create resources that don't exist yet
+		for role in elk_roles_data.keys():
+			resource_id = "{}{}".format(self.ResourcePrefix, role)
+			if resource_id not in existing_elk_resources:
+				await self.ResourceService.create(
+					resource_id,
+					description="Grants access to ELK role '{}.".format(role)
+				)
+
 	async def sync_all(self):
-		cred_svc = self.BatmanService.App.get_service('seacatauth.CredentialsService')
-		async for cred in cred_svc.iterate():
-			await self.sync(cred)
+		elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
+		elk_resources = set(
+			resource["_id"]
+			for resource in elk_resources["data"]
+		)
+		async for cred in self.CredentialsService.iterate():
+			await self.sync(cred, elk_resources)
 
 
-	async def sync(self, cred: dict):
+	async def sync(self, cred: dict, elk_resources: typing.Iterable):
 		username = cred.get('username')
 		if username is None:
 			# Be defensive
-			L.warning("Cannot create user '{}', no username".format(cred))
+			L.info("Cannot create user: No username", struct_data={"cid": cred["_id"]})
 			return
 
 		if username in self.LocalUsers:
 			# Ignore users that are specified as local
 			return
-
-		# Get roles
-		roles_svc = self.BatmanService.App.get_service('seacatauth.RoleService')
-		roles = await roles_svc.get_roles_by_credentials(cred['_id'])
 
 		json = {
 			'enabled': cred.get('suspended', False) is not True,
@@ -101,31 +156,42 @@ class ELKIntegration(asab.config.Configurable):
 		if v is not None:
 			json['full_name'] = v
 
-		elk_roles = [
-			self.Config.get('managed_role'),  # Add a role that marks the user managed by us
-		]
+		elk_roles = set(
+			self.ELKSeacatFlagRole,  # Add a role that marks users managed by Seacat Auth
+		)
 
-		roles_prefixes = re.split(r'\s+', self.Config.get('mapped_roles_prefixes'), flags=re.MULTILINE)
-		for role in roles:
-			match = None
-			for rp in roles_prefixes:
-				if role.startswith(rp):
-					match = role[len(rp):]
+		# Get authz dict
+		authz = await get_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
+
+		# ELK roles from SCA resources
+		# Use only global "*" roles for now
+		user_resources = set().union(*authz.get("*", {}).values())
+		if "authz:superuser" in user_resources:
+			elk_roles.update(
+				resource[len(self.ResourcePrefix):]
+				for resource in elk_resources
+			)
+		else:
+			elk_roles.update(
+				resource[len(self.ResourcePrefix):]
+				for resource in user_resources.intersection(elk_resources)
+			)
+
+		# Map roles to ELK roles
+		# TODO: Obsolete, use resources.
+		for role in authz.get("*", {}):
+			for prefix in self.RolePrefixes:
+				if role.startswith(prefix):
+					elk_roles.add(role[len(prefix):])
 					break
-			if match is None:
+
+		# ELK roles from tenants
+		for tenant in authz:
+			if tenant == "*":
 				continue
+			elk_roles.add("tenant_{}".format(tenant))
 
-			elk_roles.append(match)
-
-
-		# Roles by tenant
-		tenant_svc = self.BatmanService.App.get_service('seacatauth.TenantService')
-		if tenant_svc.is_enabled():
-			tenants = await tenant_svc.get_tenants(cred['_id'])
-			for tenant in tenants:
-				elk_roles.append('tenant_{}'.format(tenant))
-
-		json['roles'] = elk_roles
+		json["roles"] = list(elk_roles)
 
 		try:
 			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
@@ -135,7 +201,12 @@ class ELKIntegration(asab.config.Configurable):
 						pass
 					else:
 						text = await resp.text()
-						L.warning("Failed to create/upadate the user in ElasticSearch:\n{}".format(text[:1000]))
-
-		except Exception:
-			L.exception("Error when communicating with ElasticSearch")
+						L.warning(
+							"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
+							struct_data={"cid": cred["_id"]}
+						)
+		except Exception as e:
+			L.error(
+				"Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)),
+				struct_data={"cid": cred["_id"]}
+			)
