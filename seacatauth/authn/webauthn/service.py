@@ -221,8 +221,9 @@ class WebAuthnService(asab.Service):
 		Get existing WebAuthn registration challenge for the current session
 		"""
 		challenge_obj = await self.StorageService.get(self.WebAuthnRegistrationChallengeCollection, session_id)
+		if challenge_obj["exp"] < datetime.datetime.utcnow():
+			raise KeyError("Challenge timed out")
 		return challenge_obj["ch"]
-
 
 	async def delete_registration_challenge(self, session_id: str):
 		"""
