@@ -16,6 +16,7 @@
 ### Features
 - Generate MANIFEST.json (#20, PLUM Sprint 220325)
 - List resources call now accepts filter string (#21, PLUM Sprint 220408)
+- FIDO2/WebAuthn support (login, token management) (#12, PLUM Sprint 220408)
 
 ### Refactoring
 - Fallback values in ident translation response (#18, PLUM Sprint 220325)

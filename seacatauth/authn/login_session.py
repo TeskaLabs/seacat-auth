@@ -1,6 +1,7 @@
 import json
 import secrets
 import datetime
+import typing
 
 import cryptography.hazmat.backends
 import cryptography.hazmat.primitives.asymmetric.ec
@@ -60,9 +61,13 @@ class LoginSession(object):
 		return json.loads(decryptor.update(message) + decryptor.finalize())
 
 
-	def encrypt(self, plaintext: dict) -> bytes:
+	def encrypt(self, plaintext: typing.Union[str, dict, bytes]) -> bytes:
 		assert self.__shared_key is not None
-		plaintext = json.dumps(plaintext).encode('utf-8')
+		if isinstance(plaintext, dict):
+			plaintext = json.dumps(plaintext).encode('utf-8')
+		elif isinstance(plaintext, str):
+			plaintext = plaintext.encode('utf-8')
+
 		iv = secrets.token_bytes(12)
 
 		# Construct a Cipher object, with the key, iv, and additionally the

@@ -162,7 +162,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"ident\": \"mrs.johnson@example.xyz\"\n}"
+									"raw": "{\n    \"ident\": \"jaroslav.kokalik@test.cz\"\n}"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/public/lost-password",
@@ -229,7 +229,7 @@
 									"variable": [
 										{
 											"key": "register_token",
-											"value": "abc123def456ghi789",
+											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs",
 											"type": "string"
 										}
 									]
@@ -279,7 +279,7 @@
 									"variable": [
 										{
 											"key": "register_token",
-											"value": "abc123def456ghi789",
+											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs",
 											"type": "string"
 										}
 									]
@@ -320,7 +320,7 @@
 									"variable": [
 										{
 											"key": "register_token",
-											"value": "abc123def456ghi789",
+											"value": "hKKYIrvfXZ5k7FGqK6P8x8hiG4OM0tLi2_6tfHLdxwI",
 											"type": "string"
 										}
 									]
@@ -376,7 +376,7 @@
 									"raw": "{\n    \"newpassword\": \"betterpassword\"\n}"
 								},
 								"url": {
-									"raw": "{{BASE_URL}}/public/password-reset?x=abc123def456ghi789",
+									"raw": "{{BASE_URL}}/public/password-reset?x=hKKYIrvfXZ5k7FGqK6P8x8hiG4OM0tLi2_6tfHLdxwI",
 									"host": [
 										"{{BASE_URL}}"
 									],
@@ -387,7 +387,7 @@
 									"query": [
 										{
 											"key": "x",
-											"value": "abc123def456ghi789"
+											"value": "hKKYIrvfXZ5k7FGqK6P8x8hiG4OM0tLi2_6tfHLdxwI"
 										}
 									]
 								},
@@ -507,7 +507,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "mongodb:default:abc123def456ghi789",
+									"value": "mongodb:ext:1c56701f03bc56137b2f48e0",
 									"type": "string"
 								}
 							]
@@ -563,7 +563,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\t\"username\": \"testuser\",\n    \"email\": \"mrs.johnson@example.xyz\",\n    \"passwordlink\": true\n}",
+							"raw": "{\n\t\"username\": \"testuser\",\n    \"email\": \"testuser@test.cz\",\n    \"passwordlink\": true\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -606,7 +606,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\t\"email\": \"mrs.johnson@example.xyz\"\n}",
+							"raw": "{\n\t\"email\": \"bestuser@test.cz\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -625,7 +625,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "dict:temp:abc123def456ghi789",
+									"value": "dict:temp:5012dcc7e5f434c9addc02aaa4291e74e97896c2312eb613feac2bb2",
 									"type": "string"
 								}
 							]
@@ -634,7 +634,7 @@
 					"response": []
 				},
 				{
-					"name": "Get usernames from IDs",
+					"name": "Get idents from IDs",
 					"request": {
 						"method": "PUT",
 						"header": [
@@ -647,7 +647,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "[\n    \"mongodb:default:abc123def456ghi789\",\n    \"htpasswd:htpasswd:patrick\"\n]",
+							"raw": "[\n    \"mongodb:ext:60eee70d6b47935cf7bacdda\",\n    \"htpasswd:htpasswd:jarmila\"\n]",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -655,12 +655,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/usernames",
+							"raw": "{{BASE_URL}}/idents",
 							"host": [
 								"{{BASE_URL}}"
 							],
 							"path": [
-								"usernames"
+								"idents"
 							]
 						}
 					},
@@ -679,7 +679,7 @@
 							},
 							{
 								"key": "Authorization",
-								"value": "Bearer abc123def456ghi789",
+								"value": "Bearer HXXEHh7tsrOSZJcPgfBVp4Kn3p6McJh4LYU_Xjcp21cIrDYV",
 								"type": "text"
 							}
 						],
@@ -704,7 +704,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "mongodb:default:abc123def456ghi789",
+									"value": "mongodb:ext:5f74a00045daa0d67b00f274",
 									"type": "string"
 								}
 							]
@@ -726,7 +726,7 @@
 							{
 								"key": "Authorization",
 								"type": "text",
-								"value": "Bearer abc123def456ghi789"
+								"value": "Bearer HXXEHh7tsrOSZJcPgfBVp4Kn3p6McJh4LYU_Xjcp21cIrDYV"
 							}
 						],
 						"body": {
@@ -750,7 +750,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "mongodb:default:abc123def456ghi789",
+									"value": "mongodb:ext:5f74a00045daa0d67b00f274",
 									"type": "string"
 								}
 							]
@@ -782,7 +782,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "dict:temp:abc123def456ghi789",
+									"value": "dict:default:3b7e33751cac4b11b4868b459806c245",
 									"type": "string"
 								}
 							]
@@ -854,7 +854,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"credentials_id\": \"dict:temp:abc123def456ghi789\"\n}"
+							"raw": "{\n    \"credentials_id\": \"dict:temp:5012dcc7e5f434c9addc02aaa4291e74e97896c2312eb613feac2bb2\"\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/password",
@@ -996,7 +996,7 @@
 										},
 										{
 											"key": "code",
-											"value": "abc123def456ghi789",
+											"value": "-Q1bdCai9-0RBO0OjPo_uWAxxm1oA0d6SXz4wB-AQaK6H8wJ",
 											"type": "text"
 										}
 									]
@@ -1022,7 +1022,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"token_type_hint\": \"access_token\",\n    \"token\": \"abc123def456ghi789\"\n}",
+									"raw": "{\n    \"token_type_hint\": \"access_token\",\n    \"token\": \"KeR2diDG7ktNsgzxOtPM6rVNsFajukAn2bCHKju8K55qTM54\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -1050,7 +1050,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"refresh_token\": \"abc123def456ghi789\",\n    \"grant_type\": \"authorization_code\",\n    \"client_id\": \"signin\",\n    \"client_secret\": \"secret123456\",\n    \"scope\": \"openid\"\n}",
+									"raw": "{\n    \"refresh_token\": \"KeR2diDG7ktNsgzxOtPM6rVNsFajukAn2bCHKju8K55qTM54\",\n    \"grant_type\": \"authorization_code\",\n    \"client_id\": \"signin\",\n    \"client_secret\": \"secret123456\",\n    \"scope\": \"openid\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -1127,7 +1127,7 @@
 								"header": [
 									{
 										"key": "Authorization",
-										"value": "Bearer abc123def456ghi789",
+										"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
 										"type": "text"
 									}
 								],
@@ -1151,7 +1151,7 @@
 										"header": [
 											{
 												"key": "Authorization",
-												"value": "Bearer abc123def456ghi789",
+												"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
 												"type": "text"
 											}
 										],
@@ -1188,7 +1188,7 @@
 										}
 									],
 									"cookie": [],
-									"body": "{\n    \"sub\": \"mongodb:default:abc123def456ghi789\",\n    \"preferred_username\": \"foobar\"\n}"
+									"body": "{\n    \"sub\": \"mongodb:ext:de76c3e567fca9d246f5f8d3\",\n    \"preferred_username\": \"foobar\"\n}"
 								}
 							]
 						},
@@ -1199,7 +1199,7 @@
 								"header": [
 									{
 										"key": "Authorization",
-										"value": "Bearer abc123def456ghi789",
+										"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
 										"type": "text"
 									}
 								],
@@ -1228,7 +1228,7 @@
 										"header": [
 											{
 												"key": "Authorization",
-												"value": "Bearer abc123def456ghi789",
+												"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
 												"type": "text"
 											}
 										],
@@ -1265,7 +1265,7 @@
 										}
 									],
 									"cookie": [],
-									"body": "{\n    \"sub\": \"mongodb:default:abc123def456ghi789\",\n    \"preferred_username\": \"foobar\"\n}"
+									"body": "{\n    \"sub\": \"mongodb:ext:de76c3e567fca9d246f5f8d3\",\n    \"preferred_username\": \"foobar\"\n}"
 								}
 							]
 						}
@@ -1299,7 +1299,7 @@
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer abc123def456ghi789",
+								"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
 								"type": "text"
 							}
 						],
@@ -1760,7 +1760,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"credentials_id\": \"htpasswd:htpasswd:john_doe\",\n    \"tenant_id\": \"tenant1\"\n}",
+							"raw": "{\n    \"credentials_id\": \"htpasswd:default:john_doe\",\n    \"tenant_id\": \"tenant1\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1779,7 +1779,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "htpasswd:htpasswd:john_doe",
+									"value": "htpasswd:default:john_doe",
 									"type": "string"
 								}
 							]
@@ -1813,7 +1813,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "htpasswd:htpasswd:john_doe",
+									"value": "htpasswd:htpass:staticuser",
 									"type": "string"
 								}
 							]
@@ -1828,7 +1828,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"credentials_id\": \"htpasswd:htpasswd:john_doe\",\n    \"tenant_id\": \"tenant1\"\n}",
+							"raw": "{\n    \"credentials_id\": \"htpasswd:default:john_doe\",\n    \"tenant_id\": \"tenant1\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2151,7 +2151,7 @@
 								{
 									"key": "credentials_id",
 									"type": "string",
-									"value": "mongodb:default:abc123def456ghi789"
+									"value": "mongodb:pers:6042a28b494892106efd1c8c"
 								}
 							]
 						}
@@ -2190,7 +2190,7 @@
 								{
 									"key": "credentials_id",
 									"type": "string",
-									"value": "mongodb:default:abc123def456ghi789"
+									"value": "mongodb:pers:6042a28b494892106efd1c8c"
 								}
 							]
 						},
@@ -2283,260 +2283,6 @@
 								{
 									"key": "resource_id",
 									"value": "user:create"
-								}
-							]
-						}
-					},
-					"response": []
-				}
-			],
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				}
-			]
-		},
-		{
-			"name": "Authentication",
-			"item": [
-				{
-					"name": "Login",
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{BASE_URL}}/public/login/:lsid",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"public",
-								"login",
-								":lsid"
-							],
-							"variable": [
-								{
-									"key": "lsid",
-									"value": "abc123def456ghi789"
-								}
-							]
-						},
-						"description": "Request body is encrypted."
-					},
-					"response": []
-				},
-				{
-					"name": "Login prologue",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{BASE_URL}}/public/login.prologue",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"public",
-								"login.prologue"
-							]
-						},
-						"description": "Request body is encrypted."
-					},
-					"response": []
-				},
-				{
-					"name": "Logout",
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"url": {
-							"raw": "{{BASE_URL}}/public/logout",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"public",
-								"logout"
-							]
-						},
-						"description": "Logout endpoint for **cookie-based** sessions.\n\nFor OAuth token-based session logout, refer to `GET /openidconnect/logout`."
-					},
-					"response": []
-				},
-				{
-					"name": "External login (callback)",
-					"protocolProfileBehavior": {
-						"disableBodyPruning": true
-					},
-					"request": {
-						"method": "GET",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{BASE_URL}}/public/ext-login/:ext_login_provider",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"public",
-								"ext-login",
-								":ext_login_provider"
-							],
-							"query": [
-								{
-									"key": "code",
-									"value": null,
-									"description": "Token request code",
-									"disabled": true
-								},
-								{
-									"key": "state",
-									"value": null,
-									"disabled": true
-								}
-							],
-							"variable": [
-								{
-									"key": "ext_login_provider",
-									"value": "google"
-								}
-							]
-						},
-						"description": "Callback after successful login with an external OAuth2 provider."
-					},
-					"response": []
-				},
-				{
-					"name": "Add external login (callback)",
-					"protocolProfileBehavior": {
-						"disableBodyPruning": true
-					},
-					"request": {
-						"method": "GET",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{BASE_URL}}/public/ext-login-add/:ext_login_provider",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"public",
-								"ext-login-add",
-								":ext_login_provider"
-							],
-							"query": [
-								{
-									"key": "code",
-									"value": null,
-									"description": "Token request code",
-									"disabled": true
-								},
-								{
-									"key": "state",
-									"value": null,
-									"disabled": true
-								}
-							],
-							"variable": [
-								{
-									"key": "ext_login_provider",
-									"value": "google"
-								}
-							]
-						},
-						"description": "Callback after successful login with an external OAuth2 provider."
-					},
-					"response": []
-				},
-				{
-					"name": "Remove external login",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{BASE_URL}}/public/ext-login-delete/:ext_login_provider",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"public",
-								"ext-login-delete",
-								":ext_login_provider"
-							],
-							"variable": [
-								{
-									"key": "ext_login_provider",
-									"value": "google"
 								}
 							]
 						}
@@ -2709,6 +2455,454 @@
 							]
 						},
 						"description": "Get features available at Seacat Auth webUI."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Login",
+			"item": [
+				{
+					"name": "WebAuthn",
+					"item": [
+						{
+							"name": "Get registration options",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/public/webauthn/register-options",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"webauthn",
+										"register-options"
+									]
+								},
+								"description": "https://w3c.github.io/webauthn/#sctn-registering-a-new-credential"
+							},
+							"response": []
+						},
+						{
+							"name": "Register credential",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/public/webauthn/register",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"webauthn",
+										"register"
+									]
+								},
+								"description": "https://w3c.github.io/webauthn/#sctn-registering-a-new-credential"
+							},
+							"response": []
+						},
+						{
+							"name": "Update credential",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\"name\": \"my-yubikey\"}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/webauthn/:wacid",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"webauthn",
+										":wacid"
+									],
+									"variable": [
+										{
+											"key": "wacid",
+											"value": ""
+										}
+									]
+								},
+								"description": "https://w3c.github.io/webauthn/#sctn-registering-a-new-credential"
+							},
+							"response": []
+						},
+						{
+							"name": "List my registered credentials",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\"name\": \"my-yubikey\"}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/webauthn",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"webauthn"
+									]
+								},
+								"description": "https://w3c.github.io/webauthn/#sctn-registering-a-new-credential"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete credential",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/public/webauthn/:wacid",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"webauthn",
+										":wacid"
+									],
+									"variable": [
+										{
+											"key": "wacid",
+											"value": ""
+										}
+									]
+								},
+								"description": "https://w3c.github.io/webauthn/#sctn-registering-a-new-credential"
+							},
+							"response": []
+						},
+						{
+							"name": "Get authentication options",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/login/:lsid/webauthn",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"login",
+										":lsid",
+										"webauthn"
+									],
+									"variable": [
+										{
+											"key": "lsid",
+											"value": "ByaY1Rw94-Z3X9qsvtBrYHXVRmAgiPqAlXw_NOkz2Mk"
+										}
+									]
+								},
+								"description": "Request body is encrypted."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "External login",
+					"item": [
+						{
+							"name": "External login (callback)",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/ext-login/:ext_login_provider",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"ext-login",
+										":ext_login_provider"
+									],
+									"query": [
+										{
+											"key": "code",
+											"value": null,
+											"description": "Token request code",
+											"disabled": true
+										},
+										{
+											"key": "state",
+											"value": null,
+											"disabled": true
+										}
+									],
+									"variable": [
+										{
+											"key": "ext_login_provider",
+											"value": "google"
+										}
+									]
+								},
+								"description": "Callback after successful login with an external OAuth2 provider."
+							},
+							"response": []
+						},
+						{
+							"name": "Add external login (callback)",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/ext-login-add/:ext_login_provider",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"ext-login-add",
+										":ext_login_provider"
+									],
+									"query": [
+										{
+											"key": "code",
+											"value": null,
+											"description": "Token request code",
+											"disabled": true
+										},
+										{
+											"key": "state",
+											"value": null,
+											"disabled": true
+										}
+									],
+									"variable": [
+										{
+											"key": "ext_login_provider",
+											"value": "google"
+										}
+									]
+								},
+								"description": "Callback after successful login with an external OAuth2 provider."
+							},
+							"response": []
+						},
+						{
+							"name": "Remove external login",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/ext-login/:ext_login_provider",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"ext-login",
+										":ext_login_provider"
+									],
+									"variable": [
+										{
+											"key": "ext_login_provider",
+											"value": "google"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Login prologue",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/public/login.prologue",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"public",
+								"login.prologue"
+							]
+						},
+						"description": "Request body is encrypted."
+					},
+					"response": []
+				},
+				{
+					"name": "Send SMS code",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/public/login/:lsid/smslogin",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"public",
+								"login",
+								":lsid",
+								"smslogin"
+							],
+							"variable": [
+								{
+									"key": "lsid",
+									"value": "ByaY1Rw94-Z3X9qsvtBrYHXVRmAgiPqAlXw_NOkz2Mk"
+								}
+							]
+						},
+						"description": "Request body is encrypted."
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/public/login/:lsid",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"public",
+								"login",
+								":lsid"
+							],
+							"variable": [
+								{
+									"key": "lsid",
+									"value": "ByaY1Rw94-Z3X9qsvtBrYHXVRmAgiPqAlXw_NOkz2Mk"
+								}
+							]
+						},
+						"description": "Request body is encrypted."
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/public/logout",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"public",
+								"logout"
+							]
+						},
+						"description": "Logout endpoint for **cookie-based** sessions.\n\nFor OAuth token-based session logout, refer to `GET /openidconnect/logout`."
 					},
 					"response": []
 				}
