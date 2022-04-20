@@ -4,6 +4,7 @@ from .smscode import SMSCodeFactor
 from .totp import TOTPFactor
 from .subnet import SubnetFactor
 from .xheader import XHeaderFactor
+from .webauthn import WebAuthnFactor
 
 import logging
 L = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ def login_factor_builder(authn_service, factor_config):
 
 	elif factor_type == "totp":
 		return TOTPFactor(authn_service=authn_service, config=factor_config)
+
+	elif factor_type == "webauthn":
+		return WebAuthnFactor(authn_service=authn_service, config=factor_config)
 
 	elif factor_type == "subnet":
 		return SubnetFactor(authn_service=authn_service, config=factor_config)

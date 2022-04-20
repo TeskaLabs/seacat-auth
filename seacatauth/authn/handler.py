@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import asab
@@ -33,19 +34,17 @@ class AuthenticationHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_put(r'/public/login.prologue', self.login_prologue)
 		web_app.router.add_put(r'/public/login/{lsid}', self.login)
-
-		web_app.router.add_put(r'/public/logout', self.logout)
-
 		web_app.router.add_put(r'/public/login/{lsid}/smslogin', self.smslogin)
+		web_app.router.add_put(r'/public/login/{lsid}/webauthn', self.webauthn_login)
+		web_app.router.add_put(r'/public/logout', self.logout)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_put(r'/public/login.prologue', self.login_prologue)
 		web_app_public.router.add_put(r'/public/login/{lsid}', self.login)
-
-		web_app_public.router.add_put(r'/public/logout', self.logout)
-
 		web_app_public.router.add_put(r'/public/login/{lsid}/smslogin', self.smslogin)
+		web_app_public.router.add_put(r'/public/login/{lsid}/webauthn', self.webauthn_login)
+		web_app_public.router.add_put(r'/public/logout', self.logout)
 
 
 	async def login_prologue(self, request):
@@ -256,3 +255,33 @@ class AuthenticationHandler(object):
 
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
+
+
+	async def webauthn_login(self, request):
+		# Decode JSON request
+		lsid = request.match_info["lsid"]
+		login_session = self.AuthenticationService.LoginSessions.get(lsid)
+		if login_session is None:
+			L.error("Login session not found.", struct_data={"lsid": lsid})
+			raise aiohttp.web.HTTPUnauthorized()
+
+		json_body = login_session.decrypt(await request.read())
+
+		# descriptor_id = json_body.get("descriptor_id")
+		factor_type = json_body.get("factor_type")
+		if factor_type != "webauthn":
+			body = {"result": "FAILED", "message": "Unsupported factor type."}
+			return aiohttp.web.Response(body=login_session.encrypt(body))
+
+		# Webauthn challenge timeout should be the same as the current login session timeout
+		timeout = (login_session.ExpiresAt - datetime.datetime.now()).total_seconds() * 1000
+
+		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
+		authentication_options = await webauthn_svc.get_authentication_options(
+			login_session.CredentialsId,
+			timeout
+		)
+
+		login_session.Data["webauthn"] = authentication_options
+
+		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))

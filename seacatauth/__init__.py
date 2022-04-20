@@ -71,6 +71,12 @@ asab.Config.add_defaults({
 		"setup_expiration": "10 m"
 	},
 
+	"seacatauth:webauthn": {
+		"relying_party_name": "SeaCat Auth",
+
+		"challenge_timeout": "1 m"
+	},
+
 	"seacatauth:authentication": {
 		# Path to JSON file which configures login descriptors and methods
 		"descriptor_file": "",
