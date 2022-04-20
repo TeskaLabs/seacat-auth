@@ -93,7 +93,7 @@ class WebAuthnHandler(object):
 	@access_control()
 	async def list_credentials(self, request, *, credentials_id):
 		wa_credentials = []
-		for credential in await self.WebAuthnService.get_webauthn_credentials_by_user(credentials_id):
+		for credential in await self.WebAuthnService.list_webauthn_credentials(credentials_id):
 			wa_credential = {
 				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
 				"name": credential["name"],

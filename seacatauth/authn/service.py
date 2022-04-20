@@ -38,7 +38,7 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 	},
 	{
 		'id': 'webauthn',
-		'label': 'WebAuthn login',
+		'label': 'FIDO2/WebAuthn login',
 		'factors': [
 			[
 				{'id': 'password', 'type': 'password'},

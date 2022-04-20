@@ -21,7 +21,7 @@ class WebAuthnFactor(LoginFactorABC):
 			# Not eligible for "fake" login session
 			return False
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
-		webauthn_credentials = await webauthn_svc.get_webauthn_credentials_by_user(credentials_id)
+		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(credentials_id)
 		if len(webauthn_credentials) > 0:
 			return True
 		return False

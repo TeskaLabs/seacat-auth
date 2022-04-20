@@ -96,9 +96,9 @@ class WebAuthnService(asab.Service):
 		return await self.StorageService.get(self.WebAuthnCredentialCollection, webauthn_credential_id)
 
 
-	async def get_webauthn_credentials_by_user(self, credentials_id: str):
+	async def list_webauthn_credentials(self, credentials_id: str):
 		"""
-		Get all WebAuthn credentials of a specified user
+		Get all WebAuthn credentials associated with specific SCA credentials
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
@@ -177,9 +177,9 @@ class WebAuthnService(asab.Service):
 		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id})
 
 
-	async def delete_webauthn_credentials_by_user(self, credentials_id: str):
+	async def delete_all_webauthn_credentials(self, credentials_id: str):
 		"""
-		Delete all WebAuthn credentials of a specified user
+		Delete all WebAuthn credentials associated with specific SCA credentials
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
@@ -329,7 +329,7 @@ class WebAuthnService(asab.Service):
 
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrequestoptions
 		"""
-		wa_credentials = await self.get_webauthn_credentials_by_user(credentials_id)
+		wa_credentials = await self.list_webauthn_credentials(credentials_id)
 		allow_credentials = [
 			webauthn.helpers.structs.PublicKeyCredentialDescriptor(
 				id=credential["_id"],
