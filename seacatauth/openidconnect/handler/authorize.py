@@ -270,7 +270,7 @@ class AuthorizeHandler(object):
 
 		# Add the Authorization Code into the session ...
 		if "cookie" not in scope:
-			url_qs["code"] = self.OpenIdConnectService.generate_authotization_code(session.SessionId)
+			url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
 
 		# Success
 		url = urllib.parse.urlunparse((
