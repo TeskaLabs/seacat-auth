@@ -89,9 +89,10 @@ class TokenHandler(object):
 
 		# Translate authorization code into session id
 		# Verify that the Authorization Code has not been previously used (using `pop` operation)
-		session_id = self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
-		if session_id is None:
-			L.warning("Session id not found", struct_data={'code': authorization_code})
+		try:
+			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
+		except KeyError:
+			L.warning("Authorization code not found", struct_data={"code": authorization_code})
 			return aiohttp.web.HTTPBadRequest()
 
 		# Locate the session using session id
@@ -182,9 +183,10 @@ class TokenHandler(object):
 			return aiohttp.web.HTTPBadRequest()
 
 		# Translate authorization code into session id
-		session_id = self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
-		if session_id is None:
-			L.warning("Session id not found", struct_data={'code': authorization_code})
+		try:
+			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
+		except KeyError:
+			L.warning("Authorization code not found", struct_data={"code": authorization_code})
 			return aiohttp.web.HTTPBadRequest()
 
 		# Locate the session using session id

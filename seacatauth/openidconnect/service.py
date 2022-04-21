@@ -39,10 +39,12 @@ class OpenIdConnectService(asab.Service):
 	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationHeaderRg = re.compile(r"^\s*Bearer ([A-Za-z0-9\-\.\+_~/=]*)")
+	AuthorizationCodeCollection = "ac"
 
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
+		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
@@ -56,25 +58,51 @@ class OpenIdConnectService(asab.Service):
 			L.warning("OAuth2 issuer not specified. Assuming '{}'".format(fragments.netloc))
 			self.Issuer = fragments.netloc
 
-		# A map of authorization codes to sessions
-		# TODO: Expiration of these
-		self.AuthorizationCodes = {}
-		self.AuthorizationCodeExpiration = 30  # seconds
+		self.AuthorizationCodeTimeout = datetime.timedelta(
+			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
+		)
+
+		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
-	def generate_authotization_code(self, session_id):
-		while True:
-			code = secrets.token_urlsafe(36)
-			if code in self.AuthorizationCodes:
-				continue
-			self.AuthorizationCodes[code] = (session_id, time.time() + self.AuthorizationCodeExpiration)
-			return code
+	async def _on_tick(self, event_name):
+		await self.delete_expired_authorization_codes()
 
 
-	def pop_session_id_by_authorization_code(self, code):
-		session_id, exptime = self.AuthorizationCodes.pop(code, (None, None))
-		if exptime is None or exptime < time.time():
-			return None
+	async def generate_authorization_code(self, session_id):
+		code = secrets.token_urlsafe(36)
+		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
+
+		upsertor.set("sid", session_id)
+		upsertor.set("exp", datetime.datetime.utcnow() + self.AuthorizationCodeTimeout)
+
+		await upsertor.execute()
+
+		return code
+
+
+	async def delete_expired_authorization_codes(self):
+		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
+
+		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.info("Expired login sessions deleted", struct_data={
+				"count": result.deleted_count
+			})
+
+
+	async def pop_session_id_by_authorization_code(self, code):
+		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
+		data = await collection.find_one_and_delete(filter={"_id": code})
+		if data is None:
+			raise KeyError("Authorization code not found")
+
+		session_id = data["sid"]
+		exp = data["exp"]
+		if exp is None or exp < datetime.datetime.now():
+			raise KeyError("Authorization code expired")
+
 		return session_id
 
 
