@@ -5,6 +5,7 @@ import typing
 
 import cryptography.hazmat.backends
 import cryptography.hazmat.primitives.asymmetric.ec
+import cryptography.hazmat.primitives.serialization
 
 from .login_descriptor import LoginDescriptor
 
@@ -68,6 +69,8 @@ class LoginSession(object):
 
 
 	def serialize(self) -> dict:
+		# TODO: Include ClientLoginKey and ServerLoginKey
+		#   Serialize them using .private_bytes() and .public_bytes()
 		db_object = {
 			"_id": self.Id,
 			"__sk": self.__shared_key,  # TODO: Encrypt
@@ -85,6 +88,8 @@ class LoginSession(object):
 
 	@classmethod
 	def deserialize(cls, authn_svc, db_object: dict):
+		# TODO: Use cryptography.hazmat.primitives.serialization
+		#   to deserialize ClientLoginKey and ServerLoginKey
 		return cls(
 			id=db_object["_id"],
 			shared_key=db_object["__sk"],
