@@ -161,7 +161,7 @@ class AuthenticationHandler(object):
 
 		await self.AuthenticationService.update_login_session(
 			lsid,
-			remaining_login_attempts=login_session.RemainingLoginAttempts-1
+			remaining_login_attempts=login_session.RemainingLoginAttempts - 1
 		)
 
 		request_data = login_session.decrypt(await request.read())
