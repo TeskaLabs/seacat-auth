@@ -126,6 +126,8 @@ class AuthenticationHandler(object):
 			'lds': [descriptor.serialize() for descriptor in login_descriptors],
 			'key': key.export_public(as_dict=True),
 		}
+		import pprint
+		L.warning(f"\n👾 {pprint.pformat(response)}")
 		return asab.web.rest.json_response(request, response)
 
 
@@ -157,7 +159,10 @@ class AuthenticationHandler(object):
 				status=401
 			)
 
-		login_session.RemainingLoginAttempts -= 1
+		await self.AuthenticationService.update_login_session(
+			lsid,
+			remaining_login_attempts=login_session.RemainingLoginAttempts-1
+		)
 
 		request_data = login_session.decrypt(await request.read())
 		request_data["request_headers"] = request.headers
@@ -235,23 +240,27 @@ class AuthenticationHandler(object):
 		return response
 
 	async def smslogin(self, request):
-		# TODO: refactor and make this endpoint more general (initiate_factor or something)
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = self.AuthenticationService.LoginSessions.get(lsid)
+		login_session = await self.AuthenticationService.get_login_session(lsid)
 		if login_session is None:
 			L.error("Login session not found.", struct_data={"lsid": lsid})
 			raise aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
 
+		L.warning(f"\n🧿 {json_body}")
+
 		# Initiate SMS login
 		success = False
 		factor_id = json_body.get("factor_id")
 		if factor_id is not None:
-			sms_factor = self.AuthenticationService.get_login_factor(factor_id)
-			if sms_factor is not None:
+			try:
+				sms_factor = self.AuthenticationService.get_login_factor(factor_id)
 				success = await sms_factor.send_otp(login_session)
+				await self.AuthenticationService.update_login_session(lsid, data=login_session.Data)
+			except KeyError:
+				success = False
 
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
@@ -260,7 +269,7 @@ class AuthenticationHandler(object):
 	async def webauthn_login(self, request):
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = self.AuthenticationService.LoginSessions.get(lsid)
+		login_session = await self.AuthenticationService.get_login_session(lsid)
 		if login_session is None:
 			L.error("Login session not found.", struct_data={"lsid": lsid})
 			raise aiohttp.web.HTTPUnauthorized()
@@ -282,6 +291,9 @@ class AuthenticationHandler(object):
 			timeout
 		)
 
-		login_session.Data["webauthn"] = authentication_options
+		login_data = login_session.Data
+		login_data["webauthn"] = authentication_options
+
+		await self.AuthenticationService.update_login_session(lsid, data=login_data)
 
 		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))

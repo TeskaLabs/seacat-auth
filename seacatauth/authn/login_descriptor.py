@@ -1,7 +1,7 @@
 import logging
 import typing
 
-from seacatauth.authn.login_factors import LoginFactorABC
+from .login_factors import LoginFactorABC
 
 #
 
@@ -36,8 +36,9 @@ class LoginDescriptor:
 		for config_group in factors_config:
 			group = []
 			for config in config_group:
-				factor = authn_svc.get_login_factor(config["id"])
-				if factor is None:
+				try:
+					factor = authn_svc.get_login_factor(config["type"])
+				except KeyError:
 					factor = authn_svc.create_login_factor(config)
 				group.append(factor)
 			factor_groups.append(group)
@@ -106,17 +107,46 @@ class LoginDescriptor:
 		return True
 
 	def serialize(self):
-		"""
-		Used in HTTP JSON responses.
-		"""
-		assert len(self.FactorGroups) == 1
-		return {
-			"id": self.ID,
-			"label": self.Label,
-			"factors": [
-				factor.serialize()
-				for group in self.FactorGroups
+		if len(self.FactorGroups) == 1:
+			return {
+				"id": self.ID,
+				"label": self.Label,
+				"factors": [
+					factor.serialize()
+					for group in self.FactorGroups
+					for factor in group
+				],
+				**self.Data
+			}
+		else:
+			return {
+				"id": self.ID,
+				"label": self.Label,
+				"factors": [
+					[
+						factor.serialize()
+						for factor in group
+					]
+					for group in self.FactorGroups
+				],
+				**self.Data
+			}
+
+	@classmethod
+	def deserialize(cls, authn_svc, data: dict):
+		ldid = data.pop("id")
+		label = data.pop("label")
+		factors_config = data.pop("factors")
+
+		if not isinstance(factors_config[0], list):
+			factors_config = [factors_config]
+
+		factors = [
+			[
+				authn_svc.get_login_factor(factor["type"])
 				for factor in group
-			],
-			**self.Data
-		}
+			]
+			for group in factors_config
+		]
+
+		return cls(ldid, label, factors, data)

@@ -6,42 +6,97 @@ import typing
 import cryptography.hazmat.backends
 import cryptography.hazmat.primitives.asymmetric.ec
 
+from .login_descriptor import LoginDescriptor
+
 
 class LoginSession(object):
 
-
 	ServerLoginKeyCurve = cryptography.hazmat.primitives.asymmetric.ec.SECP256R1
 
-
-	def __init__(self, client_login_key, credentials_id, login_descriptors, login_attempts, login_expiration):
-		self.CreatedAt = datetime.datetime.utcnow()
-		self.ServerLoginKey = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
-			self.ServerLoginKeyCurve(),
-			cryptography.hazmat.backends.default_backend()
-		)
-		self.Id = secrets.token_urlsafe()
-
-		if client_login_key is not None:
-			self.ClientLoginKey = client_login_key  # Public key
-			self.__shared_key = self.ServerLoginKey.exchange(
-				cryptography.hazmat.primitives.asymmetric.ec.ECDH(),
-				self.ClientLoginKey
-			)
-		else:
-			# Dummy login session, only used after successful external login
-			self.ClientLoginKey = None
-			self.__shared_key = None
-
+	def __init__(
+		self,
+		id,
+		shared_key,
+		credentials_id,
+		login_descriptors,
+		remaining_login_attempts,
+		expires_at,
+		client_login_key=None,
+		server_login_key=None,
+		data=None
+	):
+		self.Id = id
+		self.__shared_key = shared_key
 		self.CredentialsId = credentials_id
 		self.LoginDescriptors = login_descriptors
-		self.RemainingLoginAttempts = login_attempts
-		self.ExpiresAt = datetime.datetime.utcnow() + datetime.timedelta(seconds=login_expiration)
+		self.RemainingLoginAttempts = remaining_login_attempts
+		self.ClientLoginKey = client_login_key
+		self.ServerLoginKey = server_login_key
+		self.ExpiresAt = expires_at
 
 		# Login descriptor that successfully authenticated the login session
 		self.AuthenticatedVia = None
 
 		# User space for storing custom data needed by a login process
-		self.Data = {}
+		self.Data = data or {}
+
+
+	@classmethod
+	def build(cls, client_login_key, credentials_id, login_descriptors, login_attempts, timeout):
+		# Generate shared encryption key
+		server_login_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
+			cls.ServerLoginKeyCurve(),
+			cryptography.hazmat.backends.default_backend()
+		)
+		shared_key = server_login_key.exchange(
+			cryptography.hazmat.primitives.asymmetric.ec.ECDH(),
+			client_login_key
+		)
+
+		expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
+
+		return cls(
+			id=secrets.token_urlsafe(),
+			client_login_key=client_login_key,
+			server_login_key=server_login_key,
+			shared_key=shared_key,
+			credentials_id=credentials_id,
+			login_descriptors=login_descriptors,
+			remaining_login_attempts=login_attempts,
+			expires_at=expires_at
+		)
+
+
+	def serialize(self) -> dict:
+		db_object = {
+			"_id": self.Id,
+			"__sk": self.__shared_key,  # TODO: Encrypt
+			"cid": self.CredentialsId,
+			"exp": self.ExpiresAt,
+			"la": self.RemainingLoginAttempts,
+			"ld": [
+				descriptor.serialize()
+				for descriptor in self.LoginDescriptors
+			],
+			"d": self.Data,
+		}
+		return db_object
+
+
+	@classmethod
+	def deserialize(cls, authn_svc, db_object: dict):
+		return cls(
+			id=db_object["_id"],
+			shared_key=db_object["__sk"],
+			credentials_id=db_object["cid"],
+			login_descriptors=[
+				LoginDescriptor.deserialize(authn_svc, descriptor)
+				for descriptor in db_object["ld"]
+			],
+			remaining_login_attempts=db_object["la"],
+			expires_at=db_object["exp"],
+			data=db_object["d"],
+		)
 
 
 	def decrypt(self, ciphertext: bytes) -> dict:
