@@ -13,9 +13,6 @@ L = logging.getLogger(__name__)
 class TOTPFactor(LoginFactorABC):
 	Type = "totp"
 
-	def __init__(self, authn_service, config):
-		super().__init__(authn_service, config)
-
 	async def is_eligible(self, login_data: dict) -> bool:
 		# Check if OTP is set up in credentials
 		cred_svc = self.AuthenticationService.CredentialsService
