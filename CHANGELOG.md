@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.16
 
 ### Breaking changes
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
