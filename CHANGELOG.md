@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Refactoring
+- Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
+
+---
+
+
 ## v22.16
 
 ### Breaking changes
