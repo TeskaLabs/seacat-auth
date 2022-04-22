@@ -15,7 +15,7 @@ L = logging.getLogger(__name__)
 
 
 class OTPService(asab.Service):
-	TOTPRegistrationChallengeCollection = "torc"
+	TOTPSecretCollection = "tos"
 
 	def __init__(self, app, service_name="seacatauth.OTPService"):
 		super().__init__(app, service_name)
@@ -125,7 +125,7 @@ class OTPService(asab.Service):
 			# There is no secret associated with this user session
 			pass
 
-		upsertor = self.StorageService.upsertor(self.TOTPRegistrationChallengeCollection, obj_id=session_id)
+		upsertor = self.StorageService.upsertor(self.TOTPSecretCollection, obj_id=session_id)
 
 		expires = datetime.datetime.utcnow() + self.RegistrationTimeout
 		upsertor.set("exp", expires)
@@ -141,7 +141,7 @@ class OTPService(asab.Service):
 
 
 	async def _get_totp_secret(self, session_id: str) -> str:
-		data = await self.StorageService.get(self.TOTPRegistrationChallengeCollection, session_id)
+		data = await self.StorageService.get(self.TOTPSecretCollection, session_id)
 		secret = data["__s"]
 		exp = data["exp"]
 		if exp is None or exp < datetime.datetime.now():
@@ -151,11 +151,11 @@ class OTPService(asab.Service):
 
 
 	async def _delete_totp_secret(self, session_id: str):
-		await self.StorageService.delete(self.TOTPRegistrationChallengeCollection, session_id)
+		await self.StorageService.delete(self.TOTPSecretCollection, session_id)
 
 
 	async def _delete_expired_totp_secrets(self):
-		collection = self.StorageService.Database[self.TOTPRegistrationChallengeCollection]
+		collection = self.StorageService.Database[self.TOTPSecretCollection]
 
 		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
 		result = await collection.delete_many(query_filter)
