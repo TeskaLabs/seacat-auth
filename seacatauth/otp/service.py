@@ -93,6 +93,7 @@ class OTPService(asab.Service):
 		# Store secret in credentials object
 		provider = self.CredentialsService.get_provider(credentials_id)
 		await provider.update(credentials_id, {"__totp": secret})
+		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
 
 		await self._delete_totp_secret(session.SessionId)
 
@@ -152,6 +153,7 @@ class OTPService(asab.Service):
 
 	async def _delete_totp_secret(self, session_id: str):
 		await self.StorageService.delete(self.TOTPSecretCollection, session_id)
+		L.info("TOTP secret deleted", struct_data={"sid": session_id})
 
 
 	async def _delete_expired_totp_secrets(self):
