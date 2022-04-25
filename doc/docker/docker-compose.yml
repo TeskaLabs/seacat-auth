@@ -2,48 +2,35 @@ version: '3'
 services:
 
   # Database for SeaCat Auth
-  seacat-auth-mongo:
+  mongo:
     image: mongo
     volumes:
       - /data/mongodb:/data/db
       - ./log:/log
-    networks:
-      - seacatauthnet
+    network_mode: host
 
   # Nginx reverse-proxy
-  seacat-auth-nginx:
+  nginx:
     image: nginx
     depends_on:
-      - seacat-auth-svc
-    ports:
-      - 80:80/tcp
-      - 443:443/tcp
+      - seacat-auth
+    network_mode: host
     volumes:
       - ./nginx-conf:/etc/nginx/conf.d
       - ./log:/log
       - ./seacat-auth-webui:/seacat-auth-webui
       - ./seacat-webui:/seacat-webui
-    networks:
-      - seacatauthnet
 
   # SeaCat Auth microservice
-  seacat-auth-svc:
+  seacat-auth:
     environment:
       # Provisioning mode switch
       # Set to 1 or TRUE to activate provisioning mode
       - SEACAT_AUTH_PROVISIONING=0
-    build:
-      # Adjust location or switch for pre-built image
-      context: ../..
-      dockerfile: Dockerfile
+    image: teskalabs/seacat-auth:latest
     depends_on:
-      - seacat-auth-mongo
+      - mongo
+    network_mode: host
     volumes:
       - ./seacatauth-conf:/conf
       - ./log:/log
-    networks:
-      - seacatauthnet
-
-networks:
-  seacatauthnet:
-    driver: bridge
