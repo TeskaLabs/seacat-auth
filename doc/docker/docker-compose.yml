@@ -24,10 +24,12 @@ services:
   # SeaCat Auth microservice
   seacat-auth:
     environment:
-      # Provisioning mode switch
-      # Set to 1 or TRUE to activate provisioning mode
+      # Provisioning mode switch (Set to 1 or TRUE to activate provisioning mode)
       - SEACAT_AUTH_PROVISIONING=0
     image: teskalabs/seacat-auth:latest
+    # build:
+    #   context: ../..
+    #   dockerfile: Dockerfile
     depends_on:
       - mongo
     network_mode: host
