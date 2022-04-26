@@ -22,8 +22,7 @@ class LoginSession(object):
 		login_descriptors,
 		remaining_login_attempts,
 		expires_at,
-		client_login_key=None,
-		server_login_key=None,
+		public_key=None,
 		data=None
 	):
 		self.Id = id
@@ -31,15 +30,14 @@ class LoginSession(object):
 		self.CredentialsId = credentials_id
 		self.LoginDescriptors = login_descriptors
 		self.RemainingLoginAttempts = remaining_login_attempts
-		self.ClientLoginKey = client_login_key
-		self.ServerLoginKey = server_login_key
 		self.ExpiresAt = expires_at
-
-		# Login descriptor that successfully authenticated the login session
-		self.AuthenticatedVia = None
+		self.PublicKey = public_key
 
 		# User space for storing custom data needed by a login process
 		self.Data = data or {}
+
+		# Login descriptor that successfully authenticated the login session
+		self.AuthenticatedVia = None
 
 
 	@classmethod
@@ -54,26 +52,29 @@ class LoginSession(object):
 			client_login_key
 		)
 
+		pk = server_login_key.public_key().public_bytes(cryptography.hazmat.primitives.serialization.Encoding.PEM, cryptography.hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo)
+
 		expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
 
 		return cls(
 			id=secrets.token_urlsafe(),
-			client_login_key=client_login_key,
-			server_login_key=server_login_key,
 			shared_key=shared_key,
 			credentials_id=credentials_id,
 			login_descriptors=login_descriptors,
 			remaining_login_attempts=login_attempts,
-			expires_at=expires_at
+			expires_at=expires_at,
+			public_key=server_login_key.public_key(),
 		)
 
 
 	def serialize(self) -> dict:
-		# TODO: Include ClientLoginKey and ServerLoginKey
-		#   Serialize them using .private_bytes() and .public_bytes()
 		db_object = {
 			"_id": self.Id,
-			"__sk": self.__shared_key,  # TODO: Encrypt
+			"__sk": self.__shared_key,  # TODO: Revise this. Storing plaintext shared key is not secure.
+			"pk": self.PublicKey.public_bytes(
+				encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+				format=cryptography.hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo
+			),
 			"cid": self.CredentialsId,
 			"exp": self.ExpiresAt,
 			"la": self.RemainingLoginAttempts,
@@ -88,8 +89,6 @@ class LoginSession(object):
 
 	@classmethod
 	def deserialize(cls, authn_svc, db_object: dict):
-		# TODO: Use cryptography.hazmat.primitives.serialization
-		#   to deserialize ClientLoginKey and ServerLoginKey
 		return cls(
 			id=db_object["_id"],
 			shared_key=db_object["__sk"],
@@ -100,6 +99,7 @@ class LoginSession(object):
 			],
 			remaining_login_attempts=db_object["la"],
 			expires_at=db_object["exp"],
+			public_key=cryptography.hazmat.primitives.serialization.load_pem_public_key(db_object["pk"]),
 			data=db_object["d"],
 		)
 
