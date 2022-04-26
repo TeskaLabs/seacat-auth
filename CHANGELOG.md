@@ -2,6 +2,15 @@
 
 ## Release candidate
 
+### Refactoring
+- Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
+- Persistent TOTP secrets (#27, PLUM Sprint 220408)
+
+---
+
+
+## v22.16
+
 ### Breaking changes
 - Tenant name must pass validation before tenant is created (#19, PLUM Sprint 220325)
 - Usernames, roles and resources are validated before creation (#22, PLUM Sprint 220325)

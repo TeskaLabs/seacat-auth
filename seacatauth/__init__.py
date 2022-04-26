@@ -16,7 +16,8 @@ asab.Config.add_defaults({
 	},
 
 	"openidconnect": {
-		"bearer_realm": "asab"
+		"bearer_realm": "asab",
+		"auth_code_timeout": "60 s",
 	},
 
 	"seacatauth:cookie": {
@@ -65,10 +66,11 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:otp": {
-		"issuer": "SeaCat Auth",
-
+		# Issuer name appears as the name of the secret in the user 2FA app
+		# Defaults to the hostname of auth webUI if left empty
+		"issuer": "",
 		# Maximum time between generating a TOTP secret and activating it
-		"setup_expiration": "10 m"
+		"registration_timeout": "5 m"
 	},
 
 	"seacatauth:webauthn": {
