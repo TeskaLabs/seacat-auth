@@ -52,8 +52,6 @@ class LoginSession(object):
 			client_login_key
 		)
 
-		pk = server_login_key.public_key().public_bytes(cryptography.hazmat.primitives.serialization.Encoding.PEM, cryptography.hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo)
-
 		expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
 
 		return cls(
