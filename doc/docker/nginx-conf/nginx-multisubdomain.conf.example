@@ -1,115 +1,105 @@
-proxy_cache_path on keys_zone=token_responses:1m max_size=2m;
+##############################
+# OAuth2-protected subdomain
+
+proxy_cache_path on keys_zone=app_token_responses:1m max_size=2m;
+
 server {
-	
-	listen 80;
-	listen [::]:80;
-	server_name content.test.localhost;
-	server_tokens off;
-	access_log /log/nginx-access.log;
-	error_log /log/nginx-error.log;
-	
-	location / {
-		root /home/adam/Workspace/Teskalabs/asab-webui-demo/dist;
-		index index.html;
-	}
-	
-	location /api/openidconnect {
-		rewrite               ^/api/(.*) /$1 break;
-		proxy_pass            http://auth.localhost/;
-	}
+    listen 443;
+    listen [::]:443;
+    server_name app.test.loc;
+    server_tokens off;
+    access_log /log/nginx-access.log;
+    error_log /log/nginx-error.log;
 
-	location ~ ^/api/protected/([a-zA-Z0-9][^/]*)/.* {
-		auth_request          /_oauth2_introspect;
-		set                   $tenant $1;
-		rewrite               ^/api/protected/(.*) /$1 break;
-		proxy_pass            http://localhost:8080;
+    location / {
+        auth_request    /_oauth2_introspect;
+        root            /app;
+        index           index.html;
+    }
 
-		auth_request_set      $credentials $upstream_http_x_credentials;
-		proxy_set_header      X-Credentials $credentials;
-		auth_request_set      $tenants $upstream_http_x_tenants;
-		proxy_set_header      X-Tenants $tenants;
-		auth_request_set      $roles $upstream_http_x_roles;
-		proxy_set_header      X-Roles $roles;
-	}
+    location /api/openidconnect {
+        rewrite               ^/api/(.*) /$1 break;
+        proxy_pass            http://auth.localhost/;
+    }
 
-	location = /_oauth2_introspect {
-		internal;
-		proxy_method          POST;
-		proxy_set_body        "$http_authorization";
-		proxy_set_header      X-Request-URI "$request_uri";
-		proxy_set_header      X-Tenant "$tenant";
-		# proxy_pass            http://localhost:8081/openidconnect/introspect/nginx?&add=credentials&add=tenants&add=roles; # for tenantless configuration
-		proxy_pass            http://localhost:8081/openidconnect/introspect/nginx?verify=tenant&add=credentials&add=tenants&add=roles;
-		proxy_cache           token_responses;     # Enable caching
-		# proxy_cache_key       $http_authorization;  # for tenantless configuration
-		proxy_cache_key       "$tenant $http_authorization"; # Cache for each access token and tenant
-		proxy_cache_lock      on;                  # Duplicate tokens must wait
-		proxy_cache_valid     200 10s;             # How long to use each response
-		proxy_ignore_headers  Cache-Control Expires Set-Cookie;
-	}
-	
+    location = /_oauth2_introspect {
+        internal;
+        proxy_method          POST;
+        proxy_set_body        "$http_authorization";
+        proxy_set_header      X-Request-URI "$request_uri";
+        proxy_pass            http://localhost:8081/openidconnect/introspect/nginx?add=credentials&add=tenants&add=roles;
+        proxy_cache           app_token_responses;
+        proxy_cache_key       $http_authorization;
+        proxy_cache_lock      on;
+        proxy_cache_valid     200 10s;
+        proxy_ignore_headers  Cache-Control Expires Set-Cookie;
+    }
 
-	# 401 and 403 forwards to a login page provided by a SeaCat Auth
-	error_page 401 http://auth.test.localhost/api/openidconnect/authorize?response_type=code&scope=openid%20cookie&client_id=signin&redirect_uri=http://content2.test.localhost;
-	error_page 403 http://auth.test.localhost/api/openidconnect/authorize?response_type=code&scope=openid%20cookie&client_id=signin&redirect_uri=http://content2.test.localhost;
+    error_page 401 403 https://auth.test.loc/api/openidconnect/authorize?response_type=code&scope=openid&client_id=signin&redirect_uri=$request_uri;
 }
 
-server {
-	listen 80;
-	listen [::]:80;
-	server_name content2.test.localhost;
-	server_tokens off;
-	access_log /log/nginx-access.log;
-	error_log /log/nginx-error.log;
 
-	location / {
-		auth_request          /_cookie_introspect;
-		proxy_set_header      Host $host;
-		proxy_pass            http://localhost:8080/;
-		
-		auth_request_set      $credentials $upstream_http_x_credentials;
-		proxy_set_header      X-Credentials $credentials;
-		auth_request_set      $tenants $upstream_http_x_tenants;
-		proxy_set_header      X-Tenants $tenants;
-		auth_request_set      $roles $upstream_http_x_roles;
-		proxy_set_header      X-Roles $roles;
-	}
-
-	location = /_cookie_introspect {
-		internal;
-		proxy_method          POST;
-		proxy_set_body        "$http_authorization";
-		proxy_pass            http://localhost:8081/cookie/nginx?add=credentials&add=tenants&add=roles;
-
-	}
-
-	error_page 401 http://auth.test.localhost/api/openidconnect/authorize?response_type=cookie&scope=openid%20cookie&client_id=signin&redirect_uri=http://content2.test.localhost;
-	error_page 403 http://auth.test.localhost/api/openidconnect/authorize?response_type=cookie&scope=openid%20cookie&client_id=signin&redirect_uri=http://content2.test.localhost;
-}
+##################
+# Auth subdomain
 
 server {
-	listen 80;
-	listen [::]:80;
-	server_name auth.test.localhost;
-	server_tokens off;
-	access_log /log/nginx-access.log;
-	error_log /log/nginx-error.log;
-	
-	location / {
-		root /home/adam/Workspace/Teskalabs/seacat-auth-webui/dist;
-		index index.html;
-	}
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name auth.test.loc;
+    error_log /log/nginx.error.log;
+    access_log /log/nginx.access.log;
 
-	location /api {
-		rewrite               ^/api/(.*) /$1 break;
-		proxy_set_header      Host $host;
-		proxy_pass            http://localhost:8081/;
-	}
+    # Specify path to SSL certificate files
+    ssl_certificate /etc/nginx/conf.d/cert.pem;
+    ssl_certificate_key /etc/nginx/conf.d/key.pem;
 
-	location = /_cookie_introspect {
-		internal;
-		proxy_method          POST;
-		proxy_set_body        "$http_authorization";
-		proxy_pass            http://localhost:8081/cookie/nginx;
-	}
+    location / {
+        # Redirect to default endpoint
+        return 301 /auth;
+    }
+
+
+    #####################
+    # SeaCat Auth WebUI
+
+    location /auth {
+        root  /seacat-auth-webui;
+        index index.html;
+    }
+
+    location /auth/api/seacat_auth {
+        # SCA webUI uses only the public part of the API, no authentication required
+        rewrite ^/auth/api/seacat_auth/(.*) /$1 break;
+        proxy_pass http://localhost:8081;
+    }
+
+    location /auth/api/openidconnect {
+        rewrite ^/auth/api/(.*) /$1 break;
+        proxy_pass http://localhost:8081;
+    }
+
+
+    ################
+    # SeaCat WebUI
+    location /seacat {
+        root  /seacat-webui;
+        index index.html;
+    }
+
+    location /seacat/api/seacat_auth {
+        rewrite ^/seacat/api/seacat_auth/(.*) /$1 break;
+        proxy_pass http://localhost:8082;
+    }
+
+    location /seacat/api/seacat_auth/public {
+        rewrite ^/seacat/api/seacat_auth/(.*) /$1 break;
+        proxy_pass http://localhost:8081;
+    }
+
+    location /seacat/api/openidconnect {
+        rewrite ^/seacat/api/(.*) /$1 break;
+        proxy_pass http://localhost:8081;
+    }
+
+    error_page 401 403 /auth/api/openidconnect/authorize?response_type=code&scope=openid%20cookie&client_id=signin&prompt=login&redirect_uri=$request_uri;
 }
