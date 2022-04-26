@@ -119,7 +119,7 @@ class AuthenticationHandler(object):
 		login_session.Data["requested_session_expiration"] = expiration
 		login_session.Data["ident"] = ident
 
-		key = jwcrypto.jwk.JWK.from_pyca(login_session.ServerLoginKey.public_key())
+		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 
 		response = {
 			'lsid': login_session.Id,

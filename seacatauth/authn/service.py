@@ -53,6 +53,7 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 
 
 class AuthenticationService(asab.Service):
+	# TODO: Introduce configurable LoginSession provider (MongoDB x in-memory dict)
 	LoginSessionCollection = "ls"
 
 	def __init__(self, app, service_name="seacatauth.AuthenticationService"):
