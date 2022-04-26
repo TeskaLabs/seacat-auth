@@ -149,7 +149,6 @@ class AuthenticationService(asab.Service):
 
 	async def get_login_session(self, login_session_id):
 		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
-		L.warning(f"\n💋 {ls_data}")
 		login_session = LoginSession.deserialize(self, ls_data)
 		if login_session.ExpiresAt < datetime.datetime.utcnow():
 			raise KeyError("Login session expired")

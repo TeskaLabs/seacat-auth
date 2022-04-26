@@ -126,8 +126,6 @@ class AuthenticationHandler(object):
 			'lds': [descriptor.serialize() for descriptor in login_descriptors],
 			'key': key.export_public(as_dict=True),
 		}
-		import pprint
-		L.warning(f"\n👾 {pprint.pformat(response)}")
 		return asab.web.rest.json_response(request, response)
 
 
@@ -248,8 +246,6 @@ class AuthenticationHandler(object):
 			raise aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
-
-		L.warning(f"\n🧿 {json_body}")
 
 		# Initiate SMS login
 		success = False
