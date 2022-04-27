@@ -1,10 +1,9 @@
-# Redirect HTTP to HTTPS
-server {
-    listen 80;
-    listen [::]:80;
-    server_name -;
-    return 301 https://$host$request_uri;
-}
+#####################################
+# MINIMAL HTTPS PROXY CONFIGURATION
+#
+# This configuration works best with a proper hostname (i.e. other than localhost)
+# and requires an SSL certificate.
+#
 
 
 server {
@@ -18,10 +17,15 @@ server {
     ssl_certificate /etc/nginx/conf.d/cert.pem;
     ssl_certificate_key /etc/nginx/conf.d/key.pem;
 
-    location / {
-        # Redirect to default endpoint
-        return 301 /auth;
-    }
+
+    #########################
+    # Protected example app
+	location = / {
+	    auth_request        /_cookie_introspect;
+	    auth_request_set    $authorization $upstream_http_authorization;
+        proxy_set_header    Authorization $authorization;
+	    proxy_pass          http://localhost:8080;
+	}
 
 
     #############################
@@ -78,4 +82,13 @@ server {
     # 401 and 403 redirects to /openidconnect/authorize which will require authentication via Seacat Auth login page
     # Successful login redirects back to the original requested URI
     error_page 401 403 /auth/api/openidconnect/authorize?response_type=code&scope=openid%20cookie&client_id=signin&prompt=login&redirect_uri=$request_uri;
+}
+
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name -;
+    return 301 https://$host$request_uri;
 }
