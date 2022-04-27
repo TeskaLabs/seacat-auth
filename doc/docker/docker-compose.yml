@@ -5,7 +5,7 @@ services:
   mongo:
     image: mongo
     volumes:
-      - /data/mongodb:/data/db
+      - ./mongo-data:/data/db
       - ./log:/log
     network_mode: host
 
@@ -25,14 +25,24 @@ services:
   seacat-auth:
     environment:
       # Provisioning mode switch (Set to 1 or TRUE to activate provisioning mode)
-      - SEACAT_AUTH_PROVISIONING=0
-    image: teskalabs/seacat-auth:latest
-    # build:
-    #   context: ../..
-    #   dockerfile: Dockerfile
+      - SEACAT_AUTH_PROVISIONING=1
+    build:  # Or use the prebuilt image: teskalabs/seacat-auth
+      context: ../..
+      dockerfile: Dockerfile
     depends_on:
       - mongo
     network_mode: host
     volumes:
       - ./seacatauth-conf:/conf
       - ./log:/log
+
+  # ASAB-based demo application
+  demo-app:
+    build:
+      context: ./demo-app
+      dockerfile: Dockerfile
+    depends_on:
+      - seacat-auth
+    network_mode: host
+    volumes:
+      - ./demo-app/demoapp.conf:/conf/demoapp.conf
