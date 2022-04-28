@@ -99,7 +99,7 @@ class OpenIdConnectService(asab.Service):
 
 		session_id = data["sid"]
 		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.now():
+		if exp is None or exp < datetime.datetime.utcnow():
 			raise KeyError("Authorization code expired")
 
 		return session_id
