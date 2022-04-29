@@ -113,7 +113,7 @@ class SessionAdapter:
 			self.Data = None
 
 
-	def get_rest(self):
+	def rest_get(self):
 		d = {
 			"_id": self.SessionId,
 			"_v": self.Version,
@@ -144,8 +144,6 @@ class SessionAdapter:
 			d['authz'] = self.Authz
 		if self.Data is not None:
 			d['data'] = self.Data
-		if self.OAuth2 is not None:
-			d['oauth2'] = self.OAuth2
 		return d
 
 
