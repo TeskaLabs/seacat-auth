@@ -120,7 +120,6 @@ class SessionAdapter:
 			"_c": "{}Z".format(self.CreatedAt.isoformat()),
 			"_m": "{}Z".format(self.ModifiedAt.isoformat()),
 			"expiration": "{}Z".format(self.Expiration.isoformat()),
-			"login_descriptor": self.LoginDescriptor,
 			"type": self.Type,
 		}
 
