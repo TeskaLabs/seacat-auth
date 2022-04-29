@@ -43,7 +43,7 @@ class SessionHandler(object):
 	@access_control("authz:superuser")
 	async def session_detail(self, request):
 		session_id = request.match_info['session_id']
-		session = await self.SessionService.get(session_id).rest_get()
+		session = (await self.SessionService.get(session_id)).rest_get()
 		children = await self.SessionService.recursive_list({SessionAdapter.FNParentSessionId: session_id})
 		if children["count"] > 0:
 			session["children"] = children
