@@ -271,7 +271,9 @@ class SessionService(asab.Service):
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
 			session = SessionAdapter(self, session_dict).rest_get()
 			# Include children sessions
-			session["children"] = await self.list(query_filter={SessionAdapter.FNParentSessionId: session["_id"]})
+			children = await self.list(query_filter={SessionAdapter.FNParentSessionId: session["_id"]})
+			if children["count"] > 0:
+				session["children"] = children
 			sessions.append(session)
 
 		return {
