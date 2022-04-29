@@ -39,4 +39,4 @@ async def available_factors_session_builder(authentication_service, credentials_
 def cookie_session_builder():
 	# TODO: Shorten back to 32 bytes once unencrypted cookies are obsoleted
 	token_length = 16 + 32  # The first part is AES CBC init vector, the second is the actual token
-	yield (SessionAdapter.FNCookieSessionId, secrets.token_bytes(token_length))
+	yield (SessionAdapter.FNSessionCookieId, secrets.token_bytes(token_length))

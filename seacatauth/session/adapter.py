@@ -14,34 +14,94 @@ class SessionAdapter:
 	Light object that represent a momentary view on the persisted session
 	"""
 
-	FNSessionType = "T"
-	FNParentSessionId = "PS"
+	class FN:
+		"""
+		Database field names
+		"""
+		SessionType = "t"
+		ParentSessionId = "ps"
+		Expiration = "exp"
+		MaxExpiration = "expm"
+		ExpirationExtension = "expe"
+
+		SessionCookieId = "sci"
+
+		class Credentials:
+			_FN = "c"
+			Id = "c.id"
+			Username = "c.u"
+			Email = "c.e"
+			Phone = "c.p"
+			CreatedAt = "c.c"
+			ModifiedAt = "c.m"
+
+		class Authorization:
+			_FN = "az"
+			Tenants = "az.t"
+			Roles = "az.rl"
+			Resources = "az.rs"
+			Authz = "az.az"
+
+		class Authentication:
+			_FN = "an"
+			TOTPSet = "an.ts"
+			ExternalLoginOptions = "an.ex"
+			LoginDescriptor = "an.ld"
+			AvailableFactors = "an.af"
+
+		class OAuth2:
+			_FN = "oa"
+			OAuth2IdToken = "oa.it"
+			OAuth2AccessToken = "oa.at"
+			OAuth2RefreshToken = "oa.rt"
+			OAuth2Scope = "oa.sc"
+			OAuth2ClientId = "oa.cl"
+
+	# Session properties
+	FNSessionType = "t"
+	FNParentSessionId = "ps"
 	FNExpiration = "exp"
-	FNMaxExpiration = "max_exp"
-	FNTouchExtension = "touch_ext"
+	FNMaxExpiration = "expm"
+	FNExpirationExtension = "expe"
 
-	FNTenants = 'Tn'
-	FNRoles = 'Rl'
-	FNResources = 'Rs'
-	FNAuthz = 'Authz'
-	FNCredentialsId = 'Cid'
-	FNCookieSessionId = 'SCI'
+	# Credential fields
+	FNCredentialsId = "cid"
+	FNCredentials = "c"
+	FNCredentialsUsername = "c.u"
+	FNCredentialsEmail = "c.e"
+	FNCredentialsPhone = "c.p"
+	FNCredentialsCreatedAt = "c.c"
+	FNCredentialsModifiedAt = "c.m"
 
-	FNLoginDescriptor = 'LD'
-	FNAvailableFactors = 'AF'
+	# Authorization fields
+	FNTenants = "az.t"
+	FNRoles = "az.rl"
+	FNResources = "az.rs"
+	FNAuthz = "az.az"
 
-	FNOAuth2AccessToken = 'oa.Ta'
-	FNOAuth2IdToken = 'oa.Ti'
-	FNOAuth2RefreshToken = 'oa.Tr'
-	FNOAuth2Scope = 'oa.S'
-	FNOAuth2ClientId = 'oa.Ci'
+	# Authentication fields
+	FNTOTPSet = "an.ts"
+	FNExternalLoginOptions = "an.ext"
+	FNLoginDescriptor = "an.ld"
+	FNAvailableFactors = "an.af"
+
+	# Cookie fields
+	FNSessionCookieId = "sci"
+
+	# OAuth2 fields
+	FNOAuth2 = "oa"
+	FNOAuth2IdToken = "oa.it"
+	FNOAuth2AccessToken = "oa.at"
+	FNOAuth2RefreshToken = "oa.rt"
+	FNOAuth2Scope = "oa.sc"
+	FNOAuth2ClientId = "oa.cl"
 
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
 		FNOAuth2IdToken,
 		FNOAuth2AccessToken,
 		FNOAuth2RefreshToken,
-		FNCookieSessionId,
+		FNSessionCookieId,
 	])
 
 	EncryptedPrefix = b"$aescbc$"
@@ -57,12 +117,24 @@ class SessionAdapter:
 		self.ParentSessionId = session_dict.pop(self.FNParentSessionId, None)
 		self.Expiration = session_dict.pop(self.FNExpiration)
 		self.MaxExpiration = session_dict.pop(self.FNMaxExpiration, None)
-		self.TouchExtension = session_dict.pop(self.FNTouchExtension, None)
+		self.TouchExtension = session_dict.pop(self.FNExpirationExtension, None)
 
-		self.CredentialsId = session_dict.pop(self.FNCredentialsId, None)
-		self.Authz = session_dict.pop(self.FNAuthz, None)
-		self.LoginDescriptor = session_dict.pop(self.FNLoginDescriptor, None)
-		self.AvailableFactors = session_dict.pop(self.FNAvailableFactors, None)
+		self.CredentialsId = structured_pop(session_dict, self.FN.Credentials.Id, None) or session_dict.pop("Cid", None)
+		self.CredentialsUsername = structured_pop(session_dict, self.FN.Credentials.Username, None)
+		self.CredentialsEmail = structured_pop(session_dict, self.FN.Credentials.Email, None)
+		self.CredentialsPhone = structured_pop(session_dict, self.FN.Credentials.Phone, None)
+		self.CredentialsCreatedAt = structured_pop(session_dict, self.FN.Credentials.CreatedAt, None)
+		self.CredentialsModifiedAt = structured_pop(session_dict, self.FN.Credentials.ModifiedAt, None)
+
+		self.Authz = session_dict.pop(self.FNAuthz, None) or session_dict.pop("Authz", None)
+		self.Roles = session_dict.pop(self.FNRoles, None) or session_dict.pop("Rl", None)
+		self.Resources = session_dict.pop(self.FNResources, None) or session_dict.pop("Rs", None)
+		self.Tenants = session_dict.pop(self.FNTenants, None) or session_dict.pop("Tn", None)
+
+		self.LoginDescriptor = session_dict.pop(self.FNLoginDescriptor, None) or session_dict.pop("LD", None)
+		self.AvailableFactors = session_dict.pop(self.FNAvailableFactors, None) or session_dict.pop("AF", None)
+		self.AuthnTOTPSet = session_dict.pop(self.FNTOTPSet, None) or session_dict.pop("TS", None)
+		self.ExternalLoginOptions = session_dict.pop(self.FNExternalLoginOptions, None)
 
 		data = session_dict.copy()
 
@@ -82,27 +154,30 @@ class SessionAdapter:
 				if value.startswith(self.EncryptedPrefix):
 					obj[keys[-1]] = session_svc.aes_decrypt(value[len(self.EncryptedPrefix):])
 
-		sci = data.pop(self.FNCookieSessionId, None)
+		sci = data.pop(self.FNSessionCookieId, None)
 		if sci is not None:
-			self.CookieSessionId = base64.urlsafe_b64encode(sci).decode('ascii')
+			self.SessionCookieId = base64.urlsafe_b64encode(sci).decode("ascii")
 
 		# OAuth2 / OpenId Connect
-		o = data.pop('oa', None)
-		if o is not None:
+		oa2_data = data.pop(self.FNOAuth2, None)
+		if oa2_data is not None:
 			self.OAuth2 = {}
 			# Base64-encode the tokens for OIDC service convenience
-			v = o.pop('Ta')
+			v = oa2_data.pop(self.FNOAuth2AccessToken) or oa2_data.pop("Ta")
 			if v is not None:
-				self.OAuth2['access_token'] = base64.urlsafe_b64encode(v).decode('ascii')
-			v = o.pop('Ti')
+				self.OAuth2["access_token"] = base64.urlsafe_b64encode(v).decode("ascii")
+			v = oa2_data.pop(self.FNOAuth2IdToken) or oa2_data.pop("Ti")
 			if v is not None:
-				self.OAuth2['id_token'] = base64.urlsafe_b64encode(v).decode('ascii')
-			v = o.pop('Tr')
+				self.OAuth2["id_token"] = base64.urlsafe_b64encode(v).decode("ascii")
+			v = oa2_data.pop(self.FNOAuth2RefreshToken) or oa2_data.pop("Tr")
 			if v is not None:
-				self.OAuth2['refresh_token'] = base64.urlsafe_b64encode(v).decode('ascii')
-			v = o.pop('S')
+				self.OAuth2["refresh_token"] = base64.urlsafe_b64encode(v).decode("ascii")
+			v = oa2_data.pop(self.FNOAuth2Scope) or oa2_data.pop("S")
 			if v is not None:
-				self.OAuth2['scope'] = v
+				self.OAuth2["scope"] = v
+			v = oa2_data.pop(self.FNOAuth2ClientId)
+			if v is not None:
+				self.OAuth2["client_id"] = v
 
 		else:
 			self.OAuth2 = None
@@ -160,7 +235,28 @@ class SessionAdapter:
 			"yes" if self.CredentialsId is not None else "NA",
 			"yes" if self.Authz is not None else "NA",
 			self.LoginDescriptor,
-			self.CookieSessionId,
+			self.SessionCookieId,
 			self.Data,
 			self.OAuth2,
 		))
+
+
+def structured_pop(data, fields, fallback=None):
+	if isinstance(fields, str):
+		field, *fields = fields.split(".")
+	else:
+		field, *fields = fields
+
+	if len(fields) == 0:
+		return data.pop(field, fallback)
+	else:
+		try:
+			subdata = data[field]
+			if not isinstance(subdata, dict):
+				return fallback
+			item = structured_pop(subdata, fields, fallback)
+			if len(subdata) == 0:
+				del data[field]
+			return item
+		except KeyError:
+			return fallback
