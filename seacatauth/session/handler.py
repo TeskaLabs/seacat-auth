@@ -36,7 +36,7 @@ class SessionHandler(object):
 	async def session_list(self, request):
 		page = int(request.query.get('p', 1)) - 1
 		limit = int(request.query.get('i', 10))
-		credentials = await self.SessionService.list(page, limit)
+		credentials = await self.SessionService.structured_list(page, limit)
 		return asab.web.rest.json_response(request, credentials)
 
 
@@ -44,8 +44,7 @@ class SessionHandler(object):
 	async def session_detail(self, request):
 		session_id = request.match_info['session_id']
 		session = await self.SessionService.get(session_id)
-		response = session.get_rest()
-		return asab.web.rest.json_response(request, response)
+		return asab.web.rest.json_response(request, session)
 
 
 	@access_control("authz:superuser")
