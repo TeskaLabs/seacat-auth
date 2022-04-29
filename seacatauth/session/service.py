@@ -247,7 +247,7 @@ class SessionService(asab.Service):
 		}
 
 
-	async def structured_list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None):
 		"""
 		List top-level sessions with all their children sessions inside the "children" attribute
 		"""

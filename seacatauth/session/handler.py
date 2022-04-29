@@ -36,7 +36,7 @@ class SessionHandler(object):
 	async def session_list(self, request):
 		page = int(request.query.get('p', 1)) - 1
 		limit = int(request.query.get('i', 10))
-		credentials = await self.SessionService.structured_list(page, limit)
+		credentials = await self.SessionService.recursive_list(page, limit)
 		return asab.web.rest.json_response(request, credentials)
 
 
