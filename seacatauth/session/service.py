@@ -141,7 +141,7 @@ class SessionService(asab.Service):
 
 		upsertor.set(SessionAdapter.FNExpiration, expires)
 		upsertor.set(SessionAdapter.FNMaxExpiration, max_expiration)
-		upsertor.set(SessionAdapter.FNTouchExtension, touch_extension_seconds)
+		upsertor.set(SessionAdapter.FNExpirationExtension, touch_extension_seconds)
 
 		# Add builder fields
 		if session_builders is None:
