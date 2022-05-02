@@ -252,6 +252,10 @@ class AuthenticationHandler(object):
 			sms_factor = self.AuthenticationService.get_login_factor(factor_id)
 			if sms_factor is not None:
 				success = await sms_factor.send_otp(login_session)
+			else:
+				L.error("Login factor not found", struct_data={"factor_id": factor_id})
+		else:
+			L.error("factor_id not specified", struct_data={"factor_id": factor_id})
 
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
