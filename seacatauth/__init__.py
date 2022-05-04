@@ -8,12 +8,12 @@ asab.Config.add_defaults({
 
 		# Public API base URL lets the app know from what URL is its public API served.
 		# It is used by the OpenIDConnect authorize handler for generating loopback redirect URIs.
-		"public_api_base_url": "http://localhost:3000/auth/api",
+		"public_api_base_url": "http://localhost/auth/api",
 
 		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
 		# It is used for building login and password reset URIs.
 		# The domain name is extracted for cookie and authentication purposes.
-		"auth_webui_base_url": "http://localhost:3000/auth",
+		"auth_webui_base_url": "http://localhost/auth",
 	},
 
 	"openidconnect": {
