@@ -18,12 +18,18 @@ server {
     ssl_certificate_key /etc/nginx/conf.d/key.pem;
 
 
-    #########################
-    # Protected example app
-	location = / {
+    location / {
+        return 301 /seacat;
+    }
+
+
+    ######################################
+    # EXAMPLE: Cookie-protected location
+	location /protected {
 	    auth_request        /_cookie_introspect;
 	    auth_request_set    $authorization $upstream_http_authorization;
         proxy_set_header    Authorization $authorization;
+        rewrite             ^/protected/(.*) /$1 break;
 	    proxy_pass          http://localhost:8080;
 	}
 
@@ -77,6 +83,25 @@ server {
         rewrite ^/seacat/api/(.*) /$1 break;
         proxy_pass http://localhost:8081;
     }
+
+
+    ###########################
+    # Introspection endpoints
+	location = /_cookie_introspect {
+		internal;
+		proxy_method          POST;
+		proxy_set_body        "$http_authorization";
+		proxy_pass            http://localhost:8081/cookie/nginx;
+	}
+
+	location = /_oauth2_introspect {
+		internal;
+		proxy_method          POST;
+		proxy_set_body        "$http_authorization";
+		proxy_set_header      X-Request-URI "$request_uri";
+		proxy_pass            http://localhost:8081/openidconnect/introspect/nginx;
+		proxy_ignore_headers  Cache-Control Expires Set-Cookie;
+	}
 
 
     # 401 and 403 redirects to /openidconnect/authorize which will require authentication via Seacat Auth login page
