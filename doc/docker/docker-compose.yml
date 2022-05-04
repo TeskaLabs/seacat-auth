@@ -2,48 +2,47 @@ version: '3'
 services:
 
   # Database for SeaCat Auth
-  seacat-auth-mongo:
+  mongo:
     image: mongo
     volumes:
-      - /data/mongodb:/data/db
+      - ./data/mongodb:/data/db
       - ./log:/log
-    networks:
-      - seacatauthnet
+    network_mode: host
 
   # Nginx reverse-proxy
-  seacat-auth-nginx:
+  nginx:
     image: nginx
     depends_on:
-      - seacat-auth-svc
-    ports:
-      - 80:80/tcp
-      - 443:443/tcp
+      - seacat-auth
+    network_mode: host
     volumes:
       - ./nginx-conf:/etc/nginx/conf.d
       - ./log:/log
       - ./seacat-auth-webui:/seacat-auth-webui
       - ./seacat-webui:/seacat-webui
-    networks:
-      - seacatauthnet
 
   # SeaCat Auth microservice
-  seacat-auth-svc:
+  seacat-auth:
     environment:
-      # Provisioning mode switch
-      # Set to 1 or TRUE to activate provisioning mode
+      # Provisioning mode switch (Set to 1 or TRUE to activate provisioning mode)
       - SEACAT_AUTH_PROVISIONING=0
-    build:
-      # Adjust location or switch for pre-built image
+    build:  # Or use the prebuilt image: teskalabs/seacat-auth
       context: ../..
       dockerfile: Dockerfile
     depends_on:
-      - seacat-auth-mongo
+      - mongo
+    network_mode: host
     volumes:
       - ./seacatauth-conf:/conf
       - ./log:/log
-    networks:
-      - seacatauthnet
 
-networks:
-  seacatauthnet:
-    driver: bridge
+  # ASAB-based demo application
+  demo-app:
+    build:
+      context: ./demo-app
+      dockerfile: Dockerfile
+    depends_on:
+      - seacat-auth
+    network_mode: host
+    volumes:
+      - ./demo-app/demoapp.conf:/conf/demoapp.conf
