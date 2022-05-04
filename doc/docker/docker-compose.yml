@@ -5,7 +5,7 @@ services:
   mongo:
     image: mongo
     volumes:
-      - ./mongo-data:/data/db
+      - ./data/mongodb:/data/db
       - ./log:/log
     network_mode: host
 
