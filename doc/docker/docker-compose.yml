@@ -25,7 +25,7 @@ services:
   seacat-auth:
     environment:
       # Provisioning mode switch (Set to 1 or TRUE to activate provisioning mode)
-      - SEACAT_AUTH_PROVISIONING=0
+      - SEACAT_AUTH_PROVISIONING=1
     image: teskalabs/seacat-auth
     depends_on:
       - mongo
