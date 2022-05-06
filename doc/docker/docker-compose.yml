@@ -5,11 +5,11 @@ services:
   mongo:
     image: mongo
     volumes:
-      - ./data/mongodb:/data/db
-      - ./log:/log
+      - ./mongo-data/mongodb:/data/db
+      - ./log/mongo:/log
     network_mode: host
 
-  # Nginx reverse-proxy
+  # Nginx Web Server configured as a reverse proxy
   nginx:
     image: nginx
     depends_on:
@@ -17,26 +17,24 @@ services:
     network_mode: host
     volumes:
       - ./nginx-conf:/etc/nginx/conf.d
-      - ./log:/log
+      - ./log/nginx:/log
       - ./seacat-auth-webui:/seacat-auth-webui
       - ./seacat-webui:/seacat-webui
 
-  # SeaCat Auth microservice
+  # SeaCat Auth
   seacat-auth:
     environment:
       # Provisioning mode switch (Set to 1 or TRUE to activate provisioning mode)
       - SEACAT_AUTH_PROVISIONING=0
-    build:  # Or use the prebuilt image: teskalabs/seacat-auth
-      context: ../..
-      dockerfile: Dockerfile
+    image: teskalabs/seacat-auth
     depends_on:
       - mongo
     network_mode: host
     volumes:
       - ./seacatauth-conf:/conf
-      - ./log:/log
+      - ./log/seacatauth:/log
 
-  # ASAB-based demo application
+  # Demo application
   demo-app:
     build:
       context: ./demo-app
