@@ -102,5 +102,5 @@ jobs:
     - name: Upload Docker Starter
       uses: actions/upload-artifact@v1
       with:
-        name: seacat-auth-docker-starter.zip
+        name: seacat-auth-docker-starter
         path: ${{ github.workspace }}/seacat-auth-docker-starter.zip
