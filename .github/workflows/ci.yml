@@ -92,3 +92,9 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+
+    - name: Create Docker Starter
+      uses: papeloto/action-zip@v1
+      with:
+        files: doc/docker
+        dest: seacat-auth-docker-starter.zip
