@@ -92,13 +92,3 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-
-    - name: Prepare Docker Starter
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./seacat-atuh-docker-starter.zip
-        asset_name: seacat-atuh-docker-starter.zip
-        asset_content_type: application/zip
