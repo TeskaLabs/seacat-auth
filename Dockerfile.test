@@ -42,7 +42,6 @@ RUN apk add --no-cache  \
     pyotp \
     webauthn \
     git+https://github.com/TeskaLabs/asab.git
-# && apk del buildenv
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -58,7 +57,6 @@ FROM alpine:3.13
 
 RUN apk add --no-cache \
   python3 
-#   py3-pip 
   
 COPY --from=stage1 /usr/lib/python3.8/site-packages /usr/lib/python3.8/site-packages
 
