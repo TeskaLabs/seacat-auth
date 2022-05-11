@@ -9,6 +9,7 @@
 - Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
 - Persistent TOTP secrets (#27, PLUM Sprint 220408)
 - Revise default configs and examples (#28, PLUM Sprint 220422)
+- Persistent login sessions (#26, PLUM Sprint 220422)
 
 ---
 

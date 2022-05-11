@@ -119,7 +119,7 @@ class AuthenticationHandler(object):
 		login_session.Data["requested_session_expiration"] = expiration
 		login_session.Data["ident"] = ident
 
-		key = jwcrypto.jwk.JWK.from_pyca(login_session.ServerLoginKey.public_key())
+		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 
 		response = {
 			'lsid': login_session.Id,
@@ -157,7 +157,10 @@ class AuthenticationHandler(object):
 				status=401
 			)
 
-		login_session.RemainingLoginAttempts -= 1
+		await self.AuthenticationService.update_login_session(
+			lsid,
+			remaining_login_attempts=login_session.RemainingLoginAttempts - 1
+		)
 
 		request_data = login_session.decrypt(await request.read())
 		request_data["request_headers"] = request.headers
@@ -235,10 +238,9 @@ class AuthenticationHandler(object):
 		return response
 
 	async def smslogin(self, request):
-		# TODO: refactor and make this endpoint more general (initiate_factor or something)
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = self.AuthenticationService.LoginSessions.get(lsid)
+		login_session = await self.AuthenticationService.get_login_session(lsid)
 		if login_session is None:
 			L.error("Login session not found.", struct_data={"lsid": lsid})
 			raise aiohttp.web.HTTPUnauthorized()
@@ -264,7 +266,7 @@ class AuthenticationHandler(object):
 	async def webauthn_login(self, request):
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = self.AuthenticationService.LoginSessions.get(lsid)
+		login_session = await self.AuthenticationService.get_login_session(lsid)
 		if login_session is None:
 			L.error("Login session not found.", struct_data={"lsid": lsid})
 			raise aiohttp.web.HTTPUnauthorized()
@@ -286,6 +288,9 @@ class AuthenticationHandler(object):
 			timeout
 		)
 
-		login_session.Data["webauthn"] = authentication_options
+		login_data = login_session.Data
+		login_data["webauthn"] = authentication_options
+
+		await self.AuthenticationService.update_login_session(lsid, data=login_data)
 
 		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))
