@@ -251,12 +251,13 @@ class AuthenticationHandler(object):
 		success = False
 		factor_id = json_body.get("factor_id")
 		if factor_id is not None:
-			try:
-				sms_factor = self.AuthenticationService.get_login_factor(factor_id)
+			sms_factor = self.AuthenticationService.get_login_factor(factor_id)
+			if sms_factor is not None:
 				success = await sms_factor.send_otp(login_session)
-				await self.AuthenticationService.update_login_session(lsid, data=login_session.Data)
-			except KeyError:
-				success = False
+			else:
+				L.error("Login factor not found", struct_data={"factor_id": factor_id})
+		else:
+			L.error("factor_id not specified", struct_data={"factor_id": factor_id})
 
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
@@ -279,7 +280,7 @@ class AuthenticationHandler(object):
 			return aiohttp.web.Response(body=login_session.encrypt(body))
 
 		# Webauthn challenge timeout should be the same as the current login session timeout
-		timeout = (login_session.ExpiresAt - datetime.datetime.now()).total_seconds() * 1000
+		timeout = (login_session.ExpiresAt - datetime.datetime.utcnow()).total_seconds() * 1000
 
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
 		authentication_options = await webauthn_svc.get_authentication_options(
