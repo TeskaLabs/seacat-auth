@@ -246,7 +246,7 @@ class OpenIdConnectService(asab.Service):
 		if session.LoginDescriptor is not None:
 			userinfo["ldid"] = session.LoginDescriptor["id"]
 			userinfo["factors"] = [
-				factor["id"]
+				factor["type"]
 				for factor
 				in session.LoginDescriptor["factors"]
 			]
