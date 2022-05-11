@@ -107,6 +107,7 @@ class LoginDescriptor:
 		return True
 
 	def serialize(self):
+		# Flatten the factor group if there is only one (for UI compatibility)
 		if len(self.FactorGroups) == 1:
 			return {
 				"id": self.ID,
