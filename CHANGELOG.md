@@ -5,6 +5,7 @@
 ### Refactoring
 - Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
 - Persistent TOTP secrets (#27, PLUM Sprint 220408)
+- Dockerfile is now building in two stages
 
 ---
 
