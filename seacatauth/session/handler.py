@@ -44,7 +44,7 @@ class SessionHandler(object):
 	async def session_detail(self, request):
 		session_id = request.match_info['session_id']
 		session = await self.SessionService.get(session_id)
-		response = session.get_rest()
+		response = session.rest_get()
 		return asab.web.rest.json_response(request, response)
 
 
