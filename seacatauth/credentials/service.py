@@ -285,7 +285,7 @@ class CredentialsService(asab.Service):
 
 	async def create_credentials(self, provider_id: str, credentials_data: dict, session: SessionAdapter = None):
 		# Record the requester's ID for logging purposes
-		agent_cid = session.CredentialsId if session is not None else None
+		agent_cid = session.Credentials.Id if session is not None else None
 
 		# Get provider
 		provider = self.CredentialProviders[provider_id]
@@ -348,7 +348,7 @@ class CredentialsService(asab.Service):
 			in the respective credentials provider
 		"""
 		# Record the requester's ID for logging purposes
-		agent_cid = session.CredentialsId if session is not None else None
+		agent_cid = session.Credentials.Id if session is not None else None
 
 		# Disallow sensitive field updates
 		for key in update_dict:
@@ -381,7 +381,7 @@ class CredentialsService(asab.Service):
 
 		# Check credentials policy
 		if session is not None:
-			authz = session.Authz
+			authz = session.Authorization.Authz
 		else:
 			authz = None
 		validated_data = self.Policy.validate_update_data(update_dict, authz)
