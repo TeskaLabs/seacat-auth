@@ -32,7 +32,7 @@ async def available_factors_session_builder(authentication_service, credentials_
 	factors = []
 	for factor in authentication_service.LoginFactors.values():
 		if await factor.is_eligible({"credentials_id": credentials_id}):
-			factors.append(factor.ID)
+			factors.append(factor.Type)
 	return ((SessionAdapter.FN.Authentication.AvailableFactors, factors),)
 
 
