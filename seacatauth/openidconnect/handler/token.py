@@ -115,7 +115,7 @@ class TokenHandler(object):
 			'Pragma': 'no-cache',
 		}
 
-		expires_in = int((session.Session.expiration - datetime.datetime.utcnow()).total_seconds())
+		expires_in = int((session.Session.Expiration - datetime.datetime.utcnow()).total_seconds())
 
 		# TODO: Tenant-specific token (session)
 		tenant = None
@@ -130,9 +130,9 @@ class TokenHandler(object):
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
-			"scope": session.OAuth2.scope,
-			"access_token": session.OAuth2.access_token,
-			"refresh_token": session.OAuth2.refresh_token,
+			"scope": session.OAuth2.Scope,
+			"access_token": session.OAuth2.AccessToken,
+			"refresh_token": session.OAuth2.RefreshToken,
 			"id_token": id_token,
 			"expires_in": expires_in,
 		}
@@ -199,7 +199,7 @@ class TokenHandler(object):
 			L.warning("Authorization Code not valid")
 			return aiohttp.web.HTTPBadRequest()
 
-		credentials = await self.CredentialsService.get(session.Credentials.id)
+		credentials = await self.CredentialsService.get(session.Credentials.Id)
 
 		headers = {
 			'Cache-Control': 'no-store',
@@ -208,7 +208,7 @@ class TokenHandler(object):
 
 		body = {
 			"token_type": "Batman",
-			"cid": session.Credentials.id,
+			"cid": session.Credentials.Id,
 			"username": credentials['username'],
 		}
 
@@ -266,7 +266,7 @@ class TokenHandler(object):
 
 		# scope = json_data['scope']  # TODO validate `scope` is the same as original
 
-		token_id = self.OpenIdConnectService.refresh_token(
+		token_id = self.OpenIdConnectService.RefreshToken(
 			json_data['refresh_token'],
 			json_data['client_id'],
 			json_data['client_secret'],

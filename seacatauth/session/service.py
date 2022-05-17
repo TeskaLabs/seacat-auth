@@ -200,8 +200,8 @@ class SessionService(asab.Service):
 		if is_old_token:
 			L.warning("Access with obsolete access token.", struct_data={
 				"at": value,
-				"sid": session.Session.id,
-				"cid": session.Credentials.id
+				"sid": session.Session.Id,
+				"cid": session.Credentials.Id
 			})
 
 		return session
@@ -275,31 +275,31 @@ class SessionService(asab.Service):
 		"""
 		Extend the expiration of the session if it hasn't been updated recently.
 		"""
-		if datetime.datetime.utcnow() < session.Session.modified_at + self.MinimalRefreshInterval:
+		if datetime.datetime.utcnow() < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
 			return
-		if session.Session.expiration >= session.Session.max_expiration:
+		if session.Session.Expiration >= session.Session.MaxExpiration:
 			# Session expiration is already maxed out
 			return
 
 		if expiration is not None:
 			expiration = datetime.timedelta(seconds=expiration)
-		elif session.Session.expiration_extension is not None:
-			expiration = datetime.timedelta(seconds=session.Session.expiration_extension)
+		elif session.Session.ExpirationExtension is not None:
+			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
 		else:
 			# May be a legacy "machine credentials session". Do not extend.
 			return
 		expires = datetime.datetime.utcnow() + expiration
 
-		if expires < session.Session.expiration:
+		if expires < session.Session.Expiration:
 			# Do not shorten the session!
 			return
-		if expires > session.Session.max_expiration:
+		if expires > session.Session.MaxExpiration:
 			# Do not cross maximum expiration
-			expires = session.Session.max_expiration
+			expires = session.Session.MaxExpiration
 
 		# Update session
-		version = session.Session.version
+		version = session.Session.Version
 		upsertor = self.StorageService.upsertor(
 			self.SessionCollection,
 			session.SessionId,
@@ -309,9 +309,9 @@ class SessionService(asab.Service):
 
 		try:
 			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.id, "exp": expires})
+			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.Id, "exp": expires})
 		except KeyError:
-			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.id})
+			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.Id})
 
 
 	async def delete(self, session_id):

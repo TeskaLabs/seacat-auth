@@ -201,7 +201,7 @@ class AuthenticationHandler(object):
 		body = {
 			'result': 'OK',
 			'cid': login_session.CredentialsId,
-			'sid': str(session.Session.id),
+			'sid': str(session.Session.Id),
 		}
 
 		response = aiohttp.web.Response(
@@ -219,7 +219,7 @@ class AuthenticationHandler(object):
 		if session is None:
 			raise aiohttp.web.HTTPBadRequest()
 
-		await self.SessionService.delete(session.Session.id)
+		await self.SessionService.delete(session.Session.Id)
 
 		redirect_uri = request.query.get("redirect_uri")
 		if redirect_uri is not None:

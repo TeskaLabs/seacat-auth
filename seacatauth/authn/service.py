@@ -286,7 +286,7 @@ class AuthenticationService(asab.Service):
 			"Authentication/login successful.",
 			struct_data={
 				'cid': login_session.CredentialsId,
-				'sid': str(session.Session.id),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
@@ -297,7 +297,7 @@ class AuthenticationService(asab.Service):
 			AuditCode.LOGIN_SUCCESS,
 			{
 				'cid': login_session.CredentialsId,
-				'sid': str(session.Session.id),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
@@ -349,7 +349,7 @@ class AuthenticationService(asab.Service):
 			"Authentication/login successful.",
 			struct_data={
 				'cid': credentials_id,
-				'sid': str(session.Session.id),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
@@ -360,7 +360,7 @@ class AuthenticationService(asab.Service):
 			AuditCode.LOGIN_SUCCESS,
 			{
 				'cid': credentials_id,
-				'sid': str(session.Session.id),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
