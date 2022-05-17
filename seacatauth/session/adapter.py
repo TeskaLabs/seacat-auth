@@ -276,12 +276,12 @@ class SessionAdapter:
 	def _deserialize_authentication_data(self, session_dict):
 		return AuthenticationData(
 			TOTPSet=session_dict.pop(self.FN.Authentication.TOTPSet, None)
-				or session_dict.pop("TS", None),
+			or session_dict.pop("TS", None),
 			ExternalLoginOptions=session_dict.pop(self.FN.Authentication.ExternalLoginOptions, None),
 			LoginDescriptor=session_dict.pop(self.FN.Authentication.LoginDescriptor, None)
-				or session_dict.pop("LD", None),
+			or session_dict.pop("LD", None),
 			AvailableFactors=session_dict.pop(self.FN.Authentication.AvailableFactors, None)
-				or session_dict.pop("AF", None),
+			or session_dict.pop("AF", None),
 			LastLogin=session_dict.pop(self.FN.Authentication.LastLogin, None),
 		)
 
