@@ -35,7 +35,7 @@ class RBACHandler(object):
 		# Obtain the resources and credentials ID
 		requested_resources = request.match_info["resources"].split('+')
 
-		result = self.RBACService.has_resource_access(request.Session.Authz, tenant, requested_resources)
+		result = self.RBACService.has_resource_access(request.Session.Authorization.authz, tenant, requested_resources)
 
 		return asab.web.rest.json_response(
 			request,

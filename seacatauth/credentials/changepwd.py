@@ -209,22 +209,22 @@ class ChangePasswordService(asab.Service):
 
 	async def change_password(self, session, old_password: str, new_password: str):
 		# TODO: authenticate() could be problematic here, we may introduce another call for this specific purpose
-		valid = await self.CredentialsService.authenticate(session.CredentialsId, {"password": old_password})
+		valid = await self.CredentialsService.authenticate(session.Credentials.id, {"password": old_password})
 		if not valid:
 			L.log(
 				asab.LOG_NOTICE,
 				"Password change failed, old password doesn't match.",
-				struct_data={'cid': session.CredentialsId}
+				struct_data={'cid': session.Credentials.id}
 			)
 			result = "UNAUTHORIZED"
 		else:
-			result = await self._do_change_password(session.CredentialsId, new_password)
+			result = await self._do_change_password(session.Credentials.id, new_password)
 
 		if result != "OK":
 			await self.AuditService.append(
 				AuditCode.PASSWORD_CHANGE_FAILED,
 				{
-					'cid': session.CredentialsId
+					'cid': session.Credentials.id
 				}
 			)
 		return result

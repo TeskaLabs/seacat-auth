@@ -106,10 +106,10 @@ class RolesHandler(object):
 		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
 		if tenant == "*":
 			# Assigning global roles requires superuser
-			if not self.RBACService.is_superuser(request.Session.Authz):
+			if not self.RBACService.is_superuser(request.Session.Authorization.authz):
 				message = "Missing permissions to un/assign global role"
 				L.warning(message, struct_data={
-					"agent_cid": request.Session.CredentialsId,
+					"agent_cid": request.Session.Credentials.id,
 					"role": role_id,
 				})
 				return asab.web.rest.json_response(
@@ -138,10 +138,10 @@ class RolesHandler(object):
 		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
 		if tenant == "*":
 			# Unassigning global roles requires superuser
-			if not self.RBACService.is_superuser(request.Session.Authz):
+			if not self.RBACService.is_superuser(request.Session.Authorization.authz):
 				message = "Missing permissions to un/assign global role"
 				L.warning(message, struct_data={
-					"agent_cid": request.Session.CredentialsId,
+					"agent_cid": request.Session.Credentials.id,
 					"role": role_id,
 				})
 				return asab.web.rest.json_response(

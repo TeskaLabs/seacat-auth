@@ -150,8 +150,8 @@ class AuthenticationService(asab.Service):
 
 	async def delete_expired_sessions(self):
 		delete_ids = []
-		for lsid, session in self.LoginSessions.items():
-			if session.ExpiresAt <= datetime.datetime.utcnow():
+		for lsid, login_session in self.LoginSessions.items():
+			if login_session.ExpiresAt <= datetime.datetime.utcnow():
 				delete_ids.append(lsid)
 		for lsid in delete_ids:
 			await self.delete_login_session(lsid)
@@ -286,7 +286,7 @@ class AuthenticationService(asab.Service):
 			"Authentication/login successful.",
 			struct_data={
 				'cid': login_session.CredentialsId,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.id),
 				'fi': from_info,
 			}
 		)
@@ -297,7 +297,7 @@ class AuthenticationService(asab.Service):
 			AuditCode.LOGIN_SUCCESS,
 			{
 				'cid': login_session.CredentialsId,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.id),
 				'fi': from_info,
 			}
 		)
@@ -349,7 +349,7 @@ class AuthenticationService(asab.Service):
 			"Authentication/login successful.",
 			struct_data={
 				'cid': credentials_id,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.id),
 				'fi': from_info,
 			}
 		)
@@ -360,7 +360,7 @@ class AuthenticationService(asab.Service):
 			AuditCode.LOGIN_SUCCESS,
 			{
 				'cid': credentials_id,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.id),
 				'fi': from_info,
 			}
 		)
