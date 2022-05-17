@@ -262,12 +262,12 @@ class WebAuthnService(asab.Service):
 
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialcreationoptions
 		"""
-		credentials = await self.CredentialsService.get(session.Credentials.id)
-		challenge = await self.create_registration_challenge(session.Session.id)
+		credentials = await self.CredentialsService.get(session.Credentials.Id)
+		challenge = await self.create_registration_challenge(session.Session.Id)
 		options = webauthn.generate_registration_options(
 			rp_id=self.RelyingPartyId,
 			rp_name=self.RelyingPartyName,
-			user_id=session.Credentials.id,
+			user_id=session.Credentials.Id,
 			user_name=credentials.get("email"),
 			user_display_name=credentials.get("username"),
 			challenge=challenge,
@@ -287,9 +287,9 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential
 		"""
 		try:
-			challenge = await self.get_registration_challenge(session.Session.id)
+			challenge = await self.get_registration_challenge(session.Session.Id)
 		except KeyError:
-			raise KeyError("Challenge does not exist or timed out", {"sid": session.Session.id})
+			raise KeyError("Challenge does not exist or timed out", {"sid": session.Session.Id})
 
 		_normalize_webauthn_credential_response(public_key_credential)
 
@@ -310,13 +310,13 @@ class WebAuthnService(asab.Service):
 		)
 
 		await self.create_webauthn_credential(
-			session.Credentials.id,
+			session.Credentials.Id,
 			verified_registration,
 			name=public_key_credential.get("key_name"),
 		)
 
 		try:
-			await self.delete_registration_challenge(session.Session.id)
+			await self.delete_registration_challenge(session.Session.Id)
 		except KeyError:
 			# Challenge expired in the meantime
 			pass

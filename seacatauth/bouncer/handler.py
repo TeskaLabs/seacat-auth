@@ -58,7 +58,7 @@ class BouncerHandler(object):
 		session = await self.CookieService.get_session_by_sci(request)
 
 		# Do the authorization if the user is not logged in
-		if session is None or session.Credentials.id is None:
+		if session is None or session.Credentials.Id is None:
 
 			# TODO: Make the following URLs configurable also for other uses
 			# Must be base64 in order to not get unquoted during authorizations etc.
