@@ -145,8 +145,8 @@ class AuthorizeHandler(object):
 		root_session = request.Session
 
 		# Only root sessions can be used to obtain auth code
-		if root_session is not None and root_session.Type != "root":
-			L.warning("Session type must be 'root'", struct_data={"session_type": root_session.Type})
+		if root_session is not None and root_session.Session.Type != "root":
+			L.warning("Session type must be 'root'", struct_data={"session_type": root_session.Session.Type})
 			root_session = None
 
 		prompt = request_parameters.get("prompt")
@@ -210,7 +210,7 @@ class AuthorizeHandler(object):
 		if len(factors_to_setup) > 0:
 			L.warning(
 				"Auth factor setup required. Redirecting to setup.",
-				struct_data={"missing_factors": " ".join(factors_to_setup), "cid": root_session.CredentialsId}
+				struct_data={"missing_factors": " ".join(factors_to_setup), "cid": root_session.Credentials.Id}
 			)
 			return await self.reply_with_factor_setup_redirect(
 				request, scope, request_parameters, root_session, factors_to_setup
@@ -234,12 +234,12 @@ class AuthorizeHandler(object):
 		# Check if all the enforced factors are present in the session
 		if self.AuthenticationService.EnforceFactors is not None:
 			factors_to_setup = list(self.AuthenticationService.EnforceFactors)
-			for factor in session.LoginDescriptor["factors"]:
+			for factor in session.Authentication.LoginDescriptor["factors"]:
 				if factor["type"] in factors_to_setup:
 					factors_to_setup.remove(factor["type"])
 
 		# Check if there are additional factors to be reset
-		credentials = await self.CredentialsService.get(session.CredentialsId)
+		credentials = await self.CredentialsService.get(session.Credentials.Id)
 		cred_enforce_factors = set(credentials.get("enforce_factors", []))
 		for factor in cred_enforce_factors:
 			if factor not in factors_to_setup:

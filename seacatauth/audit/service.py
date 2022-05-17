@@ -1,7 +1,6 @@
 import datetime
 import logging
 
-import asab
 import asab.storage.exceptions
 
 from .codes import AuditCode

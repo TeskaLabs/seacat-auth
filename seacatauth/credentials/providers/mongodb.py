@@ -166,8 +166,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 			access_token = base64.urlsafe_b64decode(authorization_bytes[7:])
 			try:
-				session = await self.SessionService.get_by(SessionAdapter.FNOAuth2AccessToken, access_token)
-				credentials_id = session.CredentialsId
+				session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
+				credentials_id = session.Credentials.Id
 			except (KeyError, AttributeError):
 				L.warning("Credentials authorization failed.")
 				return

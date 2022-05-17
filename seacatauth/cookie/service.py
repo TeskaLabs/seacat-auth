@@ -115,7 +115,7 @@ class CookieService(asab.Service):
 			return None
 
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FNCookieSessionId, session_cookie_id)
+			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, session_cookie_id)
 		except KeyError:
 			L.warning("Session not found", struct_data={"sci": session_cookie_id})
 			return None
