@@ -119,11 +119,11 @@ class CookieHandler(object):
 
 		# TODO: Choose builders based on scope
 		session_builders = [
-			credentials_session_builder(root_session.CredentialsId),
+			credentials_session_builder(root_session.Credentials.id),
 			await authz_session_builder(
 				tenant_service=self.CookieService.TenantService,
 				role_service=self.CookieService.RoleService,
-				credentials_id=root_session.CredentialsId
+				credentials_id=root_session.Credentials.id
 			),
 			login_descriptor_session_builder(root_session.LoginDescriptor),
 			cookie_session_builder(),
@@ -170,7 +170,7 @@ class CookieHandler(object):
 		try:
 			set_cookie(self.App, response, session, domain_id)
 		except KeyError:
-			L.error("Failed to set cookie", struct_data={"sid": session.SessionId, "domain_id": domain_id})
+			L.error("Failed to set cookie", struct_data={"sid": session.Session.id, "domain_id": domain_id})
 			return
 
 		return response

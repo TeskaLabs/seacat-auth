@@ -43,7 +43,7 @@ def private_auth_middleware_factory(app):
 			request.Session = None
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
-			return rbac_svc.has_resource_access(request.Session.Authz, tenant, [resource]) == "OK"
+			return rbac_svc.has_resource_access(request.Session.Authorization.authz, tenant, [resource]) == "OK"
 
 		request.has_resource_access = has_resource_access
 
@@ -58,7 +58,7 @@ def private_auth_middleware_factory(app):
 			#   for `authorization_resource` or "authz:superuser"
 			resources = set(
 				resource
-				for roles in request.Session.Authz.values()
+				for roles in request.Session.Authorization.authz.values()
 				for resources in roles.values()
 				for resource in resources
 			)

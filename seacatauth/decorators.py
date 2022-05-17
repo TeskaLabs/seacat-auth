@@ -102,7 +102,7 @@ def access_control(resource=None):
 				if resource not in request.Resources \
 					and "authz:superuser" not in request.Resources:
 					L.warning("Unauthorized access", struct_data={
-						"cid": request.Session.CredentialsId,
+						"cid": request.CredentialsId,
 						"requested_tenant": request.Tenant,
 						"required_resource": resource
 					})
@@ -131,17 +131,17 @@ def _authorize_tenant(request):
 	requested_tenant = request.match_info.get("tenant")
 
 	# Gather resources from all global roles
-	global_roles = request.Session.Authz.get("*")
+	global_roles = request.Session.Authorization.authz.get("*")
 	available_resources = set().union(*global_roles.values())
 
 	# Check for tenant access
 	if requested_tenant in (None, "*"):
 		# Global space is accessible to anyone
 		pass
-	elif requested_tenant in request.Session.Authz:
+	elif requested_tenant in request.Session.Authorization.authz:
 		# Tenant accessible
 		# Add resources from all roles under the requested_tenant
-		tenant_authz = request.Session.Authz.get(requested_tenant)
+		tenant_authz = request.Session.Authorization.authz.get(requested_tenant)
 		available_resources = available_resources.union(*tenant_authz.values())
 	elif "authz:superuser" in available_resources:
 		# Bypassing tenant-access check as superuser
@@ -150,13 +150,13 @@ def _authorize_tenant(request):
 	else:
 		# Tenant access denied
 		L.warning("Unauthorized access", struct_data={
-			"cid": request.Session.CredentialsId,
+			"cid": request.Session.Credentials.id,
 			"requested_tenant": requested_tenant
 		})
 		raise aiohttp.web.HTTPForbidden()
 
 	# Add credentials and tenant info to request
-	request.CredentialsId = request.Session.CredentialsId
+	request.CredentialsId = request.Session.Credentials.id
 	request.Tenant = requested_tenant
 	request.Resources = available_resources
 

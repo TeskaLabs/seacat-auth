@@ -121,7 +121,7 @@ class OpenIdConnectService(asab.Service):
 
 		# Locate the session
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FNOAuth2AccessToken, access_token)
+			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
 		except KeyError:
 			return None
 
@@ -156,13 +156,13 @@ class OpenIdConnectService(asab.Service):
 	async def create_oidc_session(self, root_session, client_id, scope, requested_expiration=None):
 		# TODO: Choose builders based on scope
 		session_builders = [
-			credentials_session_builder(root_session.CredentialsId),
+			credentials_session_builder(root_session.Credentials.id),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=root_session.CredentialsId
+				credentials_id=root_session.Credentials.id
 			),
-			login_descriptor_session_builder(root_session.LoginDescriptor),
+			login_descriptor_session_builder(root_session.Authentication.login_descriptor),
 			cookie_session_builder(),
 		]
 
@@ -186,18 +186,18 @@ class OpenIdConnectService(asab.Service):
 		userinfo = {
 			"result": "OK",
 			"iss": self.Issuer,
-			"sub": session.CredentialsId,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			"exp": session.Expiration,
+			"sub": session.Credentials.id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
+			"exp": session.Session.expiration,
 			"iat": datetime.datetime.utcnow(),
 		}
 
 		try:
 			credentials = await self.CredentialsService.get(
-				session.CredentialsId,
+				session.Credentials.id,
 				include=frozenset(["__totp", "__webauthn"])
 			)
 		except KeyError:
-			L.error("Credentials not found", struct_data={"cid": session.CredentialsId})
+			L.error("Credentials not found", struct_data={"cid": session.Credentials.id})
 			return {"result": "CREDENTIALS-NOT-FOUND"}
 
 		v = credentials.get("username")
@@ -222,7 +222,7 @@ class OpenIdConnectService(asab.Service):
 			userinfo["totp_set"] = True
 
 		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
-		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(session.CredentialsId)
+		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(session.Credentials.id)
 		if len(webauthn_credentials) > 0:
 			userinfo["webauthn_set"] = True
 
@@ -230,7 +230,7 @@ class OpenIdConnectService(asab.Service):
 
 		# Get last successful and failed login times
 		try:
-			last_login = await self.AuditService.get_last_logins(session.CredentialsId)
+			last_login = await self.AuditService.get_last_logins(session.Credentials.id)
 		except Exception as e:
 			last_login = None
 			L.warning("Could not fetch last logins: {}".format(e))
@@ -241,14 +241,14 @@ class OpenIdConnectService(asab.Service):
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
 
-		userinfo["available_factors"] = session.AvailableFactors
+		userinfo["available_factors"] = session.Authentication.available_factors
 
-		if session.LoginDescriptor is not None:
-			userinfo["ldid"] = session.LoginDescriptor["id"]
+		if session.Authentication.login_descriptor is not None:
+			userinfo["ldid"] = session.Authentication.login_descriptor["id"]
 			userinfo["factors"] = [
 				factor["id"]
 				for factor
-				in session.LoginDescriptor["factors"]
+				in session.Authentication.login_descriptor["factors"]
 			]
 
 		# List enabled external login providers
@@ -262,17 +262,17 @@ class OpenIdConnectService(asab.Service):
 
 		if self.TenantService.is_enabled():
 			# Include "tenants" section, list ALL of user's tenants (excluding "*")
-			tenants = [t for t in session.Authz.keys() if t != "*"]
+			tenants = [t for t in session.Authorization.authz.keys() if t != "*"]
 			if tenants is not None:
 				userinfo["tenants"] = tenants
 
 		# If tenant is missing or unknown, consider only global roles and resources
-		if tenant not in session.Authz:
+		if tenant not in session.Authorization.authz:
 			L.warning("Request for unknown tenant '{}', defaulting to '*'.".format(tenant))
 			tenant = "*"
 
 		# Include "roles" and "resources" sections, with items relevant to query_tenant
-		session_roles = session.Authz.get(tenant)
+		session_roles = session.Authorization.authz.get(tenant)
 		if session_roles is not None:
 			roles = []
 			resources = set()
@@ -285,11 +285,11 @@ class OpenIdConnectService(asab.Service):
 				userinfo["resources"] = list(resources)
 		else:
 			L.error(
-				"Tenant '{}' not found in session.Authz.".format(tenant),
+				"Tenant '{}' not found in session.Authorization.authz.".format(tenant),
 				struct_data={
 					"sid": session.SessionId,
-					"cid": session.CredentialsId,
-					"authz": session.Authz.keys()
+					"cid": session.Credentials.id,
+					"authz": session.Authorization.authz.keys()
 				}
 			)
 
