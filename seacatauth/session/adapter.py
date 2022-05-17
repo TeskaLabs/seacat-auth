@@ -62,7 +62,7 @@ class OAuth2Data:
 
 @dataclasses.dataclass
 class CookieData:
-	session_cookie_id: typing.Optional[str]
+	id: typing.Optional[str]
 
 
 class SessionAdapter:
@@ -122,14 +122,14 @@ class SessionAdapter:
 
 		class Cookie:
 			_prefix = "ck"
-			SessionCookieId = "ck_sci"
+			Id = "ck_sci"
 
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
 		FN.OAuth2.IdToken,
 		FN.OAuth2.AccessToken,
 		FN.OAuth2.RefreshToken,
-		FN.Cookie.SessionCookieId,
+		FN.Cookie.Id,
 		"oa.Ti", "oa.Ta", "oa.Tr", "oa.S",  # BACK COMPAT
 	])
 
@@ -139,10 +139,11 @@ class SessionAdapter:
 		self._decrypt_sensitive_fields(session_dict, session_svc)
 
 		self.Session = self._deserialize_session_data(session_dict)
-		self.SessionId = session_dict.pop('_id')
-		self.Version = session_dict.pop('_v')
-		self.CreatedAt = session_dict.pop('_c')
-		self.ModifiedAt = session_dict.pop('_m')
+		self.Id = self.Session.id
+		self.SessionId = self.Session.id
+		self.Version = self.Session.version
+		self.CreatedAt = self.Session.created_at
+		self.ModifiedAt = self.Session.modified_at
 
 		self.Credentials = self._deserialize_credentials_data(session_dict)
 		self.Authentication = self._deserialize_authentication_data(session_dict)
@@ -209,7 +210,7 @@ class SessionAdapter:
 
 		if self.Cookie is not None:
 			session_dict.update({
-				self.FN.Cookie.SessionCookieId: self.Cookie.session_cookie_id,
+				self.FN.Cookie.Id: self.Cookie.id,
 			})
 
 		if self.OAuth2 is not None:
@@ -221,42 +222,13 @@ class SessionAdapter:
 				self.FN.OAuth2.Scope: self.OAuth2.scope,
 			})
 
+		# TODO: encrypt sensitive fields
+
 		return {k: v for k, v in session_dict.items() if v is not None}
 
 	def rest_get(self):
-		d = {
-			self.FN.SessionId: self.Session.id,
-			self.FN.CreatedAt: self.Session.created_at,
-			self.FN.ModifiedAt: self.Session.modified_at,
-			self.FN.Version: self.Session.version,
-			"type": self.Session.type,
-			"expiration": self.Session.expiration,
-			"login_descriptor": self.Authentication.login_descriptor,
-		}
-
-		# TODO: Backward compatibility. Remove once WebUI adapts to the "_fields" above.
-		# >>>
-		d.update({
-			'id': self.Session.id,
-			'created_at': self.Session.created_at,
-			'modified_at': self.Session.modified_at,
-			'version': self.Session.version,
-		})
-		# <<<
-
-		if self.Session.max_expiration is not None:
-			d["max_expiration"] = self.Session.max_expiration
-		if self.Session.expiration_extension is not None:
-			d["expiration_extension"] = str(datetime.timedelta(seconds=self.Session.expiration_extension))
-		if self.Credentials.id is not None:
-			d["credentials_id"] = self.Credentials.id
-		if self.Authorization.authz is not None:
-			d["authz"] = self.Authorization.authz
-		if self.OAuth2 is not None:
-			d["oauth2"] = True
-		if self.Cookie is not None:
-			d["cookie"] = True
-		return d
+		session_dict = self.serialize()
+		return rest_get(session_dict)
 
 	def _decrypt_sensitive_fields(self, session_dict, session_svc):
 		# Decrypt sensitive fields
@@ -276,10 +248,6 @@ class SessionAdapter:
 					obj[keys[-1]] = session_svc.aes_decrypt(value[len(self.EncryptedPrefix):])
 
 	def _deserialize_session_data(self, session_dict):
-		self.SessionId = session_dict.pop(self.FN.SessionId)
-		self.Version = session_dict.pop(self.FN.Version)
-		self.CreatedAt = session_dict.pop(self.FN.CreatedAt)
-		self.ModifiedAt = session_dict.pop(self.FN.ModifiedAt)
 		return SessionData(
 			id=session_dict.pop(self.FN.SessionId),
 			version=session_dict.pop(self.FN.Version),
@@ -298,11 +266,11 @@ class SessionAdapter:
 			return
 		return CredentialsData(
 			id=credentials_id,
-			created_at=session_dict.pop(self.FN.Credentials.CreatedAt),
-			modified_at=session_dict.pop(self.FN.Credentials.ModifiedAt),
-			username=session_dict.pop(self.FN.Credentials.Username),
-			email=session_dict.pop(self.FN.Credentials.Email),
-			phone=session_dict.pop(self.FN.Credentials.Phone),
+			created_at=session_dict.pop(self.FN.Credentials.CreatedAt, None),
+			modified_at=session_dict.pop(self.FN.Credentials.ModifiedAt, None),
+			username=session_dict.pop(self.FN.Credentials.Username, None),
+			email=session_dict.pop(self.FN.Credentials.Email, None),
+			phone=session_dict.pop(self.FN.Credentials.Phone, None),
 		)
 
 	def _deserialize_authentication_data(self, session_dict):
@@ -336,12 +304,12 @@ class SessionAdapter:
 
 		id_token = base64.urlsafe_b64encode(id_token).decode("ascii")
 
-		access_token = session_dict.pop(SessionAdapter.FN.OAuth2.AccessToken) or oa2_data.pop("Ta", None),
+		access_token = session_dict.pop(SessionAdapter.FN.OAuth2.AccessToken) or oa2_data.pop("Ta", None)
 		if access_token is not None:
 			# Base64-encode the tokens for OIDC service convenience
 			access_token = base64.urlsafe_b64encode(access_token).decode("ascii")
 
-		refresh_token = session_dict.pop(SessionAdapter.FN.OAuth2.RefreshToken) or oa2_data.pop("Tr", None),
+		refresh_token = session_dict.pop(SessionAdapter.FN.OAuth2.RefreshToken) or oa2_data.pop("Tr", None)
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 
@@ -354,9 +322,42 @@ class SessionAdapter:
 		)
 
 	def _deserialize_cookie_data(self, session_dict):
-		sci = session_dict.pop(self.FN.Cookie.SessionCookieId, None) or session_dict.pop("SCI", None)
+		sci = session_dict.pop(self.FN.Cookie.Id, None) or session_dict.pop("SCI", None)
 		if sci is None:
 			return None
 		return CookieData(
-			session_cookie_id=base64.urlsafe_b64encode(sci).decode("ascii")
+			id=base64.urlsafe_b64encode(sci).decode("ascii")
 		)
+
+
+def rest_get(session_dict):
+	data = {
+		"_id": session_dict.get(SessionAdapter.FN.SessionId),
+		"_c": session_dict.get(SessionAdapter.FN.CreatedAt),
+		"_m": session_dict.get(SessionAdapter.FN.ModifiedAt),
+		"_v": session_dict.get(SessionAdapter.FN.Version),
+		"type": session_dict.get(SessionAdapter.FN.Session.Type),
+		"expiration": session_dict.get(SessionAdapter.FN.Session.Expiration),
+		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
+		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
+		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
+		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),
+	}
+	if session_dict.get(SessionAdapter.FN.OAuth2.IdToken) is not None:
+		data["oauth2"] = True
+	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
+		data["cookie"] = True
+
+	# TODO: Backward compatibility. Remove once WebUI adapts to the "_fields" above.
+	# >>>
+	data.update({
+		'id': session_dict.get(SessionAdapter.FN.SessionId),
+		'created_at': session_dict.get(SessionAdapter.FN.CreatedAt),
+		'modified_at': session_dict.get(SessionAdapter.FN.ModifiedAt),
+		'version': session_dict.get(SessionAdapter.FN.Version),
+		'Cid': session_dict.get(SessionAdapter.FN.Credentials.Id),
+		'exp': session_dict.get(SessionAdapter.FN.Session.Expiration),
+	})
+	# <<<
+
+	return data
