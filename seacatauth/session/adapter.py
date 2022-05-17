@@ -273,6 +273,9 @@ class SessionAdapter:
 			Phone=session_dict.pop(self.FN.Credentials.Phone, None),
 		)
 
+	# TODO: The following methods contain BACK-COMPAT fallbacks (the or-sections)
+	#   Remove the fallbacks in December 2022
+
 	def _deserialize_authentication_data(self, session_dict):
 		return AuthenticationData(
 			TOTPSet=session_dict.pop(self.FN.Authentication.TOTPSet, None)
@@ -348,7 +351,7 @@ def rest_get(session_dict):
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
 
-	# TODO: Backward compatibility. Remove once WebUI adapts to the "_fields" above.
+	# TODO: Backward compatibility. Remove once WebUI adapts to the standard fields above.
 	# >>>
 	data.update({
 		'id': session_dict.get(SessionAdapter.FN.SessionId),
