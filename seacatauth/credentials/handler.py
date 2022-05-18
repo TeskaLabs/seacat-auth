@@ -383,17 +383,14 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	access_control("authz:superuser")
-	async def delete_credentials(self, request):
+	@access_control("authz:superuser")
+	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials.
 		"""
-		credentials_id = request.match_info["credentials_id"]
-		_, provider_id, _ = credentials_id.split(':', 2)
-		provider = self.CredentialsService.CredentialProviders[provider_id]
-
-		# call provider to delete credentials
-		result = await provider.delete(credentials_id)
+		agent_cid = credentials_id  # Who called the request
+		credentials_id = request.match_info["credentials_id"]  # Who will be deleted
+		result = await self.CredentialsService.delete_credentials(credentials_id, agent_cid)
 		return asab.web.rest.json_response(request, {"result": result})
 
 
