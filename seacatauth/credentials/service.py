@@ -408,6 +408,45 @@ class CredentialsService(asab.Service):
 		return {"status": result}
 
 
+	async def delete_credentials(self, credentials_id: str, agent_cid: str = None):
+		# Get provider
+		provider = self.get_provider(credentials_id)
+		if not isinstance(provider, EditableCredentialsProviderABC):
+			L.error(
+				"Cannot delete credentials: Provider is read-only", struct_data={
+					"provider_id": provider.ProviderID,
+					"agent_cid": agent_cid,
+				}
+			)
+			return {
+				"status": "FAILED",
+				"message": "Provider does not support credentials deletion",
+			}
+
+		# Delete user sessions
+		session_svc = self.App.get_service("seacatauth.SessionService")
+		await session_svc.delete_sessions_by_credentials_id(credentials_id)
+
+		# Unassign tenants
+		# This also automatically unassigns roles
+		tenant_svc = self.App.get_service("seacatauth.TenantService")
+		tenants = await tenant_svc.get_tenants(credentials_id)
+		for tenant in tenants:
+			await tenant_svc.unassign_tenant(credentials_id, tenant)
+
+		# Delete credentials in provider
+		result = await provider.delete(credentials_id)
+
+		L.log(asab.LOG_NOTICE, "Credentials successfully deleted", struct_data={
+			"cid": credentials_id,
+			"agent_cid": agent_cid,
+		})
+		return {
+			"status": result,
+			"credentials_id": credentials_id,
+		}
+
+
 	def get_provider_info(self, provider_id):
 		"""
 		Combine provider capabilities with credentials policy

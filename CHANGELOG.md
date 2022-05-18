@@ -4,6 +4,7 @@
 
 ### Fix
 - Use datetime.datetime.utcnow (#29, PLUM Sprint 220422)
+- After-provisioning cleanup (#33, PLUM Sprint 220506)
 
 ### Refactoring
 - Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
@@ -11,6 +12,7 @@
 - Revise default configs and examples (#28, PLUM Sprint 220422)
 - Persistent login sessions (#26, PLUM Sprint 220422)
 - Session adapter restructured (#32, PLUM Sprint 220506)
+- Credentials deletion via credentials service (#33, PLUM Sprint 220506)
 
 ---
 
