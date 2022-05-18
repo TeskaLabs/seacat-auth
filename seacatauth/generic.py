@@ -24,7 +24,7 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 
 	# obtain username to append add in headers
 	if "credentials" in attributes_to_add:
-		credentials = await credentials_service.get(session.CredentialsId)
+		credentials = await credentials_service.get(session.Credentials.Id)
 		headers["X-Credentials"] = credentials["_id"]
 		v = credentials.get("username")
 		if v is not None:
