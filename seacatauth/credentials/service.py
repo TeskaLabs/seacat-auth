@@ -408,10 +408,7 @@ class CredentialsService(asab.Service):
 		return {"status": result}
 
 
-	async def delete_credentials(self, credentials_id: str, session: SessionAdapter = None):
-		# Record the requester's ID for logging purposes
-		agent_cid = session.Credentials.Id if session is not None else None
-
+	async def delete_credentials(self, credentials_id: str, agent_cid: str = None):
 		# Get provider
 		provider = self.get_provider(credentials_id)
 		if not isinstance(provider, EditableCredentialsProviderABC):
