@@ -156,7 +156,7 @@ class OpenIdConnectService(asab.Service):
 	async def create_oidc_session(self, root_session, client_id, scope, requested_expiration=None):
 		# TODO: Choose builders based on scope
 		session_builders = [
-			credentials_session_builder(root_session.Credentials.Id),
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
@@ -191,44 +191,59 @@ class OpenIdConnectService(asab.Service):
 			"iat": datetime.datetime.utcnow(),
 		}
 
-		try:
-			credentials = await self.CredentialsService.get(
-				session.Credentials.Id,
-				include=frozenset(["__totp", "__webauthn"])
-			)
-		except KeyError:
-			L.error("Credentials not found", struct_data={"cid": session.Credentials.Id})
-			return {"result": "CREDENTIALS-NOT-FOUND"}
+		if session.Credentials.Username is not None:
+			userinfo["preferred_username"] = session.Credentials.Username
 
-		v = credentials.get("username")
-		if v is not None:
-			userinfo["preferred_username"] = v
+		if session.Credentials.Email is not None:
+			userinfo["email"] = session.Credentials.Email
 
-		v = credentials.get("email")
-		if v is not None:
-			userinfo["email"] = v
+		if session.Credentials.Phone is not None:
+			userinfo["phone_number"] = session.Credentials.Phone
 
-		v = credentials.get("phone")
-		if v is not None:
-			userinfo["phone_number"] = v
+		if session.Credentials.ModifiedAt is not None:
+			userinfo["updated_at"] = session.Credentials.ModifiedAt
 
-		v = credentials.get("_m")
-		if v is not None:
-			userinfo["updated_at"] = v
+		if session.Authentication.TOTPSet is not None:
+			userinfo["totp_set"] = session.Authentication.TOTPSet
 
-		v = credentials.get("__totp")
-		# TODO: Use OTPService or TOTPFactor to get this information
-		if v is not None and len(v) > 0:
-			userinfo["totp_set"] = True
+		if session.Authentication.AvailableFactors is not None:
+			userinfo["available_factors"] = session.Authentication.AvailableFactors
 
-		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
-		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(session.Credentials.Id)
-		if len(webauthn_credentials) > 0:
-			userinfo["webauthn_set"] = True
+		if session.Authentication.LoginDescriptor is not None:
+			userinfo["ldid"] = session.Authentication.LoginDescriptor["id"]
+			userinfo["factors"] = [
+				factor["type"]
+				for factor
+				in session.Authentication.LoginDescriptor["factors"]
+			]
 
-		# TODO: last password change
+		# List enabled external login providers
+		if session.Authentication.ExternalLoginOptions is not None:
+			userinfo["external_login_enabled"] = [
+				account_type
+				for account_type, account_id in session.Authentication.ExternalLoginOptions.items()
+				if len(account_id) > 0
+			]
+
+		if session.Authorization.Authz is not None:
+			# Include the list of ALL the user's tenants (excluding "*")
+			tenants = [t for t in session.Authorization.Authz.keys() if t != "*"]
+			if len(tenants) > 0:
+				userinfo["tenants"] = tenants
+
+		if session.Authorization.Roles is not None:
+			userinfo["roles"] = session.Authorization.Roles
+
+		if session.Authorization.Resources is not None:
+			userinfo["resources"] = session.Authorization.Resources
+
+		if session.Authorization.Tenants is not None:
+			userinfo["tenants"] = session.Authorization.Tenants
+
+		# TODO: Last password change
 
 		# Get last successful and failed login times
+		# TODO: Store last login in session
 		try:
 			last_login = await self.AuditService.get_last_logins(session.Credentials.Id)
 		except Exception as e:
@@ -240,31 +255,6 @@ class OpenIdConnectService(asab.Service):
 				userinfo["last_failed_login"] = last_login["fat"]
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
-
-		userinfo["available_factors"] = session.Authentication.AvailableFactors
-
-		if session.Authentication.LoginDescriptor is not None:
-			userinfo["ldid"] = session.Authentication.LoginDescriptor["id"]
-			userinfo["factors"] = [
-				factor["type"]
-				for factor
-				in session.Authentication.LoginDescriptor["factors"]
-			]
-
-		# List enabled external login providers
-		accounts = credentials.get("external_login")
-		if accounts is not None:
-			userinfo["external_login_enabled"] = [
-				account_type
-				for account_type, account_id in accounts.items()
-				if len(account_id) > 0
-			]
-
-		if self.TenantService.is_enabled():
-			# Include "tenants" section, list ALL of user's tenants (excluding "*")
-			tenants = [t for t in session.Authorization.Authz.keys() if t != "*"]
-			if tenants is not None:
-				userinfo["tenants"] = tenants
 
 		# If tenant is missing or unknown, consider only global roles and resources
 		if tenant not in session.Authorization.Authz:

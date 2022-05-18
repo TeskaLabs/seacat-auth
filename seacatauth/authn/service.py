@@ -296,7 +296,7 @@ class AuthenticationService(asab.Service):
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
 		session_builders = [
-			credentials_session_builder(login_session.CredentialsId),
+			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
@@ -359,7 +359,7 @@ class AuthenticationService(asab.Service):
 		This is NOT OpenIDConnect/OAuth2 compliant!
 		"""
 		session_builders = [
-			credentials_session_builder(credentials_id),
+			await credentials_session_builder(self.CredentialsService, credentials_id),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
