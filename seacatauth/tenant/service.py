@@ -233,6 +233,15 @@ class TenantService(asab.Service):
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
 		assert (self.is_enabled())
+
+		# Unassign tenant roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		await role_svc.set_roles(
+			credentials_id,
+			tenant_scope={tenant},
+			roles=[]
+		)
+
 		return await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 
 
