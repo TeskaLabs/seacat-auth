@@ -389,11 +389,7 @@ class CredentialsHandler(object):
 		Delete credentials.
 		"""
 		credentials_id = request.match_info["credentials_id"]
-		_, provider_id, _ = credentials_id.split(':', 2)
-		provider = self.CredentialsService.CredentialProviders[provider_id]
-
-		# call provider to delete credentials
-		result = await provider.delete(credentials_id)
+		result = await self.CredentialsService.delete_credentials(credentials_id)
 		return asab.web.rest.json_response(request, {"result": result})
 
 
