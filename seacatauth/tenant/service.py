@@ -162,6 +162,9 @@ class TenantService(asab.Service):
 
 
 	async def set_tenants(self, session, credentials_id: str, tenants: list):
+		"""
+		Assign `credentials_id` to all tenants listed in `tenants`, unassign it from all tenants that are not listed.
+		"""
 		assert(self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
 		rbac_svc = self.App.get_service("seacatauth.RBACService")
@@ -197,7 +200,7 @@ class TenantService(asab.Service):
 			if rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["authz:tenant:admin"]) != "OK":
 				message = "Not authorized for tenant un/assignment"
 				L.error(message, struct_data={
-					"cid": session.Credentials.Id,
+					"agent_cid": session.Credentials.Id,
 					"tenant": tenant
 				})
 				return {
@@ -218,6 +221,7 @@ class TenantService(asab.Service):
 
 		L.log(asab.LOG_NOTICE, "Tenants successfully assigned to credentials", struct_data={
 			"cid": credentials_id,
+			"agent_cid": session.Credentials.Id,
 			"assigned_count": len(tenants_to_assign),
 			"unassigned_count": len(tenants_to_unassign),
 			"failed_count": failed_count,
