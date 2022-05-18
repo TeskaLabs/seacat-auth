@@ -97,11 +97,13 @@ class SessionService(asab.Service):
 		sessions = await self._raw_list()
 		for session in sessions["data"]:
 			try:
-				if datetime.datetime.utcnow() > session.get(SessionAdapter.FN.Session.Expiration):
+				if datetime.datetime.utcnow() > (
+					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
+				):
 					expired.append(session["_id"])
 			except KeyError:
-				L.error("Session is missing expiration", struct_data={"sid": session["_id"]})
-				continue
+				L.warning("Session is missing expiration. Deleting.", struct_data={"sid": session["_id"]})
+				expired.append(session["_id"])
 
 		for sid in expired:
 			await self.delete(session_id=sid)
