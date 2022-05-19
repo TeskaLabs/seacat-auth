@@ -68,7 +68,7 @@ class TokenIntrospectionHandler(object):
 
 	async def authenticate_request(self, request):
 		authorization_bytes = await request.read()
-		return await self.OpenIdConnectService.get_session_from_bearer_token(
+		return await self.OpenIdConnectService.get_session_by_bearer_token(
 			authorization_bytes.decode("ascii")
 		)
 
