@@ -26,11 +26,11 @@ def set_cookie(app, response, session, cookie_domain_id=None):
 	cookie_svc = app.get_service("seacatauth.CookieService")
 	cookie_domain = cookie_svc.get_cookie_domain(cookie_domain_id)
 
-	cookie_value = "{}:{}".format(cookie_domain, session.CookieSessionId)
+	cookie_value = "{}:{}".format(cookie_domain, session.Cookie.Id)
 
 	# Set cookie max age equal to session max age
 	# TODO: Set cookie expiration to current session expiration and extend it dynamically
-	max_age = int((session.MaxExpiration - datetime.datetime.utcnow()).total_seconds())
+	max_age = int((session.Session.MaxExpiration - datetime.datetime.utcnow()).total_seconds())
 
 	response.set_cookie(
 		cookie_svc.CookieName,

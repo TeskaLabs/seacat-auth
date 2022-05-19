@@ -34,7 +34,10 @@ class CookieService(asab.Service):
 		)
 		if self.RootCookieDomain is None:
 			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
-			self.RootCookieDomain = ".{}".format(fragments.netloc)
+			if fragments.netloc == "localhost":
+				self.RootCookieDomain = fragments.netloc
+			else:
+				self.RootCookieDomain = ".{}".format(fragments.netloc)
 			L.warning("""Cookie domain is not specified.
 				Assuming your cookie domain is '{}' (inferred from Auth WebUI base URL).
 				It is recommended to specify cookie domain explicitly in your Seacat Auth configuration file.
@@ -112,7 +115,7 @@ class CookieService(asab.Service):
 			return None
 
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FNCookieSessionId, session_cookie_id)
+			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, session_cookie_id)
 		except KeyError:
 			L.warning("Session not found", struct_data={"sci": session_cookie_id})
 			return None
