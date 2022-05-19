@@ -1,4 +1,4 @@
-FROM alpine:3.13
+FROM alpine:3.13 AS stage1
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG C.UTF-8
@@ -15,8 +15,8 @@ RUN apk add --no-cache \
   openldap
 
 # Create build environment so that dependencies like aiohttp can be build
-# Run all as a single command in order to reduce image size
-RUN apk add --no-cache --virtual buildenv \
+# Run all as a single command in order to reduce image size --virtual buildenv
+RUN apk add --no-cache  \
     git \
     python3-dev \
     libffi-dev \
@@ -41,8 +41,7 @@ RUN apk add --no-cache --virtual buildenv \
     jinja2 \
     pyotp \
     webauthn \
-    git+https://github.com/TeskaLabs/asab.git \
-&& apk del buildenv
+    git+https://github.com/TeskaLabs/asab.git
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -50,18 +49,27 @@ WORKDIR /app/seacat-auth
 # Create MANIFEST.json in the working directory
 # The manifest script requires git to be installed
 COPY ./.git /app/seacat-auth/.git
-RUN apk add --no-cache --virtual buildenv git \
-&& asab-manifest.py ./MANIFEST.json \
-&& apk del buildenv
-RUN rm -rf /app/seacat-auth/.git
+RUN asab-manifest.py ./MANIFEST.json
+
+
+FROM alpine:3.13
+
+
+RUN apk add --no-cache \
+  python3 
+  
+COPY --from=stage1 /usr/lib/python3.8/site-packages /usr/lib/python3.8/site-packages
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
 COPY ./CHANGELOG.md          /app/seacat-auth/CHANGELOG.md
+COPY --from=stage1 /app/seacat-auth/MANIFEST.json /app/seacat-auth/MANIFEST.json
+
 COPY ./etc/message_templates /app/seacat-auth/etc/message_templates
 
 RUN set -ex \
   && mkdir /conf \
   && touch /conf/seacatauth.conf
-
+  
+WORKDIR /app/seacat-auth
 CMD ["python3", "seacatauth.py", "-c", "/conf/seacatauth.conf"]
