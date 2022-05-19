@@ -211,6 +211,10 @@ class OpenIdConnectService(asab.Service):
 			"iat": datetime.datetime.utcnow(),
 		}
 
+		if session.OAuth2.ClientId is not None:
+			userinfo["aud"] = session.OAuth2.ClientId
+			userinfo["azp"] = session.OAuth2.ClientId
+
 		if session.Credentials.Username is not None:
 			userinfo["preferred_username"] = session.Credentials.Username
 
@@ -244,6 +248,9 @@ class OpenIdConnectService(asab.Service):
 				for account_type, account_id in session.Authentication.ExternalLoginOptions.items()
 				if len(account_id) > 0
 			]
+
+		if session.Authorization.Authz is not None:
+			userinfo["authz"] = session.Authorization.Authz
 
 		if session.Authorization.Authz is not None:
 			# Include the list of ALL the user's tenants (excluding "*")
