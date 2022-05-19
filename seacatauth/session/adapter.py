@@ -243,8 +243,8 @@ class SessionAdapter:
 			else:
 				# BACK COMPAT: Keep values without prefix raw
 				# TODO: Remove support once proper m2m tokens are in place
-				value = obj[keys[-1]]
-				if value.startswith(self.EncryptedPrefix):
+				value = obj.get(keys[-1])
+				if value is not None and value.startswith(self.EncryptedPrefix):
 					obj[keys[-1]] = session_svc.aes_decrypt(value[len(self.EncryptedPrefix):])
 
 	def _deserialize_session_data(self, session_dict):
