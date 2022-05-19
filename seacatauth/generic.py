@@ -24,7 +24,7 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 
 	# obtain username to append add in headers
 	if "credentials" in attributes_to_add:
-		credentials = await credentials_service.get(session.CredentialsId)
+		credentials = await credentials_service.get(session.Credentials.Id)
 		headers["X-Credentials"] = credentials["_id"]
 		v = credentials.get("username")
 		if v is not None:
@@ -32,7 +32,7 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 
 	# Obtain assigned tenants from session object
 	if "tenants" in attributes_to_add:
-		tenants = [tenant for tenant in session.Authz.keys() if tenant != "*"]
+		tenants = [tenant for tenant in session.Authorization.Authz.keys() if tenant != "*"]
 		if len(tenants) > 0:
 			headers["X-Tenants"] = " ".join(tenants)
 
@@ -40,33 +40,33 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 	if "roles" in attributes_to_add:
 		# Add only global roles if no tenant was requested
 		if requested_tenant is None:
-			roles = session.Authz["*"].keys()
+			roles = session.Authorization.Authz["*"].keys()
 		else:
-			roles = session.Authz[requested_tenant].keys()
+			roles = session.Authorization.Authz[requested_tenant].keys()
 		headers["X-Roles"] = " ".join(roles)
 
 	# Obtain assigned resources from session object
 	if "resources" in attributes_to_add:
 		if requested_tenant is None:
-			resources = session.Authz["*"].values()
+			resources = session.Authorization.Authz["*"].values()
 		else:
-			resources = session.Authz[requested_tenant].values()
+			resources = session.Authorization.Authz[requested_tenant].values()
 		headers["X-Resources"] = " ".join(set(sum(resources, [])))
 
 	# Obtain login factors from session object
 	if "factors" in attributes_to_add:
-		if session.LoginDescriptor is not None:
+		if session.Authentication.LoginDescriptor is not None:
 			factors = [
 				factor["id"]
 				for factor
-				in session.LoginDescriptor["factors"]
+				in session.Authentication.LoginDescriptor["factors"]
 			]
 			headers["X-Login-Factors"] = " ".join(factors)
 
 	# Obtain login descriptor IDs from session object
 	if "ldid" in attributes_to_add:
-		if session.LoginDescriptor is not None:
-			headers["X-Login-Descriptor"] = session.LoginDescriptor["id"]
+		if session.Authentication.LoginDescriptor is not None:
+			headers["X-Login-Descriptor"] = session.Authentication.LoginDescriptor["id"]
 
 	return headers
 
@@ -103,9 +103,9 @@ async def nginx_introspection(
 		raise NotImplementedError("Tenant check not implemented in introspection")
 
 	if len(requested_resources) > 0:
-		if rbac_service.has_resource_access(session.Authz, requested_tenant, requested_resources) != "OK":
+		if rbac_service.has_resource_access(session.Authorization.Authz, requested_tenant, requested_resources) != "OK":
 			L.warning("Credentials not authorized for tenant or resource.", struct_data={
-				"cid": session.CredentialsId,
+				"cid": session.Credentials.Id,
 				"tenant": requested_tenant,
 				"resources": " ".join(requested_resources),
 			})
@@ -116,7 +116,7 @@ async def nginx_introspection(
 
 	# Set the authorization header
 	headers = {
-		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2['access_token'])
+		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2.AccessToken)
 	}
 
 	# Add headers

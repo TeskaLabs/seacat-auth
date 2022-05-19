@@ -69,6 +69,13 @@ class XHeaderFactor(LoginFactorABC):
 		self.Header = config["header"]
 		self.Value = str(config["value"])
 
+	def serialize(self):
+		return {
+			**super().serialize(),
+			"header": self.Header,
+			"value": self.Value,
+		}
+
 	async def is_eligible(self, login_data) -> bool:
 		"""
 		:returns True if the HTTP header value matches the configured value.

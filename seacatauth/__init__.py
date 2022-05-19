@@ -6,13 +6,14 @@ asab.Config.add_defaults({
 	"general": {
 		"registration_encrypted": "false",
 
-		# public base URL is used for behind reverse proxy deployment, for application, to be aware from what url is api served.
-		# It is needed in oidc authorize handler, to give redirect uri back to itself when forwarding to login endpoint
-		"public_api_base_url": "http://localhost:3000/api",
+		# Public API base URL lets the app know from what URL is its public API served.
+		# It is used by the OpenIDConnect authorize handler for generating loopback redirect URIs.
+		"public_api_base_url": "http://localhost/auth/api",
 
-		# app base URL is used for behind reverse proxy deployment, for application, to be aware from what url seacat-auth-webui application is served
-		# It is needed for app login endpoint and app reset pwd endpoints
-		"auth_webui_base_url": "http://localhost:3000/auth",
+		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
+		# It is used for building login and password reset URIs.
+		# The domain name is extracted for cookie and authentication purposes.
+		"auth_webui_base_url": "http://localhost/auth",
 	},
 
 	"openidconnect": {
@@ -122,7 +123,7 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:password": {
-		# Default expiration in "{float} {unit}" format
+		# Timeout for password reset requests
 		"password_reset_expiration": "3 d",
 	},
 })

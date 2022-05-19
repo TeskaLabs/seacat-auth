@@ -2,10 +2,19 @@
 
 ## Release candidate
 
+### Fix
+- Use datetime.datetime.utcnow (#29, PLUM Sprint 220422)
+- After-provisioning cleanup (#33, PLUM Sprint 220506)
+- Fix session expiration for back-compat (#34, PLUM Sprint 220506)
+
 ### Refactoring
 - Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
 - Persistent TOTP secrets (#27, PLUM Sprint 220408)
 - Dockerfile is now building in two stages
+- Revise default configs and examples (#28, PLUM Sprint 220422)
+- Persistent login sessions (#26, PLUM Sprint 220422)
+- Session adapter restructured (#32, PLUM Sprint 220506)
+- Credentials deletion via credentials service (#33, PLUM Sprint 220506)
 
 ---
 

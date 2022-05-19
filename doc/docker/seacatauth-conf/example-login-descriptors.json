@@ -1,0 +1,30 @@
+[
+	{
+		"id": "default",
+		"label": {
+            "en": "Use recommended login",
+            "cs": "Doporučené přihlášení"
+        },
+		"factors": [
+			[
+				{"id": "password", "type": "password"},
+				{"id": "totp", "type": "totp"}
+			],
+			[
+				{"id": "password", "type": "password"}
+			]
+		]
+	},
+	{
+		"id": "passwordless",
+		"label": {
+            "en": "Passwordless login",
+            "cs": "Přihlášení bez hesla"
+        },
+		"factors": [
+			[
+				{"id": "webauthn", "type": "webauthn"}
+			]
+		]
+	}
+]

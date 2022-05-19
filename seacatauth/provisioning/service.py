@@ -59,15 +59,11 @@ class ProvisioningService(asab.Service):
 		})
 		L.log(asab.LOG_NOTICE, _provisioning_intro_message.format(username=self.SuperuserName, password=password))
 
-		# Check if provisioning tenant exists
-		try:
-			tenant_exists = (await self.TenantService.get_tenant(self.TenantID)) is not None
-		except KeyError:
-			tenant_exists = False
-
 		# Create provisioning tenant
-		if not tenant_exists:
+		try:
 			await self.TenantService.create_tenant(self.TenantID)
+		except KeyError:
+			L.log(asab.LOG_NOTICE, "Tenant already exists", struct_data={"tenant": self.TenantID})
 
 		# Assign tenant to provisioning user
 		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
@@ -83,14 +79,21 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.set_roles(self.SuperuserID, {"*"}, [self.SuperroleID])
 
 	async def finalize(self, app):
-		# Clear ALL superuser sessions
-		await self.SessionService.delete_sessions_by_credentials_id(self.SuperuserID)
+		# Delete the superuser
+		# This also all its sessions and tenant+role assignments
+		await self.CredentialsService.delete_credentials(self.SuperuserID)
 
 		# Delete superuser role
-		await self.RoleService.delete(role_id=self.SuperroleID)
+		try:
+			await self.RoleService.delete(role_id=self.SuperroleID)
+		except KeyError:
+			L.error("Failed to delete role", struct_data={"role": self.SuperroleID})
 
 		# Delete provisioning tenant with all its roles and assignments
 		tenant_provider = self.TenantService.get_provider()
-		await tenant_provider.delete(self.TenantID)
+		try:
+			await tenant_provider.delete(self.TenantID)
+		except KeyError:
+			L.error("Failed to delete tenant", struct_data={"tenant": self.TenantID})
 
 		await super().finalize(app)
