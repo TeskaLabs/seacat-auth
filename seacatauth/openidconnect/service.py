@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 import base64
 import secrets
@@ -8,6 +9,7 @@ import asab
 
 import aiohttp.web
 import urllib.parse
+import jwcrypto.jwt
 
 from ..session import SessionAdapter
 from ..session import (
@@ -105,7 +107,7 @@ class OpenIdConnectService(asab.Service):
 		return session_id
 
 
-	async def get_session_from_bearer_token(self, bearer_token: str):
+	async def get_session_by_bearer_token(self, bearer_token: str):
 		# Extract the access token
 		am = self.AuthorizationHeaderRg.match(bearer_token)
 		if am is None:
@@ -124,6 +126,24 @@ class OpenIdConnectService(asab.Service):
 			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
 		except KeyError:
 			return None
+
+		return session
+
+
+	async def get_session_from_id_token(self, bearer_token: str):
+		# Extract the access token
+		token_value = self.AuthorizationHeaderRg.match(bearer_token)
+		if token_value is None:
+			L.warning("Access Token is invalid")
+			return None
+
+		id_token = token_value.group(1)
+		# Create the session
+		id_info = jwcrypto.jwt.JWT(jwt=id_token)
+		payload = id_info.token.objects.get("payload")
+		data_dict = json.loads(payload)
+
+		session = SessionAdapter.from_id_token(self.SessionService, data_dict)
 
 		return session
 
