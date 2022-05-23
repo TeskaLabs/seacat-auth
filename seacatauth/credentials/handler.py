@@ -147,7 +147,7 @@ class CredentialsHandler(object):
 			if mode == "role":
 				# Check if the user has admin access to the role's tenant
 				tenant = filtr.split("/")[0]
-				if rbac_svc.has_resource_access(request.Session.Authz, tenant, ["authz:tenant:admin"]) != "OK":
+				if rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]) != "OK":
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
 					})
@@ -157,7 +157,7 @@ class CredentialsHandler(object):
 			elif mode == "tenant":
 				# Check if the user has admin access to the requested tenant
 				tenant = filtr
-				if rbac_svc.has_resource_access(request.Session.Authz, tenant, ["authz:tenant:admin"]) != "OK":
+				if rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]) != "OK":
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
 					})
@@ -383,17 +383,14 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	access_control("authz:superuser")
-	async def delete_credentials(self, request):
+	@access_control("authz:superuser")
+	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials.
 		"""
-		credentials_id = request.match_info["credentials_id"]
-		_, provider_id, _ = credentials_id.split(':', 2)
-		provider = self.CredentialsService.CredentialProviders[provider_id]
-
-		# call provider to delete credentials
-		result = await provider.delete(credentials_id)
+		agent_cid = credentials_id  # Who called the request
+		credentials_id = request.match_info["credentials_id"]  # Who will be deleted
+		result = await self.CredentialsService.delete_credentials(credentials_id, agent_cid)
 		return asab.web.rest.json_response(request, {"result": result})
 
 

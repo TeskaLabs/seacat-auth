@@ -22,8 +22,7 @@ def login_factor_builder(authn_service, factor_config):
 		return SMSCodeFactor(authn_service=authn_service, config=factor_config)
 
 	elif factor_type == "smslogin":
-		L.warning("Factor type 'smslogin' will be deprecated. Use 'smscode' instead.")
-		return SMSCodeFactor(authn_service=authn_service, config=factor_config)
+		L.error("Factor type 'smslogin' is deprecated. Use 'smscode' instead.")
 
 	elif factor_type == "totp":
 		return TOTPFactor(authn_service=authn_service, config=factor_config)

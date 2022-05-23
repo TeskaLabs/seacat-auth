@@ -13,7 +13,7 @@ import cryptography.hazmat.primitives.ciphers.modes
 import asab
 import asab.storage
 
-from .adapter import SessionAdapter
+from .adapter import SessionAdapter, rest_get
 
 #
 
@@ -97,7 +97,14 @@ class SessionService(asab.Service):
 		async for session in self._iterate_raw(
 			query_filter={SessionAdapter.FNExpiration: {"$lt": datetime.datetime.utcnow()}}
 		):
-			expired.append(session["_id"])
+			try:
+				if datetime.datetime.utcnow() > (
+					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
+				):
+					expired.append(session["_id"])
+			except KeyError:
+				L.warning("Session is missing expiration. Deleting.", struct_data={"sid": session["_id"]})
+				expired.append(session["_id"])
 
 		for sid in expired:
 			# Use the delete method for proper session termination
@@ -117,9 +124,9 @@ class SessionService(asab.Service):
 		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie"]):
 			L.error("Unsupported session type", struct_data={"type": session_type})
 			return None
-		upsertor.set(SessionAdapter.FNSessionType, session_type)
+		upsertor.set(SessionAdapter.FN.Session.Type, session_type)
 		if parent_session is not None:
-			upsertor.set(SessionAdapter.FNParentSessionId, parent_session.SessionId)
+			upsertor.set(SessionAdapter.FN.Session.ParentSessionId, parent_session.SessionId)
 
 		# Set up expiration variables
 		if expiration is not None:
@@ -136,9 +143,9 @@ class SessionService(asab.Service):
 		else:
 			touch_extension_seconds = self.TouchExtensionRatio * expiration.total_seconds()
 
-		upsertor.set(SessionAdapter.FNExpiration, expires)
-		upsertor.set(SessionAdapter.FNMaxExpiration, max_expiration)
-		upsertor.set(SessionAdapter.FNTouchExtension, touch_extension_seconds)
+		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+		upsertor.set(SessionAdapter.FN.Session.MaxExpiration, max_expiration)
+		upsertor.set(SessionAdapter.FN.Session.ExpirationExtension, touch_extension_seconds)
 
 		# Add builder fields
 		if session_builders is None:
@@ -197,8 +204,8 @@ class SessionService(asab.Service):
 		if is_old_token:
 			L.warning("Access with obsolete access token.", struct_data={
 				"at": value,
-				"sid": session.SessionId,
-				"cid": session.CredentialsId
+				"sid": session.Session.Id,
+				"cid": session.Credentials.Id
 			})
 
 		return session
@@ -212,9 +219,9 @@ class SessionService(asab.Service):
 		return session
 
 
-	async def _iterate_raw(self, page: int = 0, limit: int = None, query_filter=None):
+	async def _iterate_raw(self, page: int = 0, limit: int = None, query_filter: dict = None):
 		"""
-		Yields raw session dicts
+		Yields raw session dicts including ALL the fields.
 		"""
 		collection = self.StorageService.Database[self.SessionCollection]
 
@@ -239,7 +246,7 @@ class SessionService(asab.Service):
 
 		sessions = []
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
-			sessions.append(SessionAdapter(self, session_dict))
+			sessions.append(rest_get(session_dict))
 
 		return {
 			'data': sessions,
@@ -295,43 +302,43 @@ class SessionService(asab.Service):
 		"""
 		Extend the expiration of the session if it hasn't been updated recently.
 		"""
-		if datetime.datetime.utcnow() < session.ModifiedAt + self.MinimalRefreshInterval:
+		if datetime.datetime.utcnow() < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
 			return
-		if session.Expiration == session.MaxExpiration:
+		if session.Session.Expiration >= session.Session.MaxExpiration:
 			# Session expiration is already maxed out
 			return
 
 		if expiration is not None:
 			expiration = datetime.timedelta(seconds=expiration)
-		elif session.TouchExtension is not None:
-			expiration = datetime.timedelta(seconds=session.TouchExtension)
+		elif session.Session.ExpirationExtension is not None:
+			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
 		else:
 			# May be a legacy "machine credentials session". Do not extend.
 			return
 		expires = datetime.datetime.utcnow() + expiration
 
-		if expires < session.Expiration:
+		if expires < session.Session.Expiration:
 			# Do not shorten the session!
 			return
-		if expires > session.MaxExpiration:
+		if expires > session.Session.MaxExpiration:
 			# Do not cross maximum expiration
-			expires = session.MaxExpiration
+			expires = session.Session.MaxExpiration
 
 		# Update session
-		version = session.Version
+		version = session.Session.Version
 		upsertor = self.StorageService.upsertor(
 			self.SessionCollection,
 			session.SessionId,
 			version=version
 		)
-		upsertor.set(SessionAdapter.FNExpiration, expires)
+		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
 
 		try:
 			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.SessionId, "exp": expires})
+			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.Id, "exp": expires})
 		except KeyError:
-			L.warning("Conflict: Session already extended", struct_data={"sid": session.SessionId})
+			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.Id})
 
 
 	async def delete(self, session_id):
@@ -378,7 +385,7 @@ class SessionService(asab.Service):
 		})
 
 	async def delete_sessions_by_credentials_id(self, credentials_id):
-		query_filter = {SessionAdapter.FNCredentialsId: credentials_id}
+		query_filter = {SessionAdapter.FN.Credentials.Id: credentials_id}
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
 			to_delete.append(session_dict)
