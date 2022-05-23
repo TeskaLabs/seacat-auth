@@ -6,7 +6,7 @@
 - Use datetime.datetime.utcnow (#29, PLUM Sprint 220422)
 - After-provisioning cleanup (#33, PLUM Sprint 220506)
 - Fix session expiration for back-compat (#34, PLUM Sprint 220506)
-- Import ASAB web container (#36, PLUM Sprint 220520)
+- ~~Import ASAB web container (#36, PLUM Sprint 220520)~~(4ade2c60)
 
 ### Refactoring
 - Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
