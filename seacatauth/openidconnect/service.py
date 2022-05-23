@@ -216,14 +216,16 @@ class OpenIdConnectService(asab.Service):
 
 	async def build_userinfo(self, session, tenant=None):
 		userinfo = {
-			"result": "OK",
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			"exp": session.Session.Expiration,
-			"iat": datetime.datetime.utcnow(),
+			# RFC 7519 states that the exp and iat claim values must be NumericDate values.
+			"exp": session.Session.Expiration.timestamp(),
+			"iat": datetime.datetime.utcnow().timestamp(),
 		}
 
 		if session.OAuth2.ClientId is not None:
+			# aud indicates who is allowed to consume the token
+			# azp indicates who is allowed to present it
 			userinfo["aud"] = session.OAuth2.ClientId
 			userinfo["azp"] = session.OAuth2.ClientId
 
