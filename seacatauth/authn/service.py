@@ -126,15 +126,21 @@ class AuthenticationService(asab.Service):
 		self,
 		credentials_id,
 		client_public_key,
-		login_descriptors=None
+		ident,
+		login_descriptors=None,
+		requested_session_expiration=None,
+		data=None,
 	):
 		# Prepare the login session
 		login_session = LoginSession.build(
 			client_login_key=client_public_key,
 			credentials_id=credentials_id,
+			ident=ident,
 			login_descriptors=login_descriptors,
 			login_attempts=self.LoginAttempts,
-			timeout=self.LoginSessionExpiration
+			timeout=self.LoginSessionExpiration,
+			requested_session_expiration=requested_session_expiration,
+			data=data,
 		)
 
 		upsertor = self.StorageService.upsertor(self.LoginSessionCollection, login_session.Id)
@@ -317,7 +323,7 @@ class AuthenticationService(asab.Service):
 
 		session = await self.SessionService.create_session(
 			session_type="root",
-			expiration=login_session.Data.get("requested_session_expiration"),
+			expiration=login_session.RequestedSessionExpiration,
 			session_builders=session_builders,
 		)
 		L.log(
