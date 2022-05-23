@@ -130,7 +130,7 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	async def get_session_from_id_token(self, bearer_token: str):
+	async def build_session_from_id_token(self, bearer_token: str):
 		# Extract the access token
 		token_value = self.AuthorizationHeaderRg.match(bearer_token)
 		if token_value is None:
@@ -139,9 +139,18 @@ class OpenIdConnectService(asab.Service):
 
 		id_token = token_value.group(1)
 		# Create the session
-		id_info = jwcrypto.jwt.JWT(jwt=id_token)
-		payload = id_info.token.objects.get("payload")
-		data_dict = json.loads(payload)
+		try:
+			id_info = jwcrypto.jwt.JWT(jwt=id_token)
+		except ValueError:
+			L.warning("Cannot parse ID Token")
+			return None
+
+		try:
+			payload = id_info.token.objects.get("payload")
+			data_dict = json.loads(payload)
+		except ValueError:
+			L.warning("Cannot read ID token data")
+			return None
 
 		session = SessionAdapter.from_id_token(self.SessionService, data_dict)
 
@@ -158,7 +167,10 @@ class OpenIdConnectService(asab.Service):
 			L.info("Access Token not provided in the header")
 			return None
 
-		return await self.get_session_from_bearer_token(authorization_bytes)
+		session = await self.get_session_by_bearer_token(authorization_bytes)
+		if session is None:
+			session = await self.build_session_from_id_token(authorization_bytes)
+		return session
 
 
 	def refresh_token(self, refresh_token, client_id, client_secret, scope):
