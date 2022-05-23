@@ -41,6 +41,7 @@ class SMSCodeFactor(LoginFactorABC):
 				"token": generate_ergonomic_token(length=6)
 			}
 		token = login_session.Data[self.Type]["token"]
+		await self.AuthenticationService.update_login_session(login_session.Id, data=login_session.Data)
 
 		# Get phone number
 		cred_svc = self.AuthenticationService.CredentialsService
