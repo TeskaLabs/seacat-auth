@@ -95,7 +95,7 @@ class SessionService(asab.Service):
 	async def delete_expired_sessions(self):
 		expired = []
 		async for session in self._iterate_raw(
-			query_filter={SessionAdapter.FNExpiration: {"$lt": datetime.datetime.utcnow()}}
+			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.utcnow()}}
 		):
 			try:
 				if datetime.datetime.utcnow() > (
@@ -264,7 +264,7 @@ class SessionService(asab.Service):
 			query_filter = {}
 
 		# Find only top-level sessions (with no parent)
-		query_filter.update({SessionAdapter.FNParentSessionId: None})
+		query_filter.update({SessionAdapter.FN.Session.ParentSessionId: None})
 
 		cursor = collection.find(query_filter)
 
@@ -278,7 +278,7 @@ class SessionService(asab.Service):
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
 			session = SessionAdapter(self, session_dict).rest_get()
 			# Include children sessions
-			children = await self.list(query_filter={SessionAdapter.FNParentSessionId: session["_id"]})
+			children = await self.list(query_filter={SessionAdapter.FN.Session.ParentSessionId: session["_id"]})
 			if children["count"] > 0:
 				session["children"] = children
 			sessions.append(session)
@@ -343,7 +343,7 @@ class SessionService(asab.Service):
 
 	async def delete(self, session_id):
 		# Recursively delete all child sessions first
-		query_filter = {SessionAdapter.FNParentSessionId: session_id}
+		query_filter = {SessionAdapter.FN.Session.ParentSessionId: session_id}
 
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
