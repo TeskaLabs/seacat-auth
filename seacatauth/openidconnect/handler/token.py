@@ -11,6 +11,8 @@ import secrets
 
 import asab
 import asab.web.rest
+import jwcrypto.jwk
+import jwcrypto.jwt
 
 from seacatauth.session import SessionAdapter
 
@@ -145,30 +147,21 @@ class TokenHandler(object):
 		Wrap authentication data and userinfo in a JWT token
 		"""
 		header = {
-			"alg": "HS256",
-			"typ": "JWT"
+			"alg": "ES256",  # TODO: This should be mapped from key_type and key_curve
+			"typ": "JWT",
+			"kid": self.OpenIdConnectService.PrivateKey.key_id,
 		}
+
 		# TODO: ID token should always contain info about "what happened during authentication"
-		#   User info is optional and should be included (or not) based on SCOPE
-		# TODO: Add "aud" (audience) and "azp" (authorized party) fields
-		#   "aud indicates who is allowed to consume the token, and azp indicates who is allowed to present it"
+		#   User info is optional and its parts should be included (or not) based on SCOPE
 		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
-		secret_key = secrets.token_urlsafe(32)
-		total_params = "{header}.{payload}".format(
-			header=base64.urlsafe_b64encode(
-				json.dumps(header).encode("ascii")
-			).decode("utf-8").replace("=", ""),
-			payload=base64.urlsafe_b64encode(
-				json.dumps(payload, cls=_DateTimeEncoder).encode("ascii")
-			).decode("utf-8").replace("=", "")
+
+		token = jwcrypto.jwt.JWT(
+			header=header,
+			claims=json.dumps(payload, cls=_DateTimeEncoder).encode("ascii")
 		)
-		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
-		id_token = "{total_params}.{signature}".format(
-			total_params=total_params,
-			signature=base64.urlsafe_b64encode(
-				signature.encode("ascii")
-			).decode("utf-8").replace("=", "")
-		)
+		token.make_signed_token(self.OpenIdConnectService.PrivateKey)
+		id_token = token.serialize()
 
 		return id_token
 

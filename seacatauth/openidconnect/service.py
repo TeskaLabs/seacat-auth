@@ -10,6 +10,7 @@ import asab
 import aiohttp.web
 import urllib.parse
 import jwcrypto.jwt
+import jwcrypto.jwk
 
 from ..session import SessionAdapter
 from ..session import (
@@ -62,6 +63,14 @@ class OpenIdConnectService(asab.Service):
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
+
+		private_key_path = asab.Config.get("openidconnect", "private_key")
+		# TODO: If private_key_path does not exist, generate a new private key
+		with open(private_key_path, "rb") as f:
+			# TODO: Possibly with password
+			self.PrivateKey = jwcrypto.jwk.JWK.from_pem(f.read())
+			assert self.PrivateKey.key_type == "EC"
+			assert self.PrivateKey.key_curve == "P-256"
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
@@ -140,9 +149,12 @@ class OpenIdConnectService(asab.Service):
 		id_token = token_value.group(1)
 		# Create the session
 		try:
-			id_info = jwcrypto.jwt.JWT(jwt=id_token)
+			id_info = jwcrypto.jwt.JWT(jwt=id_token, key=self.PrivateKey)
 		except ValueError:
-			L.warning("Cannot parse ID Token")
+			L.warning("Cannot verify ID Token")
+			return None
+		except jwcrypto.jwt.JWTExpired:
+			L.warning("ID Token expired")
 			return None
 
 		try:
@@ -167,7 +179,12 @@ class OpenIdConnectService(asab.Service):
 			L.info("Access Token not provided in the header")
 			return None
 
-		session = await self.get_session_by_bearer_token(authorization_bytes)
+		try:
+			# TODO: Disable this. Allow only in dev mode
+			session = await self.get_session_by_bearer_token(authorization_bytes)
+		except ValueError:
+			session = None
+
 		if session is None:
 			session = await self.build_session_from_id_token(authorization_bytes)
 		return session
