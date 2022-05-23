@@ -22,26 +22,40 @@ class LoginSession(object):
 		login_descriptors,
 		remaining_login_attempts,
 		expires_at,
+		ident,
+		requested_session_expiration=None,
 		public_key=None,
 		data=None
 	):
 		self.Id = id
 		self.__shared_key = shared_key
 		self.CredentialsId = credentials_id
+		self.Ident = ident
 		self.LoginDescriptors = login_descriptors
 		self.RemainingLoginAttempts = remaining_login_attempts
 		self.ExpiresAt = expires_at
 		self.PublicKey = public_key
 
-		# User space for storing custom data needed by a login process
+		# User space for storing custom data needed by the login process
 		self.Data = data or {}
 
 		# Login descriptor that successfully authenticated the login session
 		self.AuthenticatedVia = None
+		self.RequestedSessionExpiration = requested_session_expiration
 
 
 	@classmethod
-	def build(cls, client_login_key, credentials_id, login_descriptors, login_attempts, timeout):
+	def build(
+		cls,
+		client_login_key,
+		credentials_id,
+		ident,
+		login_descriptors,
+		login_attempts,
+		timeout,
+		requested_session_expiration=None,
+		data=None
+	):
 		# Generate shared encryption key
 		server_login_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
 			cls.ServerLoginKeyCurve(),
@@ -58,10 +72,13 @@ class LoginSession(object):
 			id=secrets.token_urlsafe(),
 			shared_key=shared_key,
 			credentials_id=credentials_id,
+			ident=ident,
 			login_descriptors=login_descriptors,
 			remaining_login_attempts=login_attempts,
 			expires_at=expires_at,
 			public_key=server_login_key.public_key(),
+			requested_session_expiration=requested_session_expiration,
+			data=data,
 		)
 
 
@@ -80,6 +97,8 @@ class LoginSession(object):
 				descriptor.serialize()
 				for descriptor in self.LoginDescriptors
 			],
+			"idt": self.Ident,
+			"rse": self.RequestedSessionExpiration,
 			"d": self.Data,
 		}
 		return db_object
@@ -91,6 +110,7 @@ class LoginSession(object):
 			id=db_object["_id"],
 			shared_key=db_object["__sk"],
 			credentials_id=db_object["cid"],
+			ident=db_object["idt"],
 			login_descriptors=[
 				LoginDescriptor.deserialize(authn_svc, descriptor)
 				for descriptor in db_object["ld"]
@@ -98,6 +118,7 @@ class LoginSession(object):
 			remaining_login_attempts=db_object["la"],
 			expires_at=db_object["exp"],
 			public_key=cryptography.hazmat.primitives.serialization.load_pem_public_key(db_object["pk"]),
+			requested_session_expiration=db_object["rse"],
 			data=db_object["d"],
 		)
 

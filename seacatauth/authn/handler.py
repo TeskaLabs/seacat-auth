@@ -114,10 +114,10 @@ class AuthenticationHandler(object):
 		login_session = await self.AuthenticationService.create_login_session(
 			credentials_id=credentials_id,
 			client_public_key=key.get_op_key("encrypt"),  # extract EC public key from JWT
-			login_descriptors=login_descriptors
+			login_descriptors=login_descriptors,
+			ident=ident,
+			requested_session_expiration=expiration,
 		)
-		login_session.Data["requested_session_expiration"] = expiration
-		login_session.Data["ident"] = ident
 
 		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 
@@ -148,7 +148,7 @@ class AuthenticationHandler(object):
 			await self.AuthenticationService.delete_login_session(lsid)
 			L.warning("Login failed: no more attempts", struct_data={
 				"lsid": lsid,
-				"ident": login_session.Data["ident"],
+				"ident": login_session.Ident,
 				"cid": login_session.CredentialsId
 			})
 			return asab.web.rest.json_response(
@@ -184,7 +184,7 @@ class AuthenticationHandler(object):
 
 			L.warning("Login failed: authentication failed", struct_data={
 				"lsid": lsid,
-				"ident": login_session.Data["ident"],
+				"ident": login_session.Ident,
 				"cid": login_session.CredentialsId
 			})
 
