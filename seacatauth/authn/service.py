@@ -53,24 +53,27 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 
 
 class AuthenticationService(asab.Service):
+	# TODO: Introduce configurable LoginSession provider (MongoDB x in-memory dict)
+	LoginSessionCollection = "ls"
 
-	def __init__(self, app, service_name='seacatauth.AuthenticationService'):
+	def __init__(self, app, service_name="seacatauth.AuthenticationService"):
 		super().__init__(app, service_name)
 
-		self.SessionService = app.get_service('seacatauth.SessionService')
-		self.CredentialsService = app.get_service('seacatauth.CredentialsService')
-		self.TenantService = app.get_service('seacatauth.TenantService')
-		self.RoleService = app.get_service('seacatauth.RoleService')
-		self.ResourceService = app.get_service('seacatauth.ResourceService')
-		self.AuditService = app.get_service('seacatauth.AuditService')
-		self.CommunicationService = app.get_service('seacatauth.CommunicationService')
-		self.MetricsService = app.get_service('asab.MetricsService')
+		self.StorageService = app.get_service("asab.StorageService")
+		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.ResourceService = app.get_service("seacatauth.ResourceService")
+		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
+		self.MetricsService = app.get_service("asab.MetricsService")
 
 		self.LoginAttempts = asab.Config.getint("seacatauth:authentication", "login_attempts")
 		self.LoginSessionExpiration = asab.Config.getseconds("seacatauth:authentication", "login_session_expiration")
 
-		self.LoginDescriptors = None
 		self.LoginFactors = {}
+		self.LoginDescriptors = None
 		self.LoginDescriptorFallback = [
 			LoginDescriptor.build(self, config)
 			for config
@@ -89,9 +92,6 @@ class AuthenticationService(asab.Service):
 		else:
 			self.EnforceFactors = None
 
-		# TODO: introduce LoginSession providers
-		self.LoginSessions = {}
-
 		# Metrics - login counters
 		self.LoginCounter = self.MetricsService.create_counter(
 			"logins",
@@ -99,10 +99,12 @@ class AuthenticationService(asab.Service):
 			init_values={"successful": 0, "failed": 0}
 		)
 
-		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)
+		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+
 
 	async def _on_tick(self, event_name):
-		await self.delete_expired_sessions()
+		await self.delete_expired_login_sessions()
+
 
 	def _load_global_descriptors(self):
 		descriptor_file = asab.Config.get("seacatauth:authentication", "descriptor_file")
@@ -119,42 +121,85 @@ class AuthenticationService(asab.Service):
 			in descriptors_config
 		]
 
+
 	async def create_login_session(
 		self,
 		credentials_id,
 		client_public_key,
-		login_descriptors=None
+		ident,
+		login_descriptors=None,
+		requested_session_expiration=None,
+		data=None,
 	):
 		# Prepare the login session
-		login_session = LoginSession(
+		login_session = LoginSession.build(
 			client_login_key=client_public_key,
 			credentials_id=credentials_id,
+			ident=ident,
 			login_descriptors=login_descriptors,
 			login_attempts=self.LoginAttempts,
-			login_expiration=self.LoginSessionExpiration
+			timeout=self.LoginSessionExpiration,
+			requested_session_expiration=requested_session_expiration,
+			data=data,
 		)
 
-		self.LoginSessions[login_session.Id] = login_session
+		upsertor = self.StorageService.upsertor(self.LoginSessionCollection, login_session.Id)
+
+		for k, v in login_session.serialize().items():
+			upsertor.set(k, v)
+
+		await upsertor.execute()
 
 		return login_session
 
+
 	async def get_login_session(self, login_session_id):
-		return self.LoginSessions[login_session_id]
+		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
+		login_session = LoginSession.deserialize(self, ls_data)
+		if login_session.ExpiresAt < datetime.datetime.utcnow():
+			raise KeyError("Login session expired")
+		return login_session
+
+
+	async def update_login_session(self, login_session_id, *, data=None, remaining_login_attempts=None):
+		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
+		if ls_data["exp"] < datetime.datetime.utcnow():
+			raise KeyError("Login session expired")
+
+		upsertor = self.StorageService.upsertor(
+			self.LoginSessionCollection,
+			obj_id=login_session_id,
+			version=ls_data["_v"]
+		)
+		if data is not None:
+			upsertor.set("d", data)
+		if remaining_login_attempts is not None:
+			upsertor.set("la", remaining_login_attempts)
+
+		await upsertor.execute()
+		L.info(asab.LOG_NOTICE, "Login session updated", struct_data={
+			"lsid": login_session_id,
+		})
+		return True
+
 
 	async def delete_login_session(self, login_session_id):
-		if login_session_id in self.LoginSessions:
-			L.info("Login session deleted", struct_data={
-				"lsid": login_session_id
-			})
-			del self.LoginSessions[login_session_id]
+		await self.StorageService.delete(self.LoginSessionCollection, login_session_id)
+		L.info("Login session deleted", struct_data={
+			"lsid": login_session_id
+		})
 
-	async def delete_expired_sessions(self):
-		delete_ids = []
-		for lsid, session in self.LoginSessions.items():
-			if session.ExpiresAt <= datetime.datetime.utcnow():
-				delete_ids.append(lsid)
-		for lsid in delete_ids:
-			await self.delete_login_session(lsid)
+
+	async def delete_expired_login_sessions(self):
+		collection = self.StorageService.Database[self.LoginSessionCollection]
+
+		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.info("Expired login sessions deleted", struct_data={
+				"count": result.deleted_count
+			})
+
 
 	async def prepare_login_descriptors(self, credentials_id, request_headers, login_preferences=None):
 		return await self._prepare_login_descriptors(
@@ -211,12 +256,12 @@ class AuthenticationService(asab.Service):
 			return None
 		return ready_login_descriptors
 
-	def get_login_factor(self, factor_id):
-		return self.LoginFactors.get(factor_id)
+	def get_login_factor(self, factor_type):
+		return self.LoginFactors[factor_type]
 
 	def create_login_factor(self, factor_config):
-		self.LoginFactors[factor_config["id"]] = login_factor_builder(self, factor_config)
-		return self.LoginFactors[factor_config["id"]]
+		self.LoginFactors[factor_config["type"]] = login_factor_builder(self, factor_config)
+		return self.LoginFactors[factor_config["type"]]
 
 	async def authenticate(self, login_session, request_data):
 		"""
@@ -278,7 +323,7 @@ class AuthenticationService(asab.Service):
 
 		session = await self.SessionService.create_session(
 			session_type="root",
-			expiration=login_session.Data.get("requested_session_expiration"),
+			expiration=login_session.RequestedSessionExpiration,
 			session_builders=session_builders,
 		)
 		L.log(
@@ -286,7 +331,7 @@ class AuthenticationService(asab.Service):
 			"Authentication/login successful.",
 			struct_data={
 				'cid': login_session.CredentialsId,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
@@ -297,7 +342,7 @@ class AuthenticationService(asab.Service):
 			AuditCode.LOGIN_SUCCESS,
 			{
 				'cid': login_session.CredentialsId,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
@@ -349,7 +394,7 @@ class AuthenticationService(asab.Service):
 			"Authentication/login successful.",
 			struct_data={
 				'cid': credentials_id,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
@@ -360,7 +405,7 @@ class AuthenticationService(asab.Service):
 			AuditCode.LOGIN_SUCCESS,
 			{
 				'cid': credentials_id,
-				'sid': str(session.SessionId),
+				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)

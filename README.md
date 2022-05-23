@@ -10,14 +10,14 @@ SeaCat Auth provides a rich REST API [documented in a Postman collection](./doc/
 ## Features
 
 * Authentication
-  * Second-factor / Multi-factor
+  * Second-factor Authentication (2FA) / [Multi-factor Authentication](https://en.wikipedia.org/wiki/Multi-factor_authentication) (MFA)
   * Supported factors:
     * Password
+    * [FIDO2](https://en.wikipedia.org/wiki/FIDO2_Project) / [Webauthn](https://en.wikipedia.org/wiki/WebAuthn)
     * [Time-based One-Time Password](https://en.wikipedia.org/wiki/Time-based_One-Time_Password) (TOTP)
     * SMS code
     * Subnet (ROADMAP)
     * Request header (X-Header)
-    * [YubiKey](https://www.yubico.com) (beta)
   * Machine-to-Machine
     * API keys (ROADMAP)
 &nbsp;

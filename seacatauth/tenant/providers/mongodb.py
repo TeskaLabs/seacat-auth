@@ -204,15 +204,6 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		"""
 		Unassign credentials from tenant
 		"""
-		# Unassign tenant roles
-		role_svc = self.App.get_service("seacatauth.RoleService")
-		await role_svc.set_roles(
-			credentials_id,
-			tenant_scope={tenant},
-			roles=[]
-		)
-
-		# Unassign the tenant
 		assignment_id = "{} {}".format(credentials_id, tenant)
 		try:
 			await self.MongoDBStorageService.delete(self.AssignCollection, obj_id=assignment_id)

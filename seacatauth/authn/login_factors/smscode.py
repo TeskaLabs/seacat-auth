@@ -36,11 +36,12 @@ class SMSCodeFactor(LoginFactorABC):
 		"""
 		# If SMS Token is not present, generate it
 		# Otherwise just resend the existing one
-		if self.ID not in login_session.Data:
-			login_session.Data[self.ID] = {
+		if self.Type not in login_session.Data:
+			login_session.Data[self.Type] = {
 				"token": generate_ergonomic_token(length=6)
 			}
-		token = login_session.Data[self.ID]["token"]
+		token = login_session.Data[self.Type]["token"]
+		await self.AuthenticationService.update_login_session(login_session.Id, data=login_session.Data)
 
 		# Get phone number
 		cred_svc = self.AuthenticationService.CredentialsService
@@ -60,10 +61,10 @@ class SMSCodeFactor(LoginFactorABC):
 		return True
 
 	async def authenticate(self, login_session, request_data) -> bool:
-		if self.ID not in request_data or self.ID not in login_session.Data:
+		if self.Type not in request_data or self.Type not in login_session.Data:
 			return False
-		user_input = request_data[self.ID].strip()
-		token = login_session.Data[self.ID]["token"]
+		user_input = request_data[self.Type].strip()
+		token = login_session.Data[self.Type]["token"]
 		if token is not None and user_input == token:
 			return True
 		return False

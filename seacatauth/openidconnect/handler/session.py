@@ -32,9 +32,9 @@ class SessionHandler(object):
 		if session is None:
 			return aiohttp.web.HTTPNotFound()
 
-		if session.ParentSessionId is not None:
+		if session.Session.ParentId is not None:
 			try:
-				parent_session = await self.SessionService.get(session.ParentSessionId)
+				parent_session = await self.SessionService.get(session.Session.ParentId)
 			except KeyError:
 				parent_session = None
 		else:
@@ -42,13 +42,13 @@ class SessionHandler(object):
 
 		if parent_session is not None:
 			# Delete the root session which will also remove this session
-			await self.SessionService.delete(parent_session.SessionId)
+			await self.SessionService.delete(parent_session.Session.Id)
 		else:
 			# Back compat: This can occur with old sessions
 			L.warning("OIDC session has no parent session", struct_data={
-				"sid": session.SessionId,
-				"parent_sid": session.ParentSessionId,
+				"sid": session.Session.Id,
+				"parent_sid": session.Session.ParentId,
 			})
-			await self.SessionService.delete(session.SessionId)
+			await self.SessionService.delete(session.Session.Id)
 
 		return aiohttp.web.Response(text="", content_type="text/html")
