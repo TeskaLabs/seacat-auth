@@ -1,5 +1,13 @@
 import aiohttp.web
 import asab
+import logging
+
+
+#
+
+L = logging.getLogger(__name__)
+
+#
 
 
 def app_middleware_factory(app):
@@ -23,7 +31,7 @@ def private_auth_middleware_factory(app):
 	rbac_svc = app.get_service("seacatauth.RBACService")
 
 	@aiohttp.web.middleware
-	async def auth_middleware(request, handler):
+	async def private_auth_middleware(request, handler):
 		"""
 		Authenticate and authorize all incoming requests.
 		Raise HTTP 401 if authentication or authorization fails.
@@ -34,7 +42,6 @@ def private_auth_middleware_factory(app):
 		[asab:api:auth]
 		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-Z0
 		"""
-
 		try:
 			# Authorize by OAuth Bearer token
 			# (Authorization by cookie is not allowed for API access)
@@ -81,14 +88,14 @@ def private_auth_middleware_factory(app):
 
 		raise aiohttp.web.HTTPUnauthorized()
 
-	return auth_middleware
+	return private_auth_middleware
 
 
 def public_auth_middleware_factory(app):
 	cookie_service = app.get_service("seacatauth.CookieService")
 
 	@aiohttp.web.middleware
-	async def auth_middleware(request, handler):
+	async def public_auth_middleware(request, handler):
 		"""
 		Try to authenticate before accessing public endpoints.
 		"""
@@ -98,4 +105,4 @@ def public_auth_middleware_factory(app):
 
 		return await handler(request)
 
-	return auth_middleware
+	return public_auth_middleware
