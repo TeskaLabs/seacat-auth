@@ -3,14 +3,11 @@ import urllib.parse
 import datetime
 
 import aiohttp.web
-import base64
-import json
-import hmac
-import hashlib
-import secrets
 
 import asab
 import asab.web.rest
+import asab.web.rest.json
+
 import jwcrypto.jwk
 import jwcrypto.jwt
 
@@ -23,17 +20,6 @@ L = logging.getLogger(__name__)
 #
 
 
-class _DateTimeEncoder(json.JSONEncoder):
-	def default(self, z):
-		if isinstance(z, datetime.datetime):
-			if z.tzinfo is not None and z.tzinfo.utcoffset(z) is not None:
-				return z.isoformat()
-			else:
-				return "{}Z".format(z.isoformat())
-		else:
-			return super().default(z)
-
-
 class TokenHandler(object):
 
 
@@ -41,6 +27,8 @@ class TokenHandler(object):
 		self.OpenIdConnectService = oidc_svc
 		self.SessionService = app.get_service('seacatauth.SessionService')
 		self.CredentialsService = app.get_service('seacatauth.CredentialsService')
+
+		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/openidconnect/token', self.token_request)
@@ -158,7 +146,7 @@ class TokenHandler(object):
 
 		token = jwcrypto.jwt.JWT(
 			header=header,
-			claims=json.dumps(payload, cls=_DateTimeEncoder).encode("ascii")
+			claims=self.JSONDumper(payload)
 		)
 		token.make_signed_token(self.OpenIdConnectService.PrivateKey)
 		id_token = token.serialize()
