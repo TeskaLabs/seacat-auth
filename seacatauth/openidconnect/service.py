@@ -1,5 +1,6 @@
 import datetime
 import json
+import os.path
 import re
 import base64
 import secrets
@@ -32,15 +33,10 @@ L = logging.getLogger(__name__)
 
 class OpenIdConnectService(asab.Service):
 
-	asab.Config.add_defaults(
-		{
-		}
-	)
-
 	# Bearer token Regex is based on RFC 6750
 	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
 	# Chapter 2.1. Authorization Request Header Field
-	AuthorizationHeaderRg = re.compile(r"^\s*Bearer ([A-Za-z0-9\-\.\+_~/=]*)")
+	AuthorizationHeaderRg = re.compile(r"^\s*Bearer ([-A-Za-z0-9.+_~/=]*)")
 	AuthorizationCodeCollection = "ac"
 
 
@@ -64,19 +60,67 @@ class OpenIdConnectService(asab.Service):
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
 
-		private_key_path = asab.Config.get("openidconnect", "private_key")
-		# TODO: If private_key_path does not exist, generate a new private key
-		with open(private_key_path, "rb") as f:
-			# TODO: Possibly with password
-			self.PrivateKey = jwcrypto.jwk.JWK.from_pem(f.read())
-			assert self.PrivateKey.key_type == "EC"
-			assert self.PrivateKey.key_curve == "P-256"
+		self.PrivateKey = self._prepare_private_key()
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
 	async def _on_tick(self, event_name):
 		await self.delete_expired_authorization_codes()
+
+
+	def _prepare_private_key(self):
+		"""
+		Load private key from file.
+		If it does not exist, generate a new one and write to file.
+		"""
+		# TODO: Add encryption option
+		# TODO: Multiple key support
+		private_key_path = asab.Config.get("openidconnect", "private_key")
+		if len(private_key_path) == 0:
+			# Use config folder
+			private_key_path = os.path.join(
+				os.path.dirname(asab.Config.get("general", "config_file")),
+				"private-key.pem"
+			)
+			L.log(
+				asab.LOG_NOTICE,
+				"OpenIDConnect private key file not specified. Defaulting to '{}'.".format(private_key_path)
+			)
+
+		if os.path.isfile(private_key_path):
+			with open(private_key_path, "rb") as f:
+				private_key = jwcrypto.jwk.JWK.from_pem(f.read())
+		else:
+			# Generate a new private key
+			L.log(
+				asab.LOG_NOTICE,
+				"OpenIDConnect private key file does not exist. Generating a new one."
+			)
+			import cryptography.hazmat.backends
+			import cryptography.hazmat.primitives.serialization
+			import cryptography.hazmat.primitives.asymmetric.ec
+			import cryptography.hazmat.primitives.ciphers.algorithms
+			_private_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
+				cryptography.hazmat.primitives.asymmetric.ec.SECP256R1(),
+				cryptography.hazmat.backends.default_backend()
+			)
+			# Serialize into PEM
+			private_pem = _private_key.private_bytes(
+				encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+				format=cryptography.hazmat.primitives.serialization.PrivateFormat.PKCS8,
+				encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption()
+			)
+			with open(private_key_path, "wb") as f:
+				f.write(private_pem)
+			L.log(
+				asab.LOG_NOTICE,
+				"New private key written to '{}'.".format(private_key_path)
+			)
+			private_key = jwcrypto.jwk.JWK.from_pem(private_pem)
+		assert private_key.key_type == "EC"
+		assert private_key.key_curve == "P-256"
+		return private_key
 
 
 	async def generate_authorization_code(self, session_id):
