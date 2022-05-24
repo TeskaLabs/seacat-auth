@@ -256,7 +256,10 @@ class OpenIdConnectService(asab.Service):
 			userinfo["phone_number"] = session.Credentials.Phone
 
 		if session.Credentials.ModifiedAt is not None:
-			userinfo["updated_at"] = session.Credentials.ModifiedAt
+			userinfo["updated_at"] = session.Credentials.ModifiedAt.timestamp()
+
+		if session.Credentials.CreatedAt is not None:
+			userinfo["created_at"] = session.Credentials.CreatedAt.timestamp()
 
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet
@@ -310,9 +313,9 @@ class OpenIdConnectService(asab.Service):
 
 		if last_login is not None:
 			if "fat" in last_login:
-				userinfo["last_failed_login"] = last_login["fat"]
+				userinfo["last_failed_login"] = last_login["fat"].timestamp()
 			if "sat" in last_login:
-				userinfo["last_successful_login"] = last_login["sat"]
+				userinfo["last_successful_login"] = last_login["sat"].timestamp()
 
 		# If tenant is missing or unknown, consider only global roles and resources
 		if tenant not in session.Authorization.Authz:
