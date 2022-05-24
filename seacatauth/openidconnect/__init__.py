@@ -7,6 +7,7 @@ from .handler.token import TokenHandler
 from .handler.userinfo import UserInfoHandler
 from .handler.introspect import TokenIntrospectionHandler
 from .handler.session import SessionHandler
+from .handler.keys import KeysHandler
 
 
 class OpenIdConnectModule(asab.Module):
@@ -42,3 +43,4 @@ class OpenIdConnectModule(asab.Module):
 			self.CredentialsService
 		)
 		self.SessionHandler = SessionHandler(app, self.OpenIdConnectService, self.SessionService)
+		self.KeysHandler = KeysHandler(app, self.OpenIdConnectService)
