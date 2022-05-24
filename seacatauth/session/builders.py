@@ -20,6 +20,7 @@ async def credentials_session_builder(credentials_service, credentials_id):
 		(SessionAdapter.FN.Credentials.Phone, credentials.get("phone")),
 		(SessionAdapter.FN.Credentials.CreatedAt, credentials.get("_c")),
 		(SessionAdapter.FN.Credentials.ModifiedAt, credentials.get("_m")),
+		(SessionAdapter.FN.Authentication.ExternalLoginOptions, credentials.get("external_login")),
 	)
 
 
