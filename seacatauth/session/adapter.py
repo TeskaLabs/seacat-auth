@@ -327,17 +327,15 @@ class SessionAdapter:
 	def _deserialize_oauth2_data(cls, session_dict):
 		oa2_data = session_dict.pop("oa", {})  # BACK COMPAT
 		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
-		if id_token is None:
-			return
+		if id_token is not None:
+			id_token = id_token.decode("ascii")
 
-		id_token = base64.urlsafe_b64encode(id_token).decode("ascii")
-
-		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken) or oa2_data.pop("Ta", None)
+		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:
 			# Base64-encode the tokens for OIDC service convenience
 			access_token = base64.urlsafe_b64encode(access_token).decode("ascii")
 
-		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken) or oa2_data.pop("Tr", None)
+		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken, None) or oa2_data.pop("Tr", None)
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 

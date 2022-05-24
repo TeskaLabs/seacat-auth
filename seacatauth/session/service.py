@@ -150,7 +150,7 @@ class SessionService(asab.Service):
 			session_builders = list()
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				if key in SessionAdapter.SensitiveFields:
+				if key in SessionAdapter.SensitiveFields and value is not None:
 					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 				upsertor.set(key, value)
 

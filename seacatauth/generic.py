@@ -116,7 +116,7 @@ async def nginx_introspection(
 
 	# Set the authorization header
 	headers = {
-		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2.AccessToken)  # TODO: ID token instead
+		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2.IDToken)
 	}
 
 	# Add headers

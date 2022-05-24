@@ -12,6 +12,7 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwt
 import jwcrypto.jwk
+import jwcrypto.jws
 
 from ..session import SessionAdapter
 from ..session import (
@@ -61,6 +62,8 @@ class OpenIdConnectService(asab.Service):
 		)
 
 		self.PrivateKey = self._prepare_private_key()
+
+		self.APIAllowAccessToken = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
@@ -160,18 +163,19 @@ class OpenIdConnectService(asab.Service):
 		return session_id
 
 
-	async def get_session_by_bearer_token(self, bearer_token: str):
-		# Extract the access token
-		am = self.AuthorizationHeaderRg.match(bearer_token)
-		if am is None:
+	async def get_session_by_access_token(self, auth_header: str):
+		match = self.AuthorizationHeaderRg.match(auth_header)
+		if match is None:
 			L.warning("Access Token is invalid")
 			return None
 
+		token_string = match.group(1)
+
 		# Decode the access token
 		try:
-			access_token = base64.urlsafe_b64decode(am.group(1))
+			access_token = base64.urlsafe_b64decode(token_string)
 		except ValueError:
-			L.warning("Access Token is not base64: '{}'".format(am.group(1)))
+			L.info("Access Token is not base64: '{}'".format(token_string))
 			return None
 
 		# Locate the session
@@ -183,32 +187,34 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	async def build_session_from_id_token(self, bearer_token: str):
-		# Extract the access token
-		token_value = self.AuthorizationHeaderRg.match(bearer_token)
-		if token_value is None:
+	def build_session_from_id_token(self, auth_header: str):
+		match = self.AuthorizationHeaderRg.match(auth_header)
+		if match is None:
 			L.warning("Access Token is invalid")
 			return None
 
-		id_token = token_value.group(1)
-		# Create the session
+		token_string = match.group(1)
+
 		try:
-			id_info = jwcrypto.jwt.JWT(jwt=id_token, key=self.PrivateKey)
-		except ValueError:
-			L.warning("Cannot verify ID Token")
-			return None
+			token = jwcrypto.jwt.JWT(jwt=token_string, key=self.PrivateKey)
 		except jwcrypto.jwt.JWTExpired:
 			L.warning("ID Token expired")
 			return None
-
-		try:
-			payload = id_info.token.objects.get("payload")
-			data_dict = json.loads(payload)
-		except ValueError:
-			L.warning("Cannot read ID token data")
+		except jwcrypto.jws.InvalidJWSSignature:
+			L.warning("Invalid ID Token signature")
 			return None
 
-		session = SessionAdapter.from_id_token(self.SessionService, data_dict)
+		try:
+			data_dict = json.loads(token.claims)
+		except ValueError:
+			L.warning("Cannot read ID token claims")
+			return None
+
+		try:
+			session = SessionAdapter.from_id_token(self.SessionService, data_dict)
+		except ValueError:
+			L.warning("Cannot build session from ID token data")
+			return None
 
 		return session
 
@@ -217,21 +223,17 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Find session by token in the authorization header
 		"""
-		# Get authorization header
-		authorization_bytes = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
-		if authorization_bytes is None:
-			L.info("Access Token not provided in the header")
-			return None
-
-		try:
-			# TODO: Disable this. Allow only in dev mode
-			session = await self.get_session_by_bearer_token(authorization_bytes)
-		except ValueError:
-			session = None
-
-		if session is None:
-			session = await self.build_session_from_id_token(authorization_bytes)
-		return session
+		auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
+		if auth_header is None:
+			L.info("Bearer token not provided in Authorization header")
+		else:
+			# Authorize by OAuth ID token
+			try:
+				return self.build_session_from_id_token(auth_header)
+			except ValueError:
+				# If the header is not ID token, try treating it as access token IF ALLOWED
+				if self.APIAllowAccessToken:
+					return await self.get_session_by_access_token(auth_header)
 
 
 	def refresh_token(self, refresh_token, client_id, client_secret, scope):
