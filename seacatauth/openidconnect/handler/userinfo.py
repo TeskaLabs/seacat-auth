@@ -55,8 +55,6 @@ class UserInfoHandler(object):
 			session,
 			tenant=request.query.get("tenant", "*")
 		)
-		if userinfo["result"] == "CREDENTIALS-NOT-FOUND":
-			return self.error_response("invalid_credentials", "Invalid credentials.")
 
 		return asab.web.rest.json_response(request, userinfo)
 
