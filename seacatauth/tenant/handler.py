@@ -105,7 +105,7 @@ class TenantHandler(object):
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
 		"patternProperties": {
-			"^.+$": {"anyOf": [
+			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
 				{"type": "string"},
 				{"type": "number"},
 				{"type": "boolean"},
