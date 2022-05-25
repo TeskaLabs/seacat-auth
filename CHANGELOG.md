@@ -2,6 +2,11 @@
 
 ## Release candidate
 
+### Features
+- Custom credentials data (#40, PLUM Sprint 220520)
+
+---
+
 
 ## v22.21
 
