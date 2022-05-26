@@ -61,7 +61,7 @@ class OpenIdConnectService(asab.Service):
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
 
-		self.PrivateKey = self._prepare_private_key()
+		self.PrivateKey = self._load_private_key()
 
 		self.APIAllowAccessToken = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 
@@ -72,7 +72,7 @@ class OpenIdConnectService(asab.Service):
 		await self.delete_expired_authorization_codes()
 
 
-	def _prepare_private_key(self):
+	def _load_private_key(self):
 		"""
 		Load private key from file.
 		If it does not exist, generate a new one and write to file.
@@ -94,35 +94,48 @@ class OpenIdConnectService(asab.Service):
 		if os.path.isfile(private_key_path):
 			with open(private_key_path, "rb") as f:
 				private_key = jwcrypto.jwk.JWK.from_pem(f.read())
-		else:
+		elif self.App.Provisioning:
 			# Generate a new private key
-			L.log(
-				asab.LOG_NOTICE,
+			L.warning(
 				"OpenIDConnect private key file does not exist. Generating a new one."
 			)
-			import cryptography.hazmat.backends
-			import cryptography.hazmat.primitives.serialization
-			import cryptography.hazmat.primitives.asymmetric.ec
-			import cryptography.hazmat.primitives.ciphers.algorithms
-			_private_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
-				cryptography.hazmat.primitives.asymmetric.ec.SECP256R1(),
-				cryptography.hazmat.backends.default_backend()
+			private_key = self._generate_private_key(private_key_path)
+		else:
+			L.error(
+				"Private key file '{}' does not exist. "
+				"Run the app in provisioning mode to generate a new private key.".format(private_key_path)
 			)
-			# Serialize into PEM
-			private_pem = _private_key.private_bytes(
-				encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
-				format=cryptography.hazmat.primitives.serialization.PrivateFormat.PKCS8,
-				encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption()
-			)
-			with open(private_key_path, "wb") as f:
-				f.write(private_pem)
-			L.log(
-				asab.LOG_NOTICE,
-				"New private key written to '{}'.".format(private_key_path)
-			)
-			private_key = jwcrypto.jwk.JWK.from_pem(private_pem)
+			raise FileNotFoundError(private_key_path)
+
 		assert private_key.key_type == "EC"
 		assert private_key.key_curve == "P-256"
+		return private_key
+
+
+	def _generate_private_key(self, private_key_path):
+		assert not os.path.isfile(private_key_path)
+
+		import cryptography.hazmat.backends
+		import cryptography.hazmat.primitives.serialization
+		import cryptography.hazmat.primitives.asymmetric.ec
+		import cryptography.hazmat.primitives.ciphers.algorithms
+		_private_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
+			cryptography.hazmat.primitives.asymmetric.ec.SECP256R1(),
+			cryptography.hazmat.backends.default_backend()
+		)
+		# Serialize into PEM
+		private_pem = _private_key.private_bytes(
+			encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+			format=cryptography.hazmat.primitives.serialization.PrivateFormat.PKCS8,
+			encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption()
+		)
+		with open(private_key_path, "wb") as f:
+			f.write(private_pem)
+		L.log(
+			asab.LOG_NOTICE,
+			"New private key written to '{}'.".format(private_key_path)
+		)
+		private_key = jwcrypto.jwk.JWK.from_pem(private_pem)
 		return private_key
 
 
