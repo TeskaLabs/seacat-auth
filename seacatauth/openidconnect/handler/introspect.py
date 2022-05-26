@@ -1,7 +1,6 @@
 import urllib
 import logging
 
-import aiohttp
 import asab
 import asab.web.rest
 
