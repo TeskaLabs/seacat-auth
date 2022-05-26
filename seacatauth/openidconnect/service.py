@@ -37,9 +37,7 @@ class OpenIdConnectService(asab.Service):
 	# Bearer token Regex is based on RFC 6750
 	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
 	# Chapter 2.1. Authorization Request Header Field
-	AuthorizationHeaderRg = re.compile(r"^\s*Bearer ([-A-Za-z0-9.+_~/=]*)")
 	AuthorizationCodeCollection = "ac"
-
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
