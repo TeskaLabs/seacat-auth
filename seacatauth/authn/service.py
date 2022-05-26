@@ -177,7 +177,7 @@ class AuthenticationService(asab.Service):
 			upsertor.set("la", remaining_login_attempts)
 
 		await upsertor.execute()
-		L.info(asab.LOG_NOTICE, "Login session updated", struct_data={
+		L.info("Login session updated", struct_data={
 			"lsid": login_session_id,
 		})
 		return True
