@@ -5,7 +5,7 @@ import aiohttp
 import asab
 import asab.web.rest
 
-from ...generic import nginx_introspection
+from ...generic import nginx_introspection, get_bearer_token_value
 
 #
 
@@ -68,11 +68,10 @@ class TokenIntrospectionHandler(object):
 
 
 	async def authenticate_request(self, request):
-		auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
-		if auth_header is None:
-			L.info("Bearer token not provided in Authorization header")
+		token_value = get_bearer_token_value(request)
+		if token_value is None:
 			return None
-		return await self.OpenIdConnectService.get_session_by_access_token(auth_header)
+		return await self.OpenIdConnectService.get_session_by_access_token(token_value)
 
 
 	async def introspect_nginx(self, request):
