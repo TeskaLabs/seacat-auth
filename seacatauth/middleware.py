@@ -2,6 +2,7 @@ import aiohttp.web
 import asab
 import logging
 
+from seacatauth.generic import get_bearer_token_value
 
 #
 
@@ -27,6 +28,7 @@ def private_auth_middleware_factory(app):
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	require_authentication = asab.Config.getboolean("seacat:api", "require_authentication")
 	authorization_resource = asab.Config.get("seacat:api", "authorization_resource")
+	allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 
 	rbac_svc = app.get_service("seacatauth.RBACService")
 
@@ -42,12 +44,17 @@ def private_auth_middleware_factory(app):
 		[asab:api:auth]
 		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-Z0
 		"""
-		try:
-			# Authorize by OAuth Bearer token
-			# (Authorization by cookie is not allowed for API access)
-			request.Session = await oidc_service.get_session_from_authorization_header(request)
-		except KeyError:
-			request.Session = None
+		request.Session = None
+		token_value = get_bearer_token_value(request)
+		if token_value is not None:
+			try:
+				request.Session = await oidc_service.build_session_from_id_token(token_value)
+			except ValueError:
+				# If the token cannot be parsed as ID token, it may be an Access token
+				if allow_access_token_auth:
+					request.Session = await oidc_service.get_session_by_access_token(token_value)
+				else:
+					L.info("Invalid Bearer token")
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
 			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource]) == "OK"

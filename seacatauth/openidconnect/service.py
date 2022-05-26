@@ -63,8 +63,6 @@ class OpenIdConnectService(asab.Service):
 
 		self.PrivateKey = self._load_private_key()
 
-		self.APIAllowAccessToken = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
-
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
@@ -176,19 +174,12 @@ class OpenIdConnectService(asab.Service):
 		return session_id
 
 
-	async def get_session_by_access_token(self, auth_header: str):
-		match = self.AuthorizationHeaderRg.match(auth_header)
-		if match is None:
-			L.warning("Access token is invalid")
-			return None
-
-		token_string = match.group(1)
-
+	async def get_session_by_access_token(self, token_value):
 		# Decode the access token
 		try:
-			access_token = base64.urlsafe_b64decode(token_string)
+			access_token = base64.urlsafe_b64decode(token_value)
 		except ValueError:
-			L.info("Access token is not base64: '{}'".format(token_string))
+			L.info("Access token is not base64: '{}'".format(token_value))
 			return None
 
 		# Locate the session
@@ -200,16 +191,9 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	def build_session_from_id_token(self, auth_header: str):
-		match = self.AuthorizationHeaderRg.match(auth_header)
-		if match is None:
-			L.warning("Access token is invalid")
-			return None
-
-		token_string = match.group(1)
-
+	def build_session_from_id_token(self, token_value):
 		try:
-			token = jwcrypto.jwt.JWT(jwt=token_string, key=self.PrivateKey)
+			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
 		except jwcrypto.jwt.JWTExpired:
 			L.warning("ID token expired")
 			return None
@@ -230,23 +214,6 @@ class OpenIdConnectService(asab.Service):
 			return None
 
 		return session
-
-
-	async def get_session_from_authorization_header(self, request):
-		"""
-		Find session by token in the authorization header
-		"""
-		auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
-		if auth_header is None:
-			L.info("Bearer token not provided in Authorization header")
-		else:
-			# Authorize by OAuth ID token
-			try:
-				return self.build_session_from_id_token(auth_header)
-			except ValueError:
-				# If the header is not ID token, try treating it as access token IF ALLOWED
-				if self.APIAllowAccessToken:
-					return await self.get_session_by_access_token(auth_header)
 
 
 	def refresh_token(self, refresh_token, client_id, client_secret, scope):

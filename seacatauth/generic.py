@@ -12,6 +12,19 @@ L = logging.getLogger(__name__)
 #
 
 
+def get_bearer_token_value(request):
+	bearer_prefix = "Bearer "
+	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
+	if auth_header is None:
+		L.info("Request has no Authorization header")
+		return None
+	if auth_header.startswith(bearer_prefix):
+		return auth_header[len(bearer_prefix):]
+	else:
+		L.info("No Bearer token in Authorization header")
+		return None
+
+
 async def add_to_header(headers, attributes_to_add, session, credentials_service, requested_tenant=None):
 	"""
 	Prepare a common header with:
