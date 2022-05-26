@@ -1,7 +1,6 @@
 import datetime
 import json
 import os.path
-import re
 import base64
 import secrets
 import logging
