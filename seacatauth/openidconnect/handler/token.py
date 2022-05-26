@@ -241,7 +241,7 @@ class TokenHandler(object):
 	})
 	async def token_refresh(self, request, *, json_data):
 		"""
-		6.  Refreshing an Access Token
+		6.  Refreshing an Access token
 		"""
 		# TODO: this is not implemented
 

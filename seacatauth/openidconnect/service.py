@@ -179,7 +179,7 @@ class OpenIdConnectService(asab.Service):
 	async def get_session_by_access_token(self, auth_header: str):
 		match = self.AuthorizationHeaderRg.match(auth_header)
 		if match is None:
-			L.warning("Access Token is invalid")
+			L.warning("Access token is invalid")
 			return None
 
 		token_string = match.group(1)
@@ -188,7 +188,7 @@ class OpenIdConnectService(asab.Service):
 		try:
 			access_token = base64.urlsafe_b64decode(token_string)
 		except ValueError:
-			L.info("Access Token is not base64: '{}'".format(token_string))
+			L.info("Access token is not base64: '{}'".format(token_string))
 			return None
 
 		# Locate the session
@@ -203,7 +203,7 @@ class OpenIdConnectService(asab.Service):
 	def build_session_from_id_token(self, auth_header: str):
 		match = self.AuthorizationHeaderRg.match(auth_header)
 		if match is None:
-			L.warning("Access Token is invalid")
+			L.warning("Access token is invalid")
 			return None
 
 		token_string = match.group(1)
@@ -211,10 +211,10 @@ class OpenIdConnectService(asab.Service):
 		try:
 			token = jwcrypto.jwt.JWT(jwt=token_string, key=self.PrivateKey)
 		except jwcrypto.jwt.JWTExpired:
-			L.warning("ID Token expired")
+			L.warning("ID token expired")
 			return None
 		except jwcrypto.jws.InvalidJWSSignature:
-			L.warning("Invalid ID Token signature")
+			L.warning("Invalid ID token signature")
 			return None
 
 		try:
