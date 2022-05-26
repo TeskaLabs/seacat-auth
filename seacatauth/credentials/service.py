@@ -38,9 +38,6 @@ class CredentialsService(asab.Service):
 
 		self.IdentFields = self._prepare_ident_fields(asab.Config.get("seacatauth:credentials", "ident_fields"))
 
-		# from .google.handler import GoogleOAuth2Handler
-		# self.GoogleOAuth2Handler = GoogleOAuth2Handler(app)
-
 		# Iterate over config and create all providers
 		relevant_sections = [s for s in asab.Config.sections() if s.startswith("seacatauth:credentials:")]
 		providers = []
@@ -51,24 +48,27 @@ class CredentialsService(asab.Service):
 
 			# Ensure that providers are loaded when they are needed
 			if svc_name not in app.Services:
-				if svc_name == 'seacatauth.credentials.htpasswd':
+				if svc_name == "seacatauth.credentials.htpasswd":
 					from .providers.htpasswd import HTPasswdCredentialsService
 					HTPasswdCredentialsService(app)
-				elif svc_name == 'seacatauth.credentials.dict':
+				elif svc_name == "seacatauth.credentials.dict":
 					from .providers.dictionary import DictCredentialsService
 					DictCredentialsService(app)
-				elif svc_name == 'seacatauth.credentials.mongodb':
+				elif svc_name == "seacatauth.credentials.mongodb":
 					from .providers.mongodb import MongoDBCredentialsService
 					MongoDBCredentialsService(app)
-				elif svc_name == 'seacatauth.credentials.m2m':
+				elif svc_name == "seacatauth.credentials.m2m":
 					from .providers.m2m_mongodb import M2MMongoDBCredentialsService
 					M2MMongoDBCredentialsService(app)
-				elif svc_name == 'seacatauth.credentials.ldap':
+				elif svc_name == "seacatauth.credentials.ldap":
 					from .providers.ldap import LDAPCredentialsService
 					LDAPCredentialsService(app)
-				elif svc_name == 'seacatauth.credentials.elasticsearch':
+				elif svc_name == "seacatauth.credentials.elasticsearch":
 					from .providers.elasticsearch import ElasticSearchCredentialsService
 					ElasticSearchCredentialsService(app)
+				elif svc_name == "seacatauth.credentials.mysql":
+					from .providers.mysql import MySQLCredentialsService
+					MySQLCredentialsService(app)
 
 			service = app.get_service(svc_name)
 
@@ -84,7 +84,6 @@ class CredentialsService(asab.Service):
 		providers.sort(key=lambda item: item[0])
 		for order, provider in providers:
 			self.register(provider)
-
 
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
