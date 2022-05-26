@@ -38,6 +38,7 @@ RUN apk add --no-cache  \
     passlib \
     bcrypt \
     python-ldap \
+    aiomysql \
     jinja2 \
     pyotp \
     webauthn \
