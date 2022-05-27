@@ -396,6 +396,27 @@ class CredentialsService(asab.Service):
 				"message": "Data does not comply with update policy",
 			}
 
+		# Validate that at least phone or email will be specified after update
+		prev_cred_dict = await provider.get(credentials_id)
+		checking_dict = {
+			"prev_email": prev_cred_dict.get("email"),
+			"prev_phone": prev_cred_dict.get("phone"),
+			"new_email": update_dict.get("email"),
+			"new_phone": update_dict.get("phone")
+		}
+		email_specified = checking_dict["prev_email"] or checking_dict["new_email"]
+		phone_specified = checking_dict["prev_phone"] or checking_dict["new_phone"]
+		if (not email_specified) and (not phone_specified):
+			L.error("Update failed: Data does not comply with update policy", struct_data={
+				"provider_id": provider.ProviderID,
+				"cid": credentials_id,
+				"agent_cid": agent_cid,
+			})
+			return {
+				"status": "FAILED",
+				"message": "Data does not comply with update policy",
+			}
+
 		# Update in provider
 		result = await provider.update(credentials_id, validated_data)
 

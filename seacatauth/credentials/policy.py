@@ -70,10 +70,6 @@ class CredentialsPolicy:
 				},
 			},
 		},
-		# "anyOf": [  # Either "email" or "phone" must be required
-		# 	{"properties": {"email": {"creation": {"enum": ["required"]}}}},
-		# 	{"properties": {"phone": {"creation": {"enum": ["required"]}}}},
-		# ],
 	}
 
 	def __init__(self, rbac_svc, policy_file):
@@ -138,7 +134,6 @@ class CredentialsPolicy:
 					continue
 				else:
 					raise RuntimeError("Unknown policy: {}".format(policy))
-		# Option 1: change policy from required to allowed and add this check
 		# At least one of (phone, email) must be specified
 		if not (validated_data.get("email") or validated_data.get("phone")):
 			L.error(
@@ -206,7 +201,7 @@ class CredentialsPolicy:
 					"field": field,
 				})
 				return None
-			elif not (update_data.get("email") or update_data.get("phone")):
+			if not (update_data.get("email") or update_data.get("phone")):
 				L.error(
 					"Cannot create credentials: Phone or email must be specified",
 					struct_data={"username": update_data["username"],
