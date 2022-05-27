@@ -94,8 +94,9 @@ class SessionService(asab.Service):
 
 	async def delete_expired_sessions(self):
 		expired = []
-		sessions = await self._raw_list()
-		for session in sessions["data"]:
+		async for session in self._iterate_raw(
+			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.utcnow()}}
+		):
 			try:
 				if datetime.datetime.utcnow() > (
 					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
@@ -106,6 +107,7 @@ class SessionService(asab.Service):
 				expired.append(session["_id"])
 
 		for sid in expired:
+			# Use the delete method for proper session termination
 			await self.delete(session_id=sid)
 
 
@@ -217,9 +219,9 @@ class SessionService(asab.Service):
 		return session
 
 
-	async def _raw_list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def _iterate_raw(self, page: int = 0, limit: int = None, query_filter: dict = None):
 		"""
-		Lists session objects including ALL the fields.
+		Yields raw session dicts including ALL the fields.
 		"""
 		collection = self.StorageService.Database[self.SessionCollection]
 
@@ -232,14 +234,8 @@ class SessionService(asab.Service):
 			cursor.skip(limit * page)
 			cursor.limit(limit)
 
-		sessions = []
 		async for session_dict in cursor:
-			sessions.append(session_dict)
-
-		return {
-			'data': sessions,
-			'count': await collection.count_documents(query_filter)
-		}
+			yield session_dict
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter=None):
@@ -247,6 +243,29 @@ class SessionService(asab.Service):
 
 		if query_filter is None:
 			query_filter = {}
+
+		sessions = []
+		async for session_dict in self._iterate_raw(page, limit, query_filter):
+			sessions.append(rest_get(session_dict))
+
+		return {
+			'data': sessions,
+			'count': await collection.count_documents(query_filter)
+		}
+
+
+	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None):
+		"""
+		List top-level sessions with all their children sessions inside the "children" attribute
+		"""
+		collection = self.StorageService.Database[self.SessionCollection]
+
+		if query_filter is None:
+			query_filter = {}
+
+		# Find only top-level sessions (with no parent)
+		query_filter.update({SessionAdapter.FN.Session.ParentSessionId: None})
+
 		cursor = collection.find(query_filter)
 
 		cursor.sort('_c', -1)
@@ -255,12 +274,18 @@ class SessionService(asab.Service):
 			cursor.limit(limit)
 
 		sessions = []
-		async for session_dict in cursor:
-			sessions.append(rest_get(session_dict))
+		count = await collection.count_documents(query_filter)
+		async for session_dict in self._iterate_raw(page, limit, query_filter):
+			session = SessionAdapter(self, session_dict).rest_get()
+			# Include children sessions
+			children = await self.list(query_filter={SessionAdapter.FN.Session.ParentSessionId: session["_id"]})
+			if children["count"] > 0:
+				session["children"] = children
+			sessions.append(session)
 
 		return {
 			'data': sessions,
-			'count': await collection.count_documents(query_filter)
+			'count': count
 		}
 
 
@@ -317,32 +342,39 @@ class SessionService(asab.Service):
 
 
 	async def delete(self, session_id):
-		# Delete all child sessions first
+		# Recursively delete all child sessions first
 		query_filter = {SessionAdapter.FN.Session.ParentSessionId: session_id}
-		sessions = (await self._raw_list(query_filter=query_filter))["data"]
-		for session in sessions:
-			await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session["_id"]))
+
+		to_delete = []
+		async for session_dict in self._iterate_raw(query_filter=query_filter):
+			to_delete.append(session_dict)
+
+		for session_dict in to_delete:
+			await self.delete(session_dict["_id"])
 
 		# Delete the session itself
-		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
-		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={'sid': session_id})
+		await self.StorageService.delete(self.SessionCollection, session_id)
+		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
 
 		# TODO: Publish pubsub message for session deletion
 
 
 	async def delete_all_sessions(self):
-		sessions = (await self._raw_list())["data"]
+		to_delete = []
+		async for session_dict in self._iterate_raw():
+			to_delete.append(session_dict)
 
 		deleted = 0
 		failed = 0
 		# Delete iteratively so that every session is terminated properly
-		for session in sessions:
+		for session_dict in to_delete:
 			try:
-				await self.delete(session["_id"])
+				# TODO: Publish pubsub message for session deletion
+				await self.StorageService.delete(self.SessionCollection, session_dict["_id"])
 				deleted += 1
 			except Exception as e:
 				L.error("Cannot delete session", struct_data={
-					"sid": session["_id"],
+					"sid": session_dict["_id"],
 					"error": type(e).__name__
 				})
 				failed += 1
@@ -354,18 +386,21 @@ class SessionService(asab.Service):
 
 	async def delete_sessions_by_credentials_id(self, credentials_id):
 		query_filter = {SessionAdapter.FN.Credentials.Id: credentials_id}
-		sessions = (await self._raw_list(query_filter=query_filter))["data"]
+		to_delete = []
+		async for session_dict in self._iterate_raw(query_filter=query_filter):
+			to_delete.append(session_dict)
 
 		deleted = 0
 		failed = 0
 		# Delete iteratively so that every session is terminated properly
-		for session in sessions:
+		for session_dict in to_delete:
 			try:
-				await self.delete(session["_id"])
+				# TODO: Publish pubsub message for session deletion
+				await self.StorageService.delete(self.SessionCollection, session_dict["_id"])
 				deleted += 1
 			except Exception as e:
 				L.error("Cannot delete session", struct_data={
-					"sid": session["_id"],
+					"sid": session_dict["_id"],
 					"error": type(e).__name__
 				})
 				failed += 1
