@@ -308,7 +308,7 @@ class CredentialsHandler(object):
 			"status": "OK",
 			"_id": credentials_id,
 			"_type": provider.Type,
-			"_provider_id": provider.ProviderID,
+			"_provider_id": provider.ProviderID
 		})
 
 
