@@ -375,16 +375,4 @@ def rest_get(session_dict):
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
 
-	# TODO: Backward compatibility. Remove once WebUI adapts to the standard fields above.
-	# >>>
-	data.update({
-		'id': session_dict.get(SessionAdapter.FN.SessionId),
-		'created_at': session_dict.get(SessionAdapter.FN.CreatedAt),
-		'modified_at': session_dict.get(SessionAdapter.FN.ModifiedAt),
-		'version': session_dict.get(SessionAdapter.FN.Version),
-		'Cid': session_dict.get(SessionAdapter.FN.Credentials.Id),
-		'exp': session_dict.get(SessionAdapter.FN.Session.Expiration),
-	})
-	# <<<
-
 	return data

@@ -2,11 +2,23 @@
 
 ## Release candidate
 
+### Features
+- Structured session list (#30, PLUM Sprint 220520)
+
+---
+
+
+## v22.21
+
 ### Fix
 - Use datetime.datetime.utcnow (#29, PLUM Sprint 220422)
 - After-provisioning cleanup (#33, PLUM Sprint 220506)
 - Fix session expiration for back-compat (#34, PLUM Sprint 220506)
-- Import ASAB web container (#36, PLUM Sprint 220520)
+- ~~Import ASAB web container (#36, PLUM Sprint 220520)~~(4ade2c60)
+- Store login session data in database (#37, PLUM Sprint 220520)
+
+### Features
+- Mock mode in SMS provider (#37, PLUM Sprint 220520)
 
 ### Refactoring
 - Persistent OIDC authorization codes (#25, PLUM Sprint 220408)
