@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+
 import fastjsonschema
 
 from .schemas import USERNAME_PATTERN
@@ -138,8 +139,10 @@ class CredentialsPolicy:
 		if not (validated_data.get("email") or validated_data.get("phone")):
 			L.error(
 				"Cannot create credentials: Phone or email must be specified",
-				struct_data={"username": validated_data["username"],
-							 "phone": validated_data["phone"]}
+				struct_data={
+					"username": validated_data["username"],
+					"phone": validated_data["phone"]
+				}
 			)
 			return None
 		# Assert there are no extra fields
@@ -204,8 +207,9 @@ class CredentialsPolicy:
 			if not (update_data.get("email") or update_data.get("phone")):
 				L.error(
 					"Cannot create credentials: Phone or email must be specified",
-					struct_data={"username": update_data["username"],
-								 "phone": update_data["phone"]}
+					struct_data={
+						"username": update_data["username"],
+						"phone": update_data["phone"]}
 				)
 				return None
 		return update_data
