@@ -2,6 +2,11 @@
 
 ## Release candidate
 
+### Features
+- Structured session list (#30, PLUM Sprint 220520)
+
+---
+
 
 ## v22.21
 
