@@ -3,7 +3,6 @@ import logging
 
 import asab
 import asab.web
-import asab.web.container
 import asab.web.rest
 import asab.storage
 
@@ -31,11 +30,11 @@ class SeaCatAuthApplication(asab.Application):
 		self.WebService = self.get_service("asab.WebService")
 
 		# Create
-		self.WebContainer = asab.web.container.WebContainer(self.WebService, "web")  # TODO: Use factory method once ready
+		self.WebContainer = asab.web.WebContainer(self.WebService, "web")
 		self.WebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 		self.WebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
-		self.PublicWebContainer = asab.web.container.WebContainer(self.WebService, "web:public")  # TODO: Use factory method once ready
+		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 		self.PublicWebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
