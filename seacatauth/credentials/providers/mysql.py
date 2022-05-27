@@ -27,13 +27,15 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 	Type = "mysql"
 
 	ConfigDefaults = {
+		"editable": "no",
 		"host": "localhost",
-		"database": "credentials",
-		"table": "UzivatelRegistrovany",
+		"port": "3306",
+		"database": "auth",
+		"table": "users",
 		"user": "root",
 		"password": "",
-		"editable": "no",
-		"field_username": "usename",
+		"field_id": "id",
+		"field_username": "username",
 		"field_email": "email",
 		"field_phone": "phone",
 		"field_password": "password",
@@ -43,9 +45,11 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(provider_id, config_section_name)
+		self.Editable = self.Config.getboolean("editable")
 		self.ConnectionParams = {
 			"host": self.Config.get("host"),
-			"database": self.Config.get("database"),
+			"port": self.Config.getint("port"),
+			"db": self.Config.get("database"),
 			"user": self.Config.get("user"),
 		}
 		password = self.Config.get("password")
@@ -53,7 +57,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			self.ConnectionParams["passwd"] = password
 
 		self.Table = self.Config.get("table")
-		self.Editable = self.Config.getboolean("editable")
 
 		self.Fields = {
 			"username": self.Config.get("field_username"),
@@ -98,7 +101,15 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
-		raise NotImplementedError()
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor() as cursor:
+				await cursor.execute("FROM {table} SELECT * WHERE {field}={value};".format(
+					table=self.Table,
+					field=self.Fields["id"],
+					value=credentials_id,
+				))
+				result = await cursor.fetchone
+		return result
 
 
 	async def count(self, filtr=None) -> int:
