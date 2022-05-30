@@ -122,6 +122,7 @@ class OTPService(asab.Service):
 		# Delete existing secret
 		try:
 			await self._get_totp_secret(session_id)
+			await self._delete_totp_secret(session_id)
 		except KeyError:
 			# There is no secret associated with this user session
 			pass
@@ -145,7 +146,7 @@ class OTPService(asab.Service):
 		data = await self.StorageService.get(self.TOTPSecretCollection, session_id)
 		secret = data["__s"]
 		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.now():
+		if exp is None or exp < datetime.datetime.utcnow():
 			raise KeyError("TOTP secret timed out")
 
 		return secret

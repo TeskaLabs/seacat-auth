@@ -12,7 +12,7 @@ L = logging.getLogger(__name__)
 
 
 async def credentials_session_builder(credentials_service, credentials_id):
-	credentials = await credentials_service.get(credentials_id)
+	credentials = await credentials_service.get(credentials_id, include=["__totp"])
 	return (
 		(SessionAdapter.FN.Credentials.Id, credentials_id),
 		(SessionAdapter.FN.Credentials.Username, credentials.get("username")),
@@ -21,6 +21,7 @@ async def credentials_session_builder(credentials_service, credentials_id):
 		(SessionAdapter.FN.Credentials.CreatedAt, credentials.get("_c")),
 		(SessionAdapter.FN.Credentials.ModifiedAt, credentials.get("_m")),
 		(SessionAdapter.FN.Authentication.ExternalLoginOptions, credentials.get("external_login")),
+		(SessionAdapter.FN.Authentication.TOTPSet, credentials.get("__totp") is not None),
 	)
 
 
