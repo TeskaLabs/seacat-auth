@@ -1,10 +1,10 @@
 import logging
-
 import aiohttp
 import aiohttp.web
 
+from ...generic import get_bearer_token_value
+
 #
-from seacatauth.generic import get_bearer_token_value
 
 L = logging.getLogger(__name__)
 
