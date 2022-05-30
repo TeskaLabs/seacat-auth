@@ -21,7 +21,7 @@ async def credentials_session_builder(credentials_service, credentials_id):
 		(SessionAdapter.FN.Credentials.CreatedAt, credentials.get("_c")),
 		(SessionAdapter.FN.Credentials.ModifiedAt, credentials.get("_m")),
 		(SessionAdapter.FN.Authentication.ExternalLoginOptions, credentials.get("external_login")),
-		(SessionAdapter.FN.Authentication.TOTPSet, credentials.get("__totp") is not None),
+		(SessionAdapter.FN.Authentication.TOTPSet, credentials.get("__totp") not in (None, "")),
 	)
 
 
