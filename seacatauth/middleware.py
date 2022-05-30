@@ -2,7 +2,7 @@ import aiohttp.web
 import asab
 import logging
 
-from seacatauth.generic import get_bearer_token_value
+from .generic import get_bearer_token_value
 
 #
 
