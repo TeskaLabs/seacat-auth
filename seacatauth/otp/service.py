@@ -145,7 +145,7 @@ class OTPService(asab.Service):
 		data = await self.StorageService.get(self.TOTPSecretCollection, session_id)
 		secret = data["__s"]
 		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.now():
+		if exp is None or exp < datetime.datetime.utcnow():
 			raise KeyError("TOTP secret timed out")
 
 		return secret
