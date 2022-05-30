@@ -122,6 +122,7 @@ class OTPService(asab.Service):
 		# Delete existing secret
 		try:
 			await self._get_totp_secret(session_id)
+			await self._delete_totp_secret(session_id)
 		except KeyError:
 			# There is no secret associated with this user session
 			pass
