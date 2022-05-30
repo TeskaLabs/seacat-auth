@@ -4,7 +4,7 @@ import logging
 import asab
 import asab.web.rest
 
-from ...generic import nginx_introspection
+from ...generic import nginx_introspection, get_bearer_token_value
 
 #
 
@@ -67,10 +67,10 @@ class TokenIntrospectionHandler(object):
 
 
 	async def authenticate_request(self, request):
-		authorization_bytes = await request.read()
-		return await self.OpenIdConnectService.get_session_from_bearer_token(
-			authorization_bytes.decode("ascii")
-		)
+		token_value = get_bearer_token_value(request)
+		if token_value is None:
+			return None
+		return await self.OpenIdConnectService.get_session_by_access_token(token_value)
 
 
 	async def introspect_nginx(self, request):

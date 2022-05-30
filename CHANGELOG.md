@@ -2,8 +2,13 @@
 
 ## Release candidate
 
+### Breaking changes
+- SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
+- Introspection outputs ID token instead of Access token (#39, PLUM Sprint 220520)
+
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
+- Authentication with ID token (#39, PLUM Sprint 220520)
 
 ---
 

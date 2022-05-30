@@ -1,7 +1,8 @@
 import logging
-
 import aiohttp
 import aiohttp.web
+
+from ...generic import get_bearer_token_value
 
 #
 
@@ -28,7 +29,15 @@ class SessionHandler(object):
 
 
 	async def session_logout(self, request):
-		session = await self.OpenIdConnectService.get_session_from_authorization_header(request)
+		token_value = get_bearer_token_value(request)
+		if token_value is None:
+			L.warning("Invalid or missing Bearer token")
+			return aiohttp.web.HTTPBadRequest()
+
+		try:
+			session = await self.OpenIdConnectService.build_session_from_id_token(token_value)
+		except ValueError:
+			session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 		if session is None:
 			return aiohttp.web.HTTPNotFound()
 
