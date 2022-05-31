@@ -156,6 +156,26 @@ class SessionAdapter:
 		else:
 			self.Data = None
 
+	@classmethod
+	def from_id_token(cls, session_svc, id_token_dict):
+		session_dict = {
+			cls.FN.SessionId: None,
+			cls.FN.Session.Type: "openidconnect",
+			cls.FN.Version: None,
+			cls.FN.CreatedAt: id_token_dict.get("iat"),  # TODO: strptime
+			cls.FN.ModifiedAt: None,
+			cls.FN.Session.Expiration: id_token_dict.get("exp"),  # TODO: strptime
+			cls.FN.Credentials.Id: id_token_dict.get("sub"),
+			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
+			cls.FN.Credentials.Email: id_token_dict.get("email"),
+			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
+			cls.FN.Authorization.Authz: id_token_dict.get("authz"),
+			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
+			cls.FN.Authorization.Roles: id_token_dict.get("roles"),
+			cls.FN.Authorization.Resources: id_token_dict.get("resources"),
+		}
+		return cls(session_svc, session_dict)
+
 	def __repr__(self):
 		return ("<{} {} t:{} c:{} m:{} exp:{} cid:{} ({}{})>".format(
 			self.__class__.__name__,
@@ -243,76 +263,79 @@ class SessionAdapter:
 			else:
 				# BACK COMPAT: Keep values without prefix raw
 				# TODO: Remove support once proper m2m tokens are in place
-				value = obj[keys[-1]]
-				if value.startswith(self.EncryptedPrefix):
+				value = obj.get(keys[-1])
+				if value is not None and value.startswith(self.EncryptedPrefix):
 					obj[keys[-1]] = session_svc.aes_decrypt(value[len(self.EncryptedPrefix):])
 
-	def _deserialize_session_data(self, session_dict):
+	@classmethod
+	def _deserialize_session_data(cls, session_dict):
 		return SessionData(
-			Id=session_dict.pop(self.FN.SessionId),
-			Version=session_dict.pop(self.FN.Version),
-			CreatedAt=session_dict.pop(self.FN.CreatedAt),
-			ModifiedAt=session_dict.pop(self.FN.ModifiedAt),
-			Type=session_dict.pop(self.FN.Session.Type, None),
-			ParentId=session_dict.pop(self.FN.Session.ParentSessionId, None),
-			Expiration=session_dict.pop(self.FN.Session.Expiration, None),
-			MaxExpiration=session_dict.pop(self.FN.Session.MaxExpiration, None),
-			ExpirationExtension=session_dict.pop(self.FN.Session.ExpirationExtension, None),
+			Id=session_dict.pop(cls.FN.SessionId),
+			Version=session_dict.pop(cls.FN.Version),
+			CreatedAt=session_dict.pop(cls.FN.CreatedAt),
+			ModifiedAt=session_dict.pop(cls.FN.ModifiedAt),
+			Type=session_dict.pop(cls.FN.Session.Type, None),
+			ParentId=session_dict.pop(cls.FN.Session.ParentSessionId, None),
+			Expiration=session_dict.pop(cls.FN.Session.Expiration, None),
+			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
+			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),
 		)
 
-	def _deserialize_credentials_data(self, session_dict):
-		credentials_id = session_dict.pop(self.FN.Credentials.Id)
+	@classmethod
+	def _deserialize_credentials_data(cls, session_dict):
+		credentials_id = session_dict.pop(cls.FN.Credentials.Id)
 		if credentials_id is None:
 			return
 		return CredentialsData(
 			Id=credentials_id,
-			CreatedAt=session_dict.pop(self.FN.Credentials.CreatedAt, None),
-			ModifiedAt=session_dict.pop(self.FN.Credentials.ModifiedAt, None),
-			Username=session_dict.pop(self.FN.Credentials.Username, None),
-			Email=session_dict.pop(self.FN.Credentials.Email, None),
-			Phone=session_dict.pop(self.FN.Credentials.Phone, None),
+			CreatedAt=session_dict.pop(cls.FN.Credentials.CreatedAt, None),
+			ModifiedAt=session_dict.pop(cls.FN.Credentials.ModifiedAt, None),
+			Username=session_dict.pop(cls.FN.Credentials.Username, None),
+			Email=session_dict.pop(cls.FN.Credentials.Email, None),
+			Phone=session_dict.pop(cls.FN.Credentials.Phone, None),
 		)
 
 	# TODO: The following methods contain BACK-COMPAT fallbacks (the or-sections)
 	#   Remove the fallbacks in December 2022
 
-	def _deserialize_authentication_data(self, session_dict):
+	@classmethod
+	def _deserialize_authentication_data(cls, session_dict):
 		return AuthenticationData(
-			TOTPSet=session_dict.pop(self.FN.Authentication.TOTPSet, None)
+			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None)
 			or session_dict.pop("TS", None),
-			ExternalLoginOptions=session_dict.pop(self.FN.Authentication.ExternalLoginOptions, None),
-			LoginDescriptor=session_dict.pop(self.FN.Authentication.LoginDescriptor, None)
+			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
+			LoginDescriptor=session_dict.pop(cls.FN.Authentication.LoginDescriptor, None)
 			or session_dict.pop("LD", None),
-			AvailableFactors=session_dict.pop(self.FN.Authentication.AvailableFactors, None)
+			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None)
 			or session_dict.pop("AF", None),
-			LastLogin=session_dict.pop(self.FN.Authentication.LastLogin, None),
+			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
 		)
 
-	def _deserialize_authorization_data(self, session_dict):
-		authz = session_dict.pop(self.FN.Authorization.Authz, None) or session_dict.pop("Authz", None)
+	@classmethod
+	def _deserialize_authorization_data(cls, session_dict):
+		authz = session_dict.pop(cls.FN.Authorization.Authz, None) or session_dict.pop("Authz", None)
 		if authz is None:
 			return None
 		return AuthorizationData(
 			Authz=authz,
-			Roles=session_dict.pop(self.FN.Authorization.Roles, None) or session_dict.pop("Rl", None),
-			Resources=session_dict.pop(self.FN.Authorization.Resources, None) or session_dict.pop("Rs", None),
-			Tenants=session_dict.pop(self.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
+			Roles=session_dict.pop(cls.FN.Authorization.Roles, None) or session_dict.pop("Rl", None),
+			Resources=session_dict.pop(cls.FN.Authorization.Resources, None) or session_dict.pop("Rs", None),
+			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
 		)
 
-	def _deserialize_oauth2_data(self, session_dict):
+	@classmethod
+	def _deserialize_oauth2_data(cls, session_dict):
 		oa2_data = session_dict.pop("oa", {})  # BACK COMPAT
-		id_token = session_dict.pop(self.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
-		if id_token is None:
-			return
+		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
+		if id_token is not None:
+			id_token = id_token.decode("ascii")
 
-		id_token = base64.urlsafe_b64encode(id_token).decode("ascii")
-
-		access_token = session_dict.pop(SessionAdapter.FN.OAuth2.AccessToken) or oa2_data.pop("Ta", None)
+		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:
 			# Base64-encode the tokens for OIDC service convenience
 			access_token = base64.urlsafe_b64encode(access_token).decode("ascii")
 
-		refresh_token = session_dict.pop(SessionAdapter.FN.OAuth2.RefreshToken) or oa2_data.pop("Tr", None)
+		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken, None) or oa2_data.pop("Tr", None)
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 
@@ -320,12 +343,13 @@ class SessionAdapter:
 			IDToken=id_token,
 			AccessToken=access_token,
 			RefreshToken=refresh_token,
-			Scope=session_dict.pop(SessionAdapter.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
-			ClientId=session_dict.pop(SessionAdapter.FN.OAuth2.ClientId, None),
+			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
+			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
 		)
 
-	def _deserialize_cookie_data(self, session_dict):
-		sci = session_dict.pop(self.FN.Cookie.Id, None) or session_dict.pop("SCI", None)
+	@classmethod
+	def _deserialize_cookie_data(cls, session_dict):
+		sci = session_dict.pop(cls.FN.Cookie.Id, None) or session_dict.pop("SCI", None)
 		if sci is None:
 			return None
 		return CookieData(
@@ -350,17 +374,5 @@ def rest_get(session_dict):
 		data["oauth2"] = True
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
-
-	# TODO: Backward compatibility. Remove once WebUI adapts to the standard fields above.
-	# >>>
-	data.update({
-		'id': session_dict.get(SessionAdapter.FN.SessionId),
-		'created_at': session_dict.get(SessionAdapter.FN.CreatedAt),
-		'modified_at': session_dict.get(SessionAdapter.FN.ModifiedAt),
-		'version': session_dict.get(SessionAdapter.FN.Version),
-		'Cid': session_dict.get(SessionAdapter.FN.Credentials.Id),
-		'exp': session_dict.get(SessionAdapter.FN.Session.Expiration),
-	})
-	# <<<
 
 	return data

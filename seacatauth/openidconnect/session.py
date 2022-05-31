@@ -16,4 +16,4 @@ def oauth2_session_builder(oauth2_data):
 	yield (SessionAdapter.FN.OAuth2.ClientId, oauth2_data["client_id"])
 	yield (SessionAdapter.FN.OAuth2.AccessToken, secrets.token_bytes(token_length))
 	yield (SessionAdapter.FN.OAuth2.RefreshToken, secrets.token_bytes(token_length))
-	yield (SessionAdapter.FN.OAuth2.IdToken, secrets.token_bytes(token_length))
+	yield (SessionAdapter.FN.OAuth2.IdToken, None)

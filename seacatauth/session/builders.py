@@ -11,9 +11,18 @@ L = logging.getLogger(__name__)
 #
 
 
-def credentials_session_builder(identity_id):
-	# TODO: Include username, email, phone, maybe _c and _m
-	yield (SessionAdapter.FN.Credentials.Id, identity_id)
+async def credentials_session_builder(credentials_service, credentials_id):
+	credentials = await credentials_service.get(credentials_id, include=["__totp"])
+	return (
+		(SessionAdapter.FN.Credentials.Id, credentials_id),
+		(SessionAdapter.FN.Credentials.Username, credentials.get("username")),
+		(SessionAdapter.FN.Credentials.Email, credentials.get("email")),
+		(SessionAdapter.FN.Credentials.Phone, credentials.get("phone")),
+		(SessionAdapter.FN.Credentials.CreatedAt, credentials.get("_c")),
+		(SessionAdapter.FN.Credentials.ModifiedAt, credentials.get("_m")),
+		(SessionAdapter.FN.Authentication.ExternalLoginOptions, credentials.get("external_login")),
+		(SessionAdapter.FN.Authentication.TOTPSet, credentials.get("__totp") not in (None, "")),
+	)
 
 
 async def authz_session_builder(tenant_service, role_service, credentials_id):
