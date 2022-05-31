@@ -300,8 +300,12 @@ class SessionService(asab.Service):
 
 	async def touch(self, session: SessionAdapter, expiration: int = None):
 		"""
-		Extend the expiration of the session if it hasn't been updated recently.
+		Extend the expiration of the session group if it hasn't been updated recently.
 		"""
+		# Get parent session
+		if session.Session.ParentId is not None:
+			session = await self.get(session.Session.ParentId)
+
 		if datetime.datetime.utcnow() < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
 			return
@@ -339,6 +343,27 @@ class SessionService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.Id, "exp": expires})
 		except KeyError:
 			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.Id})
+
+		# Update child sessions
+		# TODO: Updating ALL child sessions might be unwanted
+		async for child_session_dict in self._iterate_raw(query_filter={
+			SessionAdapter.FN.Session.ParentSessionId: session.SessionId
+		}):
+			child_session_id = child_session_dict.get(SessionAdapter.FN.SessionId)
+			upsertor = self.StorageService.upsertor(
+				self.SessionCollection,
+				child_session_id,
+				version=child_session_dict.get(SessionAdapter.FN.Version)
+			)
+			upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+			try:
+				await upsertor.execute()
+				L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={
+					"sid": child_session_id,
+					"exp": expires
+				})
+			except KeyError:
+				L.warning("Conflict: Session already extended", struct_data={"sid": child_session_id})
 
 
 	async def delete(self, session_id):
