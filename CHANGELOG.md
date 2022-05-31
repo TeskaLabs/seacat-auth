@@ -9,6 +9,8 @@
 ### Fix
 - Fix TOTP activation error (#43, PLUM Sprint 220520)
 - Fix TOTP status in userinfo (#43, PLUM Sprint 220520)
+- Session from ID token bug (82d6787, PLUM Sprint 220520)
+- OIDC scope format in token response (b5a18c2, PLUM Sprint 220520)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
