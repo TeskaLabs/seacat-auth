@@ -48,7 +48,7 @@ def private_auth_middleware_factory(app):
 		token_value = get_bearer_token_value(request)
 		if token_value is not None:
 			try:
-				request.Session = await oidc_service.build_session_from_id_token(token_value)
+				request.Session = oidc_service.build_session_from_id_token(token_value)
 			except ValueError:
 				# If the token cannot be parsed as ID token, it may be an Access token
 				if allow_access_token_auth:

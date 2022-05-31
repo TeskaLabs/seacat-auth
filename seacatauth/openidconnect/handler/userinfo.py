@@ -43,7 +43,7 @@ class UserInfoHandler(object):
 			token_value = get_bearer_token_value(request)
 			if token_value is not None:
 				try:
-					session = await self.OpenIdConnectService.build_session_from_id_token(token_value)
+					session = self.OpenIdConnectService.build_session_from_id_token(token_value)
 				except ValueError:
 					session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 			else:
