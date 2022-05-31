@@ -1,10 +1,10 @@
 import logging
-
 import aiohttp
 import aiohttp.web
-
 import asab
 import asab.web.rest
+
+from ...generic import get_bearer_token_value
 
 #
 
@@ -40,9 +40,13 @@ class UserInfoHandler(object):
 			session = request.Session
 		else:
 			# Authenticate via OAuth2 Bearer token
-			try:
-				session = await self.OpenIdConnectService.get_session_from_authorization_header(request)
-			except KeyError:
+			token_value = get_bearer_token_value(request)
+			if token_value is not None:
+				try:
+					session = self.OpenIdConnectService.build_session_from_id_token(token_value)
+				except ValueError:
+					session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+			else:
 				session = None
 
 		if session is None:
@@ -55,8 +59,6 @@ class UserInfoHandler(object):
 			session,
 			tenant=request.query.get("tenant", "*")
 		)
-		if userinfo["result"] == "CREDENTIALS-NOT-FOUND":
-			return self.error_response("invalid_credentials", "Invalid credentials.")
 
 		return asab.web.rest.json_response(request, userinfo)
 

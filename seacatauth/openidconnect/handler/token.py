@@ -3,14 +3,13 @@ import urllib.parse
 import datetime
 
 import aiohttp.web
-import base64
-import json
-import hmac
-import hashlib
-import secrets
 
 import asab
 import asab.web.rest
+import asab.web.rest.json
+
+import jwcrypto.jwk
+import jwcrypto.jwt
 
 from seacatauth.session import SessionAdapter
 
@@ -21,17 +20,6 @@ L = logging.getLogger(__name__)
 #
 
 
-class _DateTimeEncoder(json.JSONEncoder):
-	def default(self, z):
-		if isinstance(z, datetime.datetime):
-			if z.tzinfo is not None and z.tzinfo.utcoffset(z) is not None:
-				return z.isoformat()
-			else:
-				return "{}Z".format(z.isoformat())
-		else:
-			return super().default(z)
-
-
 class TokenHandler(object):
 
 
@@ -39,6 +27,8 @@ class TokenHandler(object):
 		self.OpenIdConnectService = oidc_svc
 		self.SessionService = app.get_service('seacatauth.SessionService')
 		self.CredentialsService = app.get_service('seacatauth.CredentialsService')
+
+		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/openidconnect/token', self.token_request)
@@ -130,7 +120,7 @@ class TokenHandler(object):
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
-			"scope": session.OAuth2.Scope,
+			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": session.OAuth2.AccessToken,
 			"refresh_token": session.OAuth2.RefreshToken,
 			"id_token": id_token,
@@ -145,30 +135,21 @@ class TokenHandler(object):
 		Wrap authentication data and userinfo in a JWT token
 		"""
 		header = {
-			"alg": "HS256",
-			"typ": "JWT"
+			"alg": "ES256",  # TODO: This should be mapped from key_type and key_curve
+			"typ": "JWT",
+			"kid": self.OpenIdConnectService.PrivateKey.key_id,
 		}
+
 		# TODO: ID token should always contain info about "what happened during authentication"
-		#   User info is optional and should be included (or not) based on SCOPE
-		# TODO: Add "aud" (audience) and "azp" (authorized party) fields
-		#   "aud indicates who is allowed to consume the token, and azp indicates who is allowed to present it"
+		#   User info is optional and its parts should be included (or not) based on SCOPE
 		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
-		secret_key = secrets.token_urlsafe(32)
-		total_params = "{header}.{payload}".format(
-			header=base64.urlsafe_b64encode(
-				json.dumps(header).encode("ascii")
-			).decode("utf-8").replace("=", ""),
-			payload=base64.urlsafe_b64encode(
-				json.dumps(payload, cls=_DateTimeEncoder).encode("ascii")
-			).decode("utf-8").replace("=", "")
+
+		token = jwcrypto.jwt.JWT(
+			header=header,
+			claims=self.JSONDumper(payload)
 		)
-		signature = hmac.new(secret_key.encode(), total_params.encode(), hashlib.sha256).hexdigest()
-		id_token = "{total_params}.{signature}".format(
-			total_params=total_params,
-			signature=base64.urlsafe_b64encode(
-				signature.encode("ascii")
-			).decode("utf-8").replace("=", "")
-		)
+		token.make_signed_token(self.OpenIdConnectService.PrivateKey)
+		id_token = token.serialize()
 
 		return id_token
 
@@ -260,7 +241,7 @@ class TokenHandler(object):
 	})
 	async def token_refresh(self, request, *, json_data):
 		"""
-		6.  Refreshing an Access Token
+		6.  Refreshing an Access token
 		"""
 		# TODO: this is not implemented
 
