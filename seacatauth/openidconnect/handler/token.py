@@ -120,7 +120,7 @@ class TokenHandler(object):
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
-			"scope": session.OAuth2.Scope,
+			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": session.OAuth2.AccessToken,
 			"refresh_token": session.OAuth2.RefreshToken,
 			"id_token": id_token,
