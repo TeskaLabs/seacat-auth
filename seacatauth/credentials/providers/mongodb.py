@@ -501,25 +501,28 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			)
 		except KeyError:
 			# Not my user
+			L.info("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
 			return False
 
-		if dbcred.get('suspended') is True:
+		if dbcred.get("suspended") is True:
 			# if the user is in suspended state then login no allowed
+			L.info("Authentication failed: Credentials suspended", struct_data={"cid": credentials_id})
 			return False
 
-		if '__password' in dbcred:
-			ok = authn_password(dbcred, credentials)
-			if not ok:
-				return False
+		if "__password" in dbcred:
+			if authn_password(dbcred, credentials):
+				return True
+			else:
+				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
 		else:
 			# Password is the must (for now)
-			return False
+			L.info("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
 
-		return True
+		return False
 
 
 def normalize_username(username) -> bson.ObjectId:
-	bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
+	return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
 
 
 def authn_password(dbcred, credentials):
