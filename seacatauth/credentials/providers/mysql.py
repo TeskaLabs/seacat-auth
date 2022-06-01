@@ -116,9 +116,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		mysql_id = credentials_id[len(self.Prefix):]
 		updated_fields = list(update.keys())
 
-		# Fetch the existing credentials
-		credentials = await self.get(credentials_id)
-
 		assignments = []
 
 		for field, db_field in self.Fields.items():
@@ -146,7 +143,8 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 		L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
 			"provider_id": self.ProviderID,
-			"cid": credentials_id
+			"cid": credentials_id,
+			"fields": updated_fields
 		})
 		return "OK"
 
