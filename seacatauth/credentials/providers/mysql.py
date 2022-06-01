@@ -4,6 +4,7 @@ from typing import Optional
 import asab
 import aiomysql
 import passlib.hash
+import pymysql
 
 from .abc import EditableCredentialsProviderABC
 
@@ -77,7 +78,33 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def create(self, credentials: dict) -> Optional[str]:
-		raise NotImplementedError()
+		db_fields = []
+		values = []
+		for field, db_field in self.Fields.items():
+			if field in credentials:
+				db_fields.append(db_field)
+				values.append(credentials[field])
+		query = "INSERT INTO `{table}` ({fields}) VALUES ({values});".format(
+			table=self.Table,
+			fields=", ".join(db_fields),
+			values=", ".join("%s" for _ in values),
+		)
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(query, values)
+				await cursor.execute("SELECT LAST_INSERT_ID();")
+				obj_id = await cursor.fetchone()
+			try:
+				connection.commit()
+			except pymysql.err.IntegrityError as e:
+				raise ValueError("Cannot create credentials: {}".format(e)) from e
+
+		credentials_id = "{}{}".format(self.Prefix, obj_id)
+		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id
+		})
+		return credentials_id
 
 
 	async def register(self, register_info: dict) -> Optional[str]:
@@ -236,31 +263,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 					result = await cursor.fetchone()
 
 
-	def _nomalize_credentials(self, db_obj, include=None):
-		normalized = {
-			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj[self.IdField]),
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
-		}
-		for field, db_field in self.Fields.items():
-			if db_field in db_obj:
-				normalized[field] = db_obj[db_field]
-
-		data = {}
-		for field in self.DataFields:
-			if field in db_obj:
-				data[field] = db_obj[field]
-		if len(data) > 0:
-			normalized["data"] = data
-
-		if include is not None:
-			for field in include:
-				if field in db_obj:
-					normalized[field] = db_obj[field]
-
-		return normalized
-
-
 	async def get_login_descriptors(self, credentials_id):
 		raise NotImplementedError()
 
@@ -290,6 +292,31 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		else:
 			L.info("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
 		return False
+
+
+	def _nomalize_credentials(self, db_obj, include=None):
+		normalized = {
+			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj[self.IdField]),
+			'_type': self.Type,
+			'_provider_id': self.ProviderID,
+		}
+		for field, db_field in self.Fields.items():
+			if db_field in db_obj:
+				normalized[field] = db_obj[db_field]
+
+		data = {}
+		for field in self.DataFields:
+			if field in db_obj:
+				data[field] = db_obj[field]
+		if len(data) > 0:
+			normalized["data"] = data
+
+		if include is not None:
+			for field in include:
+				if field in db_obj:
+					normalized[field] = db_obj[field]
+
+		return normalized
 
 
 	def _authenticate_password(self, dbcred, credentials):
