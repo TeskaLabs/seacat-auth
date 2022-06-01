@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "cb7bdae1-6b62-43d3-afd3-a7191cdfc3a0",
+		"_postman_id": "8c8915fa-2b0d-49c6-8c91-8a7fd01f94a4",
 		"name": "SeaCat Auth",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
@@ -42,8 +42,7 @@
 							"variable": [
 								{
 									"key": "session_id",
-									"value": "5e4880e16254612d40e5b233",
-									"type": "string"
+									"value": "5e4880e16254612d40e5b233"
 								}
 							]
 						}
@@ -67,8 +66,7 @@
 							"variable": [
 								{
 									"key": "session_id",
-									"value": "5e3b20a52d9fdbc6e2621e57",
-									"type": "string"
+									"value": "5e3b20a52d9fdbc6e2621e57"
 								}
 							]
 						},
@@ -229,8 +227,7 @@
 									"variable": [
 										{
 											"key": "register_token",
-											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs",
-											"type": "string"
+											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs"
 										}
 									]
 								},
@@ -279,8 +276,7 @@
 									"variable": [
 										{
 											"key": "register_token",
-											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs",
-											"type": "string"
+											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs"
 										}
 									]
 								},
@@ -320,8 +316,7 @@
 									"variable": [
 										{
 											"key": "register_token",
-											"value": "hKKYIrvfXZ5k7FGqK6P8x8hiG4OM0tLi2_6tfHLdxwI",
-											"type": "string"
+											"value": "hKKYIrvfXZ5k7FGqK6P8x8hiG4OM0tLi2_6tfHLdxwI"
 										}
 									]
 								},
@@ -507,8 +502,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "mongodb:ext:1c56701f03bc56137b2f48e0",
-									"type": "string"
+									"value": "mongodb:ext:1c56701f03bc56137b2f48e0"
 								}
 							]
 						}
@@ -583,7 +577,6 @@
 								{
 									"key": "provider",
 									"value": "ext",
-									"type": "string",
 									"description": "Id of the credentials provider"
 								}
 							]
@@ -625,8 +618,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "dict:temp:5012dcc7e5f434c9addc02aaa4291e74e97896c2312eb613feac2bb2",
-									"type": "string"
+									"value": "dict:temp:5012dcc7e5f434c9addc02aaa4291e74e97896c2312eb613feac2bb2"
 								}
 							]
 						}
@@ -704,8 +696,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "mongodb:ext:5f74a00045daa0d67b00f274",
-									"type": "string"
+									"value": "mongodb:ext:5f74a00045daa0d67b00f274"
 								}
 							]
 						}
@@ -750,8 +741,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "mongodb:ext:5f74a00045daa0d67b00f274",
-									"type": "string"
+									"value": "mongodb:ext:5f74a00045daa0d67b00f274"
 								}
 							]
 						}
@@ -782,8 +772,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "dict:default:3b7e33751cac4b11b4868b459806c245",
-									"type": "string"
+									"value": "dict:default:3b7e33751cac4b11b4868b459806c245"
 								}
 							]
 						}
@@ -894,8 +883,7 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "ewtest14",
-									"type": "string"
+									"value": "ewtest14"
 								}
 							]
 						},
@@ -1124,13 +1112,7 @@
 							"name": "User Info",
 							"request": {
 								"method": "GET",
-								"header": [
-									{
-										"key": "Authorization",
-										"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
-										"type": "text"
-									}
-								],
+								"header": [],
 								"url": {
 									"raw": "{{BASE_URL}}/openidconnect/userinfo",
 									"host": [
@@ -1196,13 +1178,7 @@
 							"name": "User Info (with tenant information)",
 							"request": {
 								"method": "GET",
-								"header": [
-									{
-										"key": "Authorization",
-										"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
-										"type": "text"
-									}
-								],
+								"header": [],
 								"url": {
 									"raw": "{{BASE_URL}}/openidconnect/userinfo?tenant=my-tenant",
 									"host": [
@@ -1296,13 +1272,7 @@
 					"name": "Session logout",
 					"request": {
 						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
-								"type": "text"
-							}
-						],
+						"header": [],
 						"url": {
 							"raw": "{{BASE_URL}}/openidconnect/logout",
 							"host": [
@@ -1314,6 +1284,25 @@
 							]
 						},
 						"description": "Logout the current session by CSI or access token"
+					},
+					"response": []
+				},
+				{
+					"name": "Public keys",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/openidconnect/public_keys",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"openidconnect",
+								"public_keys"
+							]
+						},
+						"description": "Get public keys for the verification of ID tokens."
 					},
 					"response": []
 				}
@@ -1427,49 +1416,6 @@
 					},
 					"response": [
 						{
-							"name": "Create tenant - tenant already exists",
-							"originalRequest": {
-								"method": "POST",
-								"header": [],
-								"body": {
-									"mode": "raw",
-									"raw": "MyTenant"
-								},
-								"url": {
-									"raw": "{{BASE_URL}}/tenant",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"tenant"
-									]
-								}
-							},
-							"status": "400",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json; charset=utf-8"
-								},
-								{
-									"key": "Server",
-									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
-								},
-								{
-									"key": "Content-Length",
-									"value": "27"
-								},
-								{
-									"key": "Date",
-									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
-								}
-							],
-							"cookie": [],
-							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
-						},
-						{
 							"name": "Create tenant - success",
 							"originalRequest": {
 								"method": "POST",
@@ -1511,6 +1457,49 @@
 							],
 							"cookie": [],
 							"body": "{\n    \"result\": \"OK\"\n}"
+						},
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
 						}
 					]
 				},
@@ -1654,7 +1643,6 @@
 							"variable": [
 								{
 									"key": "tenant_id",
-									"type": "string",
 									"value": "MyTenant"
 								}
 							]
@@ -1779,8 +1767,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "htpasswd:default:john_doe",
-									"type": "string"
+									"value": "htpasswd:default:john_doe"
 								}
 							]
 						}
@@ -1813,8 +1800,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "htpasswd:htpass:staticuser",
-									"type": "string"
+									"value": "htpasswd:htpass:staticuser"
 								}
 							]
 						}
@@ -1847,8 +1833,7 @@
 							"variable": [
 								{
 									"key": "credentials_id",
-									"value": "htpasswd:default:john_doe",
-									"type": "string"
+									"value": "htpasswd:default:john_doe"
 								}
 							]
 						}
@@ -2150,7 +2135,6 @@
 								},
 								{
 									"key": "credentials_id",
-									"type": "string",
 									"value": "mongodb:pers:6042a28b494892106efd1c8c"
 								}
 							]
@@ -2189,7 +2173,6 @@
 								},
 								{
 									"key": "credentials_id",
-									"type": "string",
 									"value": "mongodb:pers:6042a28b494892106efd1c8c"
 								}
 							]
@@ -2913,13 +2896,18 @@
 		"type": "oauth2",
 		"oauth2": [
 			{
-				"key": "authUrl",
-				"value": "{{AUTH_URL}}/openidconnect/authorize",
+				"key": "clientSecret",
+				"value": "{{CLIENT_SECRET}}",
 				"type": "string"
 			},
 			{
 				"key": "clientId",
-				"value": "",
+				"value": "{{CLIENT_ID}}",
+				"type": "string"
+			},
+			{
+				"key": "authUrl",
+				"value": "{{AUTH_URL}}/openidconnect/authorize",
 				"type": "string"
 			},
 			{
