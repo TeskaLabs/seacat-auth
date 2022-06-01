@@ -3,6 +3,7 @@ from typing import Optional
 
 import asab
 import aiomysql
+import passlib.hash
 
 from .abc import EditableCredentialsProviderABC
 
@@ -63,10 +64,10 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			"username": self.Config.get("field_username"),
 			"email": self.Config.get("field_email"),
 			"phone": self.Config.get("field_phone"),
-			"password": self.Config.get("field_password"),
 			"suspended": self.Config.get("field_suspended"),
 		}
 		self.IdField = self.Config.get("field_id")
+		self.PasswordField = self.Config.get("field_password")
 
 		data_fields = self.Config.get("data_fields")
 		if len(data_fields) > 0:
@@ -123,6 +124,8 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
 				await cursor.execute(query)
 				result = await cursor.fetchone()
+		if result is None:
+			raise KeyError(value)
 		result = self._nomalize_credentials(result)
 		return result
 
@@ -142,6 +145,8 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
 				await cursor.execute(query)
 				result = await cursor.fetchone()
+		if result is None:
+			raise KeyError(credentials_id)
 		result = self._nomalize_credentials(result, include)
 		return result
 
@@ -261,8 +266,40 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		raise NotImplementedError()
+		if not credentials_id.startswith(self.Prefix):
+			return False
+
+		# Fetch the credentials from Mongo
+		try:
+			dbcred = await self.get(credentials_id, include=[self.PasswordField])
+		except KeyError:
+			# Not my user
+			L.info("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
+			return False
+
+		if dbcred.get("suspended") is True:
+			# if the user is in suspended state then login no allowed
+			L.info("Authentication failed: Credentials suspended", struct_data={"cid": credentials_id})
+			return False
+
+		if self.PasswordField in dbcred:
+			if self._authenticate_password(dbcred, credentials):
+				return True
+			else:
+				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
+		else:
+			L.info("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
+		return False
 
 
-def authn_password(dbcred, credentials):
-		raise NotImplementedError()
+	def _authenticate_password(self, dbcred, credentials):
+		# This is here for a cryptoagility, if we migrate to a newer password hashing function,
+		# this if block will be extended
+		if dbcred[self.PasswordField].startswith("$2b$") \
+			or dbcred[self.PasswordField].startswith("$2a$") \
+			or dbcred[self.PasswordField].startswith("$2y$"):
+			if passlib.hash.bcrypt.verify(credentials["password"], dbcred[self.PasswordField]):
+				return True
+		else:
+			L.warning("Unknown password hash function: {}".format(dbcred[self.PasswordField][:4]))
+			return False
