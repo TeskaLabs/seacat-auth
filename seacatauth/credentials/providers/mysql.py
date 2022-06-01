@@ -116,7 +116,25 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
-		raise NotImplementedError()
+		mysql_id = credentials_id[len(self.Prefix):]
+		query = "DELETE FROM `{table}` WHERE `{field}` = {value};".format(
+			table=self.Table,
+			field=self.IdField,
+			value=mysql_id,
+		)
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(query)
+			try:
+				await connection.commit()
+			except pymysql.err.IntegrityError as e:
+				raise ValueError("Cannot delete credentials: {}".format(e)) from e
+
+		L.log(asab.LOG_NOTICE, "Credentials deleted", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id
+		})
+		return "OK"
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
