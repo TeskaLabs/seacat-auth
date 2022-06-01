@@ -25,6 +25,7 @@ class MySQLCredentialsService(asab.Service):
 
 
 class MySQLCredentialsProvider(EditableCredentialsProviderABC):
+	# TODO: Use bind variables (https://legacy.python.org/dev/peps/pep-0249/#paramstyle)
 
 	Type = "mysql"
 
@@ -112,7 +113,42 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def update(self, credentials_id, update: dict) -> Optional[str]:
-		raise NotImplementedError()
+		mysql_id = credentials_id[len(self.Prefix):]
+		updated_fields = list(update.keys())
+
+		# Fetch the existing credentials
+		credentials = await self.get(credentials_id)
+
+		assignments = []
+
+		for field, db_field in self.Fields.items():
+			value = update.pop(field, None)
+			if value not in frozenset(["", None]):
+				assignments.append("`{}` = '{}'".format(db_field, value))
+
+		query = "UPDATE `{table}` SET {assignments} WHERE `{id_field}` = {mysql_id};".format(
+			table=self.Table,
+			assignments=", ".join(assignments),
+			id_field=self.IdField,
+			mysql_id=mysql_id,
+		)
+
+		if len(update) != 0:
+			raise KeyError("Some credentials fields cannot be updated: {}".format(", ".join(update.keys())))
+
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(query)
+			try:
+				await connection.commit()
+			except pymysql.err.IntegrityError as e:
+				raise ValueError("Cannot update credentials: {}".format(e)) from e
+
+		L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id
+		})
+		return "OK"
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
@@ -156,6 +192,8 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
 				await cursor.execute(query)
 				result = await cursor.fetchone()
+		if result is None:
+			return None
 		return "{}{}".format(self.Prefix, result[self.IdField])
 
 
