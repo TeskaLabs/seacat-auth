@@ -39,6 +39,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		"field_email": "email",
 		"field_phone": "phone",
 		"field_password": "password",
+		"field_suspended": "suspended",
 		"data_fields": ""
 	}
 
@@ -63,6 +64,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			"email": self.Config.get("field_email"),
 			"phone": self.Config.get("field_phone"),
 			"password": self.Config.get("field_password"),
+			"suspended": self.Config.get("field_suspended"),
 		}
 		self.IdField = self.Config.get("field_id")
 
@@ -90,11 +92,39 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
-		return None
+		if ident_fields is None:
+			ident_fields = ["username"]
+
+		conditions = []
+		for field, mode in ident_fields.items():
+			field = self.Fields[field]
+			if mode is None:
+				conditions.append("(`{field}` = '{ident}')".format(field=field, ident=ident))
+			if mode == "ignorecase":
+				conditions.append("(LOWER(`{field}`) = '{ident}')".format(field=field, ident=ident))
+		query = "SELECT * FROM `{table}` WHERE {where};".format(
+			table=self.Table,
+			where=" OR ".join(conditions),
+		)
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(query)
+				result = await cursor.fetchone()
+		return "{}{}".format(self.Prefix, result[self.IdField])
 
 
 	async def get_by(self, key: str, value) -> Optional[dict]:
-		raise NotImplementedError()
+		query = "SELECT * FROM `{table}` WHERE `{field}` = {value};".format(
+			table=self.Table,
+			field=key,
+			value=value,
+		)
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(query)
+				result = await cursor.fetchone()
+		result = self._nomalize_credentials(result)
+		return result
 
 
 	async def get_by_external_login_sub(self, login_provider: str, sub_id: str) -> Optional[dict]:
@@ -102,36 +132,84 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
+		mysql_id = credentials_id[len(self.Prefix):]
+		query = "SELECT * FROM `{table}` WHERE `{field}` = {value};".format(
+			table=self.Table,
+			field=self.IdField,
+			value=mysql_id,
+		)
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor() as cursor:
-				await cursor.execute("FROM {table} SELECT * WHERE {field}={value};".format(
-					table=self.Table,
-					field=self.Fields["_id"],
-					value=credentials_id,
-				))
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(query)
 				result = await cursor.fetchone()
-		result = self._nomalize_credentials(result)
+		result = self._nomalize_credentials(result, include)
 		return result
 
 
 	async def count(self, filtr=None) -> int:
-		# TODO: Filter
-		query = "SELECT * FROM `{table}`;".format(
+		if filtr is not None:
+			where = "WHERE `{}` = {}".format(self.Fields["username"], filtr)
+		else:
+			where = ""
+		query = "SELECT * FROM `{table}` {where} ORDER BY `{order}` ASC;".format(
 			table=self.Table,
+			where=where,
+			order=self.IdField
 		)
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor(aiomysql.DictCursor) as cursor:
+			async with connection.cursor() as cursor:
 				return await cursor.execute(query)
 
 
-	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
-		raise NotImplementedError()
+	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = -1) -> list:
+		results = []
+		if filter is not None:
+			assert len(filter) == 1
+			k, v = filter.popitem()
+			where = "WHERE `{}` = {}".format(k, v)
+		else:
+			where = ""
+		query = "SELECT * FROM `{table}` {where} ORDER BY `{order}` ASC;".format(
+			table=self.Table,
+			where=where,
+			order=self.IdField
+		)
+
+		if limit > 0:
+			offset = page * limit
+		else:
+			offset = 0
+
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				nrows = await cursor.execute(query)
+				if nrows == 0:
+					return []
+				try:
+					await cursor.scroll(offset)
+				except IndexError:
+					L.error("MySQL: Out of range", struct_data={"query": query, "scroll": offset})
+					return []
+				result = await cursor.fetchone()
+				while result is not None:
+					results.append(self._nomalize_credentials(result))
+					if limit > 0:
+						limit -= 1
+					if limit == 0:
+						break
+					result = await cursor.fetchone()
+		return result
 
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
-		# TODO: Filter
-		query = "SELECT * FROM `{table}`;".format(
+		if filtr is not None:
+			where = "WHERE {} = {}".format(self.Fields["username"], filtr)
+		else:
+			where = ""
+		query = "SELECT * FROM `{table}` {where} ORDER BY `{order}` ASC;".format(
 			table=self.Table,
+			where=where,
+			order=self.IdField
 		)
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
@@ -169,6 +247,12 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 				data[field] = db_obj[field]
 		if len(data) > 0:
 			normalized["data"] = data
+
+		if include is not None:
+			for field in include:
+				if field in db_obj:
+					normalized[field] = db_obj[field]
+
 		return normalized
 
 
