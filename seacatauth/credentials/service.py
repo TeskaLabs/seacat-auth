@@ -400,7 +400,8 @@ class CredentialsService(asab.Service):
 				"message": "Data does not comply with update policy",
 			}
 
-		validated_data["data"] = custom_data
+		if custom_data is not None:
+			validated_data["data"] = custom_data
 
 		# Update in provider
 		result = await provider.update(credentials_id, validated_data)
