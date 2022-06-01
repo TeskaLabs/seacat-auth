@@ -259,8 +259,8 @@ class OpenIdConnectService(asab.Service):
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
 			# RFC 7519 states that the exp and iat claim values must be NumericDate values.
-			"exp": session.Session.Expiration.timestamp(),
-			"iat": datetime.datetime.utcnow().timestamp(),
+			"exp": session.Session.Expiration.replace(tzinfo=datetime.timezone.utc).timestamp(),
+			"iat": datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).timestamp(),
 		}
 
 		if session.OAuth2.ClientId is not None:
@@ -279,10 +279,10 @@ class OpenIdConnectService(asab.Service):
 			userinfo["phone_number"] = session.Credentials.Phone
 
 		if session.Credentials.ModifiedAt is not None:
-			userinfo["updated_at"] = session.Credentials.ModifiedAt.timestamp()
+			userinfo["updated_at"] = session.Credentials.ModifiedAt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
 		if session.Credentials.CreatedAt is not None:
-			userinfo["created_at"] = session.Credentials.CreatedAt.timestamp()
+			userinfo["created_at"] = session.Credentials.CreatedAt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet
@@ -336,9 +336,9 @@ class OpenIdConnectService(asab.Service):
 
 		if last_login is not None:
 			if "fat" in last_login:
-				userinfo["last_failed_login"] = last_login["fat"].timestamp()
+				userinfo["last_failed_login"] = last_login["fat"].replace(tzinfo=datetime.timezone.utc).timestamp()
 			if "sat" in last_login:
-				userinfo["last_successful_login"] = last_login["sat"].timestamp()
+				userinfo["last_successful_login"] = last_login["sat"].replace(tzinfo=datetime.timezone.utc).timestamp()
 
 		# If tenant is missing or unknown, consider only global roles and resources
 		if tenant not in session.Authorization.Authz:
