@@ -19,6 +19,7 @@ asab.Config.add_defaults({
 	"openidconnect": {
 		"bearer_realm": "asab",
 		"auth_code_timeout": "60 s",
+		"private_key": "",
 	},
 
 	"seacatauth:cookie": {
@@ -39,7 +40,12 @@ asab.Config.add_defaults({
 
 		# Specifies resource required for API access
 		# If set to "DISABLED", no authorization is required
-		"authorization_resource": "seacat:access"
+		"authorization_resource": "seacat:access",
+
+		# DEV ONLY!
+		# Allow authentication via access token
+		# This imposes the risk of the access token being misused by 3rd party app (user impersonation)
+		"_allow_access_token_auth": "no",
 	},
 
 	"seacatauth:provisioning": {

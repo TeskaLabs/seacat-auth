@@ -63,7 +63,7 @@ class ProvisioningService(asab.Service):
 		try:
 			await self.TenantService.create_tenant(self.TenantID)
 		except KeyError:
-			L.log(asab.LOG_NOTICE, "Tenant already exists", struct_data={"tenant": self.TenantID})
+			L.error("Tenant already exists", struct_data={"tenant": self.TenantID})
 
 		# Assign tenant to provisioning user
 		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)

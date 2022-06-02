@@ -2,6 +2,24 @@
 
 ## Release candidate
 
+### Breaking changes
+- SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
+- Introspection outputs ID token instead of Access token (#39, PLUM Sprint 220520)
+
+### Fix
+- Fix TOTP activation error (#43, PLUM Sprint 220520)
+- Fix TOTP status in userinfo (#43, PLUM Sprint 220520)
+- Session from ID token bug (82d6787, PLUM Sprint 220520)
+- OIDC scope format in token response (b5a18c2, PLUM Sprint 220520)
+- Always update the expiration of the whole session group (#44, PLUM Sprint 220520)
+- Explicit UTC timezone for all time data in userinfo (#45, PLUM Sprint 220520)
+
+### Features
+- Structured session list (#30, PLUM Sprint 220520)
+- Authentication with ID token (#39, PLUM Sprint 220520)
+
+---
+
 
 ## v22.21
 
