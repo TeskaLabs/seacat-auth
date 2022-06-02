@@ -500,8 +500,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				bson.ObjectId(credentials_id[len(self.Prefix):])
 			)
 		except KeyError:
-			# Not my user
-			L.info("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
+			# Should not occur if login prologue happened correctly
+			L.error("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
 			return False
 
 		if dbcred.get("suspended") is True:
@@ -515,8 +515,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			else:
 				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
 		else:
-			# Password is the must (for now)
-			L.info("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
+			# Should not occur if login prologue happened correctly
+			L.error("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
 
 		return False
 
