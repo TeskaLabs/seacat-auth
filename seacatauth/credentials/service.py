@@ -397,24 +397,31 @@ class CredentialsService(asab.Service):
 			}
 
 		# Validate that at least phone or email will be specified after update
-		prev_cred_dict = await provider.get(credentials_id)
-		checking_dict = {
-			"prev_email": prev_cred_dict.get("email"),
-			"prev_phone": prev_cred_dict.get("phone"),
-			"new_email": update_dict.get("email"),
-			"new_phone": update_dict.get("phone")
-		}
-		email_specified = checking_dict["prev_email"] or checking_dict["new_email"]
-		phone_specified = checking_dict["prev_phone"] or checking_dict["new_phone"]
+		current_dict = await provider.get(credentials_id)
+
+		if "email" in update_dict and update_dict["email"] == "":
+			email_specified = False
+		elif "email" not in current_dict or current_dict["email"] == "":
+			email_specified = False
+		else:
+			email_specified = True
+
+		if "phone" in update_dict and update_dict["phone"] == "":
+			phone_specified = False
+		elif "phone" not in current_dict or current_dict["phone"] == "":
+			phone_specified = False
+		else:
+			phone_specified = True
+
 		if (not email_specified) and (not phone_specified):
-			L.error("Update failed: Data does not comply with update policy", struct_data={
+			L.error("Update failed: Phone and email cannot both be empty", struct_data={
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
 				"agent_cid": agent_cid,
 			})
 			return {
 				"status": "FAILED",
-				"message": "Data does not comply with update policy",
+				"message": "Phone and email cannot both be empty",
 			}
 
 		# Update in provider

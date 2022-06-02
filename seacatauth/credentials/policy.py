@@ -206,7 +206,7 @@ class CredentialsPolicy:
 				return None
 			if not (update_data.get("email") or update_data.get("phone")):
 				L.error(
-					"Cannot create credentials: Phone or email must be specified",
+					"Cannot update credentials: Phone or email must be specified",
 					struct_data={
 						"username": update_data["username"],
 						"phone": update_data["phone"]}
