@@ -330,7 +330,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			dbcred = await self.get(credentials_id, include=[self.PasswordField])
 		except KeyError:
 			# Not my user
-			L.info("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
 			return False
 
 		if dbcred.get("suspended") is True:
@@ -344,7 +344,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			else:
 				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
 		else:
-			L.info("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
 		return False
 
 
