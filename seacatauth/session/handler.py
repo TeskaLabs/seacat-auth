@@ -36,16 +36,18 @@ class SessionHandler(object):
 	async def session_list(self, request):
 		page = int(request.query.get('p', 1)) - 1
 		limit = int(request.query.get('i', 10))
-		data = await self.SessionService.list(page, limit)
+		data = await self.SessionService.recursive_list(page, limit)
 		return asab.web.rest.json_response(request, data)
 
 
 	@access_control("authz:superuser")
 	async def session_detail(self, request):
 		session_id = request.match_info['session_id']
-		session = await self.SessionService.get(session_id)
-		response = session.rest_get()
-		return asab.web.rest.json_response(request, response)
+		session = (await self.SessionService.get(session_id)).rest_get()
+		children = await self.SessionService.recursive_list({SessionAdapter.FN.Session.ParentSessionId: session_id})
+		if children["count"] > 0:
+			session["children"] = children
+		return asab.web.rest.json_response(request, session)
 
 
 	@access_control("authz:superuser")
