@@ -25,6 +25,19 @@ _FIELDS = {
 			{"const": ""},
 		],
 	},
+	"data": {
+		"type": "object",
+		"description": "Custom data",
+		"patternProperties": {
+			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
+				{"type": "string"},
+				{"type": "number"},
+				{"type": "boolean"},
+				{"type": "null"},
+			]}
+		},
+		"additionalProperties": False,
+	},
 	"suspended": {
 		"type": "boolean",
 		"description": "Is suspended?"
@@ -65,6 +78,7 @@ UPDATE_CREDENTIALS = {
 			"email",
 			"phone",
 			"suspended",
+			"data",
 		])
 	},
 }
