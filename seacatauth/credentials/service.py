@@ -379,6 +379,10 @@ class CredentialsService(asab.Service):
 				"message": "Provider does not support editing",
 			}
 
+		# Custom data is not validated with policy
+		# TODO: Configurable policy/schema for custom data
+		custom_data = update_dict.pop("data", None)
+
 		# Check credentials policy
 		if session is not None:
 			authz = session.Authorization.Authz
@@ -423,6 +427,9 @@ class CredentialsService(asab.Service):
 				"status": "FAILED",
 				"message": "Phone and email cannot both be empty",
 			}
+
+		if custom_data is not None:
+			validated_data["data"] = custom_data
 
 		# Update in provider
 		result = await provider.update(credentials_id, validated_data)
