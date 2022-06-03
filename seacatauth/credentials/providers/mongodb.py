@@ -231,7 +231,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		)
 
 		# Update basic credentials
-		for field in ("username", "email", "phone"):
+		for field in ("username", "email", "phone", "data"):
 			value = update.pop(field, None)
 			if value is not None:
 				u.set(field, value)
