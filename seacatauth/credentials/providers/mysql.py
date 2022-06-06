@@ -96,11 +96,11 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 				await cursor.execute("SELECT LAST_INSERT_ID();")
 				obj_id = await cursor.fetchone()
 			try:
-				connection.commit()
+				await connection.commit()
 			except pymysql.err.IntegrityError as e:
 				raise ValueError("Cannot create credentials: {}".format(e)) from e
 
-		credentials_id = "{}{}".format(self.Prefix, obj_id)
+		credentials_id = "{}{}".format(self.Prefix, obj_id.get("LAST_INSERT_ID()"))
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
