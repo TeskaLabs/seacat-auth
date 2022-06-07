@@ -122,15 +122,15 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 		current_credentials = await self.get(credentials_id, include=[self.PasswordField])
 		new_credentials = {}
-		editable_fields = frozenset(re.findall(r"[^%]%\((.+?)\)", self.UpdateQuery) or [])
+		expected_fields = frozenset(re.findall(r"[^%]%\((.+?)\)", self.UpdateQuery) or [])
 
 		# Set unspecified parameters to their current value
-		for param in editable_fields:
-			value = update.pop(param, None)
+		for field in expected_fields:
+			value = update.pop(field, None)
 			if value not in frozenset(["", None]):
-				new_credentials[param] = value
+				new_credentials[field] = value
 			else:
-				new_credentials[param] = current_credentials.get(param)
+				new_credentials[field] = current_credentials.get(field)
 
 		value = update.pop("password", None)
 		if value is not None:
@@ -142,8 +142,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			L.warning("MySQL: Cannot set field 'enforce_factors'")
 
 		new_credentials[self.IdField] = mysql_id
-
-		L.error(f"\n🤧 {current_credentials=}\n{new_credentials=}")
 
 		if len(update) != 0:
 			raise KeyError("Some credentials fields cannot be updated: {}".format(", ".join(update.keys())))
