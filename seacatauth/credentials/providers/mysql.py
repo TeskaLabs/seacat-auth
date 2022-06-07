@@ -312,7 +312,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			if field in db_obj:
 				normalized[field] = db_obj[field]
 
-		normalized["suspended"] = bool(db_obj["suspended"])
+		normalized["suspended"] = bool(db_obj.get("suspended"))
 
 		data = {}
 		for field in self.DataFields:
