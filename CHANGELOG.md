@@ -18,6 +18,7 @@
 - Structured session list (#30, PLUM Sprint 220520)
 - Authentication with ID token (#39, PLUM Sprint 220520)
 - Custom credentials data (#40, PLUM Sprint 220520)
+- Credentials: ensure user has at least an email or a phone (#41, PLUM Sprint 220520)
 
 ---
 
