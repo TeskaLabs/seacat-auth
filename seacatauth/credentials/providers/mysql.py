@@ -1,4 +1,3 @@
-import enum
 import logging
 from typing import Optional
 
@@ -57,17 +56,19 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			self.ConnectionParams["password"] = password
 
 		self.ListQuery = self.Config.get("list")
+		assert self.ListQuery, "MySQL credentials: 'list' query must be specified"
 		self.GetQuery = self.Config.get("get")
+		assert self.GetQuery, "MySQL credentials: 'get' query must be specified"
 		self.LocateQuery = self.Config.get("locate")
+		assert self.LocateQuery, "MySQL credentials: 'locate' query must be specified"
 
 		if self.Editable:
-			self.UpdateQuery = self.Config.get("update")
 			self.CreateQuery = self.Config.get("create")
+			assert self.CreateQuery, "MySQL credentials: 'create' query must be specified"
+			self.UpdateQuery = self.Config.get("update")
+			assert self.UpdateQuery, "MySQL credentials: 'update' query must be specified"
 			self.DeleteQuery = self.Config.get("delete")
-		else:
-			self.UpdateQuery = None
-			self.CreateQuery = None
-			self.DeleteQuery = None
+			assert self.DeleteQuery, "MySQL credentials: 'delete' query must be specified"
 
 		self.IdField = "_id"
 		self.PasswordField = "__password"
