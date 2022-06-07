@@ -204,12 +204,7 @@ class CredentialsPolicy:
 					"field": field,
 				})
 				return None
-			if not (update_data.get("email") or update_data.get("phone")):
-				L.error(
-					"Cannot update credentials: Phone or email must be specified",
-					struct_data={
-						"username": update_data["username"],
-						"phone": update_data["phone"]}
-				)
+			if update_data.get("email") == "" and update_data.get("phone") == "":
+				L.error("Credentials update failed: Cannot unset both email and phone")
 				return None
 		return update_data
