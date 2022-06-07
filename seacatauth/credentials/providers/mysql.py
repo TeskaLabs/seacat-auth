@@ -1,3 +1,4 @@
+import enum
 import logging
 from typing import Optional
 
@@ -5,6 +6,7 @@ import asab
 import aiomysql
 import passlib.hash
 import pymysql
+import re
 
 from .abc import EditableCredentialsProviderABC
 
@@ -37,12 +39,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		"table": "users",
 		"user": "root",
 		"password": "",
-		"field_id": "id",
-		"field_username": "username",
-		"field_email": "email",
-		"field_phone": "phone",
-		"field_password": "password",
-		"field_suspended": "suspended",
 		"data_fields": ""
 	}
 
@@ -60,23 +56,19 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		if len(password) > 0:
 			self.ConnectionParams["password"] = password
 
-		self.ListQuery = self.Config.get("list").replace("\n", " ")
-		self.GetQuery = self.Config.get("get").replace("\n", " ")
-		self.LocateQuery = self.Config.get("locate").replace("\n", " ")
+		self.ListQuery = self.Config.get("list")
+		self.GetQuery = self.Config.get("get")
+		self.LocateQuery = self.Config.get("locate")
 
 		if self.Editable:
-			self.UpdateQuery = self.Config.get("update_query")
-			self.CreateQuery = self.Config.get("create_query")
-			self.DeleteQuery = self.Config.get("delete_query")
+			self.UpdateQuery = self.Config.get("update")
+			self.CreateQuery = self.Config.get("create")
+			self.DeleteQuery = self.Config.get("delete")
+		else:
+			self.UpdateQuery = None
+			self.CreateQuery = None
+			self.DeleteQuery = None
 
-		self.Table = self.Config.get("table")
-
-		self.Fields = {
-			"username",
-			"email",
-			"phone",
-			"suspended",
-		}
 		self.IdField = "_id"
 		self.PasswordField = "__password"
 
@@ -88,21 +80,17 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def create(self, credentials: dict) -> Optional[str]:
-		db_fields = []
-		values = []
-		for field, db_field in self.Fields:
-			if field in credentials:
-				db_fields.append(db_field)
-				values.append(credentials[field])
-		query = "INSERT INTO `{table}` ({fields}) VALUES ({values});".format(
-			table=self.Table,
-			fields=", ".join(db_fields),
-			values=", ".join("%s" for _ in values),
-		)
-		L.warning(f"\n🥴 create {query}")
+		if not self.Editable:
+			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
+
+		# Set unspecified parameters to None
+		for param in re.findall(r"[^%]%\((.+?)\)", self.CreateQuery) or []:
+			if param not in credentials:
+				credentials[param] = None
+
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(query, values)
+				await cursor.execute(self.CreateQuery, credentials)
 				await cursor.execute("SELECT LAST_INSERT_ID();")
 				obj_id = await cursor.fetchone()
 			try:
@@ -119,34 +107,49 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def register(self, register_info: dict) -> Optional[str]:
+		if not self.Editable:
+			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
 		raise NotImplementedError()
 
 
 	async def update(self, credentials_id, update: dict) -> Optional[str]:
+		if not self.Editable:
+			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
+
 		mysql_id = credentials_id[len(self.Prefix):]
 		updated_fields = list(update.keys())
 
-		assignments = []
+		current_credentials = await self.get(credentials_id, include=[self.PasswordField])
+		new_credentials = {}
+		editable_fields = frozenset(re.findall(r"[^%]%\((.+?)\)", self.UpdateQuery) or [])
 
-		for field, db_field in self.Fields.items():
-			value = update.pop(field, None)
+		# Set unspecified parameters to their current value
+		for param in editable_fields:
+			value = update.pop(param, None)
 			if value not in frozenset(["", None]):
-				assignments.append("`{}` = '{}'".format(db_field, value))
+				new_credentials[param] = value
+			else:
+				new_credentials[param] = current_credentials.get(param)
 
-		query = "UPDATE `{table}` SET {assignments} WHERE `{id_field}` = {mysql_id};".format(
-			table=self.Table,
-			assignments=", ".join(assignments),
-			id_field=self.IdField,
-			mysql_id=mysql_id,
-		)
-		L.warning(f"\n🥴 update {query}")
+		value = update.pop("password", None)
+		if value is not None:
+			new_credentials["__password"] = passlib.hash.bcrypt.hash(value.encode("utf-8"))
+
+		value = update.pop("enforce_factors", None)
+		if value is not None:
+			# TODO: Implement factor enforcement
+			L.warning("MySQL: Cannot set field 'enforce_factors'")
+
+		new_credentials[self.IdField] = mysql_id
+
+		L.error(f"\n🤧 {current_credentials=}\n{new_credentials=}")
 
 		if len(update) != 0:
 			raise KeyError("Some credentials fields cannot be updated: {}".format(", ".join(update.keys())))
 
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(query)
+				await cursor.execute(self.UpdateQuery, new_credentials)
 			try:
 				await connection.commit()
 			except pymysql.err.IntegrityError as e:
@@ -161,16 +164,13 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
+		if not self.Editable:
+			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
+
 		mysql_id = credentials_id[len(self.Prefix):]
-		query = "DELETE FROM `{table}` WHERE `{field}` = {value};".format(
-			table=self.Table,
-			field=self.IdField,
-			value=mysql_id,
-		)
-		L.warning(f"\n🥴 delete {query}")
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(query)
+				await cursor.execute(self.DeleteQuery, {"_id": mysql_id})
 			try:
 				await connection.commit()
 			except pymysql.err.IntegrityError as e:
@@ -205,7 +205,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		mysql_id = credentials_id[len(self.Prefix):]
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(self.GetQuery, {"id": mysql_id})
+				await cursor.execute(self.GetQuery, {"_id": mysql_id})
 				result = await cursor.fetchone()
 		if result is None:
 			raise KeyError(credentials_id)
@@ -215,16 +215,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 	async def count(self, filtr=None) -> int:
 		# TODO: Filtering
-
-		# if filtr is not None:
-		# 	where = "WHERE `{}` = {}".format(self.Fields["username"], filtr)
-		# else:
-		# 	where = ""
-		# query = "SELECT * FROM `{table}` {where} ORDER BY `{order}` ASC;".format(
-		# 	table=self.Table,
-		# 	where=where,
-		# 	order=self.IdField
-		# )
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor() as cursor:
 				return await cursor.execute(self.ListQuery)
@@ -232,19 +222,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = -1) -> list:
 		# TODO: Filtering
-
-		# if filter is not None:
-		# 	assert len(filter) == 1
-		# 	k, v = filter.popitem()
-		# 	where = "WHERE `{}` = {}".format(k, v)
-		# else:
-		# 	where = ""
-		# query = "SELECT * FROM `{table}` {where} ORDER BY `{order}` ASC;".format(
-		# 	table=self.Table,
-		# 	where=where,
-		# 	order=self.IdField
-		# )
-
 		if limit > 0:
 			offset = page * limit
 		else:
@@ -274,17 +251,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
 		# TODO: Filtering
-
-		# if filtr is not None:
-		# 	where = "WHERE {} = {}".format(self.Fields["username"], filtr)
-		# else:
-		# 	where = ""
-		# query = "SELECT * FROM `{table}` {where} ORDER BY `{order}` ASC;".format(
-		# 	table=self.Table,
-		# 	where=where,
-		# 	order=self.IdField
-		# )
-
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
 				nrows = await cursor.execute(self.ListQuery)
@@ -343,9 +309,11 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			'_provider_id': self.ProviderID,
 		}
 
-		for field in self.Fields:
+		for field in frozenset(["username", "email", "phone"]):
 			if field in db_obj:
 				normalized[field] = db_obj[field]
+
+		normalized["suspended"] = bool(db_obj["suspended"])
 
 		data = {}
 		for field in self.DataFields:
