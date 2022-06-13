@@ -13,6 +13,7 @@
 - OIDC scope format in token response (b5a18c2, PLUM Sprint 220520)
 - Always update the expiration of the whole session group (#44, PLUM Sprint 220520)
 - Explicit UTC timezone for all time data in userinfo (#45, PLUM Sprint 220520)
+- DuplicateError handling (#47, PLUM Sprint 2200603)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)

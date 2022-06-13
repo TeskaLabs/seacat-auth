@@ -126,24 +126,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		for field, value in credentials.items():
 			u.set(field, value)
 
-		try:
-			credentials_id = await u.execute()
-		except pymongo.errors.DuplicateKeyError as e:
-			# TODO: This error should be probably caught in ASAB
-			if hasattr(e, "details") and "keyValue" in e.details:
-				# What caused the conflict
-				key, value = e.details["keyValue"].popitem()
-				L.error("Cannot create credentials: Duplicate key", struct_data={
-					"provider_id": self.ProviderID,
-					"conflict": {key: value}
-				})
-			else:
-				# Cause of conflict not available
-				L.error("Cannot create credentials: Duplicate key", struct_data={
-					"cid": credentials_id,
-					"details": e
-				})
-			raise ValueError("Cannot create credentials: Already exists")
+		credentials_id = await u.execute()
 
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
@@ -278,15 +261,13 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			result = "OK"
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
-				key, value = e.KeyValue
 				L.error("Cannot update credentials: Duplicate key", struct_data={
 					"cid": credentials_id,
-					"conflict": {key: value}
+					"conflict": e.KeyValue
 				})
 				result = {
 					"error": "ALREADY-IN-USE",
-					"key": key,
-					"value": value
+					"conflict": e.KeyValue,
 				}
 			else:
 				L.error("Cannot update credentials: Duplicate key", struct_data={
@@ -295,29 +276,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				result = {
 					"error": "ALREADY-IN-USE"
 				}
-		except pymongo.errors.DuplicateKeyError as e:
-			# TODO: This error should be probably caught in ASAB
-			if hasattr(e, "details") and "keyValue" in e.details:
-				# What caused the conflict
-				key, value = e.details["keyValue"].popitem()
-				L.error("Cannot update credentials: Duplicate key", struct_data={
-					"cid": credentials_id,
-					"conflict": {key: value}
-				})
-				result = {
-					"error": "ALREADY-IN-USE",
-					"key": key,
-					"value": value
-				}
-			else:
-				# Cause of conflict not available
-				L.error("Cannot update credentials: Duplicate key", struct_data={
-					"cid": credentials_id,
-					"details": e
-				})
-				result = {
-					"error": "ALREADY-IN-USE"
-				}
+
 		return result
 
 
