@@ -4,6 +4,7 @@ import asyncio
 import re
 
 import asab
+import asab.storage.exceptions
 import typing
 
 from seacatauth.credentials.policy import CredentialsPolicy
@@ -318,6 +319,13 @@ class CredentialsService(asab.Service):
 		# Create in provider
 		try:
 			credentials_id = await provider.create(validated_data)
+		except asab.storage.exceptions.DuplicateError as e:
+			L.error("Cannot create credentials: {}".format(e))
+			return {
+				"status": "FAILED",
+				"message": "Cannot create credentials: Duplicate key",
+				"conflict": e.KeyValue
+			}
 		except Exception as e:
 			L.error("Cannot create credentials: {}".format(e))
 			return {
