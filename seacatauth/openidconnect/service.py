@@ -258,7 +258,6 @@ class OpenIdConnectService(asab.Service):
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			# RFC 7519 states that the exp and iat claim values must be NumericDate values.
 			"exp": session.Session.Expiration,
 			"iat": datetime.datetime.utcnow(),
 		}
@@ -367,14 +366,11 @@ class OpenIdConnectService(asab.Service):
 				}
 			)
 
-		# Convert datetimes to UTC timestamps
+		# RFC 7519 states that the exp and iat claim values must be NumericDate values
+		# Convert all datetimes to UTC timestamps for consistency
 		for k, v in userinfo.items():
 			if isinstance(v, datetime.datetime):
-				if v.tzinfo is not None and v.tzinfo.utcoffset(v) is not None:
-					# Timezone-aware
-					userinfo[k] = int(v.timestamp())
-				else:
-					# Timezone-unaware
-					userinfo[k] = int(v.replace(tzinfo=datetime.timezone.utc).timestamp())
+				# Add explicit UTC timezone, because naive datetimes are treated as local by timestamp() method
+				userinfo[k] = int(v.replace(tzinfo=datetime.timezone.utc).timestamp())
 
 		return userinfo
