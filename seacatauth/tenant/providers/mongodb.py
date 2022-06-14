@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Optional
 
 import asab.storage.mongodb
@@ -36,10 +37,13 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		self.AssignCollection = self.Config['assign_collection']
 
 
-	async def iterate(self, page: int = 1, limit: int = None):
+	async def iterate(self, page: int = 1, limit: int = None, filter: str = None):
 		collection = await self.MongoDBStorageService.collection(self.TenantsCollection)
 
-		filter = {}
+		if filter is not None:
+			filter = {"_id": re.compile(re.escape(filter))}
+		else:
+			filter = {}
 		cursor = collection.find(filter)
 
 		cursor.sort("_id", 1)
@@ -53,7 +57,10 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 	async def count(self, filter=None) -> int:
 		coll = await self.MongoDBStorageService.collection(self.TenantsCollection)
-		if filter is None:
+
+		if filter is not None:
+			filter = {"_id": re.compile(re.escape(filter))}
+		else:
 			filter = {}
 		return await coll.count_documents(filter=filter)
 
