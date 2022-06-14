@@ -21,6 +21,7 @@
 - Custom credentials data (#40, PLUM Sprint 220520)
 - Ensure credentials contain at least an email or a phone (#41, PLUM Sprint 220520)
 - Generic MySQL credentials provider (#42, PLUM Sprint 220603)
+- Tenant search filter (#49, PLUM Sprint 220603)
 
 ---
 
