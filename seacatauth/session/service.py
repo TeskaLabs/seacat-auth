@@ -95,10 +95,10 @@ class SessionService(asab.Service):
 	async def delete_expired_sessions(self):
 		expired = []
 		async for session in self._iterate_raw(
-			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.utcnow()}}
+			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		):
 			try:
-				if datetime.datetime.utcnow() > (
+				if datetime.datetime.now(datetime.timezone.utc) > (
 					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
 				):
 					expired.append(session["_id"])
@@ -136,8 +136,8 @@ class SessionService(asab.Service):
 				L.warning("Session expiration exceeds maximum session age.")
 		else:
 			expiration = self.Expiration
-		expires = datetime.datetime.utcnow() + expiration
-		max_expiration = datetime.datetime.utcnow() + self.MaximumAge
+		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+		max_expiration = datetime.datetime.now(datetime.timezone.utc) + self.MaximumAge
 		if self.TouchExtensionSeconds is not None:
 			touch_extension_seconds = self.TouchExtensionSeconds
 		else:
@@ -306,7 +306,7 @@ class SessionService(asab.Service):
 		if session.Session.ParentId is not None:
 			session = await self.get(session.Session.ParentId)
 
-		if datetime.datetime.utcnow() < session.Session.ModifiedAt + self.MinimalRefreshInterval:
+		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
 			return
 		if session.Session.Expiration >= session.Session.MaxExpiration:
@@ -320,7 +320,7 @@ class SessionService(asab.Service):
 		else:
 			# May be a legacy "machine credentials session". Do not extend.
 			return
-		expires = datetime.datetime.utcnow() + expiration
+		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
 
 		if expires < session.Session.Expiration:
 			# Do not shorten the session!

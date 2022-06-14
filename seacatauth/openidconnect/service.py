@@ -139,7 +139,7 @@ class OpenIdConnectService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
 
 		upsertor.set("sid", session_id)
-		upsertor.set("exp", datetime.datetime.utcnow() + self.AuthorizationCodeTimeout)
+		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
 
 		await upsertor.execute()
 
@@ -149,7 +149,7 @@ class OpenIdConnectService(asab.Service):
 	async def delete_expired_authorization_codes(self):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 
-		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.info("Expired login sessions deleted", struct_data={
@@ -165,7 +165,7 @@ class OpenIdConnectService(asab.Service):
 
 		session_id = data["sid"]
 		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.utcnow():
+		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Authorization code expired")
 
 		return session_id
@@ -259,7 +259,7 @@ class OpenIdConnectService(asab.Service):
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
 			"exp": session.Session.Expiration,
-			"iat": datetime.datetime.utcnow(),
+			"iat": datetime.datetime.now(datetime.timezone.utc),
 		}
 
 		if session.OAuth2.ClientId is not None:
@@ -371,6 +371,6 @@ class OpenIdConnectService(asab.Service):
 		for k, v in userinfo.items():
 			if isinstance(v, datetime.datetime):
 				# Add explicit UTC timezone, because naive datetimes are treated as local by timestamp() method
-				userinfo[k] = int(v.replace(tzinfo=datetime.timezone.utc).timestamp())
+				userinfo[k] = int(v.timestamp())
 
 		return userinfo

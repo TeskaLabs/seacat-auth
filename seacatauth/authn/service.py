@@ -156,14 +156,14 @@ class AuthenticationService(asab.Service):
 	async def get_login_session(self, login_session_id):
 		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
 		login_session = LoginSession.deserialize(self, ls_data)
-		if login_session.ExpiresAt < datetime.datetime.utcnow():
+		if login_session.ExpiresAt < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Login session expired")
 		return login_session
 
 
 	async def update_login_session(self, login_session_id, *, data=None, remaining_login_attempts=None):
 		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
-		if ls_data["exp"] < datetime.datetime.utcnow():
+		if ls_data["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Login session expired")
 
 		upsertor = self.StorageService.upsertor(
@@ -193,7 +193,7 @@ class AuthenticationService(asab.Service):
 	async def delete_expired_login_sessions(self):
 		collection = self.StorageService.Database[self.LoginSessionCollection]
 
-		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.info("Expired login sessions deleted", struct_data={

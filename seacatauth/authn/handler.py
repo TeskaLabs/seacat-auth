@@ -280,7 +280,7 @@ class AuthenticationHandler(object):
 			return aiohttp.web.Response(body=login_session.encrypt(body))
 
 		# Webauthn challenge timeout should be the same as the current login session timeout
-		timeout = (login_session.ExpiresAt - datetime.datetime.utcnow()).total_seconds() * 1000
+		timeout = (login_session.ExpiresAt - datetime.datetime.now(datetime.timezone.utc)).total_seconds() * 1000
 
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
 		authentication_options = await webauthn_svc.get_authentication_options(

@@ -32,7 +32,7 @@ class AuditService(asab.Service):
 		else:
 			attributes = attributes.copy()
 
-		now = datetime.datetime.utcnow()
+		now = datetime.datetime.now(datetime.timezone.utc)
 		attributes['_c'] = now
 		attributes['_m'] = now
 		attributes['c'] = code.name

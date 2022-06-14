@@ -46,7 +46,7 @@ class ChangePasswordService(asab.Service):
 		expired = []
 		requests = await self.list_pwdreset_requests()
 		for r in requests["data"]:
-			if datetime.datetime.utcnow() > r["exp"]:
+			if datetime.datetime.now(datetime.timezone.utc) > r["exp"]:
 				expired.append(r["_id"])
 		for pwd_id in expired:
 			await self.delete_pwdreset_request(pwdreset_id=pwd_id)
@@ -114,7 +114,7 @@ class ChangePasswordService(asab.Service):
 		pwd_change_id = generate_ergonomic_token(length=20)
 		pwd_change_builders = [{
 			"cid": credentials_id,
-			"exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=expiration)
+			"exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 		}]
 
 		await self.create_pwdreset_request(pwd_change_id, pwd_change_builders)
