@@ -13,12 +13,12 @@ class TenantsProviderABC(asab.ConfigObject, abc.ABC):
 
 
 	@abc.abstractmethod
-	async def iterate(self, page: int = 10, limit: int = None):
+	async def iterate(self, page: int = 10, limit: int = None, filter: str = None):
 		pass
 
 
 	@abc.abstractmethod
-	async def count(self, filter=None) -> int:
+	async def count(self, filter: str = None) -> int:
 		pass
 
 
