@@ -1,6 +1,5 @@
 import collections
 import logging
-import re
 from typing import Optional
 
 import asab.storage.mongodb
