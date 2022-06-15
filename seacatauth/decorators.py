@@ -131,8 +131,7 @@ def _authorize_tenant(request):
 	requested_tenant = request.match_info.get("tenant")
 
 	# Gather resources from all global roles
-	global_roles = request.Session.Authorization.Authz.get("*")
-	available_resources = set().union(*global_roles.values())
+	available_resources = set().union(request.Session.Authorization.Authz.get("*"))
 
 	# Check for tenant access
 	if requested_tenant in (None, "*"):
@@ -141,8 +140,7 @@ def _authorize_tenant(request):
 	elif requested_tenant in request.Session.Authorization.Authz:
 		# Tenant accessible
 		# Add resources from all roles under the requested_tenant
-		tenant_authz = request.Session.Authorization.Authz.get(requested_tenant)
-		available_resources = available_resources.union(*tenant_authz.values())
+		available_resources = available_resources.union(request.Session.Authorization.Authz.get(requested_tenant))
 	elif "authz:superuser" in available_resources:
 		# Bypassing tenant-access check as superuser
 		# No resources to add
