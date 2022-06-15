@@ -131,7 +131,7 @@ def _authorize_tenant(request):
 	requested_tenant = request.match_info.get("tenant")
 
 	# Gather resources from all global roles
-	available_resources = set().union(request.Session.Authorization.Authz.get("*"))
+	available_resources = set(request.Session.Authorization.Authz.get("*"))
 
 	# Check for tenant access
 	if requested_tenant in (None, "*"):
