@@ -230,6 +230,18 @@ class CredentialsHandler(object):
 			L.error("Unsupported filter mode", struct_data={"mode": mode})
 			raise aiohttp.web.HTTPBadRequest()
 
+		#  Add brief tenant and role info into credentials list
+		for cred in credentials:
+			role_svc = self.CredentialsService.App.get_service("seacatauth.RoleService")
+			roles = await role_svc.get_roles_by_credentials(cred["_id"])
+			tenants = await self.TenantService.get_tenants(cred["_id"])
+
+			tenants = tenants[:5]
+			roles = roles[:5]
+
+			cred['tenants'] = tenants
+			cred['roles'] = roles
+
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
 			"data": credentials,
