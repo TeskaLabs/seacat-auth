@@ -1,3 +1,4 @@
+import collections
 import logging
 import re
 from typing import Optional
@@ -40,16 +41,28 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 	async def iterate(self, page: int = 1, limit: int = None, filter: str = None):
 		collection = await self.MongoDBStorageService.collection(self.TenantsCollection)
 
-		if filter is not None:
-			filter = {"_id": re.compile(re.escape(filter))}
+		if filter is None:
+			cursor = collection.find()
+			cursor.sort("_id", 1)
+			if limit is not None:
+				cursor.skip(limit * page)
+				cursor.limit(limit)
 		else:
-			filter = {}
-		cursor = collection.find(filter)
-
-		cursor.sort("_id", 1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
+			# Fetch tenants that contain `filter` substring
+			# Sort them so that items that start with `filter` substring come first,
+			# followed by those that contain the substring but do not start with it,
+			# sorted alphabetically.
+			pipeline = [
+				{"$set": {"match": {"$min": [
+					{"$indexOfCP": [{"$toLower": "$_id"}, filter.lower()]}, 1
+				]}}},
+				{"$match": {"$expr": {"$gte": ["$match", 0]}}},
+				{"$sort": collections.OrderedDict({"match": 1, "_id": 1})},
+			]
+			if limit is not None:
+				pipeline.append({"$skip": limit * page})
+				pipeline.append({"$limit": limit})
+			cursor = collection.aggregate(pipeline)
 
 		async for tenant in cursor:
 			yield tenant
@@ -59,7 +72,8 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		coll = await self.MongoDBStorageService.collection(self.TenantsCollection)
 
 		if filter is not None:
-			filter = {"_id": re.compile(re.escape(filter))}
+			# Count only entries that contain `filter` substring
+			filter = {"$expr": {"$gte": [{"$indexOfCP": [{"$toLower": "$_id"}, filter.lower()]}, 0]}}
 		else:
 			filter = {}
 		return await coll.count_documents(filter=filter)
