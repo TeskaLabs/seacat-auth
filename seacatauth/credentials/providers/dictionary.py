@@ -71,8 +71,8 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		credentials_object = {
 			"_id": credentials_id,
 			"_v": 1,
-			"_c": datetime.datetime.utcnow(),
-			"_m": datetime.datetime.utcnow(),
+			"_c": datetime.datetime.now(datetime.timezone.utc),
+			"_m": datetime.datetime.now(datetime.timezone.utc),
 			"username": username,
 			"__password": hashedpwd,
 		}
@@ -102,7 +102,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 			credentials[k] = v
 
 		credentials["_v"] += 1
-		credentials["_m"] = datetime.datetime.utcnow()
+		credentials["_m"] = datetime.datetime.now(datetime.timezone.utc)
 
 		return "OK"
 

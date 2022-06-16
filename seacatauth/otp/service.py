@@ -129,7 +129,7 @@ class OTPService(asab.Service):
 
 		upsertor = self.StorageService.upsertor(self.TOTPSecretCollection, obj_id=session_id)
 
-		expires = datetime.datetime.utcnow() + self.RegistrationTimeout
+		expires = datetime.datetime.now(datetime.timezone.utc) + self.RegistrationTimeout
 		upsertor.set("exp", expires)
 
 		# TODO: Encryption
@@ -146,7 +146,7 @@ class OTPService(asab.Service):
 		data = await self.StorageService.get(self.TOTPSecretCollection, session_id)
 		secret = data["__s"]
 		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.utcnow():
+		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
 
 		return secret
@@ -160,7 +160,7 @@ class OTPService(asab.Service):
 	async def _delete_expired_totp_secrets(self):
 		collection = self.StorageService.Database[self.TOTPSecretCollection]
 
-		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.info("Expired TOTP secrets deleted", struct_data={
