@@ -4,6 +4,8 @@ SeaCat Auth is a microservice that provides authentication, authorization, ident
 and other access control features.
 It is designed to be used as an access control app for other microservices.
 
+📖 Documentation is available at [docs.teskalabs.com](https://docs.teskalabs.com/seacat-auth).
+
 SeaCat Auth provides a rich REST API [documented in a Postman collection](./doc/postman.md).
 
 
