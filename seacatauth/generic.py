@@ -116,7 +116,7 @@ async def nginx_introspection(
 		raise NotImplementedError("Tenant check not implemented in introspection")
 
 	if len(requested_resources) > 0:
-		if rbac_service.has_resource_access(session.Authorization.Authz, requested_tenant, requested_resources) != "OK":
+		if not rbac_service.has_resource_access(session.Authorization.Authz, requested_tenant, requested_resources):
 			L.warning("Credentials not authorized for tenant or resource.", struct_data={
 				"cid": session.Credentials.Id,
 				"tenant": requested_tenant,
