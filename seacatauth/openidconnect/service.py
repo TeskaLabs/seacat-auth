@@ -367,10 +367,9 @@ class OpenIdConnectService(asab.Service):
 			)
 
 		# RFC 7519 states that the exp and iat claim values must be NumericDate values
-		# Convert all datetimes to UTC timestamps for consistency
+		# Convert ALL datetimes to UTC timestamps for consistency
 		for k, v in userinfo.items():
 			if isinstance(v, datetime.datetime):
-				# Add explicit UTC timezone, because naive datetimes are treated as local by timestamp() method
 				userinfo[k] = int(v.timestamp())
 
 		return userinfo
