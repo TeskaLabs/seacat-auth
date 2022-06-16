@@ -1,3 +1,5 @@
+import time
+
 import aiohttp.web
 import asab
 import logging
@@ -28,7 +30,7 @@ def private_auth_middleware_factory(app):
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	require_authentication = asab.Config.getboolean("seacat:api", "require_authentication")
 	authorization_resource = asab.Config.get("seacat:api", "authorization_resource")
-	allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
+	_allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 
 	rbac_svc = app.get_service("seacatauth.RBACService")
 
@@ -51,7 +53,7 @@ def private_auth_middleware_factory(app):
 				request.Session = oidc_service.build_session_from_id_token(token_value)
 			except ValueError:
 				# If the token cannot be parsed as ID token, it may be an Access token
-				if allow_access_token_auth:
+				if _allow_access_token_auth:
 					request.Session = await oidc_service.get_session_by_access_token(token_value)
 				else:
 					L.info("Invalid Bearer token")
@@ -100,15 +102,35 @@ def private_auth_middleware_factory(app):
 
 def public_auth_middleware_factory(app):
 	cookie_service = app.get_service("seacatauth.CookieService")
+	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
+	_allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 
 	@aiohttp.web.middleware
 	async def public_auth_middleware(request, handler):
 		"""
 		Try to authenticate before accessing public endpoints.
 		"""
+		request.Session = None
 
-		# Cookie-based authentication
-		request.Session = await cookie_service.get_session_by_sci(request)
+		# If Bearer token exists, authorize using Bearer token and ignore cookie
+		token_value = get_bearer_token_value(request)
+		if token_value is not None:
+			try:
+				request.Session = oidc_service.build_session_from_id_token(token_value)
+			except ValueError:
+				# If the token cannot be parsed as ID token, it may be an Access token
+				# OIDC endpoints allow authorization via Access token
+				if request.path.startswith("/openidconnect/"):
+					request.Session = await oidc_service.get_session_by_access_token(token_value)
+				# Allow authorization via Access token on all public endpoints if enabled in config
+				elif _allow_access_token_auth:
+					request.Session = await oidc_service.get_session_by_access_token(token_value)
+				else:
+					L.info("Invalid Bearer token")
+					raise aiohttp.web.HTTPUnauthorized()
+		else:
+			# No Bearer token exists, authorize using cookie
+			request.Session = await cookie_service.get_session_by_sci(request)
 
 		return await handler(request)
 
