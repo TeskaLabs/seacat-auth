@@ -31,10 +31,8 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(self.authz_test_data, "second-tenant", ["tenant:access"])
 		self.assertFalse(access)
 
-		self.assertRaises(
-			TenantRequired,
+		with self.assertRaises(TenantRequired):
 			RBACService.has_resource_access(self.authz_test_data, None, ["tenant:access"])
-		)
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, "first-tenant", ["tenant:access"])
