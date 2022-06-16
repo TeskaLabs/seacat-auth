@@ -35,19 +35,7 @@ class UserInfoHandler(object):
 		OpenID Connect Core 1.0, chapter 5.3. UserInfo Endpoint
 		"""
 
-		if request.Session is not None:
-			# Use the session that was authenticated via SCI
-			session = request.Session
-		else:
-			# Authenticate via OAuth2 Bearer token
-			token_value = get_bearer_token_value(request)
-			if token_value is not None:
-				try:
-					session = self.OpenIdConnectService.build_session_from_id_token(token_value)
-				except ValueError:
-					session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-			else:
-				session = None
+		session = request.Session
 
 		if session is None:
 			L.warning("Request for invalid/expired session")
