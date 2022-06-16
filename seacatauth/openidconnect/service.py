@@ -96,11 +96,10 @@ class OpenIdConnectService(asab.Service):
 			)
 			private_key = self._generate_private_key(private_key_path)
 		else:
-			L.error(
+			raise FileNotFoundError(
 				"Private key file '{}' does not exist. "
 				"Run the app in provisioning mode to generate a new private key.".format(private_key_path)
 			)
-			raise FileNotFoundError(private_key_path)
 
 		assert private_key.key_type == "EC"
 		assert private_key.key_curve == "P-256"
