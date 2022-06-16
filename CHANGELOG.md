@@ -25,6 +25,7 @@
 
 ### Refactoring
 - Authz object no longer contains roles (#50, PLUM Sprint 220603)
+- Datetime objects are explicitly UTC-aware (#48, PLUM Sprint 220603)
 
 ---
 
