@@ -69,7 +69,7 @@ class LoginSession(object):
 			client_login_key
 		)
 
-		expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
+		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=timeout)
 
 		return cls(
 			id=secrets.token_urlsafe(),

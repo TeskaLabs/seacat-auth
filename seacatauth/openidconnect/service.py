@@ -138,7 +138,7 @@ class OpenIdConnectService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
 
 		upsertor.set("sid", session_id)
-		upsertor.set("exp", datetime.datetime.utcnow() + self.AuthorizationCodeTimeout)
+		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
 
 		await upsertor.execute()
 
@@ -148,7 +148,7 @@ class OpenIdConnectService(asab.Service):
 	async def delete_expired_authorization_codes(self):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 
-		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.info("Expired login sessions deleted", struct_data={
@@ -164,7 +164,7 @@ class OpenIdConnectService(asab.Service):
 
 		session_id = data["sid"]
 		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.utcnow():
+		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Authorization code expired")
 
 		return session_id
@@ -257,9 +257,8 @@ class OpenIdConnectService(asab.Service):
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			# RFC 7519 states that the exp and iat claim values must be NumericDate values.
 			"exp": session.Session.Expiration,
-			"iat": datetime.datetime.utcnow(),
+			"iat": datetime.datetime.now(datetime.timezone.utc),
 		}
 
 		if session.OAuth2.ClientId is not None:
@@ -355,14 +354,10 @@ class OpenIdConnectService(asab.Service):
 				}
 			)
 
-		# Convert datetimes to UTC timestamps
+		# RFC 7519 states that the exp and iat claim values must be NumericDate values
+		# Convert ALL datetimes to UTC timestamps for consistency
 		for k, v in userinfo.items():
 			if isinstance(v, datetime.datetime):
-				if v.tzinfo is not None and v.tzinfo.utcoffset(v) is not None:
-					# Timezone-aware
-					userinfo[k] = int(v.timestamp())
-				else:
-					# Timezone-unaware
-					userinfo[k] = int(v.replace(tzinfo=datetime.timezone.utc).timestamp())
+				userinfo[k] = int(v.timestamp())
 
 		return userinfo
