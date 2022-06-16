@@ -57,7 +57,7 @@ def private_auth_middleware_factory(app):
 					L.info("Invalid Bearer token")
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
-			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource]) == "OK"
+			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
 
 		request.has_resource_access = has_resource_access
 
