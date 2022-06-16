@@ -7,29 +7,16 @@ class RBACTestCase(unittest.TestCase):
 	maxDiff = None
 
 	authz_test_data = {
-		"*": {
-			"*/user": ["post:read"],
-			"*/editor": ["post:write", "post:edit"],
-		},
-		"first-tenant": {
-			"*/user": ["post:read"],
-			"*/editor": ["post:write", "post:edit"],
-			"first-tenant/admin": ["authz:tenant:admin"]
-		}
+		"*": ["post:read", "post:write", "post:edit"],
+		"first-tenant": ["post:read", "post:write", "post:edit", "authz:tenant:admin"],
 	}
 
 	notenant_authz_test_data = {
-		"*": {
-			"*/user": ["post:read"],
-			"*/editor": ["post:write", "post:edit"],
-		}
+		"*": ["post:read", "post:write", "post:edit"],
 	}
 
 	superuser_authz_test_data = {
-		"*": {
-			"*/user": ["post:read"],
-			"*/superuser": ["authz:superuser"],
-		}
+		"*": ["post:read", "authz:superuser"],
 	}
 
 	def test_tenant_access(self):

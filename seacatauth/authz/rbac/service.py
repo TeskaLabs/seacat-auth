@@ -1,9 +1,9 @@
 import logging
+import typing
 
 import asab
 
 #
-import typing
 
 L = logging.getLogger(__name__)
 
@@ -19,8 +19,7 @@ class RBACService(asab.Service):
 	def is_superuser(authz: dict):
 		global_resources = set(
 			resource
-			for role in authz["*"].values()
-			for resource in role
+			for resource in authz["*"]
 		)
 		return "authz:superuser" in global_resources
 
@@ -35,23 +34,20 @@ class RBACService(asab.Service):
 			# Gather resources from all tenants
 			resources = set(
 				resource
-				for roles in authz.values()
-				for resources in roles.values()
+				for resources in authz.values()
 				for resource in resources
 			)
 		elif tenant is None:
 			# If the tenant is None, we check only global roles
 			resources = set(
 				resource
-				for resources in authz["*"].values()
-				for resource in resources
+				for resource in authz["*"]
 			)
 		elif tenant in authz:
 			# We are checking resources under a specific tenant
 			resources = set(
 				resource
-				for resources in authz[tenant].values()
-				for resource in resources
+				for resource in authz[tenant]
 			)
 		else:
 			# Inaccessible tenant
