@@ -48,15 +48,19 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 				cursor.limit(limit)
 		else:
 			# Fetch tenants that contain `filter` substring
-			# Sort them so that items that start with `filter` substring come first,
-			# followed by those that contain the substring but do not start with it,
-			# sorted alphabetically.
 			pipeline = [
-				{"$set": {"match": {"$min": [
+				# Set "_match" to:
+				#  -1 if tenant does not contain substring
+				#   0 if tenant starts with substring
+				#   1 if tenant contains substring but not at the start
+				{"$set": {"_match": {"$min": [
 					{"$indexOfCP": [{"$toLower": "$_id"}, filter.lower()]}, 1
 				]}}},
-				{"$match": {"$expr": {"$gte": ["$match", 0]}}},
-				{"$sort": collections.OrderedDict({"match": 1, "_id": 1})},
+				# Exclude tenants that do not contain substring at all
+				{"$match": {"$expr": {"$gte": ["$_match", 0]}}},
+				# Sort matches so that tenants that start with substring come first
+				# Secondary sort is alphabetical
+				{"$sort": collections.OrderedDict({"_match": 1, "_id": 1})},
 			]
 			if limit is not None:
 				pipeline.append({"$skip": limit * page})
