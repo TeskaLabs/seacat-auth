@@ -5,6 +5,7 @@
 ### Breaking changes
 - SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
 - Introspection outputs ID token instead of Access token (#39, PLUM Sprint 220520)
+- Roles are no longer included in userinfo or ID token (#50, PLUM Sprint 220603)
 
 ### Fix
 - Fix TOTP activation error (#43, PLUM Sprint 220520)
@@ -21,6 +22,9 @@
 - Custom credentials data (#40, PLUM Sprint 220520)
 - Ensure credentials contain at least an email or a phone (#41, PLUM Sprint 220520)
 - Generic MySQL credentials provider (#42, PLUM Sprint 220603)
+
+### Refactoring
+- Authz object no longer contains roles (#50, PLUM Sprint 220603)
 
 ---
 

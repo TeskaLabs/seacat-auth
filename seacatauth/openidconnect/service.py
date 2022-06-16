@@ -314,9 +314,6 @@ class OpenIdConnectService(asab.Service):
 			if len(tenants) > 0:
 				userinfo["tenants"] = tenants
 
-		if session.Authorization.Roles is not None:
-			userinfo["roles"] = session.Authorization.Roles
-
 		if session.Authorization.Resources is not None:
 			userinfo["resources"] = session.Authorization.Resources
 
@@ -345,17 +342,9 @@ class OpenIdConnectService(asab.Service):
 			tenant = "*"
 
 		# Include "roles" and "resources" sections, with items relevant to query_tenant
-		session_roles = session.Authorization.Authz.get(tenant)
-		if session_roles is not None:
-			roles = []
-			resources = set()
-			for session_role, session_resources in session_roles.items():
-				roles.append(session_role)
-				resources.update(session_resources)
-			if len(roles) > 0:
-				userinfo["roles"] = roles
-			if len(resources) > 0:
-				userinfo["resources"] = list(resources)
+		resources = session.Authorization.Authz.get(tenant)
+		if resources is not None:
+			userinfo["resources"] = resources
 		else:
 			L.error(
 				"Tenant '{}' not found in session.Authorization.authz.".format(tenant),
