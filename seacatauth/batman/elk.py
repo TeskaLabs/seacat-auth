@@ -177,14 +177,6 @@ class ELKIntegration(asab.config.Configurable):
 				for resource in user_resources.intersection(elk_resources)
 			)
 
-		# Map roles to ELK roles
-		# TODO: Obsolete, use resources.
-		for role in authz.get("*", {}):
-			for prefix in self.RolePrefixes:
-				if role.startswith(prefix):
-					elk_roles.add(role[len(prefix):])
-					break
-
 		# ELK roles from tenants
 		for tenant in authz:
 			if tenant == "*":

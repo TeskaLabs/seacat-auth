@@ -3,6 +3,8 @@ import typing
 
 import asab
 
+from ...exceptions import TenantRequired
+
 #
 
 L = logging.getLogger(__name__)
@@ -27,7 +29,7 @@ class RBACService(asab.Service):
 	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list):
 		# Superuser passes without further checks
 		if RBACService.is_superuser(authz):
-			return "OK"
+			return True
 
 		if tenant == "*":
 			# If the tenant is "*", we are performing a soft-check, i.e. checking if the resource is under ANY tenant
@@ -51,27 +53,27 @@ class RBACService(asab.Service):
 			)
 		else:
 			# Inaccessible tenant
-			return "NOT-AUTHORIZED"
+			return False
 
 		# Validate the resources
 		for resource in requested_resources:
 
 			if resource == "tenant:access":
 				if tenant is None:
-					# "tenant:access" must be paired with a specific tenant
-					return "TENANT-NOT-SPECIFIED"
+					# "tenant:access" must be checked against a specific tenant
+					raise TenantRequired()
 				if tenant == "*":
 					# Soft-check: Pass if at least one tenant is accessible
 					# (Authz must contain "*" plus at least one more tenant)
 					if len(authz) >= 2:
 						continue
-					return "NOT-AUTHORIZED"
+					return False
 				if tenant not in authz:
-					return "NOT-AUTHORIZED"
+					return False
 				continue
 
 			if resource in resources:
 				continue
-			return "NOT-AUTHORIZED"
+			return False
 
-		return "OK"
+		return True

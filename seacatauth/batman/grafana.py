@@ -103,15 +103,9 @@ class GrafanaIntegration(asab.config.Configurable):
 
 		# Grafana roles from SCA resources
 		# Use only global "*" roles for now
-		if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) != "OK" \
-			and self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]) != "OK":
-			# TODO: BACK COMPAT
-			#   Use resources instead of roles! This will be removed
-			# >>>>>>>>>>>>>>
-			if "*/grafana:grafana_admin" not in authz.get("*", {}) \
-				and "*/grafana:grafana_user" not in authz.get("*", {}):
-				# <<<<<<<<<<<<<<<<<<<<<<<
-				return
+		if not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) \
+			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]):
+			return
 
 		json = {
 			'login': username,
@@ -151,8 +145,7 @@ class GrafanaIntegration(asab.config.Configurable):
 						return
 
 					# Set admin role if Grafana admin resource is present
-					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]) == "OK" \
-						or "*/grafana:grafana_admin" in authz.get("*", {}):  # TODO: BACK COMPAT, Use resources instead
+					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]):
 						response = await resp.json()
 						_id = response["id"]
 						async with session.put("{}/api/admin/users/{}/permissions".format(self.URL, _id), json={
