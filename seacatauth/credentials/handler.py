@@ -147,7 +147,9 @@ class CredentialsHandler(object):
 			if mode == "role":
 				# Check if the user has admin access to the role's tenant
 				tenant = filtr.split("/")[0]
-				if rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]) != "OK":
+				if not rbac_svc.has_resource_access(
+					request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]
+				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
 					})
@@ -157,7 +159,9 @@ class CredentialsHandler(object):
 			elif mode == "tenant":
 				# Check if the user has admin access to the requested tenant
 				tenant = filtr
-				if rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]) != "OK":
+				if not rbac_svc.has_resource_access(
+					request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]
+				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
 					})

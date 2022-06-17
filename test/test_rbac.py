@@ -1,6 +1,7 @@
 import unittest
 
 from seacatauth.authz import RBACService
+from seacatauth.exceptions import TenantRequired
 
 
 class RBACTestCase(unittest.TestCase):
@@ -25,17 +26,17 @@ class RBACTestCase(unittest.TestCase):
 		"""
 
 		access = RBACService.has_resource_access(self.authz_test_data, "first-tenant", ["tenant:access"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(self.authz_test_data, "second-tenant", ["tenant:access"])
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
-		access = RBACService.has_resource_access(self.authz_test_data, None, ["tenant:access"])
-		self.assertEqual(access, "TENANT-NOT-SPECIFIED")
+		with self.assertRaises(TenantRequired):
+			RBACService.has_resource_access(self.authz_test_data, None, ["tenant:access"])
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, "first-tenant", ["tenant:access"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 
 	def test_tenant_access_softcheck(self):
@@ -43,14 +44,14 @@ class RBACTestCase(unittest.TestCase):
 		Check if the user has access to ANY tenant
 		"""
 		access = RBACService.has_resource_access(self.authz_test_data, "*", ["tenant:access"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(self.notenant_authz_test_data, "*", ["tenant:access"])
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, "*", ["tenant:access"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 
 	def test_tenant_resource(self):
@@ -63,25 +64,25 @@ class RBACTestCase(unittest.TestCase):
 			"first-tenant",
 			["authz:tenant:admin"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"first-tenant",
 			["post:delete"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"second-tenant",
 			["post:edit"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, "first-tenant", ["post:edit"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 
 	def test_tenant_multiple_resource(self):
@@ -94,18 +95,20 @@ class RBACTestCase(unittest.TestCase):
 			"first-tenant",
 			["post:edit", "post:read"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"first-tenant",
 			["post:edit", "post:delete"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
-		access = RBACService.has_resource_access(self.superuser_authz_test_data, "first-tenant", ["post:edit", "post:delete"])
-		self.assertEqual(access, "OK")
+		access = RBACService.has_resource_access(
+			self.superuser_authz_test_data, "first-tenant", ["post:edit", "post:delete"]
+		)
+		self.assertTrue(access)
 
 
 	def test_resource_softcheck(self):
@@ -118,18 +121,18 @@ class RBACTestCase(unittest.TestCase):
 			"*",
 			["authz:tenant:admin"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"*",
 			["post:delete"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, "*", ["post:edit"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 
 	def test_multiple_resource_softcheck(self):
@@ -142,18 +145,20 @@ class RBACTestCase(unittest.TestCase):
 			"*",
 			["authz:tenant:admin", "post:edit"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"*",
 			["authz:tenant:admin", "post:delete"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
-		access = RBACService.has_resource_access(self.superuser_authz_test_data, "*", ["authz:tenant:admin", "post:edit"])
-		self.assertEqual(access, "OK")
+		access = RBACService.has_resource_access(
+			self.superuser_authz_test_data, "*", ["authz:tenant:admin", "post:edit"]
+		)
+		self.assertTrue(access)
 
 
 	def test_global_roles_resource(self):
@@ -166,18 +171,18 @@ class RBACTestCase(unittest.TestCase):
 			None,
 			["post:read"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			None,
 			["authz:tenant:admin"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, None, ["post:edit"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 
 	def test_global_roles_multiple_resources(self):
@@ -190,18 +195,18 @@ class RBACTestCase(unittest.TestCase):
 			None,
 			["post:read", "post:edit"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			None,
 			["post:write", "authz:tenant:admin"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(self.superuser_authz_test_data, None, ["authz:tenant:admin", "post:edit"])
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 
 	def test_superuser(self):
@@ -214,21 +219,21 @@ class RBACTestCase(unittest.TestCase):
 			"first-tenant",
 			["authz:superuser"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"*",
 			["authz:superuser"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			None,
 			["authz:superuser"]
 		)
-		self.assertEqual(access, "NOT-AUTHORIZED")
+		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(
@@ -236,18 +241,18 @@ class RBACTestCase(unittest.TestCase):
 			"first-tenant",
 			["authz:superuser"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.superuser_authz_test_data,
 			"*",
 			["authz:superuser"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.superuser_authz_test_data,
 			None,
 			["authz:superuser"]
 		)
-		self.assertEqual(access, "OK")
+		self.assertTrue(access)
