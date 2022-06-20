@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.25
 
 ### Breaking changes
 - SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
