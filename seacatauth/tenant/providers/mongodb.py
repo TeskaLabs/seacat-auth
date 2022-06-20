@@ -1,3 +1,4 @@
+import collections
 import logging
 from typing import Optional
 
@@ -36,16 +37,36 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		self.AssignCollection = self.Config['assign_collection']
 
 
-	async def iterate(self, page: int = 1, limit: int = None):
+	async def iterate(self, page: int = 1, limit: int = None, filter: str = None):
 		collection = await self.MongoDBStorageService.collection(self.TenantsCollection)
 
-		filter = {}
-		cursor = collection.find(filter)
-
-		cursor.sort("_id", 1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
+		if filter is None:
+			cursor = collection.find()
+			cursor.sort("_id", 1)
+			if limit is not None:
+				cursor.skip(limit * page)
+				cursor.limit(limit)
+		else:
+			# Fetch tenants that contain `filter` substring
+			# Sort results so that tenants that start with the substring come first
+			pipeline = [
+				# Set "_match" to:
+				#  -1 if tenant does not contain substring
+				#   0 if tenant starts with substring
+				#   1 if tenant contains substring but not at the start
+				{"$set": {"_match": {"$min": [
+					{"$indexOfCP": [{"$toLower": "$_id"}, filter.lower()]}, 1
+				]}}},
+				# Exclude tenants that do not contain substring at all
+				{"$match": {"$expr": {"$gte": ["$_match", 0]}}},
+				# Sort matches so that tenants that start with substring come first
+				# Secondary sort is alphabetical
+				{"$sort": collections.OrderedDict({"_match": 1, "_id": 1})},
+			]
+			if limit is not None:
+				pipeline.append({"$skip": limit * page})
+				pipeline.append({"$limit": limit})
+			cursor = collection.aggregate(pipeline)
 
 		async for tenant in cursor:
 			yield tenant
@@ -53,7 +74,11 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 	async def count(self, filter=None) -> int:
 		coll = await self.MongoDBStorageService.collection(self.TenantsCollection)
-		if filter is None:
+
+		if filter is not None:
+			# Count only entries that contain `filter` substring
+			filter = {"$expr": {"$gte": [{"$indexOfCP": [{"$toLower": "$_id"}, filter.lower()]}, 0]}}
+		else:
 			filter = {}
 		return await coll.count_documents(filter=filter)
 
