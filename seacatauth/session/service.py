@@ -304,7 +304,7 @@ class SessionService(asab.Service):
 		"""
 		# Get parent session
 		if session.Session.ParentId is not None:
-			session = await self.get(session.Session.ParentId)
+			session = await self.get(bson.ObjectId(session.Session.ParentId))
 
 		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
@@ -368,7 +368,7 @@ class SessionService(asab.Service):
 
 	async def delete(self, session_id):
 		# Recursively delete all child sessions first
-		query_filter = {SessionAdapter.FN.Session.ParentSessionId: session_id}
+		query_filter = {SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session_id)}
 
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
@@ -378,7 +378,7 @@ class SessionService(asab.Service):
 			await self.delete(session_dict["_id"])
 
 		# Delete the session itself
-		await self.StorageService.delete(self.SessionCollection, session_id)
+		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
 		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
 
 		# TODO: Publish pubsub message for session deletion
