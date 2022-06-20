@@ -48,6 +48,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 				cursor.limit(limit)
 		else:
 			# Fetch tenants that contain `filter` substring
+			# Sort results so that tenants that start with the substring come first
 			pipeline = [
 				# Set "_match" to:
 				#  -1 if tenant does not contain substring
