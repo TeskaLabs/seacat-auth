@@ -46,7 +46,6 @@ class AuthenticationData:
 @dataclasses.dataclass
 class AuthorizationData:
 	Authz: dict
-	Roles: list
 	Resources: list
 	Tenants: list
 
@@ -100,7 +99,6 @@ class SessionAdapter:
 		class Authorization:
 			_prefix = "az"
 			Tenants = "az_t"
-			Roles = "az_rl"
 			Resources = "az_rs"
 			Authz = "az_az"
 
@@ -171,7 +169,6 @@ class SessionAdapter:
 			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
 			cls.FN.Authorization.Authz: id_token_dict.get("authz"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
-			cls.FN.Authorization.Roles: id_token_dict.get("roles"),
 			cls.FN.Authorization.Resources: id_token_dict.get("resources"),
 		}
 		return cls(session_svc, session_dict)
@@ -224,7 +221,6 @@ class SessionAdapter:
 			session_dict.update({
 				self.FN.Authorization.Authz: self.Authorization.Authz,
 				self.FN.Authorization.Tenants: self.Authorization.Tenants,
-				self.FN.Authorization.Roles: self.Authorization.Roles,
 				self.FN.Authorization.Resources: self.Authorization.Resources,
 			})
 
@@ -318,7 +314,6 @@ class SessionAdapter:
 			return None
 		return AuthorizationData(
 			Authz=authz,
-			Roles=session_dict.pop(cls.FN.Authorization.Roles, None) or session_dict.pop("Rl", None),
 			Resources=session_dict.pop(cls.FN.Authorization.Resources, None) or session_dict.pop("Rs", None),
 			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
 		)

@@ -72,6 +72,7 @@ class RoleService(asab.Service):
 		return role_obj["resources"]
 
 	async def create(self, role_id: str):
+		# TODO: No return dicts! This should return role_id or raise (custom) error.
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
 			return {
