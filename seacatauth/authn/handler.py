@@ -163,6 +163,8 @@ class AuthenticationHandler(object):
 		)
 
 		request_data = login_session.decrypt(await request.read())
+		L.debug("Processing login attempt", struct_data={"payload": request_data, "lsid": login_session.Id})
+
 		request_data["request_headers"] = request.headers
 
 		access_ips = [request.remote]
