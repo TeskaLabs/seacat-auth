@@ -1,0 +1,2 @@
+class TenantRequired(ValueError):
+	pass

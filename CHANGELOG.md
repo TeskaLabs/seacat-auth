@@ -1,10 +1,12 @@
 # CHANGELOG
 
-## Release candidate
+## v22.25
 
 ### Breaking changes
 - SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
 - Introspection outputs ID token instead of Access token (#39, PLUM Sprint 220520)
+- Roles are no longer included in userinfo or ID token (#50, PLUM Sprint 220603)
+- Batman no longer checks role names (#54, PLUM Sprint 220603)
 
 ### Fix
 - Fix TOTP activation error (#43, PLUM Sprint 220520)
@@ -13,7 +15,10 @@
 - OIDC scope format in token response (b5a18c2, PLUM Sprint 220520)
 - Always update the expiration of the whole session group (#44, PLUM Sprint 220520)
 - Explicit UTC timezone for all time data in userinfo (#45, PLUM Sprint 220520)
-- DuplicateError handling (#47, PLUM Sprint 2200603)
+- DuplicateError handling (#47, PLUM Sprint 220603)
+- Fix delete and touch session (#55, PLUM Sprint 220617)
+- Dict credentials creation complies with policy (b7582e5, PLUM Sprint 220617)
+- Fix header enrichment in introspection (f4c95cf, PLUM Sprint 220617)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
@@ -22,6 +27,11 @@
 - Ensure credentials contain at least an email or a phone (#41, PLUM Sprint 220520)
 - Generic MySQL credentials provider (#42, PLUM Sprint 220603)
 - Tenant search filter (#49, PLUM Sprint 220603)
+
+### Refactoring
+- Authz object no longer contains roles (#50, PLUM Sprint 220603)
+- Datetime objects are explicitly UTC-aware (#48, PLUM Sprint 220603)
+- RBAC has_resource_access returns boolean (#54, PLUM Sprint 220603)
 
 ---
 

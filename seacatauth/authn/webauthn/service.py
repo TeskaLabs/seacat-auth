@@ -65,7 +65,7 @@ class WebAuthnService(asab.Service):
 		Create database entry for a verified WebAuthn credential
 		"""
 		if name is None:
-			name = "key-{}".format(datetime.datetime.utcnow().strftime("%y%m%d-%H%M%S"))
+			name = "key-{}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
 		else:
 			if self.KeyNameRegex.fullmatch(name) is None:
 				raise ValueError("Invalid WebAuthn credential name", {"name": name})
@@ -204,7 +204,7 @@ class WebAuthnService(asab.Service):
 
 		upsertor = self.StorageService.upsertor(self.WebAuthnRegistrationChallengeCollection, obj_id=session_id)
 
-		expires = datetime.datetime.utcnow() + datetime.timedelta(milliseconds=self.RegistrationTimeout)
+		expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(milliseconds=self.RegistrationTimeout)
 		upsertor.set("exp", expires)
 
 		challenge = secrets.token_bytes(32)
@@ -221,7 +221,7 @@ class WebAuthnService(asab.Service):
 		Get existing WebAuthn registration challenge for the current session
 		"""
 		challenge_obj = await self.StorageService.get(self.WebAuthnRegistrationChallengeCollection, session_id)
-		if challenge_obj["exp"] < datetime.datetime.utcnow():
+		if challenge_obj["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Challenge timed out")
 		return challenge_obj["ch"]
 
@@ -241,7 +241,7 @@ class WebAuthnService(asab.Service):
 		"""
 		collection = self.StorageService.Database[self.WebAuthnRegistrationChallengeCollection]
 
-		query_filter = {"exp": {"$lt": datetime.datetime.utcnow()}}
+		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.info("Expired WebAuthn challenges deleted", struct_data={
@@ -401,7 +401,7 @@ class WebAuthnService(asab.Service):
 		await self.update_webauthn_credential(
 			base64.urlsafe_b64decode(verified_authentication.credential_id + b"=="),
 			sign_count=verified_authentication.new_sign_count,
-			last_login=datetime.datetime.utcnow(),
+			last_login=datetime.datetime.now(datetime.timezone.utc),
 		)
 
 		return True

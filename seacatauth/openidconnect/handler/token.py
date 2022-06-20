@@ -105,7 +105,7 @@ class TokenHandler(object):
 			'Pragma': 'no-cache',
 		}
 
-		expires_in = int((session.Session.Expiration - datetime.datetime.utcnow()).total_seconds())
+		expires_in = int((session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
 
 		# TODO: Tenant-specific token (session)
 		tenant = None
