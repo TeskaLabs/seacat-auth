@@ -4,8 +4,6 @@ from typing import Optional
 
 import asab.storage.exceptions
 
-from ...tenant import TenantService
-
 #
 
 L = logging.getLogger(__name__)
