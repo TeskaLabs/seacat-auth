@@ -33,7 +33,7 @@ class RoleService(asab.Service):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = self.App.get_service("seacatauth.RBACService")
 		# The format is always {tenant or "*"}/{role_name}!
-		# TODO: Tenant name should be validated by tenant service
+		# Tenant name is always validated by tenant service
 		self.RoleIdRegex = re.compile(r"^([^/]+)/({role})$".format(
 			role=self.RoleNamePattern
 		))
