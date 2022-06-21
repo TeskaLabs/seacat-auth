@@ -34,10 +34,11 @@ class RoleService(asab.Service):
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = self.App.get_service("seacatauth.RBACService")
-		self.RoleIdRegex = re.compile(r"^({tenant}|\*)/({role})$".format(
-			tenant=TenantService.TenantNamePattern,
+		# The format is always {tenant or "*"}/{role_name}!
+		# TODO: Tenant name should be validated by tenant service
+		self.RoleIdRegex = re.compile(r"^([^/]+)/({role})$".format(
 			role=self.RoleNamePattern
-		))  # The format is always {tenant or "*"}/{role_name}!
+		))
 
 	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
 		collection = self.StorageService.Database[self.RoleCollection]
@@ -83,7 +84,7 @@ class RoleService(asab.Service):
 					"and {role_name} consists only of characters 'a-z0-9_-', "
 					"starts with a letter or underscore, and is between 1 and 32 characters long.",
 			}
-		tenant = match.group(1)
+		tenant = await self.get_tenant_from_role_id(role_id)
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
@@ -121,7 +122,7 @@ class RoleService(asab.Service):
 		resources_to_add: Optional[list] = None,
 		resources_to_remove: Optional[list] = None
 	):
-		tenant = self.get_tenant_from_role_id(role_id)
+		tenant = await self.get_tenant_from_role_id(role_id)
 
 		resources_to_assign = set().union(
 			resources_to_set or [],
@@ -229,7 +230,7 @@ class RoleService(asab.Service):
 		roles_to_assign = set()
 		for role in roles:
 			# Validate by regex
-			role_tenant = self.get_tenant_from_role_id(role)
+			role_tenant = await self.get_tenant_from_role_id(role)
 
 			# Validate by current tenant scope
 			if role_tenant not in tenant_scope:
@@ -282,8 +283,7 @@ class RoleService(asab.Service):
 			upsertor.set("c", credentials_id)
 			upsertor.set("r", role)
 
-			rgm = self.RoleIdRegex.match(role)
-			tenant = rgm.group(1)
+			tenant = await self.get_tenant_from_role_id(role)
 			if tenant != "*":
 				upsertor.set("t", tenant)
 			await upsertor.execute()
@@ -319,7 +319,7 @@ class RoleService(asab.Service):
 
 
 	async def assign_role(self, credentials_id: str, role_id: str):
-		tenant = self.get_tenant_from_role_id(role_id)
+		tenant = await self.get_tenant_from_role_id(role_id)
 
 		# Check if credentials exist
 		try:
@@ -405,10 +405,13 @@ class RoleService(asab.Service):
 		})
 
 
-	def get_tenant_from_role_id(self, role_id):
+	async def get_tenant_from_role_id(self, role_id):
 		match = self.RoleIdRegex.match(role_id)
 		if match is not None:
 			tenant = match.group(1)
+			# Verify that tenant exists if the role is not global
+			if tenant != "*":
+				await self.TenantService.get_tenant(tenant)
 		else:
 			L.warning(
 				"Role ID contains unallowed characters. "
