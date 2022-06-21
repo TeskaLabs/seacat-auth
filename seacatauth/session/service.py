@@ -199,7 +199,14 @@ class SessionService(asab.Service):
 			else:
 				value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 		session_dict = await self.StorageService.get_by(self.SessionCollection, key=key, value=value)
-		session = SessionAdapter(self, session_dict)
+		try:
+			session = SessionAdapter(self, session_dict)
+		except Exception as e:
+			L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+				"sid": session_dict.get("_id"),
+			})
+			await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
+			raise ValueError("Invalid session") from e
 
 		if is_old_token:
 			L.warning("Access with obsolete access token.", struct_data={
@@ -215,7 +222,14 @@ class SessionService(asab.Service):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
 		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
-		session = SessionAdapter(self, session_dict)
+		try:
+			session = SessionAdapter(self, session_dict)
+		except Exception as e:
+			L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+				"sid": session_dict.get("_id"),
+			})
+			await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
+			raise ValueError("Invalid session") from e
 		return session
 
 
@@ -276,7 +290,14 @@ class SessionService(asab.Service):
 		sessions = []
 		count = await collection.count_documents(query_filter)
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
-			session = SessionAdapter(self, session_dict).rest_get()
+			try:
+				session = SessionAdapter(self, session_dict).rest_get()
+			except Exception as e:
+				L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+					"sid": session_dict.get("_id"),
+				})
+				await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
+				raise ValueError("Invalid session") from e
 			# Include children sessions
 			children = await self.list(query_filter={SessionAdapter.FN.Session.ParentSessionId: session["_id"]})
 			if children["count"] > 0:
