@@ -80,7 +80,8 @@ class ExternalLoginHandler(object):
 		login_session = await self.AuthenticationService.create_login_session(
 			credentials_id=credentials_id,
 			client_public_key=None,
-			login_descriptors=login_descriptors
+			login_descriptors=login_descriptors,
+			ident=None
 		)
 
 		# Create ad-hoc login descriptor
