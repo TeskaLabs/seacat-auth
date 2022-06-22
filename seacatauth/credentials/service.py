@@ -178,7 +178,10 @@ class CredentialsService(asab.Service):
 		"""
 		credentials = None
 		for provider in self.CredentialProviders.values():
-			credentials = await provider.get_by_external_login_sub(login_provider, sub_id)
+			try:
+				credentials = await provider.get_by_external_login_sub(login_provider, sub_id)
+			except NotImplementedError:
+				continue
 			if credentials is not None:
 				break
 		return credentials

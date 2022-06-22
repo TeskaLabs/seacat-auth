@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Fix external login flow (#58, PLUM Sprint 220617)
+
+---
+
+
 ## v22.25
 
 ### Breaking changes

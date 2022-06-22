@@ -64,10 +64,13 @@ class LoginSession(object):
 			cls.ServerLoginKeyCurve(),
 			cryptography.hazmat.backends.default_backend()
 		)
-		shared_key = server_login_key.exchange(
-			cryptography.hazmat.primitives.asymmetric.ec.ECDH(),
-			client_login_key
-		)
+		if client_login_key is not None:
+			shared_key = server_login_key.exchange(
+				cryptography.hazmat.primitives.asymmetric.ec.ECDH(),
+				client_login_key
+			)
+		else:
+			shared_key = None
 
 		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=timeout)
 
