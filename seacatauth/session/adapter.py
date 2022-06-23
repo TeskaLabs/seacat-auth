@@ -128,7 +128,7 @@ class SessionAdapter:
 		FN.OAuth2.AccessToken,
 		FN.OAuth2.RefreshToken,
 		FN.Cookie.Id,
-		"oa.Ti", "oa.Ta", "oa.Tr", "oa.S",  # BACK COMPAT
+		"oa.Ti", "oa.Ta", "oa.Tr",  # BACK COMPAT
 	])
 
 	EncryptedPrefix = b"$aescbc$"
@@ -279,7 +279,7 @@ class SessionAdapter:
 
 	@classmethod
 	def _deserialize_credentials_data(cls, session_dict):
-		credentials_id = session_dict.pop(cls.FN.Credentials.Id)
+		credentials_id = session_dict.pop(cls.FN.Credentials.Id, None) or session_dict.pop("Cid", None)
 		if credentials_id is None:
 			return
 		return CredentialsData(
@@ -323,7 +323,11 @@ class SessionAdapter:
 		oa2_data = session_dict.pop("oa", {})  # BACK COMPAT
 		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
 		if id_token is not None:
-			id_token = id_token.decode("ascii")
+			try:
+				id_token = id_token.decode("ascii")
+			except UnicodeDecodeError:
+				# Probably old ID token, encoded differently
+				L.warning("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
 		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:
