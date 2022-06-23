@@ -205,8 +205,6 @@ class SessionService(asab.Service):
 			L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
-			raise ValueError("Invalid session") from e
 
 		if is_old_token:
 			L.warning("Access with obsolete access token.", struct_data={
@@ -228,8 +226,7 @@ class SessionService(asab.Service):
 			L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
-			raise ValueError("Invalid session") from e
+			return None
 		return session
 
 
@@ -297,7 +294,7 @@ class SessionService(asab.Service):
 					"sid": session_dict.get("_id"),
 				})
 				await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
-				raise ValueError("Invalid session") from e
+				continue
 			# Include children sessions
 			children = await self.list(query_filter={SessionAdapter.FN.Session.ParentSessionId: session["_id"]})
 			if children["count"] > 0:
