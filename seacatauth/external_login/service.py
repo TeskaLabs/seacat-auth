@@ -2,6 +2,8 @@ import logging
 
 import asab
 import typing
+
+import bson
 import pymongo
 
 from .providers import create_provider, GenericOAuth2Login
@@ -33,6 +35,7 @@ class ExternalLoginService(asab.Service):
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
 
+
 	def _prepare_providers(self):
 		providers = {}
 		for section in asab.Config.sections():
@@ -41,36 +44,71 @@ class ExternalLoginService(asab.Service):
 				providers[provider.Type] = provider
 		return providers
 
-	def get_provider(self, provider_type) -> GenericOAuth2Login:
+
+	def _get_id(self, provider_type: str, sub: str):
+		return bson.ObjectId("{} {}".format(provider_type, sub))
+
+
+	def get_provider(self, provider_type: str) -> GenericOAuth2Login:
 		return self.Providers.get(provider_type)
+
 
 	async def initialize(self, app):
 		coll = await self.StorageService.collection(self.ExternalLoginCollection)
-
-		# Index all attributes that can be used for locating
-		try:
-			await coll.create_index(
-				[
-					("t", pymongo.ASCENDING),
-					("s", pymongo.ASCENDING),
-				],
-				unique=True
-			)
-		except Exception as e:
-			L.warning("{}; fix it and restart the app".format(e))
+		await coll.create_index(
+			[
+				("cid", pymongo.ASCENDING),
+			],
+		)
 
 
-	async def create(self, credentials_id, provider_type, sub):
-		raise NotImplementedError()
+	async def create(self, credentials_id: str, provider_type: str, sub: str):
+		upsertor = self.StorageService.upsertor(
+			self.ExternalLoginCollection,
+			obj_id=self._get_id(provider_type, sub)
+		)
+		upsertor.set("t", provider_type)
+		upsertor.set("s", sub)
+		upsertor.set("cid", credentials_id)
 
-	async def list(self, credentials_id):
-		raise NotImplementedError()
+		elcid = await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "External login credential created", struct_data={
+			"id": elcid,
+			"cid": credentials_id,
+		})
 
-	async def get_by_sub(self, provider_type, sub):
-		raise NotImplementedError()
+
+	async def list(self, credentials_id: str):
+		collection = self.StorageService.Database[self.ExternalLoginCollection]
+
+		query_filter = {"cid": credentials_id}
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+
+		el_credentials = []
+		async for credential in cursor:
+			el_credentials.append(credential)
+
+		return el_credentials
+
+
+	async def get(self, provider_type: str, sub: str):
+		return await self.StorageService.get(self.ExternalLoginCollection, self._get_id(provider_type, sub))
+
 
 	async def update(self, provider_type, sub):
 		raise NotImplementedError()
 
-	async def delete(self, provider_type, sub):
-		raise NotImplementedError()
+
+	async def delete(self, provider_type: str, sub: str, credentials_id: str = None):
+		if credentials_id is not None:
+			el_credential = await self.get(provider_type, sub)
+			if credentials_id != el_credential["cid"]:
+				raise KeyError("WebAuthn credential not found", {
+					"elcid": el_credential["_id"],
+					"cid": credentials_id
+				})
+
+		await self.StorageService.delete(self.ExternalLoginCollection, self._get_id(provider_type, sub))
+		L.log(asab.LOG_NOTICE, "External login credential deleted", struct_data={"elcid": self._get_id(provider_type, sub)})
