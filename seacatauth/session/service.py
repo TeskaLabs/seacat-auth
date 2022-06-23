@@ -202,9 +202,10 @@ class SessionService(asab.Service):
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+			L.error("Failed to create SessionAdapter from database object", struct_data={
 				"sid": session_dict.get("_id"),
 			})
+			raise e
 
 		if is_old_token:
 			L.warning("Access with obsolete access token.", struct_data={
@@ -223,10 +224,10 @@ class SessionService(asab.Service):
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+			L.error("Failed to create SessionAdapter from database object", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			return None
+			raise e
 		return session
 
 
