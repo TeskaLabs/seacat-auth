@@ -1,5 +1,3 @@
-import time
-
 import aiohttp.web
 import asab
 import logging

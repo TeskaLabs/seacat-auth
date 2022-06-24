@@ -4,8 +4,6 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-from ...generic import get_bearer_token_value
-
 #
 
 L = logging.getLogger(__name__)
