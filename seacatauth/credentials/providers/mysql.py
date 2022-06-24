@@ -266,10 +266,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 					result = await cursor.fetchone()
 
 
-	async def get_login_descriptors(self, credentials_id):
-		raise NotImplementedError()
-
-
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
 		if not credentials_id.startswith(self.Prefix):
 			return False
