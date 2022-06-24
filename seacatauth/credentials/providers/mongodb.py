@@ -321,7 +321,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		key = "external_login.{}".format(login_provider)
 		obj = await self.get_by(key, sub_id)
 		if obj is None:
-			return None
+			raise KeyError("External login credentials not found")
 		return self._nomalize_credentials(obj)
 
 
