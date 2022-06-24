@@ -46,7 +46,7 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		"""
 		Get credentials from external login sub ID
 		"""
-		return None
+		raise KeyError("External login credentials not found")
 
 	@abc.abstractmethod
 	async def get_login_descriptors(self, credentials_id) -> list:

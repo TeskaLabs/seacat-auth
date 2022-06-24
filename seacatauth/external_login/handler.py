@@ -67,12 +67,23 @@ class ExternalLoginHandler(object):
 		sub = str(sub)
 
 		# Get credentials by sub
-		credentials = await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-		if credentials is None:
+		try:
+			el_credentials = await self.ExternalLoginService.get(login_provider_type, sub)
+			credentials_id = el_credentials["cid"]
+		except KeyError:
+			credentials_id = None
+		if credentials_id is None:
+			try:
+				credentials = await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
+				# TODO: Migrate external login data to the dedicated collection?
+				credentials_id = credentials["_id"]
+			except KeyError:
+				credentials_id = None
+
+		if credentials_id is None:
 			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-UNKNOWN-USER")
 			delete_cookie(self.App, response)
 			return response
-		credentials_id = credentials["_id"]
 
 		# Create a placeholder login session
 		# TODO: Save the external login provider as a login factor
@@ -155,8 +166,9 @@ class ExternalLoginHandler(object):
 		sub = str(sub)
 
 		# Check if the sub is not already registered with another credentials
-		credentials = await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-		if credentials is not None:
+		try:
+			await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
+		except KeyError:
 			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-IN-USE")
 			return response
 
