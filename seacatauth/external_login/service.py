@@ -100,7 +100,7 @@ class ExternalLoginService(asab.Service):
 	async def get_sub(self, credentials_id: str, provider_type: str):
 		collection = self.StorageService.Database[self.ExternalLoginCollection]
 		query_filter = {"cid": credentials_id, "t": provider_type}
-		result = collection.find_one(query_filter)
+		result = await collection.find_one(query_filter)
 		if result is None:
 			raise KeyError("External login for type '{}' not registered for credentials".format(provider_type))
 		return result

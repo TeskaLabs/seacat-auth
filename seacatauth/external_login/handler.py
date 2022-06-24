@@ -163,7 +163,6 @@ class ExternalLoginHandler(object):
 			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-SET")
 			return response
 
-		cred_field_name = "external_login.{}".format(login_provider_type)
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
 		user_info = await login_provider.add_external_login(code)
 		if user_info is None:
@@ -180,18 +179,25 @@ class ExternalLoginHandler(object):
 		sub = str(sub)
 
 		# Check if the sub is not already registered with different credentials
+		already_used = False
 		try:
 			await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-			await self.ExternalLoginService.get(login_provider_type, sub)
+			already_used = True
+		except KeyError:
+			pass
+		try:
+			await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
+			already_used = True
+		except KeyError:
+			pass
+
+		if already_used:
 			L.error("External login already used by different credentials", struct_data={
 				"type": login_provider_type,
 				"sub": sub,
 			})
 			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-IN-USE")
 			return response
-		except KeyError:
-			# Good, this sub is not used yet
-			pass
 
 		# Update credentials
 		try:
