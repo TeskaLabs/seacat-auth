@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v22.25
+## Release candidate
 
 ### Breaking changes
 - SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
@@ -19,6 +19,10 @@
 - Fix delete and touch session (#55, PLUM Sprint 220617)
 - Dict credentials creation complies with policy (b7582e5, PLUM Sprint 220617)
 - Fix header enrichment in introspection (f4c95cf, PLUM Sprint 220617)
+- Fix external login flow (#58, PLUM Sprint 220617)
+- Fix role creation and assignment in old tenants (#57, PLUM Sprint 220617)
+- Safer session deserialization (#59, PLUM Sprint 220617)
+- Handle malformed cookies (1f6b25e, PLUM Sprint 220617)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
