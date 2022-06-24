@@ -8,9 +8,6 @@ import asab
 import asab.web.rest
 import asab.web.rest.json
 
-import jwcrypto.jwk
-import jwcrypto.jwt
-
 from seacatauth.session import SessionAdapter
 
 #
