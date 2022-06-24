@@ -22,6 +22,7 @@
 - Fix external login flow (#58, PLUM Sprint 220617)
 - Fix role creation and assignment in old tenants (#57, PLUM Sprint 220617)
 - Safer session deserialization (#59, PLUM Sprint 220617)
+- Handle malformed cookies (1f6b25e, PLUM Sprint 220617)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
