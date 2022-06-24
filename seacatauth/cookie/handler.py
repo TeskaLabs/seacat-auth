@@ -82,7 +82,8 @@ class CookieHandler(object):
 			self.authenticate_request,
 			self.CredentialsService,
 			self.SessionService,
-			self.RBACService
+			self.RBACService,
+			self.App.get_service("seacatauth.OpenIdConnectService"),
 		)
 		if response.status_code != 200:
 			delete_cookie(self.App, response)

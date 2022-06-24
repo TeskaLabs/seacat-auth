@@ -124,7 +124,8 @@ class TokenIntrospectionHandler(object):
 			self.authenticate_request,
 			self.CredentialsService,
 			self.SessionService,
-			self.RBACService
+			self.RBACService,
+			self.OpenIdConnectService,
 		)
 
 		if response.status_code != 200:
