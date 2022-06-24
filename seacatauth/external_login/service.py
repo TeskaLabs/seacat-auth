@@ -3,7 +3,6 @@ import logging
 import asab
 import typing
 
-import bson
 import pymongo
 
 from .providers import create_provider, GenericOAuth2Login
