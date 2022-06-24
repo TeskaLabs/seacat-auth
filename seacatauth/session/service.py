@@ -384,6 +384,8 @@ class SessionService(asab.Service):
 			except KeyError:
 				L.warning("Conflict: Session already extended", struct_data={"sid": child_session_id})
 
+		return SessionAdapter(self, await self.get(session.Id))
+
 
 	async def delete(self, session_id):
 		# Recursively delete all child sessions first
