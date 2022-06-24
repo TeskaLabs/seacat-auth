@@ -36,6 +36,7 @@
 - Authz object no longer contains roles (#50, PLUM Sprint 220603)
 - Datetime objects are explicitly UTC-aware (#48, PLUM Sprint 220603)
 - RBAC has_resource_access returns boolean (#54, PLUM Sprint 220603)
+- Dedicated collection for external login credentials (#60, PLUM Sprint 220617)
 
 ---
 
