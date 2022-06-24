@@ -46,7 +46,7 @@ class ExternalLoginService(asab.Service):
 
 
 	def _make_id(self, provider_type: str, sub: str):
-		return bson.ObjectId("{} {}".format(provider_type, sub))
+		return "{} {}".format(provider_type, sub)
 
 
 	def get_provider(self, provider_type: str) -> GenericOAuth2Login:
@@ -102,7 +102,7 @@ class ExternalLoginService(asab.Service):
 		query_filter = {"cid": credentials_id, "t": provider_type}
 		result = collection.find_one(query_filter)
 		if result is None:
-			raise KeyError("External login fo type '{}' not registered for credentials".format(provider_type))
+			raise KeyError("External login for type '{}' not registered for credentials".format(provider_type))
 		return result
 
 
