@@ -69,7 +69,7 @@ class ProvisioningService(asab.Service):
 		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
 
 		# Create superuser role
-		assert (await self.RoleService.create(self.SuperroleID) == "OK")
+		await self.RoleService.create(self.SuperroleID)
 		assert (await self.RoleService.update_resources(
 			role_id=self.SuperroleID,
 			resources_to_set=["authz:superuser"]

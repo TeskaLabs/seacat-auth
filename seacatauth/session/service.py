@@ -95,10 +95,10 @@ class SessionService(asab.Service):
 	async def delete_expired_sessions(self):
 		expired = []
 		async for session in self._iterate_raw(
-			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.utcnow()}}
+			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		):
 			try:
-				if datetime.datetime.utcnow() > (
+				if datetime.datetime.now(datetime.timezone.utc) > (
 					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
 				):
 					expired.append(session["_id"])
@@ -136,8 +136,8 @@ class SessionService(asab.Service):
 				L.warning("Session expiration exceeds maximum session age.")
 		else:
 			expiration = self.Expiration
-		expires = datetime.datetime.utcnow() + expiration
-		max_expiration = datetime.datetime.utcnow() + self.MaximumAge
+		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+		max_expiration = datetime.datetime.now(datetime.timezone.utc) + self.MaximumAge
 		if self.TouchExtensionSeconds is not None:
 			touch_extension_seconds = self.TouchExtensionSeconds
 		else:
@@ -199,7 +199,13 @@ class SessionService(asab.Service):
 			else:
 				value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 		session_dict = await self.StorageService.get_by(self.SessionCollection, key=key, value=value)
-		session = SessionAdapter(self, session_dict)
+		try:
+			session = SessionAdapter(self, session_dict)
+		except Exception as e:
+			L.error("Failed to create SessionAdapter from database object", struct_data={
+				"sid": session_dict.get("_id"),
+			})
+			raise e
 
 		if is_old_token:
 			L.warning("Access with obsolete access token.", struct_data={
@@ -215,7 +221,13 @@ class SessionService(asab.Service):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
 		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
-		session = SessionAdapter(self, session_dict)
+		try:
+			session = SessionAdapter(self, session_dict)
+		except Exception as e:
+			L.error("Failed to create SessionAdapter from database object", struct_data={
+				"sid": session_dict.get("_id"),
+			})
+			raise e
 		return session
 
 
@@ -276,7 +288,14 @@ class SessionService(asab.Service):
 		sessions = []
 		count = await collection.count_documents(query_filter)
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
-			session = SessionAdapter(self, session_dict).rest_get()
+			try:
+				session = SessionAdapter(self, session_dict).rest_get()
+			except Exception as e:
+				L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+					"sid": session_dict.get("_id"),
+				})
+				await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
+				continue
 			# Include children sessions
 			children = await self.list(query_filter={SessionAdapter.FN.Session.ParentSessionId: session["_id"]})
 			if children["count"] > 0:
@@ -304,9 +323,9 @@ class SessionService(asab.Service):
 		"""
 		# Get parent session
 		if session.Session.ParentId is not None:
-			session = await self.get(session.Session.ParentId)
+			session = await self.get(bson.ObjectId(session.Session.ParentId))
 
-		if datetime.datetime.utcnow() < session.Session.ModifiedAt + self.MinimalRefreshInterval:
+		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
 			return
 		if session.Session.Expiration >= session.Session.MaxExpiration:
@@ -320,7 +339,7 @@ class SessionService(asab.Service):
 		else:
 			# May be a legacy "machine credentials session". Do not extend.
 			return
-		expires = datetime.datetime.utcnow() + expiration
+		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
 
 		if expires < session.Session.Expiration:
 			# Do not shorten the session!
@@ -368,7 +387,7 @@ class SessionService(asab.Service):
 
 	async def delete(self, session_id):
 		# Recursively delete all child sessions first
-		query_filter = {SessionAdapter.FN.Session.ParentSessionId: session_id}
+		query_filter = {SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session_id)}
 
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
@@ -378,7 +397,7 @@ class SessionService(asab.Service):
 			await self.delete(session_dict["_id"])
 
 		# Delete the session itself
-		await self.StorageService.delete(self.SessionCollection, session_id)
+		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
 		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
 
 		# TODO: Publish pubsub message for session deletion

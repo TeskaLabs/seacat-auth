@@ -297,7 +297,7 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			else:
 				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
 		else:
-			L.error("Authentication failed: Credentials contain no password", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: Login data contain no password", struct_data={"cid": credentials_id})
 		return False
 
 
