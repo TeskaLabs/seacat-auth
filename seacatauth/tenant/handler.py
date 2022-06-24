@@ -55,12 +55,16 @@ class TenantHandler(object):
 		if limit is not None:
 			limit = int(limit)
 
+		filter = request.query.get("f", "")
+		if len(filter) == 0:
+			filter = None
+
 		provider = self.TenantService.get_provider()
 
-		count = await provider.count()
+		count = await provider.count(filter=filter)
 
 		tenants = []
-		async for tenant in provider.iterate(page, limit):
+		async for tenant in provider.iterate(page, limit, filter):
 			tenants.append(tenant)
 
 		result = {

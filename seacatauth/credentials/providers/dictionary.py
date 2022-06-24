@@ -40,46 +40,44 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 
 		self.Dictionary = {}
 
-	def get_info(self) -> dict:
-		info = super().get_info()
-		info["registration"] = [
-			{'type': 'email'},
-			{'type': 'password'}
-		]
-		info["creation"] = [
-			{'type': 'email'},
-			{'type': 'password'}
-		]
-		info["update"] = [
-			{"type": field} for field in self.EditableFields
-		]
-		return info
+	# def get_info(self) -> dict:
+	# 	info = super().get_info()
+	# 	info["registration"] = [
+	# 		{'type': 'email'},
+	# 		{'type': 'password'}
+	# 	]
+	# 	info["creation"] = [
+	# 		{'type': 'email'},
+	# 		{'type': 'password'}
+	# 	]
+	# 	info["update"] = [
+	# 		{"type": field} for field in self.EditableFields
+	# 	]
+	# 	return info
 
 	async def create(self, credentials: dict) -> Optional[str]:
-		username = credentials.get("username")
-		if username is None:
-			username = credentials.get("email")
+		username = credentials.get("username") or credentials.get("email") or credentials.get("phone")
 		if username is None:
 			raise ValueError("Cannot determine user name")
 
-		hashedpwd = bcrypt.hash(credentials["password"].encode('utf-8'))
-
-		credentials_id = hashlib.sha224(username.encode('utf-8')).hexdigest()
+		credentials_id = hashlib.sha224(username.encode("utf-8")).hexdigest()
 		if credentials_id in self.Dictionary:
 			raise ValueError("Already exists.")
 
 		credentials_object = {
 			"_id": credentials_id,
 			"_v": 1,
-			"_c": datetime.datetime.utcnow(),
-			"_m": datetime.datetime.utcnow(),
-			"username": username,
-			"__password": hashedpwd,
+			"_c": datetime.datetime.now(datetime.timezone.utc),
+			"_m": datetime.datetime.now(datetime.timezone.utc),
 		}
+		if "username" in credentials:
+			credentials_object["username"] = credentials["username"]
 		if "email" in credentials:
-			credentials_object["email"] = credentials.get("email")
+			credentials_object["email"] = credentials["email"]
 		if "phone" in credentials:
-			credentials_object["phone"] = credentials.get("phone")
+			credentials_object["phone"] = credentials["phone"]
+		if "password" in credentials:
+			credentials_object["__password"] = bcrypt.hash(credentials["password"].encode("utf-8"))
 
 		self.Dictionary[credentials_id] = credentials_object
 		return "{}:{}:{}".format(self.Type, self.ProviderID, credentials_id)
@@ -102,7 +100,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 			credentials[k] = v
 
 		credentials["_v"] += 1
-		credentials["_m"] = datetime.datetime.utcnow()
+		credentials["_m"] = datetime.datetime.now(datetime.timezone.utc)
 
 		return "OK"
 

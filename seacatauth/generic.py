@@ -49,22 +49,13 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 		if len(tenants) > 0:
 			headers["X-Tenants"] = " ".join(tenants)
 
-	# Obtain assigned roles from session object
-	if "roles" in attributes_to_add:
-		# Add only global roles if no tenant was requested
-		if requested_tenant is None:
-			roles = session.Authorization.Authz["*"].keys()
-		else:
-			roles = session.Authorization.Authz[requested_tenant].keys()
-		headers["X-Roles"] = " ".join(roles)
-
 	# Obtain assigned resources from session object
 	if "resources" in attributes_to_add:
 		if requested_tenant is None:
-			resources = session.Authorization.Authz["*"].values()
+			resources = session.Authorization.Authz["*"]
 		else:
-			resources = session.Authorization.Authz[requested_tenant].values()
-		headers["X-Resources"] = " ".join(set(sum(resources, [])))
+			resources = session.Authorization.Authz[requested_tenant]
+		headers["X-Resources"] = " ".join(resources)
 
 	# Obtain login factors from session object
 	if "factors" in attributes_to_add:
@@ -116,7 +107,7 @@ async def nginx_introspection(
 		raise NotImplementedError("Tenant check not implemented in introspection")
 
 	if len(requested_resources) > 0:
-		if rbac_service.has_resource_access(session.Authorization.Authz, requested_tenant, requested_resources) != "OK":
+		if not rbac_service.has_resource_access(session.Authorization.Authz, requested_tenant, requested_resources):
 			L.warning("Credentials not authorized for tenant or resource.", struct_data={
 				"cid": session.Credentials.Id,
 				"tenant": requested_tenant,

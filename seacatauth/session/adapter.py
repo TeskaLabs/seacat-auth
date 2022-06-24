@@ -46,7 +46,6 @@ class AuthenticationData:
 @dataclasses.dataclass
 class AuthorizationData:
 	Authz: dict
-	Roles: list
 	Resources: list
 	Tenants: list
 
@@ -100,7 +99,6 @@ class SessionAdapter:
 		class Authorization:
 			_prefix = "az"
 			Tenants = "az_t"
-			Roles = "az_rl"
 			Resources = "az_rs"
 			Authz = "az_az"
 
@@ -130,7 +128,7 @@ class SessionAdapter:
 		FN.OAuth2.AccessToken,
 		FN.OAuth2.RefreshToken,
 		FN.Cookie.Id,
-		"oa.Ti", "oa.Ta", "oa.Tr", "oa.S",  # BACK COMPAT
+		"oa.Ti", "oa.Ta", "oa.Tr",  # BACK COMPAT
 	])
 
 	EncryptedPrefix = b"$aescbc$"
@@ -171,7 +169,6 @@ class SessionAdapter:
 			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
 			cls.FN.Authorization.Authz: id_token_dict.get("authz"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
-			cls.FN.Authorization.Roles: id_token_dict.get("roles"),
 			cls.FN.Authorization.Resources: id_token_dict.get("resources"),
 		}
 		return cls(session_svc, session_dict)
@@ -224,7 +221,6 @@ class SessionAdapter:
 			session_dict.update({
 				self.FN.Authorization.Authz: self.Authorization.Authz,
 				self.FN.Authorization.Tenants: self.Authorization.Tenants,
-				self.FN.Authorization.Roles: self.Authorization.Roles,
 				self.FN.Authorization.Resources: self.Authorization.Resources,
 			})
 
@@ -283,7 +279,7 @@ class SessionAdapter:
 
 	@classmethod
 	def _deserialize_credentials_data(cls, session_dict):
-		credentials_id = session_dict.pop(cls.FN.Credentials.Id)
+		credentials_id = session_dict.pop(cls.FN.Credentials.Id, None) or session_dict.pop("Cid", None)
 		if credentials_id is None:
 			return
 		return CredentialsData(
@@ -318,7 +314,6 @@ class SessionAdapter:
 			return None
 		return AuthorizationData(
 			Authz=authz,
-			Roles=session_dict.pop(cls.FN.Authorization.Roles, None) or session_dict.pop("Rl", None),
 			Resources=session_dict.pop(cls.FN.Authorization.Resources, None) or session_dict.pop("Rs", None),
 			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
 		)
@@ -328,7 +323,11 @@ class SessionAdapter:
 		oa2_data = session_dict.pop("oa", {})  # BACK COMPAT
 		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
 		if id_token is not None:
-			id_token = id_token.decode("ascii")
+			try:
+				id_token = id_token.decode("ascii")
+			except UnicodeDecodeError:
+				# Probably old ID token, encoded differently
+				L.warning("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
 		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:

@@ -59,7 +59,7 @@ def private_auth_middleware_factory(app):
 					L.info("Invalid Bearer token")
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
-			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource]) == "OK"
+			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
 
 		request.has_resource_access = has_resource_access
 
@@ -74,14 +74,13 @@ def private_auth_middleware_factory(app):
 			#   for `authorization_resource` or "authz:superuser"
 			resources = set(
 				resource
-				for roles in request.Session.Authorization.Authz.values()
-				for resources in roles.values()
+				for resources in request.Session.Authorization.Authz.values()
 				for resource in resources
 			)
 			# Grant access to superuser
 			if "authz:superuser" in resources:
 				return await handler(request)
-			# Grant access the the bearer of `authorization_resource`
+			# Grant access to the bearer of `authorization_resource`
 			if authorization_resource in resources:
 				return await handler(request)
 

@@ -98,13 +98,21 @@ class CookieService(asab.Service):
 			try:
 				domain, session_cookie_id_encoded = cookie.value.split(":", 1)
 			except ValueError:
-				# Cookie has no domain prefix
-				continue
+				L.info("Cookie has no domain prefix", struct_data={"sci": cookie.value})
+				return None
 
 			# Check if domain matches
-			if domain == self.RootCookieDomain or domain in self.ApplicationCookieDomains:
+			if domain != self.RootCookieDomain and domain not in self.ApplicationCookieDomains:
+				L.info("Cookie value doesn't match any of the allowed domains", struct_data={"sci": session_cookie_id_encoded})
+				return None
+
+			try:
 				session_cookie_id = base64.urlsafe_b64decode(session_cookie_id_encoded)
-				return session_cookie_id
+			except ValueError:
+				L.info("Cookie value is not base64", struct_data={"sci": session_cookie_id_encoded})
+				return None
+
+			return session_cookie_id
 
 		return None
 

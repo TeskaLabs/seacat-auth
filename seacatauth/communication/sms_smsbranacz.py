@@ -73,7 +73,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				"message": text
 			}
 
-			time = datetime.datetime.utcnow().strftime(self.TimestampFormat)
+			time = datetime.datetime.now(datetime.timezone.utc).strftime(self.TimestampFormat)
 			salt = secrets.token_urlsafe(16)
 			auth = passlib.hash.hex_md5.hash(self.Password + time + salt)
 			url_params["time"] = time

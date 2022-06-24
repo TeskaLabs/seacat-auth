@@ -3,19 +3,13 @@ import logging
 import asab.web.rest
 
 from ...decorators import access_control
+from ...exceptions import TenantRequired
 
 ###
 
 L = logging.getLogger(__name__)
 
 ###
-
-
-result_code = {
-	"OK": 200,
-	"TENANT-NOT-SPECIFIED": 400,
-	"NOT-AUTHORIZED": 401
-}
 
 
 class RBACHandler(object):
@@ -35,10 +29,22 @@ class RBACHandler(object):
 		# Obtain the resources and credentials ID
 		requested_resources = request.match_info["resources"].split('+')
 
-		result = self.RBACService.has_resource_access(request.Session.Authorization.Authz, tenant, requested_resources)
-
-		return asab.web.rest.json_response(
-			request,
-			data={"result": result},
-			reason=result_code[result]
-		)
+		try:
+			if self.RBACService.has_resource_access(request.Session.Authorization.Authz, tenant, requested_resources):
+				return asab.web.rest.json_response(
+					request,
+					data={"result": "OK"},
+					reason=200
+				)
+			else:
+				return asab.web.rest.json_response(
+					request,
+					data={"result": "NOT-AUTHORIZED"},
+					reason=401
+				)
+		except TenantRequired:
+			return asab.web.rest.json_response(
+				request,
+				data={"result": "TENANT-NOT-SPECIFIED"},
+				reason=400
+			)
