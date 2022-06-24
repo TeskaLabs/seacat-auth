@@ -22,13 +22,10 @@ L = logging.getLogger(__name__)
 
 class TokenHandler(object):
 
-
 	def __init__(self, app, oidc_svc):
 		self.OpenIdConnectService = oidc_svc
 		self.SessionService = app.get_service('seacatauth.SessionService')
 		self.CredentialsService = app.get_service('seacatauth.CredentialsService')
-
-		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/openidconnect/token', self.token_request)
@@ -109,7 +106,7 @@ class TokenHandler(object):
 
 		# TODO: Tenant-specific token (session)
 		tenant = None
-		id_token = await self._build_id_token(session, tenant)
+		id_token = await self.OpenIdConnectService.build_id_token(session, tenant)
 
 		# Save the ID token in the session object
 		await self.SessionService.update_session(
@@ -128,30 +125,6 @@ class TokenHandler(object):
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
-
-
-	async def _build_id_token(self, session, tenant=None):
-		"""
-		Wrap authentication data and userinfo in a JWT token
-		"""
-		header = {
-			"alg": "ES256",  # TODO: This should be mapped from key_type and key_curve
-			"typ": "JWT",
-			"kid": self.OpenIdConnectService.PrivateKey.key_id,
-		}
-
-		# TODO: ID token should always contain info about "what happened during authentication"
-		#   User info is optional and its parts should be included (or not) based on SCOPE
-		payload = await self.OpenIdConnectService.build_userinfo(session, tenant)
-
-		token = jwcrypto.jwt.JWT(
-			header=header,
-			claims=self.JSONDumper(payload)
-		)
-		token.make_signed_token(self.OpenIdConnectService.PrivateKey)
-		id_token = token.serialize()
-
-		return id_token
 
 
 	async def token_request_batman(self, request, qs_data):
