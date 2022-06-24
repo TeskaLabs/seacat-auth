@@ -45,7 +45,7 @@ class ExternalLoginService(asab.Service):
 		return providers
 
 
-	def _get_id(self, provider_type: str, sub: str):
+	def _make_id(self, provider_type: str, sub: str):
 		return bson.ObjectId("{} {}".format(provider_type, sub))
 
 
@@ -65,7 +65,7 @@ class ExternalLoginService(asab.Service):
 	async def create(self, credentials_id: str, provider_type: str, sub: str):
 		upsertor = self.StorageService.upsertor(
 			self.ExternalLoginCollection,
-			obj_id=self._get_id(provider_type, sub)
+			obj_id=self._make_id(provider_type, sub)
 		)
 		upsertor.set("t", provider_type)
 		upsertor.set("s", sub)
@@ -94,7 +94,16 @@ class ExternalLoginService(asab.Service):
 
 
 	async def get(self, provider_type: str, sub: str):
-		return await self.StorageService.get(self.ExternalLoginCollection, self._get_id(provider_type, sub))
+		return await self.StorageService.get(self.ExternalLoginCollection, self._make_id(provider_type, sub))
+
+
+	async def get_sub(self, credentials_id: str, provider_type: str):
+		collection = self.StorageService.Database[self.ExternalLoginCollection]
+		query_filter = {"cid": credentials_id, "t": provider_type}
+		result = collection.find_one(query_filter)
+		if result is None:
+			raise KeyError("External login fo type '{}' not registered for credentials".format(provider_type))
+		return result
 
 
 	async def update(self, provider_type, sub):
@@ -105,10 +114,9 @@ class ExternalLoginService(asab.Service):
 		if credentials_id is not None:
 			el_credential = await self.get(provider_type, sub)
 			if credentials_id != el_credential["cid"]:
-				raise KeyError("WebAuthn credential not found", {
-					"elcid": el_credential["_id"],
-					"cid": credentials_id
-				})
-
-		await self.StorageService.delete(self.ExternalLoginCollection, self._get_id(provider_type, sub))
-		L.log(asab.LOG_NOTICE, "External login credential deleted", struct_data={"elcid": self._get_id(provider_type, sub)})
+				raise KeyError("External login not found for these credentials")
+		await self.StorageService.delete(self.ExternalLoginCollection, self._make_id(provider_type, sub))
+		L.log(asab.LOG_NOTICE, "External login credential deleted", struct_data={
+			"type": provider_type,
+			"sub": sub,
+		})
