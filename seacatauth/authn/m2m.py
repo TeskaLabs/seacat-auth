@@ -14,6 +14,7 @@ L = logging.getLogger(__name__)
 class M2MIntrospectHandler(object):
 
 	def __init__(self, app, authn_svc, session_svc, credentials_service, rbac_service):
+		self.App = app
 		self.AuthnService = authn_svc
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_service
@@ -126,7 +127,8 @@ class M2MIntrospectHandler(object):
 			self.authenticate_request,
 			self.CredentialsService,
 			self.SessionService,
-			self.RBACService
+			self.RBACService,
+			self.App.get_service("seacatauth.OpenIdConnectService"),
 		)
 
 		if response.status_code != 200:

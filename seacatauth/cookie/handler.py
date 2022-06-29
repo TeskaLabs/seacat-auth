@@ -34,7 +34,7 @@ class CookieHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		self.CookiePattern = re.compile(
-			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
+			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
 		)
 
 		web_app = app.WebContainer.WebApp
@@ -82,7 +82,8 @@ class CookieHandler(object):
 			self.authenticate_request,
 			self.CredentialsService,
 			self.SessionService,
-			self.RBACService
+			self.RBACService,
+			self.App.get_service("seacatauth.OpenIdConnectService"),
 		)
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
@@ -119,7 +120,10 @@ class CookieHandler(object):
 
 		# TODO: Choose builders based on scope
 		session_builders = [
-			credentials_session_builder(root_session.Credentials.Id),
+			credentials_session_builder(
+				self.CredentialsService,
+				root_session.Credentials.Id
+			),
 			await authz_session_builder(
 				tenant_service=self.CookieService.TenantService,
 				role_service=self.CookieService.RoleService,
