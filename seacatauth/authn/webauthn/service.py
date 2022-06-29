@@ -105,7 +105,7 @@ class WebAuthnService(asab.Service):
 
 		query_filter = {
 			"cid": credentials_id,
-			"rpid": self.RelyingPartyId,
+			"rpid": self.RelyingPartyId,  # For verification, to prevent incompatible (migrated) credentials
 		}
 		cursor = collection.find(query_filter)
 
