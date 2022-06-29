@@ -96,7 +96,7 @@ class CookieHandler(object):
 		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE)
 
 		if keep_cookie is None:
-			cookie_string = self.CookiePattern.sub(cookie_string, "")
+			cookie_string = self.CookiePattern.sub("", cookie_string)
 
 		response.headers[aiohttp.hdrs.COOKIE] = cookie_string
 
