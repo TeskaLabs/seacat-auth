@@ -24,6 +24,7 @@
 - Safer session deserialization (#59, PLUM Sprint 220617)
 - Handle malformed cookies (1f6b25e, PLUM Sprint 220617)
 - Generate new ID token when extending session (#61, PLUM Sprint 220617)
+- Fix ID token exchange in cookie introspection (#61, PLUM Sprint 220617)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
