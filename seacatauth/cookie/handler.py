@@ -34,7 +34,7 @@ class CookieHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		self.CookiePattern = re.compile(
-			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
+			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
 		)
 
 		web_app = app.WebContainer.WebApp
@@ -96,7 +96,9 @@ class CookieHandler(object):
 		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE)
 
 		if keep_cookie is None:
-			cookie_string = self.CookiePattern.sub("", cookie_string)
+			L.warning(f"\n🏩 {cookie_string=}")
+			cookie_string = self.CookiePattern.sub(cookie_string, "")
+			L.warning(f"\n👄 {cookie_string=}")
 
 		response.headers[aiohttp.hdrs.COOKIE] = cookie_string
 
