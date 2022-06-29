@@ -120,7 +120,10 @@ class CookieHandler(object):
 
 		# TODO: Choose builders based on scope
 		session_builders = [
-			credentials_session_builder(root_session.Credentials.Id),
+			credentials_session_builder(
+				self.CredentialsService,
+				root_session.Credentials.Id
+			),
 			await authz_session_builder(
 				tenant_service=self.CookieService.TenantService,
 				role_service=self.CookieService.RoleService,
