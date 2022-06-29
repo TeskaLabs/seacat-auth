@@ -7,6 +7,7 @@
 - Introspection outputs ID token instead of Access token (#39, PLUM Sprint 220520)
 - Roles are no longer included in userinfo or ID token (#50, PLUM Sprint 220603)
 - Batman no longer checks role names (#54, PLUM Sprint 220603)
+- Public API authenticates by cookie only if no Authorization header is present (#61, PLUM Sprint 220617)
 
 ### Fix
 - Fix TOTP activation error (#43, PLUM Sprint 220520)
@@ -38,6 +39,7 @@
 - Authz object no longer contains roles (#50, PLUM Sprint 220603)
 - Datetime objects are explicitly UTC-aware (#48, PLUM Sprint 220603)
 - RBAC has_resource_access returns boolean (#54, PLUM Sprint 220603)
+- Public API authenticates by cookie only if no Authorization header is present (#61, PLUM Sprint 220617)
 
 ---
 
