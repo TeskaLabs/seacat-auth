@@ -80,7 +80,8 @@ async def nginx_introspection(
 	authenticate: typing.Callable,
 	credentials_service: asab.Service,
 	session_service: asab.Service,
-	rbac_service: asab.Service
+	rbac_service: asab.Service,
+	oidc_service: asab.Service,
 ):
 	"""
 	Helper function for different types of nginx introspection (Cookie, OAuth token, Basic auth).
@@ -116,11 +117,15 @@ async def nginx_introspection(
 			return aiohttp.web.HTTPForbidden()
 
 	# Extend session expiration
-	await session_service.touch(session)
+	session = await session_service.touch(session)
+
+	# TODO: Tenant-specific token (session)
+	tenant = None
+	id_token = await oidc_service.build_id_token(session, tenant)
 
 	# Set the authorization header
 	headers = {
-		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(session.OAuth2.IDToken)
+		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(id_token)
 	}
 
 	# Add headers

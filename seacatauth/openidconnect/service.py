@@ -6,6 +6,7 @@ import secrets
 import logging
 
 import asab
+import asab.web.rest
 
 import aiohttp.web
 import urllib.parse
@@ -59,6 +60,8 @@ class OpenIdConnectService(asab.Service):
 		)
 
 		self.PrivateKey = self._load_private_key()
+
+		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
@@ -361,3 +364,27 @@ class OpenIdConnectService(asab.Service):
 				userinfo[k] = int(v.timestamp())
 
 		return userinfo
+
+
+	async def build_id_token(self, session, tenant=None):
+		"""
+		Wrap authentication data and userinfo in a JWT token
+		"""
+		header = {
+			"alg": "ES256",  # TODO: This should be mapped from key_type and key_curve
+			"typ": "JWT",
+			"kid": self.PrivateKey.key_id,
+		}
+
+		# TODO: ID token should always contain info about "what happened during authentication"
+		#   User info is optional and its parts should be included (or not) based on SCOPE
+		payload = await self.build_userinfo(session, tenant)
+
+		token = jwcrypto.jwt.JWT(
+			header=header,
+			claims=self.JSONDumper(payload)
+		)
+		token.make_signed_token(self.PrivateKey)
+		id_token = token.serialize()
+
+		return id_token
