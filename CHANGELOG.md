@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## Release candidate
+
+### Breaking changes
+- WebAuthn data format changed: Existing WebAuthn credentials are invalidated (#63, PLUM Sprint 220617)
+
+### Refactoring
+- Include relaying party ID in WebAuthn storage (#63, PLUM Sprint 220617)
+
+---
+
+
 ## v22.26
 
 ### Breaking changes
