@@ -369,6 +369,9 @@ def rest_get(session_dict):
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
 		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),
 	}
+	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)
+	if psid is not None:
+		data["parent_session_id"] = psid
 	if session_dict.get(SessionAdapter.FN.OAuth2.IdToken) is not None:
 		data["oauth2"] = True
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
