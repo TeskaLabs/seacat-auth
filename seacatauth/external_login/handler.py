@@ -21,9 +21,7 @@ class ExternalLoginHandler(object):
 	def __init__(self, app, external_login_svc: ExternalLoginService):
 		self.App = app
 		self.ExternalLoginService = external_login_svc
-		self.CookieService = app.get_service("seacatauth.CookieService")
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
-		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
@@ -67,12 +65,13 @@ class ExternalLoginHandler(object):
 		sub = str(sub)
 
 		# Get credentials by sub
-		credentials = await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-		if credentials is None:
+		try:
+			el_credentials = await self.ExternalLoginService.get(login_provider_type, sub)
+			credentials_id = el_credentials["cid"]
+		except KeyError:
 			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-UNKNOWN-USER")
 			delete_cookie(self.App, response)
 			return response
-		credentials_id = credentials["_id"]
 
 		# Create a placeholder login session
 		# TODO: Save the external login provider as a login factor
@@ -130,18 +129,24 @@ class ExternalLoginHandler(object):
 			raise aiohttp.web.HTTPBadRequest()
 
 		login_provider_type = request.match_info["ext_login_provider"]
+
 		# Check if the credentials don't have this login type enabled already
-		cred_obj = await self.CredentialsService.get(credentials_id)
-		if "external_login" in cred_obj \
-			and cred_obj["external_login"].get(login_provider_type, "") != "":
+		login_exists = False
+
+		try:
+			await self.ExternalLoginService.get_sub(credentials_id, login_provider_type)
+			login_exists = True
+		except KeyError:
+			pass
+
+		if login_exists:
 			L.error("External login of this type already exists for credentials", struct_data={
 				"cid": credentials_id,
-				"login_type": login_provider_type
+				"type": login_provider_type
 			})
 			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-SET")
 			return response
 
-		cred_field_name = "external_login.{}".format(login_provider_type)
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
 		user_info = await login_provider.add_external_login(code)
 		if user_info is None:
@@ -150,22 +155,38 @@ class ExternalLoginHandler(object):
 
 		sub = user_info.get("sub")
 		if sub is None:
-			L.error("Cannot obtain 'sub' field from external login provider", struct_data={"sub": sub})
+			L.error("Cannot obtain 'sub' field from external login provider", struct_data={
+				"type": login_provider_type
+			})
 			return self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
 
 		sub = str(sub)
 
-		# Check if the sub is not already registered with another credentials
-		credentials = await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-		if credentials is not None:
+		# Check if the sub is not already registered with different credentials
+		already_used = False
+		try:
+			await self.ExternalLoginService.get(login_provider_type, sub)
+			already_used = True
+		except KeyError:
+			pass
+
+		if already_used:
+			L.error("External login already used by different credentials", struct_data={
+				"type": login_provider_type,
+				"sub": sub,
+			})
 			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-IN-USE")
 			return response
 
 		# Update credentials
-		cred_provider = self.CredentialsService.get_provider(credentials_id)
-		result = await cred_provider.update(credentials_id, update={cred_field_name: sub})
-
-		if result != "OK":
+		try:
+			await self.ExternalLoginService.create(credentials_id, login_provider_type, sub)
+		except Exception as e:
+			L.error("{} when creating external login credentials: {}".format(type(e).__name__, str(e)), struct_data={
+				"cid": credentials_id,
+				"type": login_provider_type,
+				"sub": sub,
+			})
 			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
 			return response
 
@@ -182,14 +203,15 @@ class ExternalLoginHandler(object):
 	async def delete_external_login(self, request, *, credentials_id):
 		provider_type = request.match_info["ext_login_provider"]
 
-		provider = self.CredentialsService.get_provider(credentials_id)
-		field_name = "external_login.{}".format(provider_type)
-
-		await provider.update(credentials_id, update={field_name: ""})
+		try:
+			el_credentials = await self.ExternalLoginService.get_sub(credentials_id, provider_type)
+		except KeyError as e:
+			raise aiohttp.web.HTTPNotFound(text=str(e))
+		await self.ExternalLoginService.delete(provider_type, sub=el_credentials["s"])
 
 		L.log(asab.LOG_NOTICE, "External login successfully removed", struct_data={
 			"cid": credentials_id,
-			"account_type": provider.Type
+			"type": provider_type,
 		})
 
 		response = {"result": "OK"}

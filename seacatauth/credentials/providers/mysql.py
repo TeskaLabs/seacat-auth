@@ -196,10 +196,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		raise NotImplementedError()
 
 
-	async def get_by_external_login_sub(self, login_provider: str, sub_id: str) -> Optional[dict]:
-		raise NotImplementedError()
-
-
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
 		mysql_id = credentials_id[len(self.Prefix):]
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
@@ -268,10 +264,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 					if limit == 0:
 						return
 					result = await cursor.fetchone()
-
-
-	async def get_login_descriptors(self, credentials_id):
-		raise NotImplementedError()
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:

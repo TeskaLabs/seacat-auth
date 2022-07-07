@@ -20,9 +20,15 @@ async def credentials_session_builder(credentials_service, credentials_id):
 		(SessionAdapter.FN.Credentials.Phone, credentials.get("phone")),
 		(SessionAdapter.FN.Credentials.CreatedAt, credentials.get("_c")),
 		(SessionAdapter.FN.Credentials.ModifiedAt, credentials.get("_m")),
-		(SessionAdapter.FN.Authentication.ExternalLoginOptions, credentials.get("external_login")),
 		(SessionAdapter.FN.Authentication.TOTPSet, credentials.get("__totp") not in (None, "")),
 	)
+
+
+async def external_login_session_builder(external_login_service, credentials_id):
+	external_logins = {}
+	for result in await external_login_service.list(credentials_id):
+		external_logins[result["t"]] = result["s"]
+	return ((SessionAdapter.FN.Authentication.ExternalLoginOptions, external_logins),)
 
 
 async def authz_session_builder(tenant_service, role_service, credentials_id):

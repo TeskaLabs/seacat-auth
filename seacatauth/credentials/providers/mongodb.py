@@ -239,16 +239,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if v is not None:
 			u.set("enforce_factors", v)
 
-		# Iterate through the external_login fields
-		ext_login_update = []
-		for k, v in update.items():
-			if k.startswith("external_login."):
-				ext_login_update.append(k)
-		for k in ext_login_update:
-			v = update.pop(k)
-			if v is not None:
-				u.set(k, v)
-
 		if len(update) != 0:
 			raise KeyError("Unsupported credentials fields: {}".format(", ".join(update.keys())))
 
@@ -316,13 +306,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
 		obj = await coll.find_one({key: value})
 		return obj
-
-	async def get_by_external_login_sub(self, login_provider: str, sub_id: str) -> Optional[dict]:
-		key = "external_login.{}".format(login_provider)
-		obj = await self.get_by(key, sub_id)
-		if obj is None:
-			return None
-		return self._nomalize_credentials(obj)
 
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
