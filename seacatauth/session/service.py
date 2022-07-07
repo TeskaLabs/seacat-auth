@@ -320,6 +320,8 @@ class SessionService(asab.Service):
 	async def touch(self, session: SessionAdapter, expiration: int = None):
 		"""
 		Extend the expiration of the session group if it hasn't been updated recently.
+
+		Return the updated session object.
 		"""
 		# Get parent session
 		if session.Session.ParentId is not None:
@@ -327,10 +329,10 @@ class SessionService(asab.Service):
 
 		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
-			return
+			return session
 		if session.Session.Expiration >= session.Session.MaxExpiration:
 			# Session expiration is already maxed out
-			return
+			return session
 
 		if expiration is not None:
 			expiration = datetime.timedelta(seconds=expiration)
@@ -338,12 +340,12 @@ class SessionService(asab.Service):
 			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
 		else:
 			# May be a legacy "machine credentials session". Do not extend.
-			return
+			return session
 		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
 
 		if expires < session.Session.Expiration:
 			# Do not shorten the session!
-			return
+			return session
 		if expires > session.Session.MaxExpiration:
 			# Do not cross maximum expiration
 			expires = session.Session.MaxExpiration
@@ -383,6 +385,8 @@ class SessionService(asab.Service):
 				})
 			except KeyError:
 				L.warning("Conflict: Session already extended", struct_data={"sid": child_session_id})
+
+		return await self.get(session.SessionId)
 
 
 	async def delete(self, session_id):

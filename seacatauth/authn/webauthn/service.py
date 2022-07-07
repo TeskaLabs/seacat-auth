@@ -83,6 +83,7 @@ class WebAuthnService(asab.Service):
 		upsertor.set("uv", verified_registration.user_verified)
 		upsertor.set("ct", verified_registration.credential_type.value)
 		upsertor.set("ao", verified_registration.attestation_object)
+		upsertor.set("rpid", self.RelyingPartyId)
 		upsertor.set("name", name)
 
 		wacid = await upsertor.execute()
@@ -102,7 +103,10 @@ class WebAuthnService(asab.Service):
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
-		query_filter = {"cid": credentials_id}
+		query_filter = {
+			"cid": credentials_id,
+			"rpid": self.RelyingPartyId,  # For verification, to prevent incompatible (migrated) credentials
+		}
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)

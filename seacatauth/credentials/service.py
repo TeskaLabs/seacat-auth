@@ -296,7 +296,7 @@ class CredentialsService(asab.Service):
 		else:
 			validated_data = self.Policy.validate_creation_data(credentials_data)
 		if validated_data is None:
-			L.error("Update failed: Data does not comply with update policy", struct_data={
+			L.error("Creation failed: Data does not comply with 'create' policy", struct_data={
 				"provider_id": provider.ProviderID,
 				"agent_cid": agent_cid,
 			})

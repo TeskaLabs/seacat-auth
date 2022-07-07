@@ -173,7 +173,7 @@ class CredentialsPolicy:
 				authz,
 				tenant="*",
 				requested_resources=["authz:superuser"],
-			) == "OK"
+			)
 
 		policy = self.UpdatePolicy.get(attribute)
 

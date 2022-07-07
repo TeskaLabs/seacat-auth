@@ -3,10 +3,23 @@
 ## Release candidate
 
 ### Breaking changes
+- WebAuthn data format changed: Existing WebAuthn credentials are invalidated (#63, PLUM Sprint 220617)
+
+### Refactoring
+- Include relaying party ID in WebAuthn storage (#63, PLUM Sprint 220617)
+- Dedicated collection for external login credentials (#60, PLUM Sprint 220617)
+
+---
+
+
+## v22.26
+
+### Breaking changes
 - SeaCat API requires authentication with ID token instead of Access token (#39, PLUM Sprint 220520)
 - Introspection outputs ID token instead of Access token (#39, PLUM Sprint 220520)
 - Roles are no longer included in userinfo or ID token (#50, PLUM Sprint 220603)
 - Batman no longer checks role names (#54, PLUM Sprint 220603)
+- Public API authenticates by cookie only if no Authorization header is present (#53, PLUM Sprint 220617)
 
 ### Fix
 - Fix TOTP activation error (#43, PLUM Sprint 220520)
@@ -23,6 +36,8 @@
 - Fix role creation and assignment in old tenants (#57, PLUM Sprint 220617)
 - Safer session deserialization (#59, PLUM Sprint 220617)
 - Handle malformed cookies (1f6b25e, PLUM Sprint 220617)
+- Generate new ID token when extending session (#61, PLUM Sprint 220617)
+- Fix ID token exchange in cookie introspection (#61, PLUM Sprint 220617)
 
 ### Features
 - Structured session list (#30, PLUM Sprint 220520)
@@ -36,7 +51,7 @@
 - Authz object no longer contains roles (#50, PLUM Sprint 220603)
 - Datetime objects are explicitly UTC-aware (#48, PLUM Sprint 220603)
 - RBAC has_resource_access returns boolean (#54, PLUM Sprint 220603)
-- Dedicated collection for external login credentials (#60, PLUM Sprint 220617)
+- Public API authenticates by cookie only if no Authorization header is present (#53, PLUM Sprint 220617)
 
 ---
 
