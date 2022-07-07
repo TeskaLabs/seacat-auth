@@ -16,6 +16,7 @@ from ..session import (
 	cookie_session_builder,
 	login_descriptor_session_builder,
 	available_factors_session_builder,
+	external_login_session_builder,
 )
 
 #
@@ -301,6 +302,7 @@ class AuthenticationService(asab.Service):
 
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId),
 			await authz_session_builder(
@@ -310,7 +312,8 @@ class AuthenticationService(asab.Service):
 			),
 			login_descriptor_session_builder(login_session.AuthenticatedVia),
 			cookie_session_builder(),
-			await available_factors_session_builder(self, login_session.CredentialsId)
+			await available_factors_session_builder(self, login_session.CredentialsId),
+			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
 		]
 
 		# TODO: Temporary solution. Root session should have no OAuth2 data.

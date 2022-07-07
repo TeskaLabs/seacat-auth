@@ -7,6 +7,7 @@ from .builders import authz_session_builder
 from .builders import cookie_session_builder
 from .builders import login_descriptor_session_builder
 from .builders import available_factors_session_builder
+from .builders import external_login_session_builder
 
 __all__ = [
 	"SessionService",
@@ -16,5 +17,6 @@ __all__ = [
 	"authz_session_builder",
 	"cookie_session_builder",
 	"login_descriptor_session_builder",
-	"available_factors_session_builder"
+	"available_factors_session_builder",
+	"external_login_session_builder",
 ]

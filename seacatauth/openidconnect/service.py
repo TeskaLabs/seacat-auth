@@ -19,6 +19,7 @@ from ..session import (
 	authz_session_builder,
 	cookie_session_builder,
 	login_descriptor_session_builder,
+	external_login_session_builder,
 )
 from .session import oauth2_session_builder
 
@@ -226,6 +227,7 @@ class OpenIdConnectService(asab.Service):
 
 	async def create_oidc_session(self, root_session, client_id, scope, requested_expiration=None):
 		# TODO: Choose builders based on scope
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id),
 			await authz_session_builder(
@@ -235,6 +237,7 @@ class OpenIdConnectService(asab.Service):
 			),
 			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
 			cookie_session_builder(),
+			await external_login_session_builder(ext_login_svc, root_session.Credentials.Id),
 		]
 
 		# TODO: if 'openid' in scope
