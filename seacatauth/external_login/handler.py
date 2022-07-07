@@ -21,9 +21,7 @@ class ExternalLoginHandler(object):
 	def __init__(self, app, external_login_svc: ExternalLoginService):
 		self.App = app
 		self.ExternalLoginService = external_login_svc
-		self.CookieService = app.get_service("seacatauth.CookieService")
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
-		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
@@ -71,16 +69,6 @@ class ExternalLoginHandler(object):
 			el_credentials = await self.ExternalLoginService.get(login_provider_type, sub)
 			credentials_id = el_credentials["cid"]
 		except KeyError:
-			credentials_id = None
-		if credentials_id is None:
-			try:
-				credentials = await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-				# TODO: Migrate external login data to the dedicated collection?
-				credentials_id = credentials["_id"]
-			except KeyError:
-				credentials_id = None
-
-		if credentials_id is None:
 			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-UNKNOWN-USER")
 			delete_cookie(self.App, response)
 			return response
@@ -144,10 +132,6 @@ class ExternalLoginHandler(object):
 
 		# Check if the credentials don't have this login type enabled already
 		login_exists = False
-		cred_obj = await self.CredentialsService.get(credentials_id)
-		if "external_login" in cred_obj \
-			and cred_obj["external_login"].get(login_provider_type, "") != "":
-			login_exists = True
 
 		try:
 			await self.ExternalLoginService.get_sub(credentials_id, login_provider_type)
@@ -181,12 +165,7 @@ class ExternalLoginHandler(object):
 		# Check if the sub is not already registered with different credentials
 		already_used = False
 		try:
-			await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
-			already_used = True
-		except KeyError:
-			pass
-		try:
-			await self.CredentialsService.get_by_external_login_sub(login_provider_type, sub)
+			await self.ExternalLoginService.get(login_provider_type, sub)
 			already_used = True
 		except KeyError:
 			pass
@@ -224,19 +203,11 @@ class ExternalLoginHandler(object):
 	async def delete_external_login(self, request, *, credentials_id):
 		provider_type = request.match_info["ext_login_provider"]
 
-		cred_obj = await self.CredentialsService.get(credentials_id)
-		if "external_login" in cred_obj and cred_obj["external_login"].get(provider_type, "") != "":
-			cred_provider = self.CredentialsService.get_provider(credentials_id)
-			field_name = "external_login.{}".format(provider_type)
-			await cred_provider.update(credentials_id, update={field_name: ""})
-		else:
+		try:
 			el_credentials = await self.ExternalLoginService.get_sub(credentials_id, provider_type)
-			await self.ExternalLoginService.delete(provider_type, sub=el_credentials["s"])
-
-		cred_provider = self.CredentialsService.get_provider(credentials_id)
-		field_name = "external_login.{}".format(provider_type)
-
-		await cred_provider.update(credentials_id, update={field_name: ""})
+		except KeyError as e:
+			raise aiohttp.web.HTTPNotFound(text=str(e))
+		await self.ExternalLoginService.delete(provider_type, sub=el_credentials["s"])
 
 		L.log(asab.LOG_NOTICE, "External login successfully removed", struct_data={
 			"cid": credentials_id,
