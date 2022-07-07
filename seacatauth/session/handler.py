@@ -2,6 +2,8 @@ import logging
 
 import asab
 import asab.web.rest
+import bson
+
 from seacatauth.decorators import access_control
 from .adapter import SessionAdapter
 
@@ -44,7 +46,9 @@ class SessionHandler(object):
 	async def session_detail(self, request):
 		session_id = request.match_info['session_id']
 		session = (await self.SessionService.get(session_id)).rest_get()
-		children = await self.SessionService.recursive_list({SessionAdapter.FN.Session.ParentSessionId: session_id})
+		children = await self.SessionService.list(query_filter={
+			SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session_id)
+		})
 		if children["count"] > 0:
 			session["children"] = children
 		return asab.web.rest.json_response(request, session)
