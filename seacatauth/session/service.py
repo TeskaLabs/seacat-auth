@@ -297,7 +297,9 @@ class SessionService(asab.Service):
 				await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
 				continue
 			# Include children sessions
-			children = await self.list(query_filter={SessionAdapter.FN.Session.ParentSessionId: session["_id"]})
+			children = await self.list(
+				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])}
+			)
 			if children["count"] > 0:
 				session["children"] = children
 			sessions.append(session)
