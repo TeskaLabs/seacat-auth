@@ -172,20 +172,6 @@ class CredentialsService(asab.Service):
 				break
 		return credentials
 
-	async def get_by_external_login_sub(self, login_provider: str, sub_id: str):
-		"""
-		Get credentials by an indexed key
-		"""
-		credentials = None
-		for provider in self.CredentialProviders.values():
-			try:
-				credentials = await provider.get_by_external_login_sub(login_provider, sub_id)
-			except NotImplementedError:
-				continue
-			if credentials is not None:
-				break
-		return credentials
-
 	async def iterate(self):
 		'''
 		This iterates over all providers and combines their results

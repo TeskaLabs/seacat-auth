@@ -4,9 +4,11 @@
 
 ### Breaking changes
 - WebAuthn data format changed: Existing WebAuthn credentials are invalidated (#63, PLUM Sprint 220617)
+- External login storage changed: Existing external login credentials are invalidated (#60, PLUM Sprint 220617)
 
 ### Refactoring
 - Include relaying party ID in WebAuthn storage (#63, PLUM Sprint 220617)
+- Dedicated collection for external login credentials (#60, PLUM Sprint 220617)
 
 ---
 

@@ -42,13 +42,6 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		"""
 		return None
 
-	async def get_by_external_login_sub(self, login_provider: str, sub_id: str) -> Optional[dict]:
-		"""
-		Get credentials from external login sub ID
-		"""
-		return None
-
-	@abc.abstractmethod
 	async def get_login_descriptors(self, credentials_id) -> list:
 		'''
 		Create a descriptor for the allowed login configurations
