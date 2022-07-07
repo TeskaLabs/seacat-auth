@@ -10,6 +10,7 @@
 - Include relaying party ID in WebAuthn storage (#63, PLUM Sprint 220617)
 - Dedicated collection for external login credentials (#60, PLUM Sprint 220701)
 - Tenant name proposer is not public (#65, PLUM Sprint 220701)
+- Session detail includes parent session ID (71f83c0b, PLUM Sprint 220701)
 
 ---
 
