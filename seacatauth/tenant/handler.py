@@ -31,12 +31,11 @@ class TenantHandler(object):
 		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
 		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
 
-		web_app.router.add_get('/public/tenant_propose', self.propose_tenant)
+		web_app.router.add_get('/tenant_propose', self.propose_tenant)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get('/tenant', self.list)
-		web_app_public.router.add_get('/public/tenant_propose', self.propose_tenant)
 
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
