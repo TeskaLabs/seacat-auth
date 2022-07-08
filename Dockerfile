@@ -42,6 +42,7 @@ RUN apk add --no-cache  \
     jinja2 \
     pyotp \
     webauthn \
+    pyyaml \
     git+https://github.com/TeskaLabs/asab.git
 
 RUN mkdir -p /app/seacat-auth
