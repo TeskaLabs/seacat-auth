@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.27
 
 ### Breaking changes
 - WebAuthn data format changed: Existing WebAuthn credentials are invalidated (#63, PLUM Sprint 220617)
