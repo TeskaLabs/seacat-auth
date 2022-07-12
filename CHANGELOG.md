@@ -8,6 +8,7 @@
 
 ### Fix
 - Fixed child session filtering (#66, PLUM Sprint 220701)
+- Tenant access check in tenant-specific userinfo (#68, PLUM Sprint 220701)
 
 ### Refactoring
 - Include relaying party ID in WebAuthn storage (#63, PLUM Sprint 220617)
