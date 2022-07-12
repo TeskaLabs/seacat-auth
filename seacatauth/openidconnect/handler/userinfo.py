@@ -49,15 +49,15 @@ class UserInfoHandler(object):
 			)
 		except exceptions.NotAuthorized as e:
 			L.warning("Not authorized for requested tenant", struct_data={"tenant": e.Tenant})
-			return self.error_response("forbidden", "Not authorized for requested tenant.")
+			return self.error_response("forbidden", "Not authorized for requested tenant.", status=403)
 
 		return asab.web.rest.json_response(request, userinfo)
 
 
-	def error_response(self, error, error_description):
+	def error_response(self, error, error_description, status=401):
 		"""
 		OpenID Connect Core 1.0, 5.3.3. Error Response
 		"""
 		return aiohttp.web.Response(headers={
 			"WWW-Authenticate": "error=\"{}\", error_description=\"{}\"".format(error, error_description)
-		}, status=401)
+		}, status=status)
