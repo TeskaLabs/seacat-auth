@@ -3,9 +3,9 @@ import aiohttp
 import aiohttp.web
 import asab
 import asab.web.rest
+from ... import exceptions
 
 #
-from seacatauth import exceptions
 
 L = logging.getLogger(__name__)
 
