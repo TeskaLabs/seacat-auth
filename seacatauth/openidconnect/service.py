@@ -14,6 +14,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from .. import exceptions
 from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
@@ -260,6 +261,8 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def build_userinfo(self, session, tenant=None):
+		if tenant is None:
+			tenant = "*"
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
@@ -341,10 +344,12 @@ class OpenIdConnectService(asab.Service):
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
 
-		# If tenant is missing or unknown, consider only global roles and resources
+		# If tenant is missing or unknown, check for superuser resource
 		if tenant not in session.Authorization.Authz:
-			L.warning("Request for unknown tenant '{}', defaulting to '*'.".format(tenant))
-			tenant = "*"
+			if "authz:superuser" in session.Authorization.Authz.get("*", frozenset()):
+				tenant = "*"
+			else:
+				raise exceptions.NotAuthorized(tenant=tenant)
 
 		# Include "roles" and "resources" sections, with items relevant to query_tenant
 		resources = session.Authorization.Authz.get(tenant)

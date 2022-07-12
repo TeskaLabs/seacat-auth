@@ -5,6 +5,7 @@ import asab
 import asab.web.rest
 
 #
+from seacatauth import exceptions
 
 L = logging.getLogger(__name__)
 
@@ -41,10 +42,14 @@ class UserInfoHandler(object):
 
 		# # if authorized get provider for this identity
 
-		userinfo = await self.OpenIdConnectService.build_userinfo(
-			session,
-			tenant=request.query.get("tenant", "*")
-		)
+		try:
+			userinfo = await self.OpenIdConnectService.build_userinfo(
+				session,
+				tenant=request.query.get("tenant")
+			)
+		except exceptions.NotAuthorized as e:
+			L.warning("Not authorized for requested tenant", struct_data={"tenant": e.Tenant})
+			return self.error_response("forbidden", "Not authorized for requested tenant.")
 
 		return asab.web.rest.json_response(request, userinfo)
 
