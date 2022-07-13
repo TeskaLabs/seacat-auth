@@ -165,7 +165,7 @@ class ELKIntegration(asab.config.Configurable):
 
 		# ELK roles from SCA resources
 		# Use only global "*" roles for now
-		user_resources = set().union(*authz.get("*", {}).values())
+		user_resources = set(authz.get("*", []))
 		if "authz:superuser" in user_resources:
 			elk_roles.update(
 				resource[len(self.ResourcePrefix):]
