@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.28
 
 ### Fix
 - Fix resource check in Batman ELK (#70, PLUM Sprint 220701)
