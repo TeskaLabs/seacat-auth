@@ -135,16 +135,7 @@ class CredentialsPolicy:
 					continue
 				else:
 					raise RuntimeError("Unknown policy: {}".format(policy))
-		# At least one of (phone, email) must be specified
-		if not (validated_data.get("email") or validated_data.get("phone")):
-			L.error(
-				"Cannot create credentials: Phone or email must be specified",
-				struct_data={
-					"username": validated_data["username"],
-					"phone": validated_data["phone"]
-				}
-			)
-			return None
+
 		# Assert there are no extra fields
 		if len(credentials_data) > 0:
 			L.error(
@@ -156,7 +147,18 @@ class CredentialsPolicy:
 		return validated_data
 
 	def validate_creation_data(self, creation_data: dict):
-		return self._validate_credentials_data(creation_data, self.CreationPolicy)
+		validated_data = self._validate_credentials_data(creation_data, self.CreationPolicy)
+		# At least one of (phone, email) must be specified
+		if not (validated_data.get("email") or validated_data.get("phone")):
+			L.error(
+				"Cannot create credentials: Phone or email must be specified",
+				struct_data={
+					"username": validated_data["username"],
+					"phone": validated_data["phone"]
+				}
+			)
+			return None
+		return validated_data
 
 	def validate_m2m_creation_data(self, creation_data: dict):
 		return self._validate_credentials_data(creation_data, self.M2MCreationPolicy)
