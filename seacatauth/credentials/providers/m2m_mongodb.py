@@ -5,6 +5,7 @@ import asab.storage.exceptions
 
 import pymongo
 
+from passlib.hash import bcrypt
 from .mongodb import MongoDBCredentialsProvider
 
 #
@@ -65,6 +66,27 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 			)
 		except Exception as e:
 			L.warning("{}; fix it and restart the app".format(e))
+
+	async def create(self, credentials: dict) -> Optional[str]:
+		value = credentials.get("username")
+		if value is not None and len(value) > 0:
+			obj_id = self.normalize_username(value)
+		else:
+			raise ValueError("Cannot determine user ID")
+
+		u = self.MongoDBStorageService.upsertor(self.CredentialsCollection, obj_id)
+
+		u.set("username", credentials["username"])
+		u.set("__password", bcrypt.hash(credentials["password"].encode("utf-8")))
+
+		credentials_id = await u.execute()
+
+		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id
+		})
+
+		return "{}{}".format(self.Prefix, credentials_id)
 
 	async def register(self, register_info: dict) -> Optional[str]:
 		return None
