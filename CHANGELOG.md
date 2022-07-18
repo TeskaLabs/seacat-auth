@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Remove email and phone requirement from M2M credential creation (#73, PLUM Sprint 220715)
+
+---
+
+
 ## v22.28
 
 ### Fix
