@@ -4,7 +4,7 @@
 
 ### Fix
 - Remove email and phone requirement from M2M credential creation (#73, PLUM Sprint 220715)
-- CRITICAL: Hash M2M password before storing (#74, PLUM Sprint 220715)
+- Fix basic auth for M2M credentials (#74, PLUM Sprint 220715)
 
 ---
 
