@@ -74,13 +74,17 @@ class SeaCatAuthApplication(asab.Application):
 		self.TenantHandler = TenantHandler(self, self.TenantService)
 
 		# Init Credentials services
-		from .credentials import CredentialsService, CredentialsHandler, ChangePasswordService
+		from .credentials import CredentialsService, CredentialsHandler
 		self.CredentialService = CredentialsService(self, tenant_service=self.TenantService)
-		self.ChangePasswordService = ChangePasswordService(
-			self,
-			self.CredentialService
-		)
-		self.CredentialWebHandler = CredentialsHandler(self, self.CredentialService, self.ChangePasswordService)
+		self.CredentialWebHandler = CredentialsHandler(self, self.CredentialService)
+
+		from .credentials.change_password import ChangePasswordService, ChangePasswordHandler
+		self.ChangePasswordService = ChangePasswordService(self, self.CredentialService)
+		self.ChangePasswordHandler = ChangePasswordHandler(self, self.ChangePasswordService)
+
+		# from .credentials.registration import RegistrationService, RegistrationHandler
+		# self.RegistrationService = RegistrationService(self, self.CredentialService)
+		# self.RegistrationHandler = RegistrationHandler(self, self.RegistrationService)
 
 		# Load Role service
 		# depends on: ResourceService, TenantService, CredentialService
