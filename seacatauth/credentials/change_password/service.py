@@ -18,18 +18,12 @@ class ChangePasswordService(asab.Service):
 
 	ChangePasswordCollection = "p"
 
-	def __init__(
-		self,
-		app,
-		cred_service,
-		service_name='seacatauth.ChangePasswordService'
-	):
+	def __init__(self, app, cred_service, service_name="seacatauth.ChangePasswordService"):
 		super().__init__(app, service_name)
 
 		self.CredentialsService = cred_service
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
-
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
