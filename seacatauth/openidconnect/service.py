@@ -295,6 +295,7 @@ class OpenIdConnectService(asab.Service):
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
 
 		if session.Authentication.LoginDescriptor is not None:
+			# TODO: Include full login descriptor data?
 			userinfo["ldid"] = session.Authentication.LoginDescriptor["id"]
 			userinfo["factors"] = [
 				factor["type"]
@@ -304,10 +305,11 @@ class OpenIdConnectService(asab.Service):
 
 		# List enabled external login providers
 		if session.Authentication.ExternalLoginOptions is not None:
+			# TODO: Include external login sub ids?
 			userinfo["external_login_enabled"] = [
 				account_type
-				for account_type, account_id in session.Authentication.ExternalLoginOptions.items()
-				if len(account_id) > 0
+				for account_type, sub in session.Authentication.ExternalLoginOptions.items()
+				if len(sub) > 0
 			]
 
 		if session.Authorization.Authz is not None:

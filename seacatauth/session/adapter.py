@@ -158,7 +158,7 @@ class SessionAdapter:
 	def from_id_token(cls, session_svc, id_token_dict):
 		session_dict = {
 			cls.FN.SessionId: None,
-			cls.FN.Session.Type: "openidconnect",
+			cls.FN.Session.Type: None,
 			cls.FN.Version: None,
 			cls.FN.CreatedAt: id_token_dict.get("iat"),  # TODO: strptime
 			cls.FN.ModifiedAt: None,
@@ -167,9 +167,17 @@ class SessionAdapter:
 			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
 			cls.FN.Credentials.Email: id_token_dict.get("email"),
 			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
+			cls.FN.Credentials.CreatedAt: id_token_dict.get("created_at"),
+			cls.FN.Credentials.ModifiedAt: id_token_dict.get("updated_at"),
+			cls.FN.Authentication.TOTPSet: id_token_dict.get("totp_set"),
+			cls.FN.Authentication.AvailableFactors: id_token_dict.get("available_factors"),
+			# TODO: Login descriptor data
+			# TODO: External login data
 			cls.FN.Authorization.Authz: id_token_dict.get("authz"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
 			cls.FN.Authorization.Resources: id_token_dict.get("resources"),
+			cls.FN.OAuth2.ClientId: id_token_dict.get("aud"),
+			# TODO: Last login data
 		}
 		return cls(session_svc, session_dict)
 
