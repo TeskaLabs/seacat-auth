@@ -20,10 +20,6 @@ class ChangePasswordHandler(object):
 	def __init__(self, app, change_password_svc):
 		self.ChangePasswordService = change_password_svc
 
-		self.SessionService = app.get_service("seacatauth.SessionService")
-		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
-
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_put("/password", self.init_password_change)
 		web_app.router.add_put("/public/password-change", self.change_password)
