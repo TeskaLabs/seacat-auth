@@ -6,6 +6,10 @@
 - Remove email and phone requirement from M2M credential creation (#73, PLUM Sprint 220715)
 - Fix basic auth for M2M credentials (#74, PLUM Sprint 220715)
 
+### Refactoring
+- Move password change components into credentials submodule (#75, PLUM Sprint 220715)
+
+
 ---
 
 
