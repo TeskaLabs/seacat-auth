@@ -259,7 +259,7 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	async def build_userinfo(self, session, tenant=None):
+	async def build_userinfo(self, session):
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
@@ -311,7 +311,7 @@ class OpenIdConnectService(asab.Service):
 			]
 
 		if session.Authorization.Authz is not None:
-			userinfo["authz"] = session.Authorization.Authz
+			userinfo["resources"] = session.Authorization.Authz
 
 		if session.Authorization.Authz is not None:
 			# Include the list of ALL the user's tenants (excluding "*")
@@ -340,25 +340,6 @@ class OpenIdConnectService(asab.Service):
 				userinfo["last_failed_login"] = last_login["fat"]
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
-
-		# If tenant is missing or unknown, consider only global roles and resources
-		if tenant not in session.Authorization.Authz:
-			L.warning("Request for unknown tenant '{}', defaulting to '*'.".format(tenant))
-			tenant = "*"
-
-		# Include "roles" and "resources" sections, with items relevant to query_tenant
-		resources = session.Authorization.Authz.get(tenant)
-		if resources is not None:
-			userinfo["resources"] = resources
-		else:
-			L.error(
-				"Tenant '{}' not found in session.Authorization.authz.".format(tenant),
-				struct_data={
-					"sid": session.SessionId,
-					"cid": session.Credentials.Id,
-					"authz": session.Authorization.Authz.keys()
-				}
-			)
 
 		# RFC 7519 states that the exp and iat claim values must be NumericDate values
 		# Convert ALL datetimes to UTC timestamps for consistency
