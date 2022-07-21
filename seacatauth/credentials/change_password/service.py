@@ -4,8 +4,8 @@ import datetime
 
 import asab
 
-from seacatauth.generic import generate_ergonomic_token
-from seacatauth.audit import AuditCode
+from ...generic import generate_ergonomic_token
+from ...audit import AuditCode
 
 #
 
