@@ -61,7 +61,8 @@ class OAuth2Data:
 
 @dataclasses.dataclass
 class CookieData:
-	Id: typing.Optional[str]
+	Id: str
+	BaseUrl: typing.Optional[str]
 
 
 class SessionAdapter:
@@ -121,6 +122,7 @@ class SessionAdapter:
 		class Cookie:
 			_prefix = "ck"
 			Id = "ck_sci"
+			BaseUrl = "ck_url"
 
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
@@ -235,6 +237,7 @@ class SessionAdapter:
 		if self.Cookie is not None:
 			session_dict.update({
 				self.FN.Cookie.Id: self.Cookie.Id,
+				self.FN.Cookie.BaseUrl: self.Cookie.BaseUrl,
 			})
 
 		if self.OAuth2 is not None:
@@ -359,8 +362,10 @@ class SessionAdapter:
 		sci = session_dict.pop(cls.FN.Cookie.Id, None) or session_dict.pop("SCI", None)
 		if sci is None:
 			return None
+		base_url = session_dict.pop(cls.FN.Cookie.BaseUrl, None)
 		return CookieData(
-			Id=base64.urlsafe_b64encode(sci).decode("ascii")
+			Id=base64.urlsafe_b64encode(sci).decode("ascii"),
+			BaseUrl=base_url,
 		)
 
 
