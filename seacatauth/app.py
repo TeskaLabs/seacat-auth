@@ -122,6 +122,10 @@ class SeaCatAuthApplication(asab.Application):
 			self.RBACService
 		)
 
+		from .client import ClientService, ClientHandler
+		self.ClientService = ClientService(self)
+		self.ClientHandler = ClientHandler(self, self.ClientService)
+
 		# Load OpenID Connect module
 		# depends on: CookieService, SessionService, AuthenticationService,
 		#   CredentialsService, TenantService, RoleService
