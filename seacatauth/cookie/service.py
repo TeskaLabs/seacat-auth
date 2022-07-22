@@ -55,10 +55,20 @@ class CookieService(asab.Service):
 			domain_id = match.group(1)
 			section = asab.Config[section_name]
 
-			redirect_uri = section.get("redirect_uri", asab.Config.get("general", "auth_webui_base_url"))
 			domain = self._validate_cookie_domain(section.get("domain"))
 			if domain is None:
 				raise ValueError("Application cookie domain must be specified.")
+
+			# Set default redirect URI
+			redirect_uri = section.get("redirect_uri")
+			if redirect_uri is None:
+				L.log(asab.LOG_NOTICE, "Using default redirect URI for domain '{}': {}".format(domain, redirect_uri))
+				redirect_uri = "https://{}".format(domain.lstrip("."))
+			else:
+				# Validate that the URI matches the domain
+				parsed = urllib.parse.urlparse(redirect_uri)
+				if not parsed.hostname.endswith(domain):
+					raise ValueError("Redirect URI '{}' does not match cookie domain '{}'".format(redirect_uri, domain))
 
 			self.ApplicationCookies[domain_id] = {
 				"redirect_uri": redirect_uri,
@@ -68,7 +78,7 @@ class CookieService(asab.Service):
 
 
 	@staticmethod
-	def _validate_cookie_domain(domain):
+	def _validate_cookie_domain(domain) -> str:
 		if domain in ("", None):
 			L.warning("Cookie domain not specified or empty")
 			return None

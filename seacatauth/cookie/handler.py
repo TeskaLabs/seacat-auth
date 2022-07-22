@@ -1,5 +1,6 @@
 import logging
 import re
+import urllib.parse
 
 import aiohttp
 import aiohttp.web
@@ -158,8 +159,21 @@ class CookieHandler(object):
 		domain_id = request.match_info["domain_id"]
 		if domain_id not in self.CookieService.ApplicationCookies:
 			L.error("Invalid domain ID", struct_data={"domain_id": domain_id})
+			return aiohttp.web.HTTPBadRequest()
 
-		redirect_uri = self.CookieService.ApplicationCookies[domain_id]["redirect_uri"]
+		redirect_uri = request.query.get("redirect_uri")
+		if redirect_uri is None:
+			redirect_uri = self.CookieService.ApplicationCookies[domain_id]["redirect_uri"]
+		else:
+			# Check if redirect_uri matches the cookie domain
+			parsed = urllib.parse.urlparse(redirect_uri)
+			cookie_domain = self.CookieService.ApplicationCookies[domain_id]["domain"]
+			if not parsed.hostname.endswith(cookie_domain):
+				L.error("Redirect URI does not match cookie domain", struct_data={
+					"redirect_uri": redirect_uri,
+					"cookie_domain": cookie_domain,
+				})
+				return aiohttp.web.HTTPBadRequest()
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
