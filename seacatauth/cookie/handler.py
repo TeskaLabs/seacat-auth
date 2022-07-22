@@ -48,7 +48,7 @@ class CookieHandler(object):
 
 
 	async def authenticate_request(self, request):
-		return await self.CookieService.get_session_by_sci(request)
+		return await self.CookieService.get_application_session_by_sci(request)
 
 
 	async def nginx(self, request):
@@ -72,6 +72,7 @@ class CookieHandler(object):
 			internal;
 			proxy_method          POST;
 			proxy_set_body        "$http_authorization";
+			proxy_set_header      X-Original-URI $request_uri;
 			proxy_pass            http://seacat-auth-svc:8081/cookie/nginx?add=credentials&resource=my-app:access;
 		}
 		```

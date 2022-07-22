@@ -117,7 +117,7 @@ class CookieService(asab.Service):
 		return None
 
 
-	async def get_session_by_sci(self, request):
+	async def get_root_session_by_sci(self, request):
 		session_cookie_id = self._get_session_cookie_id(request)
 		if session_cookie_id is None:
 			return None
@@ -129,6 +129,46 @@ class CookieService(asab.Service):
 			return None
 
 		return session
+
+
+	async def get_application_session_by_sci(self, request):
+		session_cookie_id = self._get_session_cookie_id(request)
+		if session_cookie_id is None:
+			return None
+
+		target_uri = request.headers.get("X-Original-URI")
+		if target_uri is None:
+			L.error("Missing 'X-Original-URI' header")
+			return None
+		urllib.parse.urlparse(target_uri)
+
+		query_filter = {
+			SessionAdapter.FN.Cookie.Id: SessionAdapter.EncryptedPrefix + self.SessionService.aes_encrypt(session_cookie_id),
+			"$expr": {
+				"$regexMatch": {
+					"input": target_uri,
+					"regex": {
+						"$concat": ["^", "${}".format(SessionAdapter.FN.Cookie.BaseUrl), ".*"]
+					},
+				}
+			}
+		}
+
+		# TODO: Move the search to SessionService
+		sessions = []
+		async for session_dict in self.SessionService._iterate_raw(query_filter=query_filter):
+			sessions.append(SessionAdapter(self.SessionService, session_dict))
+
+		if len(sessions) == 0:
+			return None
+		elif len(sessions) == 1:
+			return sessions.pop()
+		else:
+			# TODO: What now?
+			L.error("More than one application session match the target url", struct_data={
+				"sci": session_cookie_id, "url": target_uri
+			})
+			return sessions.pop()
 
 
 	def get_cookie_domain(self, cookie_domain_id=None):

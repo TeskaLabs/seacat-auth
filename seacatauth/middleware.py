@@ -127,7 +127,7 @@ def public_auth_middleware_factory(app):
 					raise aiohttp.web.HTTPUnauthorized()
 		else:
 			# No Bearer token exists, authorize using cookie
-			request.Session = await cookie_service.get_session_by_sci(request)
+			request.Session = await cookie_service.get_application_session_by_sci(request)
 
 		return await handler(request)
 

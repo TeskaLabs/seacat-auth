@@ -55,7 +55,7 @@ class BouncerHandler(object):
 			return aiohttp.web.HTTPBadRequest(reason="URL is not allowed for bouncing.")
 
 		# Obtain the session
-		session = await self.CookieService.get_session_by_sci(request)
+		session = await self.CookieService.get_root_session_by_sci(request)
 
 		# Do the authorization if the user is not logged in
 		if session is None or session.Credentials.Id is None:

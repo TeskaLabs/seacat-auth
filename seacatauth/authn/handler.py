@@ -220,7 +220,7 @@ class AuthenticationHandler(object):
 		return response
 
 	async def logout(self, request):
-		session = await self.CookieService.get_session_by_sci(request)
+		session = await self.CookieService.get_root_session_by_sci(request)
 		if session is None:
 			raise aiohttp.web.HTTPBadRequest()
 
