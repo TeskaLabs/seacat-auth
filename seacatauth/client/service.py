@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import re
 import secrets
@@ -80,7 +79,7 @@ class ClientService(asab.Service):
 		upsertor.set("bu", base_url)  # TODO: Validate
 
 		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
-		upsertor.set("c", client_secret)
+		upsertor.set("cs", client_secret)
 
 		if description is not None:
 			upsertor.set("d", description)
@@ -93,6 +92,18 @@ class ClientService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Client created", struct_data={"client_id": client_id})
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="id", value=client_id)
+
+		return {
+			"client_id": client_id,
+			"client_secret": client_secret,
+		}
+
+
+	async def reset_secret(self, client_id: str):
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
+		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
+		upsertor.set("cs", client_secret)
+		return client_secret
 
 
 	async def update(
