@@ -13,7 +13,6 @@ L = logging.getLogger(__name__)
 
 
 class ClientService(asab.Service):
-
 	ClientCollection = "cl"
 	ClientIdPattern = r"[a-z][a-z0-9._-]{2,31}"
 	ClientSecretLength = 32
@@ -64,13 +63,12 @@ class ClientService(asab.Service):
 		description: str = None,
 		scope: list = None,
 	):
-		# TODO: Generate client secret
 		if self.ClientIdRegex.match(client_id) is None:
 			L.error("Invalid ID format", struct_data={"client_id": client_id})
 			return {
 				"result": "INVALID-VALUE",
 				"message":
-					"Client ID must consist only of characters 'a-z0-9._-', "
+					"OpenIDConnect Client ID must consist only of characters 'a-z0-9._-', "
 					"start with a letter, and be between 3 and 32 characters long.",
 			}
 
@@ -79,7 +77,7 @@ class ClientService(asab.Service):
 		upsertor.set("bu", base_url)  # TODO: Validate
 
 		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
-		upsertor.set("cs", client_secret)
+		upsertor.set("__cs", client_secret)
 
 		if description is not None:
 			upsertor.set("d", description)
@@ -89,7 +87,7 @@ class ClientService(asab.Service):
 
 		try:
 			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Client created", struct_data={"client_id": client_id})
+			L.log(asab.LOG_NOTICE, "OpenIDConnect Client created", struct_data={"client_id": client_id})
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="id", value=client_id)
 
@@ -113,8 +111,21 @@ class ClientService(asab.Service):
 		description: str = None,
 		scope: list = None,
 	):
-		raise NotImplementedError()
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
+
+		if base_url is not None:
+			upsertor.set("bu", base_url)  # TODO: Validate
+
+		if description is not None:
+			upsertor.set("d", description)
+
+		if scope is not None:
+			upsertor.set("s", scope)  # TODO: Validate
+
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "OpenIDConnect Client updated", struct_data={"client_id": client_id})
 
 
 	async def delete(self, client_id: str):
-		raise NotImplementedError()
+		self.StorageService.delete(self.ClientCollection, client_id)
+		L.log(asab.LOG_NOTICE, "OpenIDConnect Client deleted", struct_data={"client_id": client_id})
