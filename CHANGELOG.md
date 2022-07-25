@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Fix the format of M2M credential creation policy (#78, PLUM Sprint 220715)
+
+---
+
+
 ## v22.30
 
 ### Fix
