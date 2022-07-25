@@ -81,8 +81,8 @@ class CredentialsPolicy:
 		self.RegistrationPolicy = {}
 		self.UpdatePolicy = {}
 		self.M2MCreationPolicy = {
-			"username": {"creation": "required"},
-			"password": {"creation": "required"},  # At this moment password is the only login option
+			"username": "required",
+			"password": "required",  # At this moment password is the only login option
 		}
 
 		self._load_policy(policy_file)
