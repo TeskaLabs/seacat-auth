@@ -1,6 +1,7 @@
 import asab
 
 from .service import OpenIdConnectService
+from .client import ClientService, ClientHandler
 
 from .handler.authorize import AuthorizeHandler
 from .handler.token import TokenHandler
@@ -21,10 +22,11 @@ class OpenIdConnectModule(asab.Module):
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
 
+		self.ClientService = ClientService(app)
 		self.OpenIdConnectService = OpenIdConnectService(app)
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
-		self.TenantService = app.get_service('seacatauth.TenantService')
+		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 
 		self.AuthorizeHandler = AuthorizeHandler(
@@ -43,4 +45,5 @@ class OpenIdConnectModule(asab.Module):
 			self.CredentialsService
 		)
 		self.SessionHandler = SessionHandler(app, self.OpenIdConnectService, self.SessionService)
-		self.KeysHandler = PublicKeysHandler(app, self.OpenIdConnectService)
+		self.PublicKeysHandler = PublicKeysHandler(app, self.OpenIdConnectService)
+		self.ClientHandler = ClientHandler(app, self.ClientService)
