@@ -41,8 +41,8 @@ class ClientHandler(object):
 				))
 			}
 
-		resources = await self.ClientService.list(page, limit, query_filter)
-		return asab.web.rest.json_response(request, resources)
+		data = await self.ClientService.list(page, limit, query_filter)
+		return asab.web.rest.json_response(request, data)
 
 
 	@access_control("authz:superuser")
