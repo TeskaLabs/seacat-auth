@@ -87,6 +87,7 @@ class ClientService(asab.Service):
 		upsertor.set("bu", base_url)  # TODO: Validate
 
 		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
+		# TODO: Encrypt secret
 		upsertor.set("__cs", client_secret)
 
 		if description is not None:
