@@ -1,6 +1,5 @@
 import logging
 import re
-from json import JSONDecodeError
 
 import asab
 import asab.web.rest
@@ -22,6 +21,7 @@ class ClientHandler(object):
 		web_app.router.add_get("/client", self.list)
 		web_app.router.add_get("/client/{client_id}", self.get)
 		web_app.router.add_post("/client/{client_id}", self.create)
+		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/client/{client_id}", self.update)
 
 
@@ -74,12 +74,9 @@ class ClientHandler(object):
 	async def create(self, request, *, json_data):
 		client_id = request.match_info["client_id"]
 
-		await self.ClientService.create(client_id, **json_data)
+		data = await self.ClientService.create(client_id, **json_data)
 
-		return asab.web.rest.json_response(
-			request,
-			data={"result": "OK"},
-		)
+		return asab.web.rest.json_response(request, data=data)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -104,4 +101,14 @@ class ClientHandler(object):
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
+		)
+
+
+	@access_control("authz:superuser")
+	async def reset_secret(self, request):
+		client_id = request.match_info["client_id"]
+		client_secret = await self.ClientService.reset_secret(client_id)
+		return asab.web.rest.json_response(
+			request,
+			data={"client_secret": client_secret},
 		)
