@@ -170,7 +170,13 @@ class CredentialsHandler(object):
 				cid = assignment["c"]
 				_, provider_id, _ = cid.split(":", 2)
 				provider = self.CredentialsService.CredentialProviders[provider_id]
-				credentials.append(await provider.get(cid))
+				try:
+					credentials.append(await provider.get(cid))
+				except KeyError:
+					L.warning("Found an assignment of nonexisting credentials", struct_data={
+						"cid": cid,
+						"assigned_to": filtr,
+					})
 
 		# Substring based filtering
 		elif mode in frozenset(["", "default"]):
