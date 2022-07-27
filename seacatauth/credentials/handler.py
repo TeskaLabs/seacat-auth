@@ -173,7 +173,7 @@ class CredentialsHandler(object):
 				try:
 					credentials.append(await provider.get(cid))
 				except KeyError:
-					L.error("Found an assignment of nonexisting credentials", struct_data={
+					L.warning("Found an assignment of nonexisting credentials", struct_data={
 						"cid": cid,
 						"assigned_to": filtr,
 					})
