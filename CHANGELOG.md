@@ -3,7 +3,7 @@
 ## Release candidate
 
 ### Fix
-- Fix the format of M2M credential creation policy (#78, PLUM Sprint 220715)
+- Handle old assignments of nonexisting credentials (#79, PLUM Sprint 220715)
 
 ---
 
@@ -13,6 +13,8 @@
 ### Fix
 - Remove email and phone requirement from M2M credential creation (#73, PLUM Sprint 220715)
 - Fix basic auth for M2M credentials (#74, PLUM Sprint 220715)
+- Fix the format of M2M credential creation policy (#78, PLUM Sprint 220715)
+- Fixed two-stage build (1b354f2c, PLUM Sprint 220715)
 
 ### Refactoring
 - Move password change components into credentials submodule (#75, PLUM Sprint 220715)
