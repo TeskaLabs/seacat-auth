@@ -3,8 +3,10 @@ import re
 
 import asab
 import asab.web.rest
+import asab.exceptions
 
-from seacatauth.decorators import access_control
+from ...decorators import access_control
+from .. import exceptions
 
 #
 
@@ -13,14 +15,14 @@ L = logging.getLogger(__name__)
 #
 
 
-class ClientHandler(object):
+class OAuth2ClientHandler(object):
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/client", self.list)
 		web_app.router.add_get("/client/{client_id}", self.get)
-		web_app.router.add_post("/client/{client_id}", self.create)
+		web_app.router.add_post("/client", self.create)
 		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/client/{client_id}", self.update)
 
@@ -56,26 +58,32 @@ class ClientHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["base_url"],
+		"required": ["client_name", "client_type"],
 		"additionalProperties": False,
 		"properties": {
+			"client_name": {
+				"type": "string",
+				"pattern": "^.{1,64}$",
+				"description": "Short, human-readable client name",
+			},
+			"client_type": {
+				"type": "string",
+				"enum": ["confidential", "public"],
+			},
 			"description": {
 				"type": "string",
 			},
-			"base_url": {
-				"type": "string",
+			"redirect_uris": {
+				"type": "array",
 			},
-			"scope": {
+			"allowed_scopes": {
 				"type": "array",
 			},
 		}
 	})
 	@access_control("authz:superuser")
 	async def create(self, request, *, json_data):
-		client_id = request.match_info["client_id"]
-
-		data = await self.ClientService.create(client_id, **json_data)
-
+		data = await self.ClientService.create(**json_data)
 		return asab.web.rest.json_response(request, data=data)
 
 
@@ -83,13 +91,18 @@ class ClientHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
+			"client_name": {
+				"type": "string",
+				"pattern": "^.{1,64}$",
+				"description": "Short, human-readable client name",
+			},
 			"description": {
 				"type": "string",
 			},
-			"base_url": {
-				"type": "string",
+			"redirect_uris": {
+				"type": "array",
 			},
-			"scope": {
+			"allowed_scopes": {
 				"type": "array",
 			},
 		}
