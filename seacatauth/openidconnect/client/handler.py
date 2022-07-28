@@ -6,7 +6,6 @@ import asab.web.rest
 import asab.exceptions
 
 from ...decorators import access_control
-from .. import exceptions
 
 #
 
@@ -20,11 +19,11 @@ class OAuth2ClientHandler(object):
 		self.ClientService = client_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/client", self.list)
-		web_app.router.add_get("/client/{client_id}", self.get)
-		web_app.router.add_post("/client", self.create)
-		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
-		web_app.router.add_put("/client/{client_id}", self.update)
+		web_app.router.add_get("/openidconnect/client", self.list)
+		web_app.router.add_get("/openidconnect/client/{client_id}", self.get)
+		web_app.router.add_post("/openidconnect/client", self.create)
+		web_app.router.add_post("/openidconnect/client/{client_id}/reset_secret", self.reset_secret)
+		web_app.router.add_put("/openidconnect/client/{client_id}", self.update)
 
 
 	@access_control("authz:superuser")
