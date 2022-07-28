@@ -7,6 +7,7 @@ import aiohttp.web
 import asab
 
 from ...cookie.utils import set_cookie, delete_cookie
+from .. import exceptions
 
 #
 
@@ -105,6 +106,7 @@ class AuthorizeHandler(object):
 				request,
 				scope=frozenset(request_parameters["scope"].split(" ")),
 				client_id=request_parameters["client_id"],
+				client_secret=request_parameters.get("client_secret"),
 				redirect_uri=request_parameters["redirect_uri"],
 				request_parameters=request_parameters
 			)
@@ -118,7 +120,15 @@ class AuthorizeHandler(object):
 		)
 
 
-	async def authentication_code_flow(self, request, scope, client_id, redirect_uri, request_parameters):
+	async def authentication_code_flow(
+			self,
+			request,
+			scope,
+			client_id,
+			client_secret,
+			redirect_uri,
+			request_parameters
+	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 
@@ -135,12 +145,32 @@ class AuthorizeHandler(object):
 				"Scope must contain 'openid'",
 			)
 
-		# TODO: Properly validate client_id
-		if len(client_id) == 0:
+		try:
+			await self.OpenIdConnectService.OAuth2ClientService.authorize_client(
+				client_id=client_id,
+				client_secret=client_secret,
+				redirect_uri=redirect_uri,
+				scope=scope,
+			)
+		# TODO: Return error response if client authorization fails
+		except exceptions.InvalidClientID:
 			L.warning("Invalid client ID", struct_data={"client_id": client_id})
-			return self.reply_with_authentication_error(request, request_parameters, "invalid_client")
-
-		# TODO: Validate the client's permission to requested scope and redirect_uri
+			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_id")
+		except exceptions.InvalidClientSecret:
+			L.warning("Invalid client secret", struct_data={"client_id": client_id})
+			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_secret")
+		except exceptions.ForbiddenScope as e:
+			L.warning("OAuth2 client not authorized for scope", struct_data={
+				"client_id": client_id,
+				"scope": e.Scope,
+			})
+			# return self.reply_with_authentication_error(request, request_parameters, "invalid_scope")
+		except exceptions.ForbiddenRedirectURI as e:
+			L.warning("OAuth2 client not authorized for URI", struct_data={
+				"client_id": client_id,
+				"redirect_uri": e.RedirectURI,
+			})
+			# return self.reply_with_authentication_error(request, request_parameters, "invalid_redirect_uri")
 
 		root_session = request.Session
 

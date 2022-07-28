@@ -1,7 +1,7 @@
-from .handler import ClientHandler
-from .service import ClientService
+from .handler import OAuth2ClientHandler
+from .service import OAuth2ClientService
 
 __all__ = [
-	"ClientHandler",
-	"ClientService",
+	"OAuth2ClientHandler",
+	"OAuth2ClientService",
 ]
