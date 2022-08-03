@@ -121,13 +121,13 @@ class AuthorizeHandler(object):
 
 
 	async def authentication_code_flow(
-			self,
-			request,
-			scope,
-			client_id,
-			client_secret,
-			redirect_uri,
-			request_parameters
+		self,
+		request,
+		scope: list,
+		client_id: str,
+		client_secret: str,
+		redirect_uri: str,
+		request_parameters: dict
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -153,24 +153,12 @@ class AuthorizeHandler(object):
 				scope=scope,
 			)
 		# TODO: Return error response if client authorization fails
-		except exceptions.InvalidClientID:
-			L.warning("Invalid client ID", struct_data={"client_id": client_id})
+		except KeyError:
+			L.warning("Client ID not found", struct_data={"client_id": client_id})
 			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_id")
-		except exceptions.InvalidClientSecret:
-			L.warning("Invalid client secret", struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_secret")
-		except exceptions.ForbiddenScope as e:
-			L.warning("OAuth2 client not authorized for scope", struct_data={
-				"client_id": client_id,
-				"scope": e.Scope,
-			})
-			# return self.reply_with_authentication_error(request, request_parameters, "invalid_scope")
-		except exceptions.ForbiddenRedirectURI as e:
-			L.warning("OAuth2 client not authorized for URI", struct_data={
-				"client_id": client_id,
-				"redirect_uri": e.RedirectURI,
-			})
-			# return self.reply_with_authentication_error(request, request_parameters, "invalid_redirect_uri")
+		except exceptions.OpenIDConnectClientError as e:
+			L.warning(str(e), struct_data={"client_id": client_id})
+			# return self.reply_with_authentication_error(request, request_parameters, "client_error")
 
 		root_session = request.Session
 
