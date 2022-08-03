@@ -25,6 +25,7 @@ class ClientHandler(object):
 		web_app.router.add_post("/openidconnect/client", self.register)
 		web_app.router.add_post("/openidconnect/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/openidconnect/client/{client_id}", self.update)
+		web_app.router.add_delete("/openidconnect/client/{client_id}", self.delete)
 
 
 	@access_control("authz:superuser")
@@ -81,4 +82,14 @@ class ClientHandler(object):
 		return asab.web.rest.json_response(
 			request,
 			data={"client_secret": client_secret},
+		)
+
+
+	@access_control("authz:superuser")
+	async def delete(self, request):
+		client_id = request.match_info["client_id"]
+		await self.ClientService.delete(client_id)
+		return asab.web.rest.json_response(
+			request,
+			data={"result": "OK"},
 		)
