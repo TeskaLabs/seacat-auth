@@ -147,7 +147,7 @@ class CredentialsService(asab.Service):
 				if result is None:
 					continue
 
-				assert(isinstance(result, str))
+				assert (isinstance(result, str))
 
 				if stop_at_first:
 					for f in pending:
