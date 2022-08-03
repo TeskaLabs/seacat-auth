@@ -133,7 +133,7 @@ class ChangePasswordService(asab.Service):
 			L.warning("Provider not found", struct_data={'cid': credentials_id})
 			return "FAILED"
 
-		assert(provider is not None)
+		assert (provider is not None)
 
 		# Remove "password" from enforced factors
 		credentials = await self.CredentialsService.get(credentials_id)
