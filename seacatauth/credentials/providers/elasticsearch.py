@@ -63,7 +63,7 @@ class ElasticSearchCredentialsProvider(CredentialsProviderABC):
 
 	async def search(self) -> list:
 		users = await self._load_users()
-		return[self._nomalize_credentials(username, user) for username, user in users.items()]
+		return [self._nomalize_credentials(username, user) for username, user in users.items()]
 
 
 	async def get(self, credentials_id, include=None) -> dict:
