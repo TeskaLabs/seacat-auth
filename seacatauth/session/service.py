@@ -30,6 +30,7 @@ class SessionService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
+		# TODO: SessionService should use the encryption provided by StorageService
 		aes_key = asab.Config.get("seacatauth:session", "aes_key")
 		if len(aes_key) == 0:
 			raise ValueError("""Session AES key must not be empty.
@@ -41,6 +42,7 @@ class SessionService(asab.Service):
 				```
 			""".replace("\t", "").format(secrets.token_urlsafe(16)))
 		self.AESKey = hashlib.sha256(aes_key.encode("utf-8")).digest()
+		self.StorageService.AESKey = self.AESKey
 		# Block size is used for determining the size of CBC initialization vector
 		self.AESBlockSize = cryptography.hazmat.primitives.ciphers.algorithms.AES.block_size // 8
 
