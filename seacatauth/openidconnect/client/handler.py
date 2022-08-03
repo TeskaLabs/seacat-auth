@@ -6,6 +6,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ...decorators import access_control
+from .service import OIDC_CLIENT_METADATA_SCHEMA
 
 #
 
@@ -14,14 +15,14 @@ L = logging.getLogger(__name__)
 #
 
 
-class OAuth2ClientHandler(object):
+class ClientHandler(object):
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/openidconnect/client", self.list)
 		web_app.router.add_get("/openidconnect/client/{client_id}", self.get)
-		web_app.router.add_post("/openidconnect/client", self.create)
+		web_app.router.add_post("/openidconnect/client", self.register)
 		web_app.router.add_post("/openidconnect/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/openidconnect/client/{client_id}", self.update)
 
@@ -55,57 +56,14 @@ class OAuth2ClientHandler(object):
 		)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["client_name", "client_type"],
-		"additionalProperties": False,
-		"properties": {
-			"client_name": {
-				"type": "string",
-				"pattern": "^.{1,64}$",
-				"description": "Short, human-readable client name",
-			},
-			"client_type": {
-				"type": "string",
-				"enum": ["confidential", "public"],
-			},
-			"description": {
-				"type": "string",
-			},
-			"redirect_uris": {
-				"type": "array",
-			},
-			"allowed_scopes": {
-				"type": "array",
-			},
-		}
-	})
+	@asab.web.rest.json_schema_handler(OIDC_CLIENT_METADATA_SCHEMA)
 	@access_control("authz:superuser")
-	async def create(self, request, *, json_data):
-		data = await self.ClientService.create(**json_data)
+	async def register(self, request, *, json_data):
+		data = await self.ClientService.register(**json_data)
 		return asab.web.rest.json_response(request, data=data)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"client_name": {
-				"type": "string",
-				"pattern": "^.{1,64}$",
-				"description": "Short, human-readable client name",
-			},
-			"description": {
-				"type": "string",
-			},
-			"redirect_uris": {
-				"type": "array",
-			},
-			"allowed_scopes": {
-				"type": "array",
-			},
-		}
-	})
+	@asab.web.rest.json_schema_handler(OIDC_CLIENT_METADATA_SCHEMA)
 	@access_control("authz:superuser")
 	async def update(self, request, *, json_data):
 		client_id = request.match_info["client_id"]
