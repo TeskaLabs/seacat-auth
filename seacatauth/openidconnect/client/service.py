@@ -80,6 +80,10 @@ OIDC_CLIENT_METADATA_SCHEMA = {
 
 
 class ClientService(asab.Service):
+	"""
+	Provides API for the registration and management of OpenID Connect clients
+	"""
+
 	ClientCollection = "cl"
 	ClientIdPattern = r"[a-z][a-z0-9._-]{2,31}"
 	ClientSecretLength = 32
@@ -224,6 +228,8 @@ class ClientService(asab.Service):
 		upsertor.set("grant_types", list(grant_types))
 		upsertor.set("response_types", list(response_types))
 
+		upsertor.set("application_type", application_type)
+
 		# Optional client metadata
 
 		if client_name is not None:
@@ -352,17 +358,19 @@ class ClientService(asab.Service):
 
 
 	def _check_redirect_uris(self, redirect_uris: list, application_type: str, client_uri: str = None):
-		# https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-		# The redirection endpoint URI MUST be an absolute URI as defined by [RFC3986] Section 4.3.
-		# The endpoint URI MUST NOT include a fragment component. [rfc6749#section-3.1.2]
+		"""
+		Validate client redirect URIs
+
+		https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+		"""
 		for uri in redirect_uris:
 			parsed = urllib.parse.urlparse(uri)
-			if len(parsed.netloc) == 0 or len(parsed.scheme) == 0 or len(parsed.fragment) == 0:
+			if len(parsed.netloc) == 0 or len(parsed.scheme) == 0 or len(parsed.fragment) != 0:
 				raise asab.exceptions.ValidationError(
 					"Redirect URI must be an absolute URI without a fragment component.")
 
 			if application_type == "web":
-				if parsed.scheme != "https://":
+				if parsed.scheme != "https":
 					raise asab.exceptions.ValidationError(
 						"Web Clients using the OAuth Implicit Grant Type MUST only register URLs "
 						"using the https scheme as redirect_uris.")
@@ -371,7 +379,7 @@ class ClientService(asab.Service):
 						"Web Clients using the OAuth Implicit Grant Type MUST NOT use localhost as the hostname.")
 			elif application_type == "native":
 				# TODO: Authorization Servers MAY place additional constraints on Native Clients.
-				if parsed.scheme == "http://":
+				if parsed.scheme == "http":
 					if parsed.hostname == "localhost":
 						# This is valid
 						pass
@@ -385,4 +393,4 @@ class ClientService(asab.Service):
 					# TODO: Support custom URI schemes
 					raise asab.exceptions.ValidationError(
 						"Native Clients MUST only register redirect_uris using custom URI schemes "
-						"or URLs using the http: scheme with localhost as the hostname.")
+						"or URLs using the http scheme with localhost as the hostname.")
