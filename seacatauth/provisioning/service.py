@@ -74,7 +74,7 @@ class ProvisioningService(asab.Service):
 		L.log(asab.LOG_NOTICE, _PROVISIONING_INTRO_MESSAGE.format(username=self.SuperuserName, password=password))
 
 		# Create provisioning tenant
-		result = await self.TenantService.create_tenant(self.TenantID)
+		await self.TenantService.create_tenant(self.TenantID)
 
 		# Assign tenant to provisioning user
 		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
