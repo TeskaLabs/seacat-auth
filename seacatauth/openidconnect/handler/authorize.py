@@ -154,13 +154,13 @@ class AuthorizeHandler(object):
 			)
 		# TODO: Fail with error response if client authorization fails
 		except KeyError:
-			L.warning("Client ID not found", struct_data={"client_id": client_id})
+			L.info("Client ID not found", struct_data={"client_id": client_id})
 			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_id")
 		except exceptions.InvalidClientSecret as e:
-			L.warning(str(e), struct_data={"client_id": client_id})
+			L.info(str(e), struct_data={"client_id": client_id})
 			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 		except exceptions.ClientError as e:
-			L.warning(str(e), struct_data={"client_id": client_id})
+			L.info(str(e), struct_data={"client_id": client_id})
 			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 
 		root_session = request.Session

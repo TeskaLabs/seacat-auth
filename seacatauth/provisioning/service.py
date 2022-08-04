@@ -2,6 +2,7 @@ import json
 import logging
 import passlib.pwd
 
+import asab.exceptions
 import asab.storage.exceptions
 
 #
@@ -26,6 +27,7 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_provider_id": "provisioning",
 	"role_name": "provisioning-superrole",
 	"tenant": "provisioning-tenant",
+	"webui_clients": [],
 }
 
 
@@ -36,6 +38,7 @@ class ProvisioningService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 
 		self.Config = _PROVISIONING_CONFIG_DEFAULTS
@@ -88,6 +91,23 @@ class ProvisioningService(asab.Service):
 
 		# Assign superuser role to the provisioning user
 		await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
+
+		# Initialize web UI clients
+		if len(self.Config["webui_clients"]) > 0:
+			client_svc = app.get_service("seacatauth.ClientService")
+			for client in self.Config["webui_clients"]:
+				client.update({
+					"application_type": "web",
+					"token_endpoint_auth_method": "none",
+					"grant_types": ["authorization_code"],
+					"response_types": ["code"]})
+				client_id = client.pop("client_id", None)
+				try:
+					# Overwrite the client in case it was not created correctly
+					await client_svc.delete(client_id=client_id)
+				except KeyError:
+					pass
+				await client_svc.register(_custom_client_id=client_id, **client)
 
 
 	async def finalize(self, app):
