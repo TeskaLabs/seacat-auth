@@ -1,3 +1,4 @@
+import json
 import logging
 import passlib.pwd
 
@@ -9,7 +10,7 @@ L = logging.getLogger(__name__)
 
 #
 
-_provisioning_intro_message = """
+_PROVISIONING_INTRO_MESSAGE = """
 
 SeaCat Auth is running in provisioning mode.
 
@@ -20,6 +21,13 @@ Use the following credentials to log in:
 
 """
 
+_PROVISIONING_CONFIG_DEFAULTS = {
+	"credentials_name": "provisioning-superuser",
+	"credentials_provider_id": "provisioning",
+	"role_name": "provisioning-superrole",
+	"tenant": "provisioning-tenant",
+}
+
 
 class ProvisioningService(asab.Service):
 
@@ -28,19 +36,25 @@ class ProvisioningService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.SessionService = app.get_service("seacatauth.SessionService")
-		self.SuperuserName = asab.Config.get("seacatauth:provisioning", "superuser_name")
-		self.TenantID = asab.Config.get("seacatauth:provisioning", "tenant")
+		self.ResourceService = app.get_service("seacatauth.ResourceService")
+
+		self.Config = _PROVISIONING_CONFIG_DEFAULTS
+		config_file = asab.Config.get("seacatauth:provisioning", "provisioning_config_file").strip() or None
+		if config_file is not None:
+			with open(config_file) as f:
+				self.Config.update(json.load(f))
+		self.SuperuserName = self.Config["credentials_name"]
+		self.TenantID = self.Config["tenant"]
 		self.SuperuserID = None
-		self.SuperroleID = asab.Config.get("seacatauth:provisioning", "superrole_id")
-		self.CredentialsProviderID = asab.Config.get("seacatauth:provisioning", "credentials_provider_id")
+		self.SuperroleID = "*/{}".format(self.Config["role_name"])
+		self.CredentialsProviderID = self.Config["credentials_provider_id"]
+
 
 	async def initialize(self, app):
 		await super().initialize(app)
 
 		# TODO: ResourceService should be already initialized by the app
-		resource_svc = app.get_service("seacatauth.ResourceService")
-		await resource_svc.initialize(app)
+		await self.ResourceService.initialize(app)
 
 		# Create provisioning credentials provider
 		self.CredentialsService.create_dict_provider(self.CredentialsProviderID)
@@ -57,13 +71,10 @@ class ProvisioningService(asab.Service):
 			"username": self.SuperuserName,
 			"password": password
 		})
-		L.log(asab.LOG_NOTICE, _provisioning_intro_message.format(username=self.SuperuserName, password=password))
+		L.log(asab.LOG_NOTICE, _PROVISIONING_INTRO_MESSAGE.format(username=self.SuperuserName, password=password))
 
 		# Create provisioning tenant
-		try:
-			await self.TenantService.create_tenant(self.TenantID)
-		except KeyError:
-			L.error("Tenant already exists", struct_data={"tenant": self.TenantID})
+		await self.TenantService.create_tenant(self.TenantID)
 
 		# Assign tenant to provisioning user
 		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
@@ -76,7 +87,8 @@ class ProvisioningService(asab.Service):
 		) == "OK")
 
 		# Assign superuser role to the provisioning user
-		await self.RoleService.set_roles(self.SuperuserID, {"*"}, [self.SuperroleID])
+		await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
+
 
 	async def finalize(self, app):
 		# Delete the superuser

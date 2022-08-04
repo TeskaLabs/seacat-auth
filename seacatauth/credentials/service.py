@@ -265,9 +265,11 @@ class CredentialsService(asab.Service):
 
 
 	def create_dict_provider(self, provider_id):
-		from .providers.dictionary import DictCredentialsService
-		DictCredentialsService(self.App)
-		service = self.App.get_service("seacatauth.credentials.dict")
+		try:
+			service = self.App.get_service("seacatauth.credentials.dict")
+		except KeyError:
+			from .providers.dictionary import DictCredentialsService
+			service = DictCredentialsService(self.App)
 		provider = service.create_provider(provider_id, None)
 		self.register(provider)
 
