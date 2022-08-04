@@ -152,13 +152,16 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				scope=scope,
 			)
-		# TODO: Return error response if client authorization fails
+		# TODO: Fail with error response if client authorization fails
 		except KeyError:
 			L.warning("Client ID not found", struct_data={"client_id": client_id})
 			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_id")
-		except exceptions.OpenIDConnectClientError as e:
+		except exceptions.InvalidClientSecret as e:
 			L.warning(str(e), struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "client_error")
+			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
+		except exceptions.ClientError as e:
+			L.warning(str(e), struct_data={"client_id": client_id})
+			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 
 		root_session = request.Session
 
