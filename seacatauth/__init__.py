@@ -56,10 +56,7 @@ asab.Config.add_defaults({
 	"seacatauth:provisioning": {
 		# Specifies which environment variable will activate provisioning mode when set to true
 		"env_variable_name": "SEACAT_AUTH_PROVISIONING",
-		"superuser_name": "superuser",
-		"superrole_id": "*/provisioning-superrole",
-		"credentials_provider_id": "provisioning",
-		"tenant": "provisioning-tenant",
+		"provisioning_config_file": "",
 	},
 
 	"seacatauth:credentials": {
