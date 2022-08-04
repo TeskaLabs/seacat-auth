@@ -99,16 +99,13 @@ class ClientService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.ClientService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
-		self.ClientSecretTimeout = asab.Config.getseconds("seacatauth:client", "client_secret_timeout", fallback=None)
-		if self.ClientSecretTimeout <= 0:
-			self.ClientSecretTimeout = None
+		self.ClientSecretExpiration = asab.Config.getseconds(
+			"seacatauth:client", "client_secret_expiration", fallback=None)
+		if self.ClientSecretExpiration <= 0:
+			self.ClientSecretExpiration = None
 		# DEV OPTIONS
 		self._AllowInsecureWebClientURIs = asab.Config.getboolean(
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
-
-
-	async def _initialize_webui_client(self, redirect_uris):
-		await self.register(redirect_uris=redirect_uris, custom_data={"app_id": "seacat-webui"})
 
 
 	async def rest_list(self, page: int = 0, limit: int = None, query_filter: dict = None, include: list = None):
@@ -147,7 +144,7 @@ class ClientService(asab.Service):
 		return client
 
 
-	async def _rest_normalize(self, client: dict, include_client_secret: bool = False):
+	def _rest_normalize(self, client: dict, include_client_secret: bool = False):
 		rest_data = {
 			k: v
 			for k, v in client.items()
@@ -200,7 +197,7 @@ class ClientService(asab.Service):
 		:type logout_uri: str
 		:param custom_data: NON-CANONICAL. Additional client data.
 		:type custom_data: str
-		:param _custom_client_id: NON-CANONICAL. Additional client data.
+		:param _custom_client_id: NON-CANONICAL, INTERNAL ONLY. Request a specific ID for the client.
 		:type _custom_client_id: str
 		:return: Response containing the issued client_id and client_secret.
 		"""
@@ -211,7 +208,11 @@ class ClientService(asab.Service):
 		assert application_type in APPLICATION_TYPES
 		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 
-		client_id = secrets.token_urlsafe(self.ClientIdLength)
+		if _custom_client_id is not None:
+			client_id = _custom_client_id
+			L.warning("Creating a client with custom ID", struct_data={"client_id": client_id})
+		else:
+			client_id = secrets.token_urlsafe(self.ClientIdLength)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
 
 		if token_endpoint_auth_method == "none":
@@ -270,7 +271,11 @@ class ClientService(asab.Service):
 		if custom_data is not None:
 			upsertor.set("custom_data", custom_data)
 
-		await upsertor.execute()
+		try:
+			await upsertor.execute()
+		except asab.storage.exceptions.DuplicateError:
+			raise asab.exceptions.Conflict(key="client_id", value=client_id)
+
 		L.log(asab.LOG_NOTICE, "Client created", struct_data={"client_id": client_id})
 
 		response = {
@@ -292,7 +297,7 @@ class ClientService(asab.Service):
 			# However, the authorization server MUST NOT rely on public client authentication for the purpose
 			# of identifying the client. [rfc6749#section-3.1.2]
 			raise asab.exceptions.ValidationError("Cannot set secret for public client")
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
 		if client_secret_expires_at is not None:
@@ -318,13 +323,13 @@ class ClientService(asab.Service):
 		self._check_redirect_uris(
 			redirect_uris=client_update.get("redirect_uris", client["redirect_uris"]),
 			application_type=client_update.get("application_type", client["application_type"]),
-			client_uri=client_update.get("client_uri", client["client_uri"]))
+			client_uri=client_update.get("client_uri", client.get("client_uri")))
 
 		self._check_grant_types(
 			grant_types=client_update.get("grant_types", client["grant_types"]),
 			response_types=client_update.get("response_types", client["response_types"]))
 
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
 		for k, v in client_update.items():
 			upsertor.set(k, v)
@@ -334,7 +339,7 @@ class ClientService(asab.Service):
 
 
 	async def delete(self, client_id: str):
-		self.StorageService.delete(self.ClientCollection, client_id)
+		await self.StorageService.delete(self.ClientCollection, client_id)
 		L.log(asab.LOG_NOTICE, "Client deleted", struct_data={"client_id": client_id})
 
 
@@ -431,9 +436,9 @@ class ClientService(asab.Service):
 
 	def _generate_client_secret(self):
 		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
-		if self.ClientSecretTimeout is not None:
+		if self.ClientSecretExpiration is not None:
 			client_secret_expires_at = \
-				datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=self.ClientSecretTimeout)
+				datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=self.ClientSecretExpiration)
 		else:
 			client_secret_expires_at = None
 		return client_secret, client_secret_expires_at

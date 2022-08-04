@@ -24,7 +24,7 @@ asab.Config.add_defaults({
 
 	"seacatauth:client": {
 		# How long until the secret expires
-		"client_secret_timeout": "0",
+		"client_secret_expiration": "0",
 	},
 
 	"seacatauth:cookie": {
