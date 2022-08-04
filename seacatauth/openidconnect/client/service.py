@@ -129,7 +129,7 @@ class ClientService(asab.Service):
 		clients = []
 		count = await collection.count_documents(query_filter)
 		async for data in cursor:
-			clients.append(self.rest_normalize(data))
+			clients.append(self._rest_normalize(data))
 
 		return {
 			"data": clients,
@@ -146,11 +146,11 @@ class ClientService(asab.Service):
 
 	async def rest_get(self, client_id: str):
 		client = await self._get(client_id)
-		client = self.rest_normalize(client, include_client_secret=True)
+		client = self._rest_normalize(client, include_client_secret=True)
 		return client
 
 
-	async def rest_normalize(self, client: dict, include_client_secret: bool = False):
+	async def _rest_normalize(self, client: dict, include_client_secret: bool = False):
 		rest_data = {
 			k: v
 			for k, v in client.items()
@@ -166,7 +166,8 @@ class ClientService(asab.Service):
 
 
 	async def register(
-		self, redirect_uris: list, *,
+		self, *,
+		redirect_uris: list,
 		response_types: list = frozenset(["code"]),
 		grant_types: list = frozenset(["authorization_code"]),
 		application_type: str = "web",
@@ -270,9 +271,7 @@ class ClientService(asab.Service):
 			upsertor.set("custom_data", custom_data)
 
 		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "Client created", struct_data={
-			"client_id": client_id,
-			"client_name": client_name})
+		L.log(asab.LOG_NOTICE, "Client created", struct_data={"client_id": client_id})
 
 		response = {
 			"client_id": client_id,
@@ -292,20 +291,18 @@ class ClientService(asab.Service):
 			# The authorization server MAY establish a client authentication method with public clients.
 			# However, the authorization server MUST NOT rely on public client authentication for the purpose
 			# of identifying the client. [rfc6749#section-3.1.2]
-			raise asab.exceptions.ValidationError("Cannot set secret for public OIDC client")
+			raise asab.exceptions.ValidationError("Cannot set secret for public client")
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Client secret updated", struct_data={"client_id": client_id})
 		return client_secret
 
 
-	async def update(
-		self,
-		client_id: str,
-		**kwargs
-	):
+	async def update(self, client_id: str, **kwargs):
 		client = await self._get(client_id)
 		client_update = {}
 		for k, v in kwargs.items():
@@ -328,12 +325,12 @@ class ClientService(asab.Service):
 			upsertor.set(k, v)
 
 		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "OIDC client updated", struct_data={"client_id": client_id})
+		L.log(asab.LOG_NOTICE, "Client updated", struct_data={"client_id": client_id})
 
 
 	async def delete(self, client_id: str):
 		self.StorageService.delete(self.ClientCollection, client_id)
-		L.log(asab.LOG_NOTICE, "OIDC client deleted", struct_data={"client_id": client_id})
+		L.log(asab.LOG_NOTICE, "Client deleted", struct_data={"client_id": client_id})
 
 
 	async def authorize_client(
@@ -358,6 +355,7 @@ class ClientService(asab.Service):
 		if response_type not in registered_client["response_types"]:
 			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
 		if "client_secret_expires_at" in registered_client \
+			and registered_client["client_secret_expires_at"] != 0 \
 			and registered_client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.InvalidClientSecret(client_id)
 		if client_secret != registered_client.get("__client_secret", ""):
