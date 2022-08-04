@@ -78,10 +78,10 @@ class ClientHandler(object):
 	@access_control("authz:superuser")
 	async def reset_secret(self, request):
 		client_id = request.match_info["client_id"]
-		client_secret = await self.ClientService.reset_secret(client_id)
+		response = await self.ClientService.reset_secret(client_id)
 		return asab.web.rest.json_response(
 			request,
-			data={"client_secret": client_secret},
+			data=response,
 		)
 
 

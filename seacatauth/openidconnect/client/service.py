@@ -300,7 +300,12 @@ class ClientService(asab.Service):
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
 		await upsertor.execute()
 		L.log(asab.LOG_NOTICE, "Client secret updated", struct_data={"client_id": client_id})
-		return client_secret
+
+		response = {"client_secret": client_secret}
+		if client_secret_expires_at is not None:
+			response["client_secret_expires_at"] = client_secret_expires_at
+
+		return response
 
 
 	async def update(self, client_id: str, **kwargs):
