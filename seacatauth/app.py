@@ -149,7 +149,7 @@ class SeaCatAuthApplication(asab.Application):
 		self.FeatureHandler = FeatureHandler(self, self.FeatureService)
 
 		# Provisioning service
-		# depends on: RoleService, CredentialService, SessionService
+		# depends on: RoleService, CredentialService
 		if self.Provisioning:
 			from .provisioning import ProvisioningService
 			self.ProvisioningService = ProvisioningService(self)
