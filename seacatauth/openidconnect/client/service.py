@@ -94,14 +94,12 @@ class ClientService(asab.Service):
 	"""
 
 	ClientCollection = "cl"
-	ClientIdPattern = r"[a-z][a-z0-9._-]{2,31}"
 	ClientSecretLength = 32
 	ClientIdLength = 16
 
 	def __init__(self, app, service_name="seacatauth.ClientService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
-		self.ClientIdRegex = re.compile("^{}$".format(self.ClientIdPattern))
 		self.ClientSecretTimeout = asab.Config.getseconds("seacatauth:client", "client_secret_timeout", fallback=None)
 		if self.ClientSecretTimeout <= 0:
 			self.ClientSecretTimeout = None
@@ -176,6 +174,7 @@ class ClientService(asab.Service):
 		token_endpoint_auth_method: str = "client_secret_basic",
 		logout_uri: str = None,
 		custom_data: dict = None,
+		_custom_client_id: str = None,
 		**kwargs
 	):
 		"""
@@ -202,6 +201,8 @@ class ClientService(asab.Service):
 		:type logout_uri: str
 		:param custom_data: NON-CANONICAL. Additional client data.
 		:type custom_data: str
+		:param _custom_client_id: NON-CANONICAL. Additional client data.
+		:type _custom_client_id: str
 		:return: Response containing the issued client_id and client_secret.
 		"""
 		for v in response_types:
