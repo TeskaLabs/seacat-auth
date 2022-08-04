@@ -6,7 +6,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ...decorators import access_control
-from .service import OIDC_CLIENT_METADATA_SCHEMA
+from .service import CLIENT_METADATA_SCHEMA
 
 #
 
@@ -20,12 +20,12 @@ class ClientHandler(object):
 		self.ClientService = client_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/openidconnect/client", self.list)
-		web_app.router.add_get("/openidconnect/client/{client_id}", self.get)
-		web_app.router.add_post("/openidconnect/client", self.register)
-		web_app.router.add_post("/openidconnect/client/{client_id}/reset_secret", self.reset_secret)
-		web_app.router.add_put("/openidconnect/client/{client_id}", self.update)
-		web_app.router.add_delete("/openidconnect/client/{client_id}", self.delete)
+		web_app.router.add_get("/client", self.list)
+		web_app.router.add_get("/client/{client_id}", self.get)
+		web_app.router.add_post("/client", self.register)
+		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
+		web_app.router.add_put("/client/{client_id}", self.update)
+		web_app.router.add_delete("/client/{client_id}", self.delete)
 
 
 	@access_control("authz:superuser")
@@ -44,27 +44,27 @@ class ClientHandler(object):
 				))
 			}
 
-		data = await self.ClientService.list(page, limit, query_filter)
+		data = await self.ClientService.rest_list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, data)
 
 
 	@access_control("authz:superuser")
 	async def get(self, request):
 		client_id = request.match_info["client_id"]
-		result = await self.ClientService.get(client_id)
+		result = await self.ClientService.rest_get(client_id)
 		return asab.web.rest.json_response(
 			request, result
 		)
 
 
-	@asab.web.rest.json_schema_handler(OIDC_CLIENT_METADATA_SCHEMA)
+	@asab.web.rest.json_schema_handler(CLIENT_METADATA_SCHEMA)
 	@access_control("authz:superuser")
 	async def register(self, request, *, json_data):
 		data = await self.ClientService.register(**json_data)
 		return asab.web.rest.json_response(request, data=data)
 
 
-	@asab.web.rest.json_schema_handler(OIDC_CLIENT_METADATA_SCHEMA)
+	@asab.web.rest.json_schema_handler(CLIENT_METADATA_SCHEMA)
 	@access_control("authz:superuser")
 	async def update(self, request, *, json_data):
 		client_id = request.match_info["client_id"]

@@ -17,14 +17,15 @@ L = logging.getLogger(__name__)
 
 # TODO: Implement support for remaining metadata
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-OIDC_GRANT_TYPES = ["authorization_code", "implicit", "refresh_token"]
-OIDC_RESPONSE_TYPES = ["code", "id_token", "token"]
-OIDC_APPLICATION_TYPES = ["web", "native"]
-OIDC_TOKEN_ENDPOINT_AUTH_METHODS = [
+GRANT_TYPES = ["authorization_code", "implicit", "refresh_token"]
+RESPONSE_TYPES = ["code", "id_token", "token"]
+APPLICATION_TYPES = ["web", "native"]
+TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none", "client_secret_basic", "client_secret_post", "client_secret_jwt", "private_key_jwt"]
-OIDC_CLIENT_METADATA_SCHEMA = {
+CLIENT_METADATA_SCHEMA = {
 	"type": "object",
 	"required": ["redirect_uris"],
+	"additionalProperties": False,
 	"properties": {
 		"redirect_uris": {
 			"type": "array", "description": "Array of Redirection URI values used by the Client."},
@@ -33,17 +34,17 @@ OIDC_CLIENT_METADATA_SCHEMA = {
 		#  "contacts": {},
 		"application_type": {
 			"type": "string",
-			"enum": OIDC_APPLICATION_TYPES},
+			"enum": APPLICATION_TYPES},
 		"response_types": {
 			"type": "array",
 			"items": {
 				"type": "string",
-				"enum": OIDC_RESPONSE_TYPES}},
+				"enum": RESPONSE_TYPES}},
 		"grant_types": {
 			"type": "array",
 			"items": {
 				"type": "string",
-				"enum": OIDC_GRANT_TYPES}},
+				"enum": GRANT_TYPES}},
 		# "logo_uri": {},  # Can have language tags
 		"client_uri": {  # Can have language tags
 			"type": "string"},
@@ -64,7 +65,7 @@ OIDC_CLIENT_METADATA_SCHEMA = {
 		# "request_object_encryption_enc": {},
 		"token_endpoint_auth_method": {
 			"type": "string",
-			"enum": OIDC_TOKEN_ENDPOINT_AUTH_METHODS},
+			"enum": TOKEN_ENDPOINT_AUTH_METHODS},
 		# "token_endpoint_auth_signing_alg": {},
 		# "default_max_age": {},
 		# "require_auth_time": {},
@@ -75,7 +76,15 @@ OIDC_CLIENT_METADATA_SCHEMA = {
 			"type": "object", "description": "Additional client data."},
 		"logout_uri": {  # NON-CANONICAL
 			"type": "string", "description": "URI that will be called on session logout."},
-	}
+	},
+	# "patternProperties": {
+	#   # Language-specific metadata with RFC 5646 language tags
+	# 	"^client_name#[-a-zA-Z0-9]+$": {"type": "string"},
+	# 	"^logo_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+	# 	"^client_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+	# 	"^policy_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+	# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+	# }
 }
 
 
@@ -93,13 +102,19 @@ class ClientService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.ClientIdRegex = re.compile("^{}$".format(self.ClientIdPattern))
+		self.ClientSecretTimeout = asab.Config.getseconds("seacatauth:client", "client_secret_timeout", fallback=None)
+		if self.ClientSecretTimeout <= 0:
+			self.ClientSecretTimeout = None
+		# DEV OPTIONS
+		self._AllowInsecureWebClientURIs = asab.Config.getboolean(
+			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 
 	async def _initialize_webui_client(self, redirect_uris):
 		await self.register(redirect_uris=redirect_uris, custom_data={"app_id": "seacat-webui"})
 
 
-	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None, include: list = None):
+	async def rest_list(self, page: int = 0, limit: int = None, query_filter: dict = None, include: list = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -114,7 +129,7 @@ class ClientService(asab.Service):
 		clients = []
 		count = await collection.count_documents(query_filter)
 		async for data in cursor:
-			clients.append(self.normalize_client(data, include))
+			clients.append(self.rest_normalize(data))
 
 		return {
 			"data": clients,
@@ -122,25 +137,32 @@ class ClientService(asab.Service):
 		}
 
 
-	async def get(self, client_id: str, include: list = frozenset()):
-		client = await self.StorageService.get(self.ClientCollection, client_id)
-		client = self.normalize_client(client, include)
-		# TODO: Generate authorize URIs for the client (for convenience)
-		return client
-
-
-	def normalize_client(self, data, include):
-		"""
-		Remove confidential client data
-		"""
-		client = {
-			k: v
-			for k, v in data.items()
-			if not k.startswith("__") or k in include
-		}
+	async def _get(self, client_id: str):
+		client = await self.StorageService.get(self.ClientCollection, client_id, decrypt=["__client_secret"])
 		if "__client_secret" in client:
 			client["__client_secret"] = client["__client_secret"].decode("ascii")
 		return client
+
+
+	async def rest_get(self, client_id: str):
+		client = await self._get(client_id)
+		client = self.rest_normalize(client, include_client_secret=True)
+		return client
+
+
+	async def rest_normalize(self, client: dict, include_client_secret: bool = False):
+		rest_data = {
+			k: v
+			for k, v in client.items()
+			if not k.startswith("__")
+		}
+		rest_data["client_id"] = rest_data["_id"]
+		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
+		if include_client_secret and "__client_secret" in client:
+			rest_data["client_secret"] = client["__client_secret"]
+			if "client_secret_expires_at" in rest_data:
+				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
+		return rest_data
 
 
 	async def register(
@@ -182,11 +204,11 @@ class ClientService(asab.Service):
 		:return: Response containing the issued client_id and client_secret.
 		"""
 		for v in response_types:
-			assert v in OIDC_RESPONSE_TYPES
+			assert v in RESPONSE_TYPES
 		for v in grant_types:
-			assert v in OIDC_GRANT_TYPES
-		assert application_type in OIDC_APPLICATION_TYPES
-		assert token_endpoint_auth_method in OIDC_TOKEN_ENDPOINT_AUTH_METHODS
+			assert v in GRANT_TYPES
+		assert application_type in APPLICATION_TYPES
+		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 
 		client_id = secrets.token_urlsafe(self.ClientIdLength)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
@@ -203,6 +225,7 @@ class ClientService(asab.Service):
 			# on public client authentication for the purpose of identifying the
 			# client.
 			client_secret = None
+			client_secret_expires_at = None
 		elif token_endpoint_auth_method == "client_secret_basic":
 			# The client is CONFIDENTIAL
 			# Clients capable of maintaining the confidentiality of their
@@ -212,8 +235,10 @@ class ClientService(asab.Service):
 			# Confidential clients are typically issued (or establish) a set of
 			# client credentials used for authenticating with the authorization
 			# server (e.g., password, public/private key pair).
-			client_secret = secrets.token_urlsafe(self.ClientSecretLength)
+			client_secret, client_secret_expires_at = self._generate_client_secret()
 			upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
+			if client_secret_expires_at is not None:
+				upsertor.set("client_secret_expires_at", client_secret_expires_at)
 		else:
 			# The client is CONFIDENTIAL
 			# Valid method type, not implemented yet
@@ -241,8 +266,11 @@ class ClientService(asab.Service):
 		if logout_uri is not None:
 			upsertor.set("logout_uri", logout_uri)
 
+		if custom_data is not None:
+			upsertor.set("custom_data", custom_data)
+
 		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "OIDC client ID created", struct_data={
+		L.log(asab.LOG_NOTICE, "Client created", struct_data={
 			"client_id": client_id,
 			"client_name": client_name})
 
@@ -251,26 +279,25 @@ class ClientService(asab.Service):
 			"client_id_issued_at": int(datetime.datetime.now(datetime.timezone.utc).timestamp())}
 
 		if client_secret is not None:
-			response.update({
-				"client_secret": client_secret,
-				"client_secret_expires_at": client_secret})
-
-		if custom_data is not None:
-			upsertor.set("custom_data", custom_data)
+			response["client_secret"] = client_secret
+			if client_secret_expires_at is not None:
+				response["client_secret_expires_at"] = client_secret_expires_at
 
 		return response
 
 
 	async def reset_secret(self, client_id: str):
-		client = await self.get(client_id)
+		client = await self._get(client_id)
 		if client["token_endpoint_auth_method"] == "none":
 			# The authorization server MAY establish a client authentication method with public clients.
 			# However, the authorization server MUST NOT rely on public client authentication for the purpose
 			# of identifying the client. [rfc6749#section-3.1.2]
 			raise asab.exceptions.ValidationError("Cannot set secret for public OIDC client")
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
-		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
+		client_secret, client_secret_expires_at = self._generate_client_secret()
 		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
+		if client_secret_expires_at is not None:
+			upsertor.set("client_secret_expires_at", client_secret_expires_at)
 		return client_secret
 
 
@@ -279,10 +306,10 @@ class ClientService(asab.Service):
 		client_id: str,
 		**kwargs
 	):
-		client = await self.get(client_id)
+		client = await self._get(client_id)
 		client_update = {}
 		for k, v in kwargs.items():
-			if k not in OIDC_CLIENT_METADATA_SCHEMA["properties"]:
+			if k not in CLIENT_METADATA_SCHEMA["properties"]:
 				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
 			client_update[k] = v
 
@@ -318,20 +345,23 @@ class ClientService(asab.Service):
 		grant_type: str = None,
 		response_type: str = None,
 	):
-		registered_client = await self.get(client_id, include=frozenset(["__client_secret"]))
+		registered_client = await self._get(client_id)
 
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
 			client_secret = ""
 		if redirect_uri not in registered_client["redirect_uris"]:
-			raise exceptions.OpenIDConnectClientError(client_id=client_id, redirect_uri=redirect_uri)
+			raise exceptions.ClientError(client_id=client_id, redirect_uri=redirect_uri)
 		if grant_type not in registered_client["grant_types"]:
-			raise exceptions.OpenIDConnectClientError(client_id=client_id, grant_type=grant_type)
+			raise exceptions.ClientError(client_id=client_id, grant_type=grant_type)
 		if response_type not in registered_client["response_types"]:
-			raise exceptions.OpenIDConnectClientError(client_id=client_id, response_type=response_type)
+			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
+		if "client_secret_expires_at" in registered_client \
+			and registered_client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.InvalidClientSecret(client_id)
 		if client_secret != registered_client.get("__client_secret", ""):
-			raise exceptions.OpenIDConnectClientError(client_id=client_id, client_secret=client_secret)
+			raise exceptions.InvalidClientSecret(client_id)
 
 		return True
 
@@ -370,7 +400,7 @@ class ClientService(asab.Service):
 					"Redirect URI must be an absolute URI without a fragment component.")
 
 			if application_type == "web":
-				if parsed.scheme != "https":
+				if parsed.scheme != "https" and not self._AllowInsecureWebClientURIs:
 					raise asab.exceptions.ValidationError(
 						"Web Clients using the OAuth Implicit Grant Type MUST only register URLs "
 						"using the https scheme as redirect_uris.")
@@ -394,3 +424,13 @@ class ClientService(asab.Service):
 					raise asab.exceptions.ValidationError(
 						"Native Clients MUST only register redirect_uris using custom URI schemes "
 						"or URLs using the http scheme with localhost as the hostname.")
+
+
+	def _generate_client_secret(self):
+		client_secret = secrets.token_urlsafe(self.ClientSecretLength)
+		if self.ClientSecretTimeout is not None:
+			client_secret_expires_at = \
+				datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=self.ClientSecretTimeout)
+		else:
+			client_secret_expires_at = None
+		return client_secret, client_secret_expires_at
