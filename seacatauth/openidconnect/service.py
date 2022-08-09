@@ -350,7 +350,7 @@ class OpenIdConnectService(asab.Service):
 		return userinfo
 
 
-	async def build_id_token(self, session, tenant=None):
+	async def build_id_token(self, session):
 		"""
 		Wrap authentication data and userinfo in a JWT token
 		"""
@@ -362,7 +362,7 @@ class OpenIdConnectService(asab.Service):
 
 		# TODO: ID token should always contain info about "what happened during authentication"
 		#   User info is optional and its parts should be included (or not) based on SCOPE
-		payload = await self.build_userinfo(session, tenant)
+		payload = await self.build_userinfo(session)
 
 		token = jwcrypto.jwt.JWT(
 			header=header,
