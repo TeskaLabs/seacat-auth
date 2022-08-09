@@ -4,8 +4,8 @@ import datetime
 
 import asab
 
-from ..generic import generate_ergonomic_token
-from ..audit import AuditCode
+from ...generic import generate_ergonomic_token
+from ...audit import AuditCode
 
 #
 
@@ -18,18 +18,12 @@ class ChangePasswordService(asab.Service):
 
 	ChangePasswordCollection = "p"
 
-	def __init__(
-		self,
-		app,
-		cred_service,
-		service_name='seacatauth.ChangePasswordService'
-	):
+	def __init__(self, app, cred_service, service_name="seacatauth.ChangePasswordService"):
 		super().__init__(app, service_name)
 
 		self.CredentialsService = cred_service
-		self.CommunicationService = app.get_service('seacatauth.CommunicationService')
-		self.AuditService = app.get_service('seacatauth.AuditService')
-
+		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
+		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
@@ -40,27 +34,27 @@ class ChangePasswordService(asab.Service):
 		app.PubSub.subscribe("Application.tick/3600!", self._on_tick)
 
 	async def _on_tick(self, event_name):
-		await self.delete_expired_pwdreset_requests()
+		await self.delete_expired_pwdreset_tokens()
 
-	async def delete_expired_pwdreset_requests(self):
+	async def delete_expired_pwdreset_tokens(self):
 		expired = []
-		requests = await self.list_pwdreset_requests()
+		requests = await self.list_pwdreset_tokens()
 		for r in requests["data"]:
 			if datetime.datetime.now(datetime.timezone.utc) > r["exp"]:
 				expired.append(r["_id"])
 		for pwd_id in expired:
-			await self.delete_pwdreset_request(pwdreset_id=pwd_id)
+			await self.delete_pwdreset_token(pwdreset_id=pwd_id)
 
-	async def delete_pwdreset_requests_by_cid(self, cid):
+	async def delete_pwdreset_tokens_by_cid(self, cid):
 		expired = []
-		requests = await self.list_pwdreset_requests()
+		requests = await self.list_pwdreset_tokens()
 		for r in requests["data"]:
 			if r["cid"] == cid:
 				expired.append(r["_id"])
 		for pwd_id in expired:
-			await self.delete_pwdreset_request(pwdreset_id=pwd_id)
+			await self.delete_pwdreset_token(pwdreset_id=pwd_id)
 
-	async def list_pwdreset_requests(self, page: int = 0, limit: int = None):
+	async def list_pwdreset_tokens(self, page: int = 0, limit: int = None):
 		collection = self.StorageService.Database[self.ChangePasswordCollection]
 
 		query_filter = {}
@@ -80,21 +74,21 @@ class ChangePasswordService(asab.Service):
 			'count': await collection.count_documents(query_filter)
 		}
 
-	async def create_pwdreset_request(self, pwd_change_id: str, request_builders: list):
+	async def create_pwdreset_token(self, pwd_change_id: str, request_builders: list):
 		upsertor = self.StorageService.upsertor(self.ChangePasswordCollection, obj_id=pwd_change_id)
 		for request_builder in request_builders:
 			for key, value in request_builder.items():
 				upsertor.set(key, value)
 		request_id = await upsertor.execute()
 		assert pwd_change_id == request_id
-		L.log(asab.LOG_NOTICE, "Password request created", struct_data={'sid': request_id})
+		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"pwd_token": request_id})
 		return request_id
 
-	async def delete_pwdreset_request(self, pwdreset_id: str):
+	async def delete_pwdreset_token(self, pwdreset_id: str):
 		await self.StorageService.delete(self.ChangePasswordCollection, pwdreset_id)
-		L.log(asab.LOG_NOTICE, "Password reset request deleted", struct_data={'sid': pwdreset_id})
+		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={"pwd_token": pwdreset_id})
 
-	async def get_pwdreset_request(self, pwdreset_id: str):
+	async def get_pwdreset_token(self, pwdreset_id: str):
 		return await self.StorageService.get(self.ChangePasswordCollection, pwdreset_id)
 
 	async def init_password_change(self, credentials_id: str, is_new_user: bool = False, expiration: float = None):
@@ -106,7 +100,7 @@ class ChangePasswordService(asab.Service):
 		# Verify if credentials exists
 		creds = await self.CredentialsService.get(credentials_id)
 		if creds is None:
-			L.warning("Cannot find credentials", struct_data={'cid': credentials_id})
+			L.warning("Cannot find credentials", struct_data={"cid": credentials_id})
 			return False
 
 		if expiration is None:
@@ -117,12 +111,12 @@ class ChangePasswordService(asab.Service):
 			"exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 		}]
 
-		await self.create_pwdreset_request(pwd_change_id, pwd_change_builders)
+		await self.create_pwdreset_token(pwd_change_id, pwd_change_builders)
 
 		# Sent the message
-		email = creds.get('email')
-		username = creds.get('username')
-		phone = creds.get('phone')
+		email = creds.get("email")
+		username = creds.get("username")
+		phone = creds.get("phone")
 		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, pwd_change_id)
 		await self.CommunicationService.password_reset(
 			email=email, username=username, phone=phone, reset_url=reset_url, welcome=is_new_user
@@ -139,7 +133,7 @@ class ChangePasswordService(asab.Service):
 			L.warning("Provider not found", struct_data={'cid': credentials_id})
 			return "FAILED"
 
-		assert(provider is not None)
+		assert (provider is not None)
 
 		# Remove "password" from enforced factors
 		credentials = await self.CredentialsService.get(credentials_id)
@@ -150,8 +144,8 @@ class ChangePasswordService(asab.Service):
 		# Update password in DB
 		try:
 			await provider.update(credentials_id, {
-				'password': new_password,
-				'enforce_factors': list(enforce_factors)
+				"password": new_password,
+				"enforce_factors": list(enforce_factors)
 			})
 		except Exception as e:
 			L.exception("Password change failed: {}".format(e), struct_data={'cid': credentials_id})
@@ -178,7 +172,7 @@ class ChangePasswordService(asab.Service):
 
 		# Get password change object from the storage and extract credentials_id from it
 		try:
-			pwdreset_dict = await self.get_pwdreset_request(pwdreset_id)
+			pwdreset_dict = await self.get_pwdreset_token(pwdreset_id)
 		except KeyError:
 			L.warning("Password reset request not found", struct_data={'id': pwdreset_id})
 			return "INVALID-CODE"
@@ -192,13 +186,13 @@ class ChangePasswordService(asab.Service):
 			await self.AuditService.append(
 				AuditCode.PASSWORD_CHANGE_FAILED,
 				{
-					'cid': credentials_id
+					"cid": credentials_id
 				}
 			)
 
 		# Delete ALL pwdreset requests with this credentials id
 		try:
-			await self.delete_pwdreset_requests_by_cid(cid=credentials_id)
+			await self.delete_pwdreset_tokens_by_cid(cid=credentials_id)
 		except Exception as e:
 			L.warning(
 				"Unable to remove old password change requests: {} ({})".format(type(e), e),
@@ -214,7 +208,7 @@ class ChangePasswordService(asab.Service):
 			L.log(
 				asab.LOG_NOTICE,
 				"Password change failed, old password doesn't match.",
-				struct_data={'cid': session.Credentials.Id}
+				struct_data={"cid": session.Credentials.Id}
 			)
 			result = "UNAUTHORIZED"
 		else:
@@ -224,7 +218,15 @@ class ChangePasswordService(asab.Service):
 			await self.AuditService.append(
 				AuditCode.PASSWORD_CHANGE_FAILED,
 				{
-					'cid': session.Credentials.Id
+					"cid": session.Credentials.Id
 				}
 			)
 		return result
+
+	async def lost_password(self, ident):
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True)
+		if credentials_id is not None:
+			await self.init_password_change(credentials_id)
+		else:
+			L.warning("No credentials matching '{}'".format(ident))
+		return True  # Since this is public, don't disclose the true result

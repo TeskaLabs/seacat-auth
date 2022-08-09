@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Handle old assignments of nonexisting credentials (#79, PLUM Sprint 220715)
+
+### Refactoring
+- Provisioning config in a dedicated JSON file (#80, PLUM Sprint 220729)
+
+---
+
+
+## v22.30
+
+### Fix
+- Remove email and phone requirement from M2M credential creation (#73, PLUM Sprint 220715)
+- Fix basic auth for M2M credentials (#74, PLUM Sprint 220715)
+- Fix the format of M2M credential creation policy (#78, PLUM Sprint 220715)
+- Fixed two-stage build (1b354f2c, PLUM Sprint 220715)
+
+### Refactoring
+- Move password change components into credentials submodule (#75, PLUM Sprint 220715)
+
+
+---
+
+
+## v22.28
+
+### Fix
+- Fix resource check in Batman ELK (#70, PLUM Sprint 220701)
+
+---
+
+
 ## v22.27
 
 ### Breaking changes

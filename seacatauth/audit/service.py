@@ -24,7 +24,7 @@ class AuditService(asab.Service):
 
 
 	async def append(self, code: AuditCode, attributes: dict = None):
-		assert(isinstance(code, AuditCode))
+		assert (isinstance(code, AuditCode))
 
 
 		if attributes is None:

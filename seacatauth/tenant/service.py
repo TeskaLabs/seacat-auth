@@ -22,7 +22,7 @@ class TenantService(asab.Service):
 
 
 	def create_provider(self, provider_id, config_section_name):
-		assert(self.TenantsProvider is None)  # We support only one tenant provider for now
+		assert (self.TenantsProvider is None)  # We support only one tenant provider for now
 		_, creds, provider_type, provider_name = config_section_name.rsplit(":", 3)
 		if provider_type == 'mongodb':
 			from .providers.mongodb import MongoDBTenantProvider
@@ -153,7 +153,7 @@ class TenantService(asab.Service):
 
 
 	async def get_tenants(self, credentials_id: str):
-		assert(self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
+		assert (self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		# TODO: This has to be cached agressivelly
 		result = []
 		async for obj in self.TenantsProvider.iterate_assigned(credentials_id):
@@ -165,7 +165,7 @@ class TenantService(asab.Service):
 		"""
 		Assign `credentials_id` to all tenants listed in `tenants`, unassign it from all tenants that are not listed.
 		"""
-		assert(self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
+		assert (self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
 		rbac_svc = self.App.get_service("seacatauth.RBACService")
 
