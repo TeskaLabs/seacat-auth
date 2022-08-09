@@ -117,7 +117,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		for attribute in ("username", "email", "phone"):
 			value = credentials.get(attribute)
 			if value is not None and len(value) > 0:
-				obj_id = normalize_username(value)
+				obj_id = self.normalize_username(value)
 				break
 		else:
 			raise ValueError("Cannot determine user ID")
@@ -463,8 +463,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return False
 
 
-def normalize_username(username) -> bson.ObjectId:
-	return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
+	def normalize_username(self, username) -> bson.ObjectId:
+		return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
 
 
 def authn_password(dbcred, credentials):

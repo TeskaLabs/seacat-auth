@@ -56,10 +56,11 @@ RUN asab-manifest.py ./MANIFEST.json
 
 FROM alpine:3.13
 
-
 RUN apk add --no-cache \
-  python3 
-  
+  python3 \
+  openssl \
+  openldap
+
 COPY --from=stage1 /usr/lib/python3.8/site-packages /usr/lib/python3.8/site-packages
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth

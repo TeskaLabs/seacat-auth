@@ -1,7 +1,6 @@
 import json
 import secrets
 import logging
-import asyncio
 
 import aiohttp
 import aiohttp.web
@@ -27,9 +26,8 @@ L = logging.getLogger(__name__)
 class CredentialsHandler(object):
 
 
-	def __init__(self, app, credentials_svc, chpwd_svc):
+	def __init__(self, app, credentials_svc):
 		self.CredentialsService = credentials_svc
-		self.ChangePasswordService = chpwd_svc
 
 		self.SessionService = app.get_service('seacatauth.SessionService')
 		self.TenantService = app.get_service("seacatauth.TenantService")
@@ -64,14 +62,8 @@ class CredentialsHandler(object):
 		web_app.router.add_get('/public/invitation/{register_token}', self.register_with_invite_get)
 		web_app.router.add_post('/public/register/{register_token}', self.register_post)
 
-		web_app.router.add_put('/password', self.init_password_change)
 		web_app.router.add_get('/public/provider', self.get_my_provider_info)
 		web_app.router.add_put('/enforce-factors/{credentials_id}', self.enforce_factors)
-
-		web_app.router.add_put('/public/password-change', self.change_password)
-		web_app.router.add_put('/public/password-reset', self.reset_password)
-
-		web_app.router.add_put(r'/public/lost-password', self.lost_password)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
@@ -81,13 +73,7 @@ class CredentialsHandler(object):
 		web_app_public.router.add_get('/public/invitation/{register_token}', self.register_with_invite_get)
 		web_app_public.router.add_post('/public/register/{register_token}', self.register_post)
 
-		web_app_public.router.add_put('/password', self.init_password_change)
 		web_app_public.router.add_get('/public/provider', self.get_my_provider_info)
-
-		web_app_public.router.add_put('/public/password-change', self.change_password)
-		web_app_public.router.add_put('/public/password-reset', self.reset_password)
-
-		web_app_public.router.add_put(r'/public/lost-password', self.lost_password)
 
 
 	async def list_providers(self, request):
@@ -184,7 +170,13 @@ class CredentialsHandler(object):
 				cid = assignment["c"]
 				_, provider_id, _ = cid.split(":", 2)
 				provider = self.CredentialsService.CredentialProviders[provider_id]
-				credentials.append(await provider.get(cid))
+				try:
+					credentials.append(await provider.get(cid))
+				except KeyError:
+					L.warning("Found an assignment of nonexisting credentials", struct_data={
+						"cid": cid,
+						"assigned_to": filtr,
+					})
 
 		# Substring based filtering
 		elif mode in frozenset(["", "default"]):
@@ -513,94 +505,3 @@ class CredentialsHandler(object):
 		else:
 			self.Registrations.pop(register_token)
 			return asab.web.rest.json_response(request, {'result': 'OK'})
-
-
-	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'required': ['oldpassword', 'newpassword'],
-		'properties': {
-			'oldpassword': {'type': 'string'},
-			'newpassword': {'type': 'string'},
-		}
-	})
-	@access_control()
-	async def change_password(self, request, *, json_data):
-		"""
-		There are three general ways how a password could be changed:
-		1) By being logged in and providing old password
-		2) Being the superuser and specify the password for an user (TODO: Not implemented yet)
-		"""
-		result = await self.ChangePasswordService.change_password(
-			request.Session,
-			json_data.get('oldpassword'),
-			json_data.get('newpassword'),
-		)
-
-		return asab.web.rest.json_response(request, {'result': result})
-
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": [
-			"newpassword",
-			"pwd_token"  # Password reset token
-		],
-		"properties": {
-			"newpassword": {
-				"type": "string"
-			},
-			"pwd_token": {
-				"type": "string",
-				"description": "One-time code for password reset"
-			},
-		}
-	})
-	async def reset_password(self, request, *, json_data):
-		"""
-		Set a new password using pwdreset_id obtained in "Lost password" procedure
-		"""
-		# TODO: this call needs to be encrypted
-		result = await self.ChangePasswordService.change_password_by_pwdreset_id(
-			json_data.get("pwd_token"),
-			json_data.get("newpassword"),
-		)
-
-		return asab.web.rest.json_response(request, {"result": result})
-
-	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'required': ['credentials_id'],
-		'properties': {
-			'credentials_id': {'type': 'string'},
-			'expiration': {'type': 'number'},
-		}
-	})
-	@access_control("authz:tenant:admin")
-	async def init_password_change(self, request, *, json_data):
-		"""
-		Directly creates a password reset request. This should be called by admin only.
-		For user-initiated password reset use `lost_password` method.
-		"""
-		result = await self.ChangePasswordService.init_password_change(
-			json_data.get('credentials_id'),
-			expiration=json_data.get('expiration')
-		)
-		return asab.web.rest.json_response(request, {'result': result})
-
-	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'required': ['ident'],
-		'properties': {
-			'ident': {'type': 'string'},
-		}
-	})
-	async def lost_password(self, request, *, json_data):
-		await asyncio.sleep(5)  # Safety time cooldown
-		ident = json_data['ident']
-		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True)
-		if credentials_id is not None:
-			await self.ChangePasswordService.init_password_change(credentials_id)
-		else:
-			L.warning("No credentials matching '{}'".format(ident))
-		response = {'result': 'OK'}  # Since this is public, don't disclose the true result
-		return asab.web.rest.json_response(request, response)
