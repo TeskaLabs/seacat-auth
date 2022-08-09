@@ -101,9 +101,7 @@ class TokenHandler(object):
 
 		expires_in = int((session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
 
-		# TODO: Tenant-specific token (session)
-		tenant = None
-		id_token = await self.OpenIdConnectService.build_id_token(session, tenant)
+		id_token = await self.OpenIdConnectService.build_id_token(session)
 
 		# Save the ID token in the session object
 		await self.SessionService.update_session(
