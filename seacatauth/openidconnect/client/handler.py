@@ -39,19 +39,26 @@ class ClientHandler(object):
 		query_filter = request.query.get("f", None)
 		if query_filter is not None:
 			query_filter = {
-				"_id": re.compile("^{}".format(
-					re.escape(query_filter)
-				))
-			}
+				"_id": re.compile("^{}".format(re.escape(query_filter)))}
 
-		data = await self.ClientService.rest_list(page, limit, query_filter)
-		return asab.web.rest.json_response(request, data)
+		data = []
+		async for client in self.ClientService.iterate(page, limit, query_filter):
+			data.append(self._rest_normalize(client))
+
+		count = await self.ClientService.count(query_filter)
+
+		return asab.web.rest.json_response(request, {
+			"data": data,
+			"count": count,
+		})
 
 
 	@access_control("authz:superuser")
 	async def get(self, request):
 		client_id = request.match_info["client_id"]
-		result = await self.ClientService.rest_get(client_id)
+		result = self._rest_normalize(
+			await self.ClientService.get(client_id),
+			include_client_secret=True)
 		return asab.web.rest.json_response(
 			request, result
 		)
@@ -93,3 +100,18 @@ class ClientHandler(object):
 			request,
 			data={"result": "OK"},
 		)
+
+
+	def _rest_normalize(self, client: dict, include_client_secret: bool = False):
+		rest_data = {
+			k: v
+			for k, v in client.items()
+			if not k.startswith("__")
+		}
+		rest_data["client_id"] = rest_data["_id"]
+		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
+		if include_client_secret and "__client_secret" in client:
+			rest_data["client_secret"] = client["__client_secret"]
+			if "client_secret_expires_at" in rest_data:
+				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
+		return rest_data

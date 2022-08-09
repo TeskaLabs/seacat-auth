@@ -89,7 +89,9 @@ CLIENT_METADATA_SCHEMA = {
 
 class ClientService(asab.Service):
 	"""
-	Provides API for the registration and management of OpenID Connect clients
+	Implements API for OpenID Connect client registration.
+
+	https://openid.net/specs/openid-connect-registration-1_0.html
 	"""
 
 	ClientCollection = "cl"
@@ -108,7 +110,7 @@ class ClientService(asab.Service):
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 
-	async def rest_list(self, page: int = 0, limit: int = None, query_filter: dict = None, include: list = None):
+	async def iterate(self, page: int = 0, limit: int = None, query_filter: dict = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -121,42 +123,25 @@ class ClientService(asab.Service):
 			cursor.limit(limit)
 
 		clients = []
-		count = await collection.count_documents(query_filter)
-		async for data in cursor:
-			clients.append(self._rest_normalize(data))
-
-		return {
-			"data": clients,
-			"count": count,
-		}
+		count = await self.count(query_filter)
+		async for client in cursor:
+			if "__client_secret" in client:
+				client["__client_secret"] = client["__client_secret"].decode("ascii")
+			yield client
 
 
-	async def _get(self, client_id: str):
+	async def count(self, query_filter: dict = None):
+		collection = self.StorageService.Database[self.ClientCollection]
+		if query_filter is None:
+			query_filter = {}
+		return await collection.count_documents(query_filter)
+
+
+	async def get(self, client_id: str):
 		client = await self.StorageService.get(self.ClientCollection, client_id, decrypt=["__client_secret"])
 		if "__client_secret" in client:
 			client["__client_secret"] = client["__client_secret"].decode("ascii")
 		return client
-
-
-	async def rest_get(self, client_id: str):
-		client = await self._get(client_id)
-		client = self._rest_normalize(client, include_client_secret=True)
-		return client
-
-
-	def _rest_normalize(self, client: dict, include_client_secret: bool = False):
-		rest_data = {
-			k: v
-			for k, v in client.items()
-			if not k.startswith("__")
-		}
-		rest_data["client_id"] = rest_data["_id"]
-		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
-		if include_client_secret and "__client_secret" in client:
-			rest_data["client_secret"] = client["__client_secret"]
-			if "client_secret_expires_at" in rest_data:
-				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
-		return rest_data
 
 
 	async def register(
@@ -291,7 +276,7 @@ class ClientService(asab.Service):
 
 
 	async def reset_secret(self, client_id: str):
-		client = await self._get(client_id)
+		client = await self.get(client_id)
 		if client["token_endpoint_auth_method"] == "none":
 			# The authorization server MAY establish a client authentication method with public clients.
 			# However, the authorization server MUST NOT rely on public client authentication for the purpose
@@ -313,7 +298,7 @@ class ClientService(asab.Service):
 
 
 	async def update(self, client_id: str, **kwargs):
-		client = await self._get(client_id)
+		client = await self.get(client_id)
 		client_update = {}
 		for k, v in kwargs.items():
 			if k not in CLIENT_METADATA_SCHEMA["properties"]:
@@ -352,7 +337,7 @@ class ClientService(asab.Service):
 		grant_type: str = None,
 		response_type: str = None,
 	):
-		registered_client = await self._get(client_id)
+		registered_client = await self.get(client_id)
 
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
