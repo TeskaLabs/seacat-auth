@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "8c8915fa-2b0d-49c6-8c91-8a7fd01f94a4",
+		"_postman_id": "7151a57e-20ca-44cb-8afa-5ac53dae3912",
 		"name": "SeaCat Auth",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
@@ -1124,77 +1124,6 @@
 									]
 								},
 								"description": "Return the info about the current user based on `Authorization` header."
-							},
-							"response": [
-								{
-									"name": "User Info",
-									"originalRequest": {
-										"method": "GET",
-										"header": [
-											{
-												"key": "Authorization",
-												"value": "Bearer _eCvWbCxqonelo8xOrSMz7sI2-_zkcr5gGcgTsJcqtUdACcB",
-												"type": "text"
-											}
-										],
-										"url": {
-											"raw": "{{BASE_URL}}/openidconnect/userinfo",
-											"host": [
-												"{{BASE_URL}}"
-											],
-											"path": [
-												"openidconnect",
-												"userinfo"
-											]
-										}
-									},
-									"status": "OK",
-									"code": 200,
-									"_postman_previewlanguage": "json",
-									"header": [
-										{
-											"key": "Content-Type",
-											"value": "application/json; charset=utf-8"
-										},
-										{
-											"key": "Server",
-											"value": "Python/3.7 aiohttp/3.4.4 asab/devel"
-										},
-										{
-											"key": "Content-Length",
-											"value": "79"
-										},
-										{
-											"key": "Date",
-											"value": "Tue, 17 Mar 2020 13:54:27 GMT"
-										}
-									],
-									"cookie": [],
-									"body": "{\n    \"sub\": \"mongodb:ext:de76c3e567fca9d246f5f8d3\",\n    \"preferred_username\": \"foobar\"\n}"
-								}
-							]
-						},
-						{
-							"name": "User Info (with tenant information)",
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{BASE_URL}}/openidconnect/userinfo?tenant=my-tenant",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"openidconnect",
-										"userinfo"
-									],
-									"query": [
-										{
-											"key": "tenant",
-											"value": "my-tenant"
-										}
-									]
-								}
 							},
 							"response": [
 								{
@@ -2888,6 +2817,712 @@
 						"description": "Logout endpoint for **cookie-based** sessions.\n\nFor OAuth token-based session logout, refer to `GET /openidconnect/logout`."
 					},
 					"response": []
+				}
+			]
+		},
+		{
+			"name": "Clients",
+			"item": [
+				{
+					"name": "List registered clients",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/client",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"client"
+							]
+						},
+						"description": "_Requires `authz:superuser` resource._"
+					},
+					"response": [
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
+						},
+						{
+							"name": "Create tenant - success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "201",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "16"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:56:50 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"OK\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Register a new client",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"redirect_uris\": [\n        \"https://auth.test.loc/app\"\n    ],\n    \"client_name\": \"My web UI\",\n    \"application_type\": \"web\",\n    \"response_types\": [\n        \"authorization_code\"\n    ],\n    \"grant_types\": [\n        \"code\"\n    ],\n    \"token_endpoint_auth_method\": \"client_secret_basic\"\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/client",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"client"
+							]
+						},
+						"description": "_Requires `authz:superuser` resource._\n\nRegister a new OpenID Connect client.\n\nhttps://openid.net/specs/openid-connect-registration-1_0.html"
+					},
+					"response": [
+						{
+							"name": "Create tenant - success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "201",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "16"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:56:50 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"OK\"\n}"
+						},
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get client detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/client/:client_id",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"client",
+								":client_id"
+							],
+							"variable": [
+								{
+									"key": "client_id",
+									"value": "",
+									"description": "Client ID obtained at registration"
+								}
+							]
+						},
+						"description": "_Requires `authz:superuser` resource._\n\nhttps://openid.net/specs/openid-connect-registration-1_0.html#ReadRequest"
+					},
+					"response": [
+						{
+							"name": "Create tenant - success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "201",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "16"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:56:50 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"OK\"\n}"
+						},
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update client metadata",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"redirect_uris\": [\n        \"https://auth.test.loc/app\",\n        \"https://auth.test.loc/app/welcome\"\n    ],\n    \"client_name\": \"My new web UI\"\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/client/:client_id",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"client",
+								":client_id"
+							],
+							"variable": [
+								{
+									"key": "client_id",
+									"value": "",
+									"description": "Client ID obtained at registration"
+								}
+							]
+						},
+						"description": "_Requires `authz:superuser` resource._\n\nhttps://openid.net/specs/openid-connect-registration-1_0.html#ClientConfigurationEndpoint"
+					},
+					"response": [
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
+						},
+						{
+							"name": "Create tenant - success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "201",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "16"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:56:50 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"OK\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Reset client secret",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/client/:client_id/reset_secret",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"client",
+								":client_id",
+								"reset_secret"
+							],
+							"variable": [
+								{
+									"description": "Client ID obtained at registration",
+									"key": "client_id",
+									"value": ""
+								}
+							]
+						},
+						"description": "_Requires `authz:superuser` resource._"
+					},
+					"response": [
+						{
+							"name": "Create tenant - success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "201",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "16"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:56:50 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"OK\"\n}"
+						},
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete client",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/client/:client_id",
+							"host": [
+								"{{BASE_URL}}"
+							],
+							"path": [
+								"client",
+								":client_id"
+							],
+							"variable": [
+								{
+									"description": "Client ID obtained at registration",
+									"key": "client_id",
+									"value": ""
+								}
+							]
+						},
+						"description": "_Requires `authz:superuser` resource._"
+					},
+					"response": [
+						{
+							"name": "Create tenant - tenant already exists",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "400",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "27"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:57:12 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"TENANT-EXISTS\"\n}"
+						},
+						{
+							"name": "Create tenant - success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "MyTenant"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/tenant",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"tenant"
+									]
+								}
+							},
+							"status": "201",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Server",
+									"value": "Python/3.6 aiohttp/3.5.4 asab/devel"
+								},
+								{
+									"key": "Content-Length",
+									"value": "16"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 18 Mar 2020 11:56:50 GMT"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"result\": \"OK\"\n}"
+						}
+					]
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
 				}
 			]
 		}
