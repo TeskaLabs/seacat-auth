@@ -283,6 +283,9 @@ class OpenIdConnectService(asab.Service):
 		if session.Credentials.Phone is not None:
 			userinfo["phone_number"] = session.Credentials.Phone
 
+		if session.Credentials.CustomData is not None:
+			userinfo["custom"] = session.Credentials.CustomData
+
 		if session.Credentials.ModifiedAt is not None:
 			userinfo["updated_at"] = session.Credentials.ModifiedAt
 
