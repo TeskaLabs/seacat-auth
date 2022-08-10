@@ -122,11 +122,9 @@ class ClientService(asab.Service):
 			cursor.skip(limit * page)
 			cursor.limit(limit)
 
-		clients = []
-		count = await self.count(query_filter)
 		async for client in cursor:
 			if "__client_secret" in client:
-				client["__client_secret"] = client["__client_secret"].decode("ascii")
+				client.pop("__client_secret")
 			yield client
 
 
