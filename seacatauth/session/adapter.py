@@ -32,6 +32,7 @@ class CredentialsData:
 	Username: typing.Optional[str]
 	Email: typing.Optional[str]
 	Phone: typing.Optional[str]
+	CustomData: typing.Optional[dict]
 
 
 @dataclasses.dataclass
@@ -95,6 +96,7 @@ class SessionAdapter:
 			Phone = "c_p"
 			CreatedAt = "c_c"
 			ModifiedAt = "c_m"
+			CustomData = "c_d"
 
 		class Authorization:
 			_prefix = "az"
@@ -167,6 +169,7 @@ class SessionAdapter:
 			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
 			cls.FN.Credentials.Email: id_token_dict.get("email"),
 			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
+			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
 			cls.FN.Authorization.Authz: id_token_dict.get("authz"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
 			cls.FN.Authorization.Resources: id_token_dict.get("resources"),
@@ -205,6 +208,7 @@ class SessionAdapter:
 				self.FN.Credentials.Email: self.Credentials.Email,
 				self.FN.Credentials.Phone: self.Credentials.Phone,
 				self.FN.Credentials.Username: self.Credentials.Username,
+				self.FN.Credentials.CustomData: self.Credentials.CustomData,
 				self.FN.Credentials.CreatedAt: self.Credentials.CreatedAt,
 				self.FN.Credentials.ModifiedAt: self.Credentials.ModifiedAt,
 			})
@@ -289,6 +293,7 @@ class SessionAdapter:
 			Username=session_dict.pop(cls.FN.Credentials.Username, None),
 			Email=session_dict.pop(cls.FN.Credentials.Email, None),
 			Phone=session_dict.pop(cls.FN.Credentials.Phone, None),
+			CustomData=session_dict.pop(cls.FN.Credentials.CustomData, None),
 		)
 
 	# TODO: The following methods contain BACK-COMPAT fallbacks (the or-sections)
