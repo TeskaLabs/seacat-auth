@@ -7,7 +7,10 @@ import aiohttp.web
 
 import asab
 import asab.web.rest
-import asab.web.webcrypto
+
+import jwcrypto
+
+from ...decorators import access_control
 
 #
 
@@ -18,15 +21,16 @@ L = logging.getLogger(__name__)
 
 class RegistrationHandler(object):
 
-	def __init__(self, app, registration_svc):
+	def __init__(self, app, registration_svc, credentials_svc):
 		self.RegistrationService = registration_svc
+		self.CredentialsService = credentials_svc
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service('seacatauth.AuditService')
+		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/{tenant}/register/invite", self.create_invite)
+		web_app.router.add_post("/{tenant}/register/invite", self.create_invitation)
 		web_app.router.add_get("/public/register", self.register_get)
 		web_app.router.add_get("/public/invitation/{register_token}", self.register_with_invite_get)
 		web_app.router.add_post("/public/register/{register_token}", self.register_post)
@@ -35,6 +39,9 @@ class RegistrationHandler(object):
 		web_app_public.router.add_get("/public/register", self.register_get)
 		web_app_public.router.add_get("/public/invitation/{register_token}", self.register_with_invite_get)
 		web_app_public.router.add_post("/public/register/{register_token}", self.register_post)
+
+		self.RegistrationEncrypted = asab.Config.getboolean("general", "registration_encrypted")
+
 
 	async def register_get(self, request):
 		# TODO: Limit a total number of active registration
@@ -65,6 +72,7 @@ class RegistrationHandler(object):
 
 		return asab.web.rest.json_response(request, result)
 
+
 	async def register_with_invite_get(self, request):
 		# TODO: Limit a total number of active registration
 		# TODO: Limit a number of active registration from a single IP
@@ -84,30 +92,37 @@ class RegistrationHandler(object):
 
 		return asab.web.rest.json_response(request, result)
 
-	async def create_invite(self, request):
-		# TODO: Limit a total number of active invites
-		# TODO: Limit a number of active registration from a single invites
-		tenant = request.match_info["tenant"]
 
-		register_token = secrets.token_urlsafe()
-		key = secrets.token_bytes(256 // 8)
-		register_info = {
-			'timestamp': self.CredentialsService.App.time(),
-			'key': key,
-			'tenant': tenant,
-			"features": [
-				"email",
-				"password",
-			]
-			# TODO: add an IP from where invite is made (including proxy)
-		}
-		self.Registrations[register_token] = register_info
-		result = {
-			"register_token": register_token,
-		}
-		return asab.web.rest.json_response(request, result)
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"properties": {
+			"features": {"type": "object"},
+		},
+		"required": ["features"],
+	})
+	@access_control("authz:superuser")
+	async def create_invitation(self, request, *, tenant, credentials_id, json_data):
+		# Get IPs of invitation issuer
+		access_ips = [request.remote]
+		forwarded_for = request.headers.get("X-Forwarded-For")
+		if forwarded_for is not None:
+			access_ips.extend(forwarded_for.split(", "))
+
+		# Create invitation
+		token = await self.RegistrationService.create_invitation(
+			features=json_data["features"],
+			tenant=tenant,
+			issued_by_cid=credentials_id,
+			issued_by_ips=access_ips,
+		)
+
+		return asab.web.rest.json_response(request, {"registration_token": token})
+
 
 	async def register_post(self, request):
+		"""
+		Validate registration data and create credentials (and tenant, if needed)
+		"""
 		register_token = request.match_info["register_token"]
 		register_info = self.Registrations.get(register_token)
 		if register_info is None:
