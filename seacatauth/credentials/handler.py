@@ -31,10 +31,6 @@ class CredentialsHandler(object):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.AuditService = app.get_service('seacatauth.AuditService')
 
-		# TODO: refactor Credentials Handler to configurable?
-		self.RegistrationEncrypted = asab.Config.getboolean("general", "registration_encrypted")
-		self.Registrations = {}
-
 		web_app = app.WebContainer.WebApp
 
 		web_app.router.add_get('/credentials', self.list_credentials)
