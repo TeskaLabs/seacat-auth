@@ -21,7 +21,7 @@ class ClientHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/client", self.list)
-		web_app.router.add_get("/client/options", self.options)
+		web_app.router.add_get("/client/features", self.features)
 		web_app.router.add_get("/client/{client_id}", self.get)
 		web_app.router.add_post("/client", self.register)
 		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
@@ -66,7 +66,7 @@ class ClientHandler(object):
 
 
 	@access_control("authz:superuser")
-	async def options(self, request):
+	async def features(self, request):
 		result = {
 			"metadata_schema": CLIENT_METADATA_SCHEMA,
 			"templates": CLIENT_TEMPLATES
