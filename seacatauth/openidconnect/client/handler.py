@@ -6,7 +6,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ...decorators import access_control
-from .service import CLIENT_METADATA_SCHEMA
+from .service import CLIENT_METADATA_SCHEMA, CLIENT_TEMPLATES
 
 #
 
@@ -21,6 +21,7 @@ class ClientHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/client", self.list)
+		web_app.router.add_get("/client/options", self.options)
 		web_app.router.add_get("/client/{client_id}", self.get)
 		web_app.router.add_post("/client", self.register)
 		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
@@ -59,6 +60,17 @@ class ClientHandler(object):
 		result = self._rest_normalize(
 			await self.ClientService.get(client_id),
 			include_client_secret=True)
+		return asab.web.rest.json_response(
+			request, result
+		)
+
+
+	@access_control("authz:superuser")
+	async def options(self, request):
+		result = {
+			"metadata_schema": CLIENT_METADATA_SCHEMA,
+			"templates": CLIENT_TEMPLATES
+		}
 		return asab.web.rest.json_response(
 			request, result
 		)
