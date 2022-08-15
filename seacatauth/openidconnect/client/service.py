@@ -86,6 +86,17 @@ CLIENT_METADATA_SCHEMA = {
 	# }
 }
 
+CLIENT_TEMPLATES = {
+	"Public web application": {
+		"application_type": "web",
+		"token_endpoint_auth_method": "none",
+		"grant_types": ["authorization_code"],
+		"response_types": ["code"]},
+	"Public mobile app": {
+		"application_type": "native",
+		"token_endpoint_auth_method": "none"},
+}
+
 
 class ClientService(asab.Service):
 	"""
