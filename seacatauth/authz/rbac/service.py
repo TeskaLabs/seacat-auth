@@ -62,6 +62,9 @@ class RBACService(asab.Service):
 				if tenant is None:
 					# "tenant:access" must be checked against a specific tenant
 					raise TenantRequired()
+				if "authz:tenant:access" in authz["*"]:
+					# "authz:tenant:access" grants access to all tenants
+					continue
 				if tenant == "*":
 					# Soft-check: Pass if at least one tenant is accessible
 					# (Authz must contain "*" plus at least one more tenant)

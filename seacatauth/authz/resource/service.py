@@ -31,7 +31,7 @@ class ResourceService(asab.Service):
 			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
 		},
 		{
-			"id": "tenant:access",
+			"id": "authz:tenant:access",
 			"description": "Grants access to all tenants.",
 		},
 	]

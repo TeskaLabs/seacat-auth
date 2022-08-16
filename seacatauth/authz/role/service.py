@@ -134,8 +134,8 @@ class RoleService(asab.Service):
 				message = "Resource 'authz:superuser' can only be assigned to global roles."
 				L.warning(message)
 				raise ValueError(message)
-			if "tenant:access" in resources_to_assign:
-				message = "Resource 'tenant:access' can only be assigned to global roles."
+			if "authz:tenant:access" in resources_to_assign:
+				message = "Resource 'authz:tenant:access' can only be assigned to global roles."
 				L.warning(message)
 				raise ValueError(message)
 
