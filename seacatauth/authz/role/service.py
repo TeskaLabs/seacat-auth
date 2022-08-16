@@ -129,9 +129,13 @@ class RoleService(asab.Service):
 		)
 		if tenant != "*":
 			# TENANT role
-			# Resource "authz:superuser" cannot be assigned to a tenant role
+			# Resources "authz:superuser" and "tenant:access" cannot be assigned to tenant roles
 			if "authz:superuser" in resources_to_assign:
-				message = "Cannot assign resource 'authz:superuser' to a tenant role ({}).".format(role_id)
+				message = "Resource 'authz:superuser' can only be assigned to global roles."
+				L.warning(message)
+				raise ValueError(message)
+			if "tenant:access" in resources_to_assign:
+				message = "Resource 'tenant:access' can only be assigned to global roles."
 				L.warning(message)
 				raise ValueError(message)
 
