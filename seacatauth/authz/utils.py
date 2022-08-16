@@ -24,6 +24,8 @@ async def get_credentials_authz(credentials_id, tenant_service, role_service):
 
 	# Add tenant-specific roles and resources if tenant service is enabled
 	if tenant_service.is_enabled():
+		# TODO: ?? Add all known tenants if the user has "authz:superuser" or "authz:tenant:access" ??
+		#   Or use OIDC scope and add only tenants in scope?
 		for tenant in await tenant_service.get_tenants(credentials_id):
 			authz[tenant] = set()
 			for role in await role_service.get_roles_by_credentials(credentials_id, tenant):

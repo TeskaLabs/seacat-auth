@@ -250,6 +250,7 @@ class TenantService(asab.Service):
 
 
 	def is_enabled(self):
+		# TODO: Obsolete, TenantService is always enabled. Remove this method.
 		'''
 		Tenants are optional, SeaCat Auth can operate without tenant.
 		'''

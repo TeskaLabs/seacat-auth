@@ -77,6 +77,7 @@ class CredentialsService(asab.Service):
 			providers.append((provider.Order, provider))
 
 			if tenant_service is not None:
+				# TODO: TenantService should have its own config section and create the provider on its own
 				if not provider.Config.getboolean('tenants'):
 					continue
 				tenant_service.create_provider(provider_name, section)
