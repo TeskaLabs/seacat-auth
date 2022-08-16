@@ -86,6 +86,7 @@ CLIENT_METADATA_SCHEMA = {
 	# }
 }
 
+# TODO: Configurable templates
 CLIENT_TEMPLATES = {
 	"Public web application": {
 		"application_type": "web",
