@@ -100,7 +100,7 @@ class RegistrationHandler(object):
 		},
 		"required": ["features"],
 	})
-	@access_control("authz:superuser")
+	@access_control("authz:tenant:admin")  # TODO: Maybe create a specific resource for invitation
 	async def create_invitation(self, request, *, tenant, credentials_id, json_data):
 		# Get IPs of invitation issuer
 		access_ips = [request.remote]
