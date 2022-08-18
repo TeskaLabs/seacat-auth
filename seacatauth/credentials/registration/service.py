@@ -150,20 +150,35 @@ class RegistrationService(asab.Service):
 
 
 	async def create_invitation(
-		self, features: dict,
-		provider_id: str = None,
+		self,
+		credentials: dict,
 		tenant: str = None,
+		roles: list = None,
 		issued_by_cid: str = None,
 		issued_by_ips: str = None,
 	):
+		"""
+		Create an invitation into a tenant and send it to a specified email address.
+		"""
 
-		return await self.create_registration_token(
-			features,
-			provider_id,
+		registration_token = await self.create_registration_token(
+			credentials,
 			tenant,
+			roles,
 			issued_by_cid,
 			issued_by_ips,
 		)
+
+		# TODO: Send invitation via mail
+		L.log(asab.LOG_NOTICE, "Sending invitation", struct_data={
+			"c": credentials,
+			"t": tenant,
+			"r": roles,
+			"issued_by_cid": issued_by_cid,
+			"issued_by_ips": issued_by_ips,
+		})
+
+		return registration_token
 
 
 	async def register_credentials(self, register_info: dict):
