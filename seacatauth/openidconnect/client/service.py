@@ -122,6 +122,7 @@ CLIENT_TEMPLATES = {
 	"Public mobile app": {
 		"application_type": "native",
 		"token_endpoint_auth_method": "none"},
+	"Custom...": {},
 }
 
 
