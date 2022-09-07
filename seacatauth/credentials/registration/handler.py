@@ -31,8 +31,8 @@ class RegistrationHandler(object):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/{tenant}/register/invite", self.get_invitation_features)
-		web_app.router.add_post("/{tenant}/register/invite", self.create_invitation)
+		web_app.router.add_get("/{tenant}/invite", self.get_invitation_features)
+		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_registration)
 		web_app.router.add_get("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.get_registration_token)
 		web_app.router.add_put("/public/register/prologue", self.registration_prologue)
