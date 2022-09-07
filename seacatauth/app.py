@@ -84,7 +84,7 @@ class SeaCatAuthApplication(asab.Application):
 
 		from .credentials.registration import RegistrationService, RegistrationHandler
 		self.RegistrationService = RegistrationService(self, self.CredentialService)
-		self.RegistrationHandler = RegistrationHandler(self, self.RegistrationService)
+		self.RegistrationHandler = RegistrationHandler(self, self.RegistrationService, self.CredentialService)
 
 		# Load Role service
 		# depends on: ResourceService, TenantService, CredentialService
