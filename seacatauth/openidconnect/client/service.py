@@ -40,7 +40,7 @@ CLIENT_METADATA_SCHEMA = {
 		"response_types": {
 			"type": "array",
 			"description":
-				"JSON array containing a list of the OAuth 2.0 response_type values " 
+				"JSON array containing a list of the OAuth 2.0 response_type values "
 				"that the Client is declaring that it will restrict itself to using. "
 				"If omitted, the default is that the Client will use only the `code` Response Type.",
 			"items": {
