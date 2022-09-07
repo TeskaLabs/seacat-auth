@@ -78,8 +78,7 @@ CLIENT_METADATA_SCHEMA = {
 			"type": "string",
 			"description":
 				"Requested Client Authentication method for the Token Endpoint. "
-				"If omitted, the default is `client_secret_basic` -- "
-				"the HTTP Basic Authentication Scheme specified in Section 2.3.1 of OAuth 2.0 [RFC6749].",
+				"If omitted, the default is `client_secret_basic`.",
 			"enum": TOKEN_ENDPOINT_AUTH_METHODS},
 		# "token_endpoint_auth_signing_alg": {},
 		# "default_max_age": {},
