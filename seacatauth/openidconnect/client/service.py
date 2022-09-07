@@ -23,30 +23,42 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none", "client_secret_basic", "client_secret_post", "client_secret_jwt", "private_key_jwt"]
 CLIENT_METADATA_SCHEMA = {
 	"type": "object",
-	"required": ["redirect_uris"],
+	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
 	"properties": {
 		"redirect_uris": {
-			"type": "array", "description": "Array of Redirection URI values used by the Client."},
+			"type": "array",
+			"description": "Array of Redirection URI values used by the Client."},
 		"client_name": {  # Can have language tags (e.g. "client_name#cs")
-			"type": "string"},
+			"type": "string",
+			"description": "Name of the Client to be presented to the End-User."},
 		#  "contacts": {},
 		"application_type": {
 			"type": "string",
+			"description": "Kind of the application. The default, if omitted, is `web`.",
 			"enum": APPLICATION_TYPES},
 		"response_types": {
 			"type": "array",
+			"description":
+				"JSON array containing a list of the OAuth 2.0 response_type values " 
+				"that the Client is declaring that it will restrict itself to using. "
+				"If omitted, the default is that the Client will use only the `code` Response Type.",
 			"items": {
 				"type": "string",
 				"enum": RESPONSE_TYPES}},
 		"grant_types": {
 			"type": "array",
+			"description":
+				"JSON array containing a list of the OAuth 2.0 Grant Types "
+				"that the Client is declaring that it will restrict itself to using. "
+				"If omitted, the default is that the Client will use only the `authorization_code` Grant Type.",
 			"items": {
 				"type": "string",
 				"enum": GRANT_TYPES}},
 		# "logo_uri": {},  # Can have language tags
 		"client_uri": {  # Can have language tags
-			"type": "string"},
+			"type": "string",
+			"description": "URL of the home page of the Client."},
 		# "policy_uri": {},  # Can have language tags
 		# "tos_uri": {},  # Can have language tags
 		# "jwks_uri": {},
@@ -64,6 +76,10 @@ CLIENT_METADATA_SCHEMA = {
 		# "request_object_encryption_enc": {},
 		"token_endpoint_auth_method": {
 			"type": "string",
+			"description":
+				"Requested Client Authentication method for the Token Endpoint. "
+				"If omitted, the default is `client_secret_basic` -- "
+				"the HTTP Basic Authentication Scheme specified in Section 2.3.1 of OAuth 2.0 [RFC6749].",
 			"enum": TOKEN_ENDPOINT_AUTH_METHODS},
 		# "token_endpoint_auth_signing_alg": {},
 		# "default_max_age": {},
@@ -85,6 +101,17 @@ CLIENT_METADATA_SCHEMA = {
 	# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
 	# }
 }
+
+FORM_ELEMENTS = [
+	"client_name",
+	"client_uri",
+	"redirect_uris",
+	"logout_uri",
+	"application_type",
+	"response_types",
+	"grant_types",
+	"token_endpoint_auth_method",
+]
 
 # TODO: Configurable templates
 CLIENT_TEMPLATES = {
