@@ -26,13 +26,21 @@ CLIENT_METADATA_SCHEMA = {
 	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
 	"properties": {
-		"redirect_uris": {
-			"type": "array",
-			"description": "Array of Redirection URI values used by the Client."},
+		# The order of the properties is preserved in the UI form
 		"client_name": {  # Can have language tags (e.g. "client_name#cs")
 			"type": "string",
 			"description": "Name of the Client to be presented to the End-User."},
+		"client_uri": {  # Can have language tags
+			"type": "string",
+			"description": "URL of the home page of the Client."},
+		"redirect_uris": {
+			"type": "array",
+			"description": "Array of Redirection URI values used by the Client."},
 		#  "contacts": {},
+		"custom_data": {  # NON-CANONICAL
+			"type": "object", "description": "Additional client data."},
+		"logout_uri": {  # NON-CANONICAL
+			"type": "string", "description": "URI that will be called on session logout."},
 		"application_type": {
 			"type": "string",
 			"description": "Kind of the application. The default, if omitted, is `web`.",
@@ -56,9 +64,6 @@ CLIENT_METADATA_SCHEMA = {
 				"type": "string",
 				"enum": GRANT_TYPES}},
 		# "logo_uri": {},  # Can have language tags
-		"client_uri": {  # Can have language tags
-			"type": "string",
-			"description": "URL of the home page of the Client."},
 		# "policy_uri": {},  # Can have language tags
 		# "tos_uri": {},  # Can have language tags
 		# "jwks_uri": {},
@@ -86,10 +91,6 @@ CLIENT_METADATA_SCHEMA = {
 		# "default_acr_values": {},
 		# "initiate_login_uri": {},
 		# "request_uris": {},
-		"custom_data": {  # NON-CANONICAL
-			"type": "object", "description": "Additional client data."},
-		"logout_uri": {  # NON-CANONICAL
-			"type": "string", "description": "URI that will be called on session logout."},
 	},
 	# "patternProperties": {
 	#   # Language-specific metadata with RFC 5646 language tags
@@ -100,17 +101,6 @@ CLIENT_METADATA_SCHEMA = {
 	# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
 	# }
 }
-
-FORM_ELEMENTS = [
-	"client_name",
-	"client_uri",
-	"redirect_uris",
-	"logout_uri",
-	"application_type",
-	"response_types",
-	"grant_types",
-	"token_endpoint_auth_method",
-]
 
 # TODO: Configurable templates
 CLIENT_TEMPLATES = {
