@@ -79,8 +79,8 @@ This section clarifies role of various components in the SeaCat Auth ecosystem.
 
 There are two separate Web UIs (user interfaces):
 
-* [SeaCat WebUI](http://gitlab.teskalabs.int/seacat/seacat-webui) provides a graphical interface for Seacat Auth administration.
-* [SeaCat Auth WebUI](http://gitlab.teskalabs.int/seacat/seacat-auth-webui) provides a login form, a password reset screen, and other common-user-facing screens.
+* SeaCat WebUI provides a graphical interface for Seacat Auth administration.
+* [SeaCat Auth WebUI](https://github.com/TeskaLabs/seacat-auth-webui) provides a login form, a password reset screen, and self-care user portal.
 
 #### Docker and Docker Compose
 
