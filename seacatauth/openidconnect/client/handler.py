@@ -6,7 +6,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ...decorators import access_control
-from .service import CLIENT_METADATA_SCHEMA, CLIENT_TEMPLATES, FORM_ELEMENTS
+from .service import CLIENT_METADATA_SCHEMA, CLIENT_TEMPLATES
 
 #
 
@@ -67,14 +67,9 @@ class ClientHandler(object):
 
 	@access_control("authz:superuser")
 	async def features(self, request):
-		form_schema = [
-			{attribute: CLIENT_METADATA_SCHEMA["properties"][attribute]}
-			for attribute in FORM_ELEMENTS
-		]
 		result = {
 			"metadata_schema": CLIENT_METADATA_SCHEMA,
 			"templates": CLIENT_TEMPLATES,
-			"form_schema": form_schema,
 		}
 		return asab.web.rest.json_response(
 			request, result
