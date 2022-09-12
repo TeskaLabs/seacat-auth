@@ -37,10 +37,10 @@ CLIENT_METADATA_SCHEMA = {
 			"type": "array",
 			"description": "Array of Redirection URI values used by the Client."},
 		#  "contacts": {},
-		"custom_data": {  # NON-CANONICAL
-			"type": "object", "description": "Additional client data."},
-		"logout_uri": {  # NON-CANONICAL
-			"type": "string", "description": "URI that will be called on session logout."},
+		# "custom_data": {  # NON-CANONICAL
+		# 	"type": "object", "description": "Additional client data."},
+		# "logout_uri": {  # NON-CANONICAL
+		# 	"type": "string", "description": "URI that will be called on session logout."},
 		"application_type": {
 			"type": "string",
 			"description": "Kind of the application. The default, if omitted, is `web`.",
