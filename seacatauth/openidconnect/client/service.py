@@ -440,12 +440,15 @@ class ClientService(asab.Service):
 						# other than the localhost case for Native Clients.
 						raise asab.exceptions.ValidationError(
 							"Native Clients MUST only register redirect_uris using custom URI schemes "
-							"or URLs using the http: scheme with localhost as the hostname.")
-				else:
-					# TODO: Support custom URI schemes
+							"or URLs using the http scheme with localhost as the hostname.")
+				elif parsed.scheme == "https":
 					raise asab.exceptions.ValidationError(
 						"Native Clients MUST only register redirect_uris using custom URI schemes "
 						"or URLs using the http scheme with localhost as the hostname.")
+				else:
+					# TODO: Proper support for custom URI schemes
+					raise asab.exceptions.ValidationError(
+						"Support for custom URI schemes has not been implemented yet.")
 
 
 	def _generate_client_secret(self):
