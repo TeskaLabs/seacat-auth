@@ -22,6 +22,11 @@ asab.Config.add_defaults({
 		"private_key": "",
 	},
 
+	"seacatauth:client": {
+		# How long until the secret expires
+		"client_secret_expiration": "0",
+	},
+
 	"seacatauth:cookie": {
 		"name": "SeaCatSCI",
 

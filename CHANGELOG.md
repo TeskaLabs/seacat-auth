@@ -5,6 +5,10 @@
 ### Fix
 - Handle old assignments of nonexisting credentials (#79, PLUM Sprint 220715)
 
+### Features
+- OpenID Connect client registration (#77, PLUM Sprint 220729)
+- Custom credentials data included in userinfo response (#81, PLUM Sprint 220729)
+
 ### Refactoring
 - Provisioning config in a dedicated JSON file (#80, PLUM Sprint 220729)
 
