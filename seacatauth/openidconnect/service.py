@@ -323,9 +323,6 @@ class OpenIdConnectService(asab.Service):
 			if len(tenants) > 0:
 				userinfo["tenants"] = tenants
 
-		if session.Authorization.Resources is not None:
-			userinfo["resources"] = session.Authorization.Resources
-
 		if session.Authorization.Tenants is not None:
 			userinfo["tenants"] = session.Authorization.Tenants
 
