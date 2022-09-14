@@ -32,6 +32,7 @@ class CredentialsData:
 	Username: typing.Optional[str]
 	Email: typing.Optional[str]
 	Phone: typing.Optional[str]
+	CustomData: typing.Optional[dict]
 
 
 @dataclasses.dataclass
@@ -46,7 +47,6 @@ class AuthenticationData:
 @dataclasses.dataclass
 class AuthorizationData:
 	Authz: dict
-	Resources: list
 	Tenants: list
 
 
@@ -95,6 +95,7 @@ class SessionAdapter:
 			Phone = "c_p"
 			CreatedAt = "c_c"
 			ModifiedAt = "c_m"
+			CustomData = "c_d"
 
 		class Authorization:
 			_prefix = "az"
@@ -167,7 +168,8 @@ class SessionAdapter:
 			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
 			cls.FN.Credentials.Email: id_token_dict.get("email"),
 			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
-			cls.FN.Authorization.Authz: id_token_dict.get("resources"),
+			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
+			cls.FN.Authorization.Authz: id_token_dict.get("authz") or id_token_dict.get("resources"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
 		}
 		return cls(session_svc, session_dict)
@@ -204,6 +206,7 @@ class SessionAdapter:
 				self.FN.Credentials.Email: self.Credentials.Email,
 				self.FN.Credentials.Phone: self.Credentials.Phone,
 				self.FN.Credentials.Username: self.Credentials.Username,
+				self.FN.Credentials.CustomData: self.Credentials.CustomData,
 				self.FN.Credentials.CreatedAt: self.Credentials.CreatedAt,
 				self.FN.Credentials.ModifiedAt: self.Credentials.ModifiedAt,
 			})
@@ -220,7 +223,6 @@ class SessionAdapter:
 			session_dict.update({
 				self.FN.Authorization.Authz: self.Authorization.Authz,
 				self.FN.Authorization.Tenants: self.Authorization.Tenants,
-				self.FN.Authorization.Resources: self.Authorization.Resources,
 			})
 
 		if self.Cookie is not None:
@@ -288,6 +290,7 @@ class SessionAdapter:
 			Username=session_dict.pop(cls.FN.Credentials.Username, None),
 			Email=session_dict.pop(cls.FN.Credentials.Email, None),
 			Phone=session_dict.pop(cls.FN.Credentials.Phone, None),
+			CustomData=session_dict.pop(cls.FN.Credentials.CustomData, None),
 		)
 
 	# TODO: The following methods contain BACK-COMPAT fallbacks (the or-sections)
@@ -311,7 +314,6 @@ class SessionAdapter:
 		authz = session_dict.pop(cls.FN.Authorization.Authz, None) or session_dict.pop("Authz", None)
 		return AuthorizationData(
 			Authz=authz,
-			Resources=session_dict.pop(cls.FN.Authorization.Resources, None) or session_dict.pop("Rs", None),
 			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
 		)
 
