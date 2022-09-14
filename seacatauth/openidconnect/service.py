@@ -40,8 +40,9 @@ class OpenIdConnectService(asab.Service):
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationCodeCollection = "ac"
 
-	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
+	def __init__(self, app, oauth2_client_svc, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
+		self.OAuth2ClientService = oauth2_client_svc
 		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
@@ -281,6 +282,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Credentials.Phone is not None:
 			userinfo["phone_number"] = session.Credentials.Phone
+
+		if session.Credentials.CustomData is not None:
+			userinfo["custom"] = session.Credentials.CustomData
 
 		if session.Credentials.ModifiedAt is not None:
 			userinfo["updated_at"] = session.Credentials.ModifiedAt
