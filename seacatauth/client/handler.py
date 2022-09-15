@@ -5,7 +5,7 @@ import asab
 import asab.web.rest
 import asab.exceptions
 
-from ...decorators import access_control
+from seacatauth.decorators import access_control
 from .service import CLIENT_METADATA_SCHEMA, CLIENT_TEMPLATES
 
 #

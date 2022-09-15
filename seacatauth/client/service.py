@@ -6,7 +6,7 @@ import urllib.parse
 import asab.storage.exceptions
 import asab.exceptions
 
-from .. import exceptions
+from seacatauth.client import exceptions
 
 #
 

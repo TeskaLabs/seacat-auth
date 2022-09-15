@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 
 from ...cookie.utils import set_cookie, delete_cookie
-from .. import exceptions
+from ...client import exceptions
 
 #
 
@@ -146,7 +146,7 @@ class AuthorizeHandler(object):
 			)
 
 		try:
-			await self.OpenIdConnectService.OAuth2ClientService.authorize_client(
+			await self.OpenIdConnectService.ClientService.authorize_client(
 				client_id=client_id,
 				client_secret=client_secret,
 				redirect_uri=redirect_uri,
