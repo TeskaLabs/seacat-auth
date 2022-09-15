@@ -9,8 +9,6 @@ import asab
 import asab.web.rest
 import asab.utils
 
-import jwcrypto
-
 from ...decorators import access_control
 
 #
