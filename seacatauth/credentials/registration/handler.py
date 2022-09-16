@@ -8,6 +8,7 @@ import aiohttp.web
 import asab
 import asab.web.rest
 import asab.utils
+import asab.exceptions
 
 from ...decorators import access_control
 
@@ -41,8 +42,6 @@ class RegistrationHandler(object):
 		web_app_public.router.add_get("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.get_registration_token)
 		web_app_public.router.add_put("/public/register/prologue", self.registration_prologue)
 		web_app_public.router.add_put("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.register)
-
-		self.RegistrationEncrypted = asab.Config.getboolean("general", "registration_encrypted")
 
 
 	@access_control("authz:tenant:admin")
@@ -146,6 +145,8 @@ class RegistrationHandler(object):
 		if forwarded_for is not None:
 			access_ips.extend(forwarded_for.split(", "))
 
+		# TODO: Limit the number of self-registrations with the same IP / same email address
+
 		# Create invitation
 		token_id = await self.RegistrationService.create_invitation(
 			tenant=None,
@@ -154,6 +155,7 @@ class RegistrationHandler(object):
 		)
 
 		payload = {
+			"email": json_data.get("email"),
 			"registration_token": token_id,
 			"registration_uri": self.RegistrationService.format_registration_uri(token_id),
 		}
@@ -171,7 +173,9 @@ class RegistrationHandler(object):
 		token_id = request.match_info["registration_token"]
 		token = await self.RegistrationService.get_registration_token(token_id)
 
-		assert token.get("t") is not None
+		if token.get("t") is None and not self.RegistrationService.SelfRegistrationAllowed:
+			# Self-registration is not allowed
+			raise aiohttp.web.HTTPForbidden()
 
 		if request.Session is not None:
 			# A user is logged in
@@ -181,20 +185,6 @@ class RegistrationHandler(object):
 		else:
 			# User is not logged in
 			...
-
-		if token_id is None:
-			# User-initiated public registration
-			# TODO: Check if open registration is enabled
-
-			# Get IPs of the requester
-			access_ips = [request.remote]
-			forwarded_for = request.headers.get("X-Forwarded-For")
-			if forwarded_for is not None:
-				access_ips.extend(forwarded_for.split(", "))
-			token_id = await self.RegistrationService.create_registration_token(
-				expiration=self.RegistrationService.OpenRegistrationExpiration,
-				invited_by_ips=access_ips,
-			)
 
 		token_data = await self.RegistrationService.get_registration_token(token_id)
 
@@ -211,30 +201,24 @@ class RegistrationHandler(object):
 
 		Scenarios:
 		1) User is logged in
-			a) Registration request has a tenant
+			a) Registration token has a tenant
 				-> Add the user to the tenant
-			b) Reqistration request has no tenant
+			b) Registration token has no tenant
 				->
 		"""
 		registration_token = request.match_info["registration_token"]
 		token_data = await self.RegistrationService.get_registration_token(registration_token)
 
-		headers = request.headers
-		authorization_bytes = bytes(headers.get("Authorization", ""), "ascii")
-		register_info['request_authorization'] = authorization_bytes
-
 		req_data = await request.read()
 
-		# decrypt request body
-		if self.RegistrationEncrypted:
-			req_data = asab.web.webcrypto.aes_gcm_decrypt(
-				register_info['key'],
-				req_data  # , register_token.encode('ascii')
-			)
+		if self.RegistrationService.RegistrationEncrypted:
+			# TODO: Decrypt the payload
+			raise NotImplementedError()
+
 		try:
 			data = json.loads(req_data)
 		except json.decoder.JSONDecodeError:
-			return aiohttp.web.HTTPBadRequest(reason="Invalid json.")
+			return asab.exceptions.ValidationError("Invalid JSON.")
 
 		# fill register_info
 		# TODO: Validations !!!

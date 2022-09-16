@@ -29,7 +29,13 @@ class RegistrationService(asab.Service):
 
 		self.InviteExpiration = asab.Config.getseconds("seacatauth:registration", "expiration", fallback=0)
 
-		self.RegistrationEncrypted = asab.Config.getboolean("general", "registration_encrypted")
+		self.RegistrationEncrypted = asab.Config.getboolean("seacatauth:registration", "registration_encrypted")
+		if self.RegistrationEncrypted:
+			raise NotImplementedError("Registration encryption has not been implemented yet.")
+
+		self.SelfRegistrationAllowed = asab.Config.getboolean("seacatauth:registration", "allow_self_registration")
+		if self.SelfRegistrationAllowed:
+			raise NotImplementedError("Self-registration has not been implemented yet.")
 
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
