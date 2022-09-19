@@ -32,16 +32,16 @@ class RegistrationHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/{tenant}/invite", self.get_invitation_features)
 		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
-		web_app.router.add_post("/public/register", self.request_self_registration)
-		web_app.router.add_get("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.get_registration_token)
+		web_app.router.add_post("/public/register", self.request_self_invitation)
+		web_app.router.add_get("/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
 		web_app.router.add_put("/public/register/prologue", self.registration_prologue)
-		web_app.router.add_put("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app.router.add_put("/public/register/{registration_session_id:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/public/register", self.request_self_registration)
-		web_app_public.router.add_get("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.get_registration_token)
+		web_app_public.router.add_post("/public/register", self.request_self_invitation)
+		web_app_public.router.add_get("/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
 		web_app_public.router.add_put("/public/register/prologue", self.registration_prologue)
-		web_app_public.router.add_put("/public/register/{registration_token:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app_public.router.add_put("/public/register/{registration_session_id:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 
 	@access_control("authz:tenant:admin")
@@ -105,20 +105,26 @@ class RegistrationHandler(object):
 		if forwarded_for is not None:
 			access_ips.extend(forwarded_for.split(", "))
 
+		expiration = json_data.get("expiration")
+		if expiration is not None:
+			expiration = asab.utils.convert_to_seconds(expiration)
+		else:
+			expiration = self.RegistrationService.InviteExpiration
+
 		# Create invitation
-		token_id = await self.RegistrationService.create_invitation(
+		invitation_id = await self.RegistrationService.invite(
 			tenant=tenant,
 			roles=json_data.get("roles"),
 			email=json_data.get("email"),
 			provider_id=json_data.get("provider_id"),
-			expiration=asab.utils.convert_to_seconds(json_data.get("expiration")),
+			expiration=expiration,
 			invited_by_cid=credentials_id,
 			invited_by_ips=access_ips,
 		)
 
 		payload = {
-			"registration_token": token_id,
-			"registration_uri": self.RegistrationService.format_registration_uri(token_id),
+			"invitation_code": invitation_id,
+			"registration_uri": self.RegistrationService.format_registration_uri(invitation_id),
 		}
 
 		return asab.web.rest.json_response(request, payload)
@@ -134,12 +140,12 @@ class RegistrationHandler(object):
 				"description": "User email to send the invitation to."},
 		},
 	})
-	async def request_self_registration(self, request, *, json_data):
+	async def request_self_invitation(self, request, *, json_data):
 		"""
 		Anonymous user request to register themself.
 		Generate a registration token and send a registration link to the user's email.
 		"""
-		# Get IPs of the user who requested the registration
+		# Log IPs from which the request was made
 		access_ips = [request.remote]
 		forwarded_for = request.headers.get("X-Forwarded-For")
 		if forwarded_for is not None:
@@ -148,87 +154,82 @@ class RegistrationHandler(object):
 		# TODO: Limit the number of self-registrations with the same IP / same email address
 
 		# Create invitation
-		token_id = await self.RegistrationService.create_invitation(
+		await self.RegistrationService.invite(
 			tenant=None,
 			email=json_data.get("email"),
 			invited_by_ips=access_ips,
 		)
 
 		payload = {
+			"result": "OK",
 			"email": json_data.get("email"),
-			"registration_token": token_id,
-			"registration_uri": self.RegistrationService.format_registration_uri(token_id),
 		}
 
 		return asab.web.rest.json_response(request, payload)
 
 
-	async def get_registration_token(self, request):
+	async def get_invitation_details(self, request):
 		"""
 		Get information about the specified registration token
 		"""
-		# TODO: Initiate E2E-encrypted session
 		# TODO: Limit the total number of active registrations
 		# TODO: Limit the number of active registrations from a single IP
-		token_id = request.match_info["registration_token"]
-		token = await self.RegistrationService.get_registration_token(token_id)
+		invitation_id = request.match_info["invitation_code"]
+		invitation = await self.RegistrationService.get_invitation_detail(invitation_id)
+		credentials = invitation.get("c")
+		response = {
+			"id": invitation_id,
+			"email": credentials["email"],
+		}
 
-		if token.get("t") is None and not self.RegistrationService.SelfRegistrationAllowed:
-			# Self-registration is not allowed
-			raise aiohttp.web.HTTPForbidden()
-
-		if request.Session is not None:
-			# A user is logged in
-			# Update the token with the user's credentials ID
-			# Return token data
-			...
+		if credentials.get("tenant") is not None:
+			# Invited by tenant admin
+			response["tenant"] = credentials["tenant"]
 		else:
-			# User is not logged in
-			...
+			# Request for self-registration
+			if not self.RegistrationService.SelfRegistrationAllowed:
+				# Self-registration is not allowed
+				raise aiohttp.web.HTTPForbidden()
 
-		token_data = await self.RegistrationService.get_registration_token(token_id)
-
-		return asab.web.rest.json_response(request, token_data)
+		return asab.web.rest.json_response(request, response)
 
 
 	async def registration_prologue(self, request):
-		pass
+		invitation_id = request.query.get("invitation_code")
+		registration_session = await self.RegistrationService.create_registration_session(invitation_id)
+		response = {
+			"rsid": registration_session.Id,
+		}
+
+		if self.RegistrationService.RegistrationEncrypted:
+			# TODO: Initiate E2E-encrypted session
+			# key = jwcrypto.jwk.JWK.from_pyca(registration_session.PublicKey)
+			# response["key"] = key.export_public(as_dict=True)
+			raise NotImplementedError()
+
+		return asab.web.rest.json_response(request, response)
 
 
 	async def register(self, request):
 		"""
 		Validate registration data and create credentials (and tenant, if needed)
-
-		Scenarios:
-		1) User is logged in
-			a) Registration token has a tenant
-				-> Add the user to the tenant
-			b) Registration token has no tenant
-				->
 		"""
-		registration_token = request.match_info["registration_token"]
-		token_data = await self.RegistrationService.get_registration_token(registration_token)
+		rsid = request.match_info["registration_session_id"]
+
+		registration_session = await self.RegistrationService.get_login_session(rsid)
 
 		req_data = await request.read()
 
 		if self.RegistrationService.RegistrationEncrypted:
 			# TODO: Decrypt the payload
+			# request_data = registration_session.decrypt(await request.read())
 			raise NotImplementedError()
 
 		try:
-			data = json.loads(req_data)
+			registration_data = json.loads(req_data)
 		except json.decoder.JSONDecodeError:
 			return asab.exceptions.ValidationError("Invalid JSON.")
 
-		# fill register_info
-		# TODO: Validations !!!
-		register_info['request'] = data
-		# TODO: If email has to be confirmed, for that here
+		result = await self.CredentialsService.register_credentials(registration_session, **registration_data)
 
-		# register
-		result = await self.CredentialsService.register_credentials(register_info)
-		if result is None:
-			return asab.web.rest.json_response(request, {'result': 'FAILED'})
-		else:
-			self.Registrations.pop(register_token)
-			return asab.web.rest.json_response(request, {'result': 'OK'})
+		return asab.web.rest.json_response(request, result)
