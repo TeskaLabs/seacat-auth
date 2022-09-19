@@ -40,12 +40,12 @@ class OpenIdConnectService(asab.Service):
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationCodeCollection = "ac"
 
-	def __init__(self, app, oauth2_client_svc, service_name="seacatauth.OpenIdConnectService"):
+	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
-		self.OAuth2ClientService = oauth2_client_svc
 		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.ClientService = app.get_service("seacatauth.ClientService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
