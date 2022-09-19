@@ -13,21 +13,25 @@ L = logging.getLogger(__name__)
 
 class RegistrationService(asab.Service):
 
-	RegistrationTokenCollection = "rg"
+	InvitationTokenCollection = "it"
+	InvitationTokenByteLength = 32
+	RegistrationTokenCollection = "rt"
 	RegistrationTokenByteLength = 32
 	RegistrationKeyByteLength = 32
-	RegistrationUriFormat = "{auth_webui_base_url}#register?token={token_id}"
+	RegistrationUriFormat = "{auth_webui_base_url}#register?invite={token_id}"
 
-	def __init__(self, app, cred_service, service_name="seacatauth.RegistrationService"):
+	def __init__(self, app, service_name="seacatauth.RegistrationService"):
 		super().__init__(app, service_name)
-		self.CredentialsService = cred_service
+		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 
-		self.InviteExpiration = asab.Config.getseconds("seacatauth:registration", "expiration", fallback=0)
+		self.InviteExpiration = asab.Config.getseconds("seacatauth:registration", "expiration", fallback=None)
 
 		self.RegistrationEncrypted = asab.Config.getboolean("seacatauth:registration", "registration_encrypted")
 		if self.RegistrationEncrypted:
@@ -42,10 +46,10 @@ class RegistrationService(asab.Service):
 
 
 	async def _on_tick(self, event_name):
-		await self.delete_expired_registration_tokens()
+		await self.delete_expired_invitations()
 
 
-	async def create_registration_token(
+	async def create_invitation(
 		self,
 		expiration: float,
 		credential_data: dict = None,
@@ -53,9 +57,9 @@ class RegistrationService(asab.Service):
 		invited_by_ips: list = None,
 	):
 		"""
-		Issue a new registration token
+		Issue a new invitation
 
-		:param credential_data: Details of the user being registered
+		:param credential_data: Details of the user being invited
 		:type credential_data: dict
 		:param expiration: Number of seconds specifying the expiration of the token
 		:type expiration: float
@@ -63,15 +67,12 @@ class RegistrationService(asab.Service):
 		:type invited_by_cid: str
 		:param invited_by_ips: IP address(es) of the issuer.
 		:type invited_by_ips: list
-		:return: The generated registration token.
+		:return: The generated invitation token.
 		"""
-		token_id = secrets.token_urlsafe(self.RegistrationTokenByteLength)
-		upsertor = self.StorageService.upsertor(self.RegistrationTokenCollection, token_id)
+		token_id = secrets.token_urlsafe(self.InvitationTokenByteLength)
+		upsertor = self.StorageService.upsertor(self.InvitationTokenCollection, token_id)
 
-		key = secrets.token_bytes(self.RegistrationKeyByteLength)
-		upsertor.set("__k", key, encrypt=True)
-
-		# TODO: The credential_data should be in line with the registration policy
+		# TODO: The credential_data should be validated with the registration policy
 		# policy = self.CredentialsService.Policy.RegistrationPolicy
 		upsertor.set("c", credential_data)
 
@@ -86,7 +87,7 @@ class RegistrationService(asab.Service):
 
 		await upsertor.execute(custom_data={"event_type": "registration_token_created"})
 
-		L.log(asab.LOG_NOTICE, "Registration token created", struct_data={
+		L.log(asab.LOG_NOTICE, "Invitation created", struct_data={
 			"token_id": token_id,
 			"invited_by_cid": invited_by_cid,
 			"invited_by_ips": invited_by_ips,
@@ -95,61 +96,44 @@ class RegistrationService(asab.Service):
 		return token_id
 
 
-	async def set_registration_token_key(self, token_id, **kwargs):
+	async def get_invitation_detail(self, token_id):
 		"""
-		Generate a random key, encrypt it, and store it in the token object in the database.
-
-		:param token_id: The ID of the token to set the key for
-		:return: The generated key.
-		"""
-		token = await self.get_registration_token(token_id)
-		upsertor = self.StorageService.upsertor(
-			self.RegistrationTokenCollection,
-			obj_id=token_id,
-			version=token["_v"])
-		key = secrets.token_bytes(self.RegistrationKeyByteLength)
-		upsertor.set("__k", key, encrypt=True)
-		return key
-
-
-	async def update_registration_token(self, token_id, **kwargs):
-		# TODO
-		raise NotImplementedError()
-
-
-	async def get_registration_token(self, token_id):
-		"""
-		Retrieve registration token from the database. If it's expired, raise KeyError.
+		Retrieve invitation from the database. If it's expired, raise KeyError.
 
 		:param token_id: The token ID
 		:return: Token data.
 		"""
-		token = await self.StorageService.get(self.RegistrationTokenCollection, token_id, decrypt=["__k"])
+		token = await self.StorageService.get(self.InvitationTokenCollection, token_id, decrypt=["__k"])
 		if token["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Expired token")
 		return token
 
 
-	async def delete_registration_token(self, token_id):
+	async def delete_invitation(self, invitation_id):
 		"""
-		Delete a registration token from the database
+		Delete an invitation from the database
 
-		:param token_id: The token generated by the registration service
+		:param invitation_id: The token generated by the registration service
 		"""
-		await self.StorageService.delete(self.RegistrationTokenCollection, token_id)
-		L.log(asab.LOG_NOTICE, "Registration token deleted", struct_data={"token_id": token_id})
+		await self.StorageService.delete(self.InvitationTokenCollection, invitation_id)
+		L.log(asab.LOG_NOTICE, "Registration token deleted", struct_data={"token_id": invitation_id})
 
 
-	async def delete_expired_registration_tokens(self):
+	async def delete_expired_invitations(self):
 		"""
-		Delete all registration tokens that have expired
+		Delete all expired invitations
 		"""
-		collection = self.StorageService.Database[self.RegistrationTokenCollection]
+		collection = self.StorageService.Database[self.InvitationTokenCollection]
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Expired registration tokens deleted", struct_data={
+			L.log(asab.LOG_NOTICE, "Expired invitations deleted", struct_data={
 				"count": result.deleted_count})
+
+
+	async def update_registration_token(self, token_id, **kwargs):
+		# TODO
+		raise NotImplementedError()
 
 
 	def get_provider(self, provider_id: str = None):
@@ -179,7 +163,7 @@ class RegistrationService(asab.Service):
 			return None
 
 
-	async def create_invitation(
+	async def invite(
 		self,
 		tenant: str,
 		email: str,
@@ -213,7 +197,7 @@ class RegistrationService(asab.Service):
 			expiration = self.InviteExpiration
 
 		credential_data = {
-			"provider_id": provider_id,
+			"provider_id": self.get_provider(provider_id),
 			"email": email,
 			"tenant": tenant,
 			"roles": roles,
@@ -224,7 +208,7 @@ class RegistrationService(asab.Service):
 		#   - tenant exists
 		#   - roles exist and match tenant
 
-		token_id = await self.create_registration_token(
+		token_id = await self.create_invitation(
 			expiration,
 			credential_data=credential_data,
 			invited_by_cid=invited_by_cid,
@@ -246,14 +230,99 @@ class RegistrationService(asab.Service):
 		return token_id
 
 
-	async def register_credentials(self, register_info: dict):
+	async def self_invite(
+		self,
+		email: str,
+		invited_from_ips: str = None,
+	):
 		"""
-		This is an anonymous user request to register (create) new credentials
+		Request invitation for self-registration.
+
+		:param email: The email address of the user to invite
+		:type email: str
+		:param invited_from_ips: The IP addresses of the user who requested the invitation
+		:type invited_from_ips: str
+		:return: The ID of the generated token.
 		"""
+
+		credential_data = {
+			"provider_id": self.get_provider(),
+			"email": email,
+		}
+
+		token_id = await self.create_invitation(
+			expiration=self.InviteExpiration,
+			credential_data=credential_data,
+			invited_by_ips=invited_from_ips,
+		)
+
+		# TODO: Send invitation via mail
+		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
+		L.log(asab.LOG_NOTICE, "Sending self-invitation", struct_data={
+			"email": email,
+			"issued_by_ips": invited_from_ips,
+			"registration_token": token_id,
+			"registration_uri": self.format_registration_uri(token_id),
+		})
+
+		return token_id
+
+
+	async def set_registration_token_key(self, token_id, **kwargs):
+		"""
+		Generate a random key, encrypt it, and store it in the token object in the database.
+
+		:param token_id: The ID of the token to set the key for
+		:return: The generated key.
+		"""
+		token = await self.get_invitation_detail(token_id)
+		upsertor = self.StorageService.upsertor(
+			self.RegistrationTokenCollection,
+			obj_id=token_id,
+			version=token["_v"])
+		key = secrets.token_bytes(self.RegistrationKeyByteLength)
+		upsertor.set("__k", key, encrypt=True)
+		return key
+
+
+
+	async def register_existing_credentials(self, token_id, register_info: dict):
+		pass
+
+	async def register_new_credentials(self, token_id, register_info: dict):
+		"""
+		Finalize registration process.
+
+		Scenarios:
+		1) User is logged in
+			a) Registration token has a tenant
+				-> Add the user to the tenant
+			b) Registration token has no tenant
+				-> Assert that self-registration is open
+				-> Let the user create a tenant
+		2) User is not logged in
+			a) Registration token has a tenant
+				-> Create a new user with requested details
+				-> Add the user to the tenant
+			b) Registration token has no tenant
+				-> Invalid request
+		"""
+		token = await self.get_invitation_detail(token_id)
+		token_credentials = token.get("c")
 		provider = self.get_provider()
 		if provider is None:
 			return None
-		return await provider.register(register_info)
+		credentials_id = await provider.register(register_info)
+
+		tenant = token_credentials.get("tenant")
+		if tenant is not None:
+			await self.TenantService.assign_tenant(credentials_id, tenant)
+
+		roles = token_credentials.get("roles")
+		if roles is not None:
+			await self.RoleService.set_roles(credentials_id, [tenant], roles)
+
+		return result
 
 
 	def format_registration_uri(self, token_id: str):
