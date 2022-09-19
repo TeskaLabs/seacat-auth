@@ -93,7 +93,6 @@ class TenantHandler(object):
 		"additionalProperties": False,
 	})
 	@access_control("authz:superuser")
-	# TODO: "authz:superuser" not required if registrations are open
 	async def create(self, request, *, credentials_id, json_data):
 		tenant_id = json_data["id"]
 
