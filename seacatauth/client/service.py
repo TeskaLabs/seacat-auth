@@ -6,7 +6,7 @@ import urllib.parse
 import asab.storage.exceptions
 import asab.exceptions
 
-from .. import exceptions
+from seacatauth.client import exceptions
 
 #
 
@@ -23,30 +23,47 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none", "client_secret_basic", "client_secret_post", "client_secret_jwt", "private_key_jwt"]
 CLIENT_METADATA_SCHEMA = {
 	"type": "object",
-	"required": ["redirect_uris"],
+	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
 	"properties": {
-		"redirect_uris": {
-			"type": "array", "description": "Array of Redirection URI values used by the Client."},
+		# The order of the properties is preserved in the UI form
 		"client_name": {  # Can have language tags (e.g. "client_name#cs")
-			"type": "string"},
+			"type": "string",
+			"description": "Name of the Client to be presented to the End-User."},
+		"client_uri": {  # Can have language tags
+			"type": "string",
+			"description": "URL of the home page of the Client."},
+		"redirect_uris": {
+			"type": "array",
+			"description": "Array of Redirection URI values used by the Client."},
 		#  "contacts": {},
+		# "custom_data": {  # NON-CANONICAL
+		# 	"type": "object", "description": "Additional client data."},
+		# "logout_uri": {  # NON-CANONICAL
+		# 	"type": "string", "description": "URI that will be called on session logout."},
 		"application_type": {
 			"type": "string",
+			"description": "Kind of the application. The default, if omitted, is `web`.",
 			"enum": APPLICATION_TYPES},
 		"response_types": {
 			"type": "array",
+			"description":
+				"JSON array containing a list of the OAuth 2.0 response_type values "
+				"that the Client is declaring that it will restrict itself to using. "
+				"If omitted, the default is that the Client will use only the `code` Response Type.",
 			"items": {
 				"type": "string",
 				"enum": RESPONSE_TYPES}},
 		"grant_types": {
 			"type": "array",
+			"description":
+				"JSON array containing a list of the OAuth 2.0 Grant Types "
+				"that the Client is declaring that it will restrict itself to using. "
+				"If omitted, the default is that the Client will use only the `authorization_code` Grant Type.",
 			"items": {
 				"type": "string",
 				"enum": GRANT_TYPES}},
 		# "logo_uri": {},  # Can have language tags
-		"client_uri": {  # Can have language tags
-			"type": "string"},
 		# "policy_uri": {},  # Can have language tags
 		# "tos_uri": {},  # Can have language tags
 		# "jwks_uri": {},
@@ -64,6 +81,9 @@ CLIENT_METADATA_SCHEMA = {
 		# "request_object_encryption_enc": {},
 		"token_endpoint_auth_method": {
 			"type": "string",
+			"description":
+				"Requested Client Authentication method for the Token Endpoint. "
+				"If omitted, the default is `client_secret_basic`.",
 			"enum": TOKEN_ENDPOINT_AUTH_METHODS},
 		# "token_endpoint_auth_signing_alg": {},
 		# "default_max_age": {},
@@ -71,10 +91,6 @@ CLIENT_METADATA_SCHEMA = {
 		# "default_acr_values": {},
 		# "initiate_login_uri": {},
 		# "request_uris": {},
-		"custom_data": {  # NON-CANONICAL
-			"type": "object", "description": "Additional client data."},
-		"logout_uri": {  # NON-CANONICAL
-			"type": "string", "description": "URI that will be called on session logout."},
 	},
 	# "patternProperties": {
 	#   # Language-specific metadata with RFC 5646 language tags
@@ -84,6 +100,21 @@ CLIENT_METADATA_SCHEMA = {
 	# 	"^policy_uri#[-a-zA-Z0-9]+$": {"type": "string"},
 	# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
 	# }
+}
+
+# TODO: Configurable templates
+CLIENT_TEMPLATES = {
+	"Public web application": {
+		"application_type": "web",
+		"token_endpoint_auth_method": "none",
+		"grant_types": ["authorization_code"],
+		"response_types": ["code"]},
+	"Public mobile application": {
+		"application_type": "native",
+		"token_endpoint_auth_method": "none",
+		"grant_types": ["authorization_code"],
+		"response_types": ["code"]},
+	"Custom": {},
 }
 
 
@@ -409,12 +440,15 @@ class ClientService(asab.Service):
 						# other than the localhost case for Native Clients.
 						raise asab.exceptions.ValidationError(
 							"Native Clients MUST only register redirect_uris using custom URI schemes "
-							"or URLs using the http: scheme with localhost as the hostname.")
-				else:
-					# TODO: Support custom URI schemes
+							"or URLs using the http scheme with localhost as the hostname.")
+				elif parsed.scheme == "https":
 					raise asab.exceptions.ValidationError(
 						"Native Clients MUST only register redirect_uris using custom URI schemes "
 						"or URLs using the http scheme with localhost as the hostname.")
+				else:
+					# TODO: Proper support for custom URI schemes
+					raise asab.exceptions.ValidationError(
+						"Support for custom URI schemes has not been implemented yet.")
 
 
 	def _generate_client_secret(self):
