@@ -20,9 +20,9 @@ class RegistrationService(asab.Service):
 	RegistrationKeyByteLength = 32
 	RegistrationUriFormat = "{auth_webui_base_url}#register?invite={token_id}"
 
-	def __init__(self, app, service_name="seacatauth.RegistrationService"):
+	def __init__(self, app, credentials_svc, service_name="seacatauth.RegistrationService"):
 		super().__init__(app, service_name)
-		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.CredentialsService = credentials_svc
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
