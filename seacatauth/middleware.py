@@ -65,7 +65,7 @@ def private_auth_middleware_factory(app):
 			return await handler(request)
 
 		# All API endpoints are considered non-public and have to pass authn/authz
-		if request.Session is not None:
+		if request.Session is not None and request.Session.Authorization.Authz is not None:
 			if authorization_resource == "DISABLED":
 				return await handler(request)
 			# Resource authorization is required: scan ALL THE RESOURCES

@@ -41,10 +41,7 @@ class UserInfoHandler(object):
 
 		# # if authorized get provider for this identity
 
-		userinfo = await self.OpenIdConnectService.build_userinfo(
-			session,
-			tenant=request.query.get("tenant", "*")
-		)
+		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
 		return asab.web.rest.json_response(request, userinfo)
 
