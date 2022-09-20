@@ -68,7 +68,10 @@ asab.Config.add_defaults({
 
 	"seacatauth:registration": {
 		# How long until invitation expires
-		"expiration": "3d",
+		"invitation_expiration": "3d",
+
+		# Timeout of registration sessions
+		"registration_session_expiration": "5m",
 
 		# Use E2E encryption for registration form
 		"registration_encrypted": "no",
