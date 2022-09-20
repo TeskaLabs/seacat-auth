@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.38
 
 ### Breaking changes
 - Userinfo endpoint no longer accepts `tenant` parameter (#69, PLUM Sprint 220909)
