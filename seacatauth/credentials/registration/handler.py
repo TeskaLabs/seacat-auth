@@ -34,12 +34,19 @@ class RegistrationHandler(object):
 		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
+		# Non-encrypted registration
+		web_app.router.add_put("/public/register", self.register)
+		# Encrypted registration
 		web_app.router.add_put("/public/register/prologue", self.registration_prologue)
 		web_app.router.add_put("/public/register/{registration_session_id:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
-		web_app_public.router.add_get("/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
+		web_app_public.router.add_get(
+			"/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
+		# Non-encrypted registration
+		web_app_public.router.add_put("/public/register", self.register)
+		# Encrypted registration
 		web_app_public.router.add_put("/public/register/prologue", self.registration_prologue)
 		web_app_public.router.add_put("/public/register/{registration_session_id:[-_=a-zA-Z0-9]{16,}}", self.register)
 
@@ -195,6 +202,9 @@ class RegistrationHandler(object):
 
 
 	async def registration_prologue(self, request):
+		"""
+
+		"""
 		invitation_id = request.query.get("invitation_code")
 		registration_session = await self.RegistrationService.create_registration_session(invitation_id)
 		response = {
@@ -214,22 +224,24 @@ class RegistrationHandler(object):
 		"""
 		Validate registration data and create credentials (and tenant, if needed)
 		"""
-		rsid = request.match_info["registration_session_id"]
+		request_data = await request.read()
 
-		registration_session = await self.RegistrationService.get_login_session(rsid)
-
-		req_data = await request.read()
-
-		if self.RegistrationService.RegistrationEncrypted:
-			# TODO: Decrypt the payload
-			# request_data = registration_session.decrypt(await request.read())
-			raise NotImplementedError()
-
-		try:
-			registration_data = json.loads(req_data)
-		except json.decoder.JSONDecodeError:
-			return asab.exceptions.ValidationError("Invalid JSON.")
-
-		result = await self.CredentialsService.register_credentials(registration_session, **registration_data)
+		if "registration_session_id" in request.match_info:
+			# Encrypted registration session
+			assert self.RegistrationService.RegistrationEncrypted
+			rsid = request.match_info["registration_session_id"]
+			registration_session = await self.RegistrationService.get_registration_session(rsid)
+			registration_data = registration_session.decrypt(request_data)
+			result = await self.RegistrationService.register_encrypted(registration_session, registration_data)
+		elif "registration_session_id" in request.query:
+			# Plain registration
+			invitation_id = request.query["registration_session_id"]
+			try:
+				registration_data = json.loads(request_data)
+			except json.decoder.JSONDecodeError:
+				return asab.exceptions.ValidationError("Invalid JSON.")
+			result = await self.RegistrationService.register_simple(invitation_id, registration_data)
+		else:
+			raise aiohttp.web.HTTPBadRequest()
 
 		return asab.web.rest.json_response(request, result)

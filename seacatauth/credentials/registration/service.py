@@ -3,6 +3,9 @@ import logging
 import secrets
 
 import asab
+import asab.storage.exceptions
+import asab.exceptions
+import pymongo
 
 #
 
@@ -13,10 +16,10 @@ L = logging.getLogger(__name__)
 
 class RegistrationService(asab.Service):
 
-	InvitationTokenCollection = "it"
-	InvitationTokenByteLength = 32
-	RegistrationSessionCollection = "rt"
-	RegistrationTokenByteLength = 32
+	InvitationCollection = "i"
+	InvitationCodeByteLength = 32
+	RegistrationSessionCollection = "rg"
+	RegistrationCodeByteLength = 32
 	RegistrationKeyByteLength = 32
 	RegistrationUriFormat = "{auth_webui_base_url}#register?invite={invitation_id}"
 
@@ -52,6 +55,16 @@ class RegistrationService(asab.Service):
 		await self.delete_expired_invitations()
 
 
+	async def initialize(self, app):
+		collection = await self.StorageService.collection(self.RegistrationSessionCollection)
+		try:
+			await collection.create_index([("i", pymongo.ASCENDING)], unique=True)
+		except Exception as e:
+			L.warning(
+				"Could not initialize registration session collection:\n{}".format(str(e)),
+				struct_data={"collection": self.RegistrationSessionCollection})
+
+
 	async def create_invitation(
 		self,
 		expiration: float,
@@ -72,8 +85,8 @@ class RegistrationService(asab.Service):
 		:type invited_by_ips: list
 		:return: The ID of the generated invitation.
 		"""
-		invitation_id = secrets.token_urlsafe(self.InvitationTokenByteLength)
-		upsertor = self.StorageService.upsertor(self.InvitationTokenCollection, invitation_id)
+		invitation_id = secrets.token_urlsafe(self.InvitationCodeByteLength)
+		upsertor = self.StorageService.upsertor(self.InvitationCollection, invitation_id)
 
 		# TODO: The credential_data should be validated with the registration policy
 		# policy = self.CredentialsService.Policy.RegistrationPolicy
@@ -106,7 +119,7 @@ class RegistrationService(asab.Service):
 		:param invitation_id: The invitation ID
 		:return: Token data.
 		"""
-		invitation = await self.StorageService.get(self.InvitationTokenCollection, invitation_id)
+		invitation = await self.StorageService.get(self.InvitationCollection, invitation_id)
 		if invitation["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Expired invitation")
 		return invitation
@@ -118,7 +131,7 @@ class RegistrationService(asab.Service):
 
 		:param invitation_id: The ID of the invitation
 		"""
-		await self.StorageService.delete(self.InvitationTokenCollection, invitation_id)
+		await self.StorageService.delete(self.InvitationCollection, invitation_id)
 		L.log(asab.LOG_NOTICE, "Invitation deleted", struct_data={"invitation_id": invitation_id})
 
 
@@ -126,7 +139,7 @@ class RegistrationService(asab.Service):
 		"""
 		Delete all expired invitations
 		"""
-		collection = self.StorageService.Database[self.InvitationTokenCollection]
+		collection = self.StorageService.Database[self.InvitationCollection]
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
@@ -272,7 +285,7 @@ class RegistrationService(asab.Service):
 
 
 	async def create_registration_session(self, invitation_id):
-		registration_session_id = secrets.token_urlsafe(self.InvitationTokenByteLength)
+		registration_session_id = secrets.token_urlsafe(self.InvitationCodeByteLength)
 		upsertor = self.StorageService.upsertor(self.RegistrationSessionCollection, registration_session_id)
 
 		# TODO: Create key for encrypted registration
@@ -281,6 +294,7 @@ class RegistrationService(asab.Service):
 		# 	key = secrets.token_urlsafe(self.RegistrationKeyByteLength)
 		# 	upsertor.set("__k", key, encrypt=True)
 
+		# TODO: Only one registration session per invitation can exist
 		upsertor.set("i", invitation_id)
 
 		expires_at = \
@@ -288,7 +302,16 @@ class RegistrationService(asab.Service):
 			datetime.timedelta(seconds=self.RegistrationSessionExpiration)
 		upsertor.set("exp", expires_at)
 
-		await upsertor.execute(custom_data={"event_type": "registration_session_created"})
+		try:
+			await upsertor.execute(custom_data={"event_type": "registration_session_created"})
+		except asab.storage.exceptions.DuplicateError as e:
+			if e.KeyValue is not None and "i" in e.KeyValue:
+				raise asab.exceptions.Conflict(
+					"Active registration session for this invitation already exists",
+					value=e.KeyValue["i"]
+				) from e
+			else:
+				raise ValueError("Falied to create registration session") from e
 
 		L.log(asab.LOG_NOTICE, "Registration session created", struct_data={
 			"rsid": registration_session_id,
@@ -297,7 +320,7 @@ class RegistrationService(asab.Service):
 		return registration_session_id
 
 
-	async def get_registration_session(self, registration_session_id, **kwargs):
+	async def get_registration_session(self, registration_session_id):
 		# TODO: Create RegistrationSession class, similarly to LoginSession
 		registration_session = await self.StorageService.get(
 			self.RegistrationSessionCollection, registration_session_id, decrypt=["__k"])
@@ -325,11 +348,20 @@ class RegistrationService(asab.Service):
 				"count": result.deleted_count})
 
 
-	async def register_existing_credentials(self, token_id, register_info: dict):
+	async def registration_prologue(self, invitation_id):
+		registration_session_id = await self.create_registration_session(invitation_id)
+		registration_session = await self.get_registration_session(registration_session_id)
+
+
+	async def register(self, registration_session_id):
+		await self.get_registration_session(registration_session_id)
+
+
+	async def register_existing_credentials(self, registration_session_id):
 		pass
 
 
-	async def register_new_credentials(self, token_id, register_info: dict):
+	async def register_new_credentials(self, registration_session_id, register_info: dict):
 		"""
 		Finalize registration process.
 
