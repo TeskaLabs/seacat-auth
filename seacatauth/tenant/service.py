@@ -201,11 +201,11 @@ class TenantService(asab.Service):
 
 		failed_count = 0
 		for tenant in tenants_to_assign:
-			data = await self.TenantsProvider.assign_tenant(credentials_id, tenant)
+			data = await self.assign_tenant(credentials_id, tenant)
 			if data["result"] != "OK":
 				failed_count += 1
 		for tenant in tenants_to_unassign:
-			data = await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
+			data = await self.unassign_tenant(credentials_id, tenant)
 			if data["result"] != "OK":
 				failed_count += 1
 
