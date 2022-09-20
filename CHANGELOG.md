@@ -4,10 +4,11 @@
 
 ### Breaking changes
 - Userinfo endpoint no longer accepts `tenant` parameter (#69, PLUM Sprint 220909)
-- Userinfo `resources` is now an object with tenant keys  (#69, PLUM Sprint 220909)
+- Userinfo `resources` is now an object with tenant keys (#69, PLUM Sprint 220909)
 
 ### Fix
 - Handle old assignments of nonexisting credentials (#79, PLUM Sprint 220715)
+- Check for the existence of tenant when creating a role (#88, PLUM Sprint 220909)
 
 ### Features
 - OpenID Connect client registration (#77, PLUM Sprint 220729)
@@ -16,7 +17,7 @@
 ### Refactoring
 - Provisioning config in a dedicated JSON file (#80, PLUM Sprint 220729)
 - Userinfo endpoint no longer accepts `tenant` parameter (#69, PLUM Sprint 220909)
-- Userinfo `resources` is now an object with tenant keys  (#69, PLUM Sprint 220909)
+- Userinfo `resources` is now an object with tenant keys (#69, PLUM Sprint 220909)
 
 ---
 
