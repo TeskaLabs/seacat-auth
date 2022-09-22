@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 from typing import Optional
 
@@ -10,7 +9,6 @@ import motor
 import motor.motor_asyncio
 import typing
 
-import yaml
 import bson.json_util
 
 from .abc import EditableCredentialsProviderABC
@@ -67,15 +65,11 @@ class XMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			codec_options=bson.codec_options.CodecOptions(tz_aware=True, tzinfo=datetime.timezone.utc))
 		self.Collection = self.Database.get_collection(self.Config.get("collection"))
 
-		query_file = self.Config.get("queries")
-		with open(query_file) as f:
-			queries = yaml.safe_load(f)
-
-		self.ListQuery = queries.get("list")
+		self.ListQuery = self.Config.get("list")
 		assert self.ListQuery, "XMongoDB credentials: 'list' query/pipeline must be specified"
-		self.GetQuery = queries.get("get")
+		self.GetQuery = self.Config.get("get")
 		assert self.GetQuery, "XMongoDB credentials: 'get' query/pipeline must be specified"
-		self.LocateQuery = queries.get("locate")
+		self.LocateQuery = self.Config.get("locate")
 		assert self.LocateQuery, "XMongoDB credentials: 'locate' query/pipeline must be specified"
 
 		self.IdField = "_id"
