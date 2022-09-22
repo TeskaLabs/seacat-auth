@@ -70,6 +70,9 @@ class CredentialsService(asab.Service):
 				elif svc_name == "seacatauth.credentials.mysql":
 					from .providers.mysql import MySQLCredentialsService
 					MySQLCredentialsService(app)
+				elif svc_name == "seacatauth.credentials.xmongodb":
+					from .providers.xmongodb import XMongoDBCredentialsService
+					XMongoDBCredentialsService(app)
 
 			service = app.get_service(svc_name)
 

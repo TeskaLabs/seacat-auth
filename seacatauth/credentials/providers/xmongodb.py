@@ -6,10 +6,12 @@ from typing import Optional
 import asab
 import bson
 import passlib.hash
-import pymysql
-import re
 import motor
 import motor.motor_asyncio
+import typing
+
+import yaml
+import bson.json_util
 
 from .abc import EditableCredentialsProviderABC
 
@@ -20,17 +22,19 @@ L = logging.getLogger(__name__)
 #
 
 
-class CustomMongoDBCredentialsService(asab.Service):
+class XMongoDBCredentialsService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.credentials.xmongodb"):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return CustomMongoDBCredentialsProvider(self.App, provider_id, config_section_name)
+		return XMongoDBCredentialsProvider(self.App, provider_id, config_section_name)
 
 
-class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
-	# TODO: Use bind variables (https://legacy.python.org/dev/peps/pep-0249/#paramstyle)
+class XMongoDBCredentialsProvider(EditableCredentialsProviderABC):
+	"""
+	Customizable MongoDB provider
+	"""
 
 	Type = "xmongodb"
 
@@ -43,7 +47,6 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		"password": "",
 	}
 
-
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(provider_id, config_section_name)
 		self.Editable = self.Config.getboolean("editable")
@@ -54,7 +57,7 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			"host": self.Config.get("mongodb_uri"),
 		}
 		for option in ["username", "password"]:
-			value = self.Config.get(option, fallback="")
+			value = self.Config.get(option, "")
 			if len(value) > 0:
 				self.ConnectionParams[option] = value
 
@@ -64,24 +67,28 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			codec_options=bson.codec_options.CodecOptions(tz_aware=True, tzinfo=datetime.timezone.utc))
 		self.Collection = self.Database.get_collection(self.Config.get("collection"))
 
-		self.ListQuery = self.Config.get("list")
+		query_file = self.Config.get("queries")
+		with open(query_file) as f:
+			queries = yaml.safe_load(f)
+
+		self.ListQuery = queries.get("list")
 		assert self.ListQuery, "XMongoDB credentials: 'list' query/pipeline must be specified"
-		self.GetQuery = self.Config.get("get")
+		self.GetQuery = queries.get("get")
 		assert self.GetQuery, "XMongoDB credentials: 'get' query/pipeline must be specified"
-		self.LocateQuery = self.Config.get("locate")
+		self.LocateQuery = queries.get("locate")
 		assert self.LocateQuery, "XMongoDB credentials: 'locate' query/pipeline must be specified"
 
 		self.IdField = "_id"
 		self.PasswordField = "__password"
 
 
-	def prepare_query(self, query: str, query_args: dict):
+	def _prepare_query(self, query: str, query_args: dict):
 		# Surround strings with double quotes to be JSON-deserializable
 		for k, v in query_args.items():
 			if isinstance(v, str):
 				query_args[k] = '"{}"'.format(v)
 		bound_query = query % query_args
-		return json.loads(bound_query)
+		return bson.json_util.loads(bound_query)
 
 
 	async def create(self, credentials: dict) -> Optional[str]:
@@ -101,11 +108,13 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
-		query = self.prepare_query(self.GetQuery, {"ident": ident})
+		query = self._prepare_query(self.LocateQuery, {"ident": ident})
 		cursor = self.Collection.aggregate(query)
-		try:
-			result = await cursor.next()
-		except StopIteration:
+		result = None
+		async for obj in cursor:
+			result = obj
+			break
+		if result is None:
 			return None
 		return "{}{}".format(self.Prefix, result[self.IdField])
 
@@ -116,77 +125,60 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
 		mongodb_id = credentials_id[len(self.Prefix):]
-		query = self.prepare_query(self.GetQuery, {self.IdField: mongodb_id})
+		query = self._prepare_query(self.GetQuery, {self.IdField: mongodb_id})
 		cursor = self.Collection.aggregate(query)
-		try:
-			result = await cursor.next()
-		except StopIteration:
+		result = None
+		async for obj in cursor:
+			result = obj
+			break
+		if result is None:
 			raise KeyError(credentials_id)
 		result = self._nomalize_credentials(result, include)
 		return result
 
 
-	async def count(self, filtr=None) -> int:
+	async def count(self, filtr=None) -> typing.Optional[int]:
 		# TODO: Filtering
-		query = self.prepare_query(self.ListQuery, {})
+		query = self._prepare_query(self.ListQuery, {})
 		query.append({"$count": "count"})
 		cursor = self.Collection.aggregate(query)
-		try:
-			result = await cursor.next()
-			return result["count"]
-		except (StopIteration, KeyError):
-			raise RuntimeError("Credential count failed.")
+		result = None
+		async for obj in cursor:
+			result = obj
+			break
+		if result is None:
+			L.error("Credential count failed.")
+			return None
+		return result["count"]
 
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = -1) -> list:
 		# TODO: Filtering
-		if limit > 0:
-			offset = page * limit
-		else:
-			offset = 0
-
-		results = []
-		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				nrows = await cursor.execute(self.ListQuery)
-				if nrows == 0:
-					return []
-				try:
-					await cursor.scroll(offset)
-				except IndexError:
-					L.error("MySQL: Out of range", struct_data={"query": self.ListQuery, "scroll": offset})
-					return []
-				result = await cursor.fetchone()
-				while result is not None:
-					results.append(self._nomalize_credentials(result))
-					if limit > 0:
-						limit -= 1
-					if limit == 0:
-						break
-					result = await cursor.fetchone()
+		query = self._prepare_query(self.ListQuery, {})
+		if sort is not None:
+			query.append({"$sort": sort})
+		if page > 0:
+			query.append({"$skip": page * limit})
+		if limit > -1:
+			query.append({"$limit": limit})
+		cursor = self.Collection.aggregate(query)
+		result = []
+		async for obj in cursor:
+			result.append(self._nomalize_credentials(obj))
 		return result
 
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
 		# TODO: Filtering
-		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				nrows = await cursor.execute(self.ListQuery)
-				if nrows == 0:
-					return
-				try:
-					await cursor.scroll(offset)
-				except IndexError:
-					L.error("MySQL: Out of range", struct_data={"query": self.ListQuery, "scroll": offset})
-					return
-				result = await cursor.fetchone()
-				while result is not None:
-					yield self._nomalize_credentials(result)
-					if limit > 0:
-						limit -= 1
-					if limit == 0:
-						return
-					result = await cursor.fetchone()
+		query = self._prepare_query(self.ListQuery, {})
+		if offset > 0:
+			query.append({"$skip": offset})
+		if limit > -1:
+			query.append({"$limit": limit})
+		cursor = self.Collection.aggregate(query)
+
+		async for obj in cursor:
+			yield self._nomalize_credentials(obj)
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
@@ -197,31 +189,34 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		try:
 			dbcred = await self.get(credentials_id, include=[self.PasswordField])
 		except KeyError:
-			# Not my user
 			L.error("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
 			return False
 
 		if dbcred.get("suspended") is True:
-			# if the user is in suspended state then login no allowed
 			L.info("Authentication failed: Credentials suspended", struct_data={"cid": credentials_id})
 			return False
 
-		if self.PasswordField in dbcred:
-			if self._authenticate_password(dbcred, credentials):
-				return True
-			else:
-				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
-		else:
+		if self.PasswordField not in dbcred:
 			L.error("Authentication failed: Login data contain no password", struct_data={"cid": credentials_id})
-		return False
+			return False
+
+		if not self._authenticate_password(dbcred, credentials):
+			L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
+			return False
+
+		return True
 
 
 	def _nomalize_credentials(self, db_obj, include=None):
 		normalized = {
-			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj[self.IdField]),
+			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj.pop(self.IdField)),
 			'_type': self.Type,
 			'_provider_id': self.ProviderID,
 		}
+
+		for field in frozenset(["_v", "_c", "_m"]):
+			if field in db_obj:
+				normalized[field] = db_obj.pop(field)
 
 		for field in frozenset(["username", "email", "phone"]):
 			if field in db_obj:
@@ -230,9 +225,9 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		normalized["suspended"] = bool(db_obj.pop("suspended", False))
 
 		data = {}
-		for field in self.DataFields:
-			if field in db_obj:
-				data[field] = db_obj[field]
+		for k, v in db_obj.items():
+			if not k.startswith("_"):
+				data[k] = v
 		if len(data) > 0:
 			normalized["data"] = data
 
@@ -245,13 +240,15 @@ class CustomMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	def _authenticate_password(self, dbcred, credentials):
-		# This is here for a cryptoagility, if we migrate to a newer password hashing function,
+		# This is here for cryptoagility: if we migrate to a newer password hashing function,
 		# this if block will be extended
 		if dbcred[self.PasswordField].startswith("$2b$") \
 			or dbcred[self.PasswordField].startswith("$2a$") \
 			or dbcred[self.PasswordField].startswith("$2y$"):
 			if passlib.hash.bcrypt.verify(credentials["password"], dbcred[self.PasswordField]):
 				return True
+			else:
+				return False
 		else:
 			L.warning("Unknown password hash function: {}".format(dbcred[self.PasswordField][:4]))
 			return False
