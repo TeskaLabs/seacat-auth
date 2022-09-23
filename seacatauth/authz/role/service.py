@@ -63,7 +63,10 @@ class RoleService(asab.Service):
 		}
 
 	async def get(self, role_id: str):
-		result = await self.StorageService.get(self.RoleCollection, role_id)
+		try:
+			result = await self.StorageService.get(self.RoleCollection, role_id)
+		except KeyError:
+			raise KeyError("Role '{}' not found".format(role_id))
 		return result
 
 	async def get_role_resources(self, role_id: str):
@@ -82,7 +85,11 @@ class RoleService(asab.Service):
 					"and {role_name} consists only of characters 'a-z0-9_-', "
 					"starts with a letter or underscore, and is between 1 and 32 characters long.",
 			}
-		tenant = await self.get_tenant_from_role_id(role_id)
+		try:
+			tenant = await self.get_role_tenant(role_id)
+		except KeyError:
+			tenant, _ = role_id.split("/", 1)
+			raise KeyError("Tenant '{}' not found.".format(tenant))
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
@@ -120,8 +127,16 @@ class RoleService(asab.Service):
 		resources_to_add: Optional[list] = None,
 		resources_to_remove: Optional[list] = None
 	):
-		tenant = await self.get_tenant_from_role_id(role_id)
+		# Verify that role exists
+		role_current = await self.get(role_id)
 
+		# Verify that role tenant exists
+		try:
+			tenant = await self.get_role_tenant(role_id)
+		except KeyError as e:
+			raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role_id)) from e
+
+		# Validate resources
 		resources_to_assign = set().union(
 			resources_to_set or [],
 			resources_to_add or [],
@@ -130,16 +145,13 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			# TENANT role
 			# Resource "authz:superuser" cannot be assigned to a tenant role
-			if "authz:superuser" in resources_to_assign:
-				message = "Cannot assign resource 'authz:superuser' to a tenant role ({}).".format(role_id)
-				L.warning(message)
-				raise ValueError(message)
+			for global_only_resource in frozenset(["authz:superuser", "authz:tenant:access"]):
+				if global_only_resource in resources_to_assign:
+					message = "Cannot assign a global-only resource '{}' to a tenant role ({}).".format(global_only_resource, role_id)
+					L.warning(message)
+					raise ValueError(message)
 
-		role_current = await self.StorageService.get(self.RoleCollection, role_id)
-		if role_current is not None:
-			version = role_current["_v"]
-		else:
-			version = 0
+		version = role_current["_v"]
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
 			role_id,
@@ -227,8 +239,14 @@ class RoleService(asab.Service):
 		# Validate all requested roles
 		roles_to_assign = set()
 		for role in roles:
-			# Validate by regex
-			role_tenant = await self.get_tenant_from_role_id(role)
+			# Validate that role exists
+			await self.get(role_id=role)
+
+			# Check that role has valid tenant
+			try:
+				role_tenant = await self.get_role_tenant(role)
+			except KeyError as e:
+				raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role)) from e
 
 			# Validate by current tenant scope
 			if role_tenant not in tenant_scope:
@@ -243,14 +261,6 @@ class RoleService(asab.Service):
 					"tenants": list(tenant_scope)
 				})
 				raise ValueError(message)
-
-			# Validate that role exists
-			try:
-				await self.get(role_id=role)
-			except KeyError:
-				message = "Role not found"
-				L.error(message, struct_data={"role": role})
-				raise KeyError(message)
 
 			roles_to_assign.add(role)
 
@@ -281,7 +291,8 @@ class RoleService(asab.Service):
 			upsertor.set("c", credentials_id)
 			upsertor.set("r", role)
 
-			tenant = await self.get_tenant_from_role_id(role)
+			# TODO: Optimize; this database lookup is being called twice for each role
+			tenant = await self.get_role_tenant(role)
 			if tenant != "*":
 				upsertor.set("t", tenant)
 			await upsertor.execute()
@@ -317,29 +328,20 @@ class RoleService(asab.Service):
 
 
 	async def assign_role(self, credentials_id: str, role_id: str):
-		tenant = await self.get_tenant_from_role_id(role_id)
+		# Verify that role exists
+		await self.get(role_id)
 
-		# Check if credentials exist
+		# Verify that role tenant exists
+		try:
+			tenant = await self.get_role_tenant(role_id)
+		except KeyError as e:
+			raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role_id)) from e
+
+		# Verify that credentials exist
 		try:
 			await self.CredentialService.detail(credentials_id)
 		except KeyError:
-			message = "Credentials not found"
-			L.warning(message, struct_data={"cid": credentials_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": message,
-			}
-
-		# Check if role exists
-		try:
-			await self.get(role_id)
-		except KeyError:
-			message = "Role not found"
-			L.warning(message, struct_data={"role": role_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": message,
-			}
+			raise KeyError("Credentials '{}' not found.".format(credentials_id))
 
 		return await self._do_assign_role(credentials_id, role_id, tenant)
 
@@ -403,13 +405,17 @@ class RoleService(asab.Service):
 		})
 
 
-	async def get_tenant_from_role_id(self, role_id):
+	async def get_role_tenant(self, role_id):
+		"""
+		Get the tenant from role ID.
+		Verify that the tenant exists, propagate KeyError if it does not.
+
+		:param role_id: Role ID
+		:return: Tenant ID
+		"""
 		match = self.RoleIdRegex.match(role_id)
 		if match is not None:
 			tenant = match.group(1)
-			# Verify that tenant exists if the role is not global
-			if tenant != "*":
-				await self.TenantService.get_tenant(tenant)
 		else:
 			L.warning(
 				"Role ID contains unallowed characters. "
@@ -417,4 +423,9 @@ class RoleService(asab.Service):
 				struct_data={"role_id": role_id}
 			)
 			tenant, _ = role_id.split("/", 1)
+
+		# Verify that tenant exists if the role is not global
+		if tenant != "*":
+			await self.TenantService.get_tenant(tenant)
+
 		return tenant

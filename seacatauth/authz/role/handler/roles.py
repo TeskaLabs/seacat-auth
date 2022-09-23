@@ -91,8 +91,6 @@ class RolesHandler(object):
 			)
 		except ValueError:
 			raise aiohttp.web.HTTPBadRequest()
-		except KeyError:
-			raise aiohttp.web.HTTPNotFound()
 
 		resp_data = {"result": "OK"}
 		return asab.web.rest.json_response(

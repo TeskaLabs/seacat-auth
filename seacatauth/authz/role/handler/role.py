@@ -153,8 +153,6 @@ class RoleHandler(object):
 			)
 		except ValueError:
 			raise aiohttp.web.HTTPBadRequest()
-		except KeyError:
-			raise aiohttp.web.HTTPNotFound()
 		return asab.web.rest.json_response(
 			request,
 			data={"result": result}
