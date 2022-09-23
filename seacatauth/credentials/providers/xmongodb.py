@@ -86,19 +86,19 @@ class XMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def create(self, credentials: dict) -> Optional[str]:
-		raise NotImplementedError()
+		raise NotImplementedError("XMongoDB credentials provider is read-only.")
 
 
 	async def register(self, register_info: dict) -> Optional[str]:
-		raise NotImplementedError()
+		raise NotImplementedError("XMongoDB credentials provider is read-only.")
 
 
 	async def update(self, credentials_id, update: dict) -> Optional[str]:
-		raise NotImplementedError()
+		raise NotImplementedError("XMongoDB credentials provider is read-only.")
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
-		raise NotImplementedError()
+		raise NotImplementedError("XMongoDB credentials provider is read-only.")
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
