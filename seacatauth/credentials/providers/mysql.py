@@ -329,6 +329,8 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			or dbcred[self.PasswordField].startswith("$2y$"):
 			if passlib.hash.bcrypt.verify(credentials["password"], dbcred[self.PasswordField]):
 				return True
+			else:
+				return False
 		else:
 			L.warning("Unknown password hash function: {}".format(dbcred[self.PasswordField][:4]))
 			return False

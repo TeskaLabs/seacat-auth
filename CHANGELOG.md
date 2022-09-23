@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- New MongoDB credential provider with configurable queries (#90, PLUM Sprint 220909)
+
+---
+
+
 ## v22.38
 
 ### Breaking changes
