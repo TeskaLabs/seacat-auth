@@ -5,6 +5,8 @@ import passlib.pwd
 import asab.exceptions
 import asab.storage.exceptions
 
+from ..client.service import CLIENT_TEMPLATES
+
 #
 
 L = logging.getLogger(__name__)
@@ -27,7 +29,8 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_provider_id": "provisioning",
 	"role_name": "provisioning-superrole",
 	"tenant": "provisioning-tenant",
-	"webui_clients": [],
+	"seacat_auth_ui_url": "",
+	"seacat_admin_ui_url": "",
 }
 
 
@@ -93,20 +96,27 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
 
 		# Initialize web UI clients
-		if len(self.Config["webui_clients"]) > 0:
-			client_svc = app.get_service("seacatauth.ClientService")
-			for client in self.Config["webui_clients"]:
-				client.update({
-					"application_type": "web",
-					"token_endpoint_auth_method": "none",
-					"grant_types": ["authorization_code"],
-					"response_types": ["code"]})
-				client_id = client.pop("client_id", None)
-				try:
-					# Overwrite the client in case it was not created correctly
-					await client_svc.delete(client_id=client_id)
-				except KeyError:
-					pass
+		client_svc = app.get_service("seacatauth.ClientService")
+		seacat_auth_ui_url = self.Config["seacat_auth_ui_url"].rstrip("/")
+		if len(seacat_auth_ui_url) > 0:
+			client_id = "seacat-auth-ui"
+			try:
+				await client_svc.get(client_id)
+			except KeyError:
+				client = {k: v for k, v in CLIENT_TEMPLATES["Public web application"].items()}
+				# TODO: Redirect URI cannot contain #fragment
+				client["redirect_uris"] = ["{}/#tenant=<TENANT>/".format(seacat_auth_ui_url)]
+				await client_svc.register(_custom_client_id=client_id, **client)
+
+		seacat_admin_ui_url = self.Config["seacat_admin_ui_url"].rstrip("/")
+		if len(seacat_admin_ui_url) > 0:
+			client_id = "seacat-admin-ui"
+			try:
+				await client_svc.get(client_id)
+			except KeyError:
+				client = {k: v for k, v in CLIENT_TEMPLATES["Public web application"].items()}
+				# TODO: Redirect URI cannot contain #fragment
+				client["redirect_uris"] = ["{}/#tenant=<TENANT>/".format(seacat_admin_ui_url)]
 				await client_svc.register(_custom_client_id=client_id, **client)
 
 
