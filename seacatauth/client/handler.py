@@ -37,10 +37,7 @@ class ClientHandler(object):
 			limit = int(limit)
 
 		# Filter by ID.startswith()
-		query_filter = request.query.get("f", None)
-		if query_filter is not None:
-			query_filter = {
-				"_id": re.compile("^{}".format(re.escape(query_filter)))}
+		query_filter = request.query.get("f")
 
 		data = []
 		async for client in self.ClientService.iterate(page, limit, query_filter):
