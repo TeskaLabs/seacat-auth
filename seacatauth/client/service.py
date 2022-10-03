@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 import secrets
 import urllib.parse
 
@@ -141,11 +142,21 @@ class ClientService(asab.Service):
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 
-	async def iterate(self, page: int = 0, limit: int = None, query_filter: dict = None):
+	def build_filter(self, match_string):
+		return {"$or": [
+			{"_id": re.compile("^{}".format(re.escape(match_string)))},
+			{"client_name": re.compile(re.escape(match_string), re.IGNORECASE)},
+		]}
+
+
+	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
 			query_filter = {}
+		else:
+			query_filter = self.build_filter(query_filter)
+		L.warning(str(query_filter))
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
@@ -163,6 +174,8 @@ class ClientService(asab.Service):
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
+		else:
+			query_filter = self.build_filter(query_filter)
 		return await collection.count_documents(query_filter)
 
 
