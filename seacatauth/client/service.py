@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 import secrets
 import urllib.parse
 
@@ -15,12 +16,29 @@ L = logging.getLogger(__name__)
 #
 
 # TODO: Implement support for remaining metadata
+# TODO: Implement support for other response and grant types and stuff
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-GRANT_TYPES = ["authorization_code", "implicit", "refresh_token"]
-RESPONSE_TYPES = ["code", "id_token", "token"]
-APPLICATION_TYPES = ["web", "native"]
+GRANT_TYPES = [
+	"authorization_code",
+	# "implicit",
+	# "refresh_token"
+]
+RESPONSE_TYPES = [
+	"code",
+	# "id_token",
+	# "token"
+]
+APPLICATION_TYPES = [
+	"web",
+	# "native"
+]
 TOKEN_ENDPOINT_AUTH_METHODS = [
-	"none", "client_secret_basic", "client_secret_post", "client_secret_jwt", "private_key_jwt"]
+	"none",
+	# "client_secret_basic",
+	# "client_secret_post",
+	# "client_secret_jwt",
+	# "private_key_jwt"
+]
 CLIENT_METADATA_SCHEMA = {
 	"type": "object",
 	"required": ["redirect_uris", "client_name"],
@@ -141,11 +159,21 @@ class ClientService(asab.Service):
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 
-	async def iterate(self, page: int = 0, limit: int = None, query_filter: dict = None):
+	def build_filter(self, match_string):
+		return {"$or": [
+			{"_id": re.compile("^{}".format(re.escape(match_string)))},
+			{"client_name": re.compile(re.escape(match_string), re.IGNORECASE)},
+		]}
+
+
+	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
 			query_filter = {}
+		else:
+			query_filter = self.build_filter(query_filter)
+		L.warning(str(query_filter))
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
@@ -163,6 +191,8 @@ class ClientService(asab.Service):
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
+		else:
+			query_filter = self.build_filter(query_filter)
 		return await collection.count_documents(query_filter)
 
 
