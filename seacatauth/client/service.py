@@ -16,12 +16,29 @@ L = logging.getLogger(__name__)
 #
 
 # TODO: Implement support for remaining metadata
+# TODO: Implement support for other response and grant types and stuff
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-GRANT_TYPES = ["authorization_code", "implicit", "refresh_token"]
-RESPONSE_TYPES = ["code", "id_token", "token"]
-APPLICATION_TYPES = ["web", "native"]
+GRANT_TYPES = [
+	"authorization_code",
+	# "implicit",
+	# "refresh_token"
+]
+RESPONSE_TYPES = [
+	"code",
+	# "id_token",
+	# "token"
+]
+APPLICATION_TYPES = [
+	"web",
+	# "native"
+]
 TOKEN_ENDPOINT_AUTH_METHODS = [
-	"none", "client_secret_basic", "client_secret_post", "client_secret_jwt", "private_key_jwt"]
+	"none",
+	# "client_secret_basic",
+	# "client_secret_post",
+	# "client_secret_jwt",
+	# "private_key_jwt"
+]
 CLIENT_METADATA_SCHEMA = {
 	"type": "object",
 	"required": ["redirect_uris", "client_name"],
