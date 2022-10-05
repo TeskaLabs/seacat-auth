@@ -248,6 +248,7 @@ class AuthorizeHandler(object):
 				scope=scope, client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
+				tenant=tenant,
 				login_parameters=login_parameters)
 
 		# We are authenticated!
@@ -277,8 +278,15 @@ class AuthorizeHandler(object):
 				struct_data={"missing_factors": " ".join(factors_to_setup), "cid": root_session.Credentials.Id}
 			)
 			return await self.reply_with_factor_setup_redirect(
-				root_session, factors_to_setup,
-				"code", scope, client_id, redirect_uri, state, login_parameters
+				session=root_session,
+				missing_factors=factors_to_setup,
+				response_type="code",
+				scope=scope,
+				client_id=client_id,
+				redirect_uri=redirect_uri,
+				state=state,
+				tenant=tenant,
+				login_parameters=login_parameters
 			)
 
 		requested_expiration = login_parameters.get("expiration")
@@ -289,7 +297,7 @@ class AuthorizeHandler(object):
 		session = await self.OpenIdConnectService.create_oidc_session(
 			root_session, client_id, scope, tenant, requested_expiration)
 
-		return await self.reply_with_successful_response(session, scope, redirect_uri, tenant, state)
+		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
 
 
 	async def _get_factors_to_setup(self, session):
@@ -314,7 +322,6 @@ class AuthorizeHandler(object):
 
 	async def reply_with_successful_response(
 		self, session, scope: list, redirect_uri: str,
-		tenant: str = None,
 		state: str = None
 	):
 		"""
@@ -336,9 +343,7 @@ class AuthorizeHandler(object):
 			# then use the exact value received from the client.
 			url_qs["state"] = state
 
-		# TODO: Include tenant?
-		if tenant is not None:
-			url_qs["tenant"] = tenant
+		# TODO: Include tenant in response query?
 
 		# Add the Authorization Code into the session ...
 		if "cookie" not in scope:
@@ -374,6 +379,7 @@ class AuthorizeHandler(object):
 	async def reply_with_redirect_to_login(
 		self, response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
+		tenant: str = None,
 		login_parameters: dict = None
 	):
 		"""
@@ -395,6 +401,8 @@ class AuthorizeHandler(object):
 		]
 		if state is not None:
 			authorize_query_params.append(("state", state))
+		if tenant is not None:
+			authorize_query_params.append(("tenant", tenant))
 
 		# Build the redirect URI back to this endpoint and add it to login params
 		authorize_redirect_uri = "{}{}?{}".format(
@@ -426,6 +434,7 @@ class AuthorizeHandler(object):
 		self, session, missing_factors: list,
 		response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
+		tenant: str = None,
 		login_parameters: dict = None
 	):
 		"""
@@ -447,6 +456,8 @@ class AuthorizeHandler(object):
 		]
 		if state is not None:
 			authorize_query_params.append(("state", state))
+		if tenant is not None:
+			authorize_query_params.append(("tenant", tenant))
 
 		# Build the redirect URI back to this endpoint and add it to auth URL params
 		authorize_redirect_uri = "{}{}?{}".format(
