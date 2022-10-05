@@ -318,12 +318,6 @@ class OpenIdConnectService(asab.Service):
 		if session.Authorization.Authz is not None:
 			userinfo["resources"] = session.Authorization.Authz
 
-		if session.Authorization.Authz is not None:
-			# Include the list of ALL the user's tenants (excluding "*")
-			tenants = [t for t in session.Authorization.Authz.keys() if t != "*"]
-			if len(tenants) > 0:
-				userinfo["tenants"] = tenants
-
 		if session.Authorization.Tenants is not None:
 			userinfo["tenants"] = session.Authorization.Tenants
 
