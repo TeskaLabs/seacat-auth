@@ -252,6 +252,16 @@ class AuthorizeHandler(object):
 
 		# We are authenticated!
 
+		# Check if requested tenant is accessible to the user
+		if tenant is not None:
+			if tenant not in await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id):
+				return self.reply_with_authentication_error(
+					"access_denied",
+					redirect_uri,
+					state=state,
+					error_description="Unauthorized tenant",
+				)
+
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
 		# TODO: replace with ABAC
@@ -276,9 +286,10 @@ class AuthorizeHandler(object):
 			requested_expiration = int(requested_expiration)
 
 		# TODO: Create a new child session with the requested scope
-		session = await self.OpenIdConnectService.create_oidc_session(root_session, client_id, scope, tenant, requested_expiration)
+		session = await self.OpenIdConnectService.create_oidc_session(
+			root_session, client_id, scope, tenant, requested_expiration)
 
-		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
+		return await self.reply_with_successful_response(session, scope, redirect_uri, tenant, state)
 
 
 	async def _get_factors_to_setup(self, session):
@@ -325,6 +336,7 @@ class AuthorizeHandler(object):
 			# then use the exact value received from the client.
 			url_qs["state"] = state
 
+		# TODO: Include tenant?
 		if tenant is not None:
 			url_qs["tenant"] = tenant
 
