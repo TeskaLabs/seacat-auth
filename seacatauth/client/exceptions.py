@@ -12,6 +12,12 @@ class ClientError(Exception):
 			super().__init__(*args)
 
 
+class InvalidRedirectURI(ClientError):
+	def __init__(self, *args, client_id, redirect_uri):
+		self.RedirectURI = redirect_uri
+		super().__init__(*args, client_id=client_id, redirect_uri=redirect_uri)
+
+
 class InvalidClientSecret(ClientError):
 	def __init__(self, client_id, *args):
 		message = "Invalid client secret for client '{client_id}'".format(client_id=client_id)
