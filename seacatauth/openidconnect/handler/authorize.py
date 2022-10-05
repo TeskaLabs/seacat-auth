@@ -301,7 +301,11 @@ class AuthorizeHandler(object):
 		return factors_to_setup
 
 
-	async def reply_with_successful_response(self, session, scope: list, redirect_uri: str, state=None):
+	async def reply_with_successful_response(
+		self, session, scope: list, redirect_uri: str,
+		tenant: str = None,
+		state: str = None
+	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 		3.1.2.5.  Successful Authentication Response
@@ -320,6 +324,9 @@ class AuthorizeHandler(object):
 			# If the "state" parameter was present in the client authorization request,
 			# then use the exact value received from the client.
 			url_qs["state"] = state
+
+		if tenant is not None:
+			url_qs["tenant"] = tenant
 
 		# Add the Authorization Code into the session ...
 		if "cookie" not in scope:

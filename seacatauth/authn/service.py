@@ -308,7 +308,8 @@ class AuthenticationService(asab.Service):
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=login_session.CredentialsId
+				credentials_id=login_session.CredentialsId,
+				tenant=None  # Root session is tenant-agnostic
 			),
 			login_descriptor_session_builder(login_session.AuthenticatedVia),
 			cookie_session_builder(),
@@ -367,12 +368,18 @@ class AuthenticationService(asab.Service):
 		Direct authentication for M2M access (without login sessions)
 		This is NOT OpenIDConnect/OAuth2 compliant!
 		"""
+		# TODO: Where to get the tenant from
+		#   - in request? (header?)
+		#   - in M2M credentials? (this implies single-tenant credentials)
+		tenant = None
+
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, credentials_id),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=credentials_id
+				credentials_id=credentials_id,
+				tenant=tenant,
 			),
 			# login_descriptor_session_builder(login_descriptor),  # TODO: Add login descriptor
 			cookie_session_builder(),

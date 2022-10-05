@@ -118,6 +118,8 @@ class CookieHandler(object):
 		if root_session is None:
 			return aiohttp.web.HTTPBadRequest()
 
+		tenant = request.query.get("tenant")
+
 		# TODO: Choose builders based on scope
 		session_builders = [
 			credentials_session_builder(
@@ -127,7 +129,8 @@ class CookieHandler(object):
 			await authz_session_builder(
 				tenant_service=self.CookieService.TenantService,
 				role_service=self.CookieService.RoleService,
-				credentials_id=root_session.Credentials.Id
+				credentials_id=root_session.Credentials.Id,
+				tenant=tenant,
 			),
 			login_descriptor_session_builder(root_session.LoginDescriptor),
 			cookie_session_builder(),
