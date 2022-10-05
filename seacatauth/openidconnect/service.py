@@ -229,7 +229,7 @@ class OpenIdConnectService(asab.Service):
 		raise aiohttp.web.HTTPNotImplemented()
 
 
-	async def create_oidc_session(self, root_session, client_id, scope, requested_expiration=None):
+	async def create_oidc_session(self, root_session, client_id, scope, tenant, requested_expiration=None):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
