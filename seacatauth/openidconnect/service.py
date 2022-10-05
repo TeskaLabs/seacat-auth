@@ -237,7 +237,8 @@ class OpenIdConnectService(asab.Service):
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id
+				credentials_id=root_session.Credentials.Id,
+				tenant=tenant,
 			),
 			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
 			cookie_session_builder(),

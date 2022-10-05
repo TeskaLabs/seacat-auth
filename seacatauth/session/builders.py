@@ -32,11 +32,11 @@ async def external_login_session_builder(external_login_service, credentials_id)
 	return ((SessionAdapter.FN.Authentication.ExternalLoginOptions, external_logins),)
 
 
-async def authz_session_builder(tenant_service, role_service, credentials_id):
+async def authz_session_builder(tenant_service, role_service, credentials_id, tenant):
 	"""
 	Add 'authz' dict with complete information about credentials' tenants, roles and resources
 	"""
-	return ((SessionAdapter.FN.Authorization.Authz, await get_credentials_authz(credentials_id, tenant_service, role_service)),)
+	return ((SessionAdapter.FN.Authorization.Authz, await get_credentials_authz(tenant_service, role_service, credentials_id, tenant)),)
 
 
 def login_descriptor_session_builder(login_descriptor):
