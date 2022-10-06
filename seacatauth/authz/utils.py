@@ -1,4 +1,4 @@
-async def get_credentials_authz(tenant_service, role_service, credentials_id, tenant):
+async def build_credentials_authz(tenant_service, role_service, credentials_id, tenants=None):
 	"""
 	Creates a nested 'authz' dict with tenant:resource structure:
 	{
@@ -15,17 +15,17 @@ async def get_credentials_authz(tenant_service, role_service, credentials_id, te
 	"""
 
 	# Add global roles and resources under "*"
-	authz = {}
-	authz["*"] = set()
+	authz = {"*": set()}
 	for role in await role_service.get_roles_by_credentials(credentials_id, "*"):
 		authz["*"].update(await role_service.get_role_resources(role))
 	authz["*"] = list(authz["*"])
 
 	# Add tenant-specific roles and resources
-	if tenant_service.is_enabled() and tenant is not None:
-		authz[tenant] = set()
-		for role in await role_service.get_roles_by_credentials(credentials_id, tenant):
-			authz[tenant].update(await role_service.get_role_resources(role))
-		authz[tenant] = list(authz[tenant])
+	if tenant_service.is_enabled() and tenants is not None:
+		for tenant in tenants:
+			authz[tenant] = set()
+			for role in await role_service.get_roles_by_credentials(credentials_id, tenant):
+				authz[tenant].update(await role_service.get_role_resources(role))
+			authz[tenant] = list(authz[tenant])
 
 	return authz
