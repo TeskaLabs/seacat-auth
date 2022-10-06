@@ -47,6 +47,7 @@ class OpenIdConnectService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
 
@@ -229,7 +230,7 @@ class OpenIdConnectService(asab.Service):
 		raise aiohttp.web.HTTPNotImplemented()
 
 
-	async def create_oidc_session(self, root_session, client_id, scope, tenant, requested_expiration=None):
+	async def create_oidc_session(self, root_session, client_id, scope, tenants=None, requested_expiration=None):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
@@ -238,7 +239,7 @@ class OpenIdConnectService(asab.Service):
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
 				credentials_id=root_session.Credentials.Id,
-				tenant=tenant,
+				tenants=tenants,
 			),
 			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
 			cookie_session_builder(),

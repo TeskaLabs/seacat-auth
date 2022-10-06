@@ -2,7 +2,7 @@ import logging
 import secrets
 
 from .adapter import SessionAdapter
-from ..authz import get_credentials_authz
+from ..authz import build_credentials_authz
 
 #
 
@@ -32,14 +32,14 @@ async def external_login_session_builder(external_login_service, credentials_id)
 	return ((SessionAdapter.FN.Authentication.ExternalLoginOptions, external_logins),)
 
 
-async def authz_session_builder(tenant_service, role_service, credentials_id, tenant):
+async def authz_session_builder(tenant_service, role_service, credentials_id, tenants=None):
 	"""
 	Add 'authz' dict with currently authorized tenants and their resources
 	Add 'tenants' list with complete list of credential's tenants
 	"""
 	return (
-		(SessionAdapter.FN.Authorization.Authz, await get_credentials_authz(
-			tenant_service, role_service, credentials_id, tenant)),
+		(SessionAdapter.FN.Authorization.Authz, await build_credentials_authz(
+			tenant_service, role_service, credentials_id, tenants)),
 		(SessionAdapter.FN.Authorization.Tenants, await tenant_service.get_tenants(credentials_id)),
 	)
 

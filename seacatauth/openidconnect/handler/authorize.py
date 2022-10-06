@@ -96,9 +96,6 @@ class AuthorizeHandler(object):
 					"invalid_request",
 					"Missing required parameter: {}".format(parameter),
 				)
-		if "tenant" not in request_parameters:
-			# TODO: Respond with error
-			L.warning("Missing required parameter: {}".format("tenant"), struct_data=request_parameters)
 
 		# Select the proper flow based on response_type
 		response_type = request_parameters["response_type"]
@@ -118,7 +115,6 @@ class AuthorizeHandler(object):
 				scope=request_parameters["scope"].split(" "),
 				client_id=request_parameters["client_id"],
 				redirect_uri=request_parameters["redirect_uri"],
-				tenant=request_parameters.get("tenant"),
 				client_secret=request_parameters.get("client_secret"),
 				state=request_parameters.get("state"),
 				prompt=request_parameters.get("prompt"),
@@ -139,7 +135,6 @@ class AuthorizeHandler(object):
 		scope: list,
 		client_id: str,
 		redirect_uri: str,
-		tenant: str,
 		client_secret: str = None,
 		state: str = None,
 		prompt: str = None,
@@ -245,22 +240,49 @@ class AuthorizeHandler(object):
 			# We are not authenticated, show 404 and provide the link to the login form
 			return await self.reply_with_redirect_to_login(
 				response_type="code",
-				scope=scope, client_id=client_id,
+				scope=scope,
+				client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
-				tenant=tenant,
 				login_parameters=login_parameters)
 
 		# We are authenticated!
 
-		# Check if requested tenant is accessible to the user
-		if tenant is not None:
-			if tenant not in await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id):
+		# Check if requested tenants are accessible to the user
+		user_tenants = await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id)
+		user_has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
+			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			or self.OpenIdConnectService.RBACService.has_resource_access(
+			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		tenants = set()
+		for resource in scope:
+			if not resource.startswith("tenant:"):
+				continue
+			tenant = resource[len("tenant:"):]
+			if tenant == "*":
+				# Client is requesting access to all of the user's tenants
+				# TODO: Check if the client is allowed to do this
+				tenants.update(user_tenants)
+			elif tenant in user_tenants:
+				tenants.add(tenant)
+			elif user_has_access_to_all_tenants:
+				try:
+					await self.OpenIdConnectService.TenantService.get_tenant(tenant)
+					tenants.add(tenant)
+				except KeyError:
+					# Tenant does not exist
+					return self.reply_with_authentication_error(
+						"access_denied",
+						redirect_uri,
+						state=state,
+						error_description="Unauthorized tenant: '{}'".format(tenant),
+					)
+			else:
 				return self.reply_with_authentication_error(
 					"access_denied",
 					redirect_uri,
 					state=state,
-					error_description="Unauthorized tenant",
+					error_description="Unauthorized tenant: ''".format(tenant),
 				)
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
@@ -285,7 +307,6 @@ class AuthorizeHandler(object):
 				client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
-				tenant=tenant,
 				login_parameters=login_parameters
 			)
 
@@ -295,7 +316,7 @@ class AuthorizeHandler(object):
 
 		# TODO: Create a new child session with the requested scope
 		session = await self.OpenIdConnectService.create_oidc_session(
-			root_session, client_id, scope, tenant, requested_expiration)
+			root_session, client_id, scope, tenants, requested_expiration)
 
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
 
@@ -379,7 +400,6 @@ class AuthorizeHandler(object):
 	async def reply_with_redirect_to_login(
 		self, response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
-		tenant: str = None,
 		login_parameters: dict = None
 	):
 		"""
@@ -401,8 +421,6 @@ class AuthorizeHandler(object):
 		]
 		if state is not None:
 			authorize_query_params.append(("state", state))
-		if tenant is not None:
-			authorize_query_params.append(("tenant", tenant))
 
 		# Build the redirect URI back to this endpoint and add it to login params
 		authorize_redirect_uri = "{}{}?{}".format(
@@ -434,7 +452,6 @@ class AuthorizeHandler(object):
 		self, session, missing_factors: list,
 		response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
-		tenant: str = None,
 		login_parameters: dict = None
 	):
 		"""
@@ -456,8 +473,6 @@ class AuthorizeHandler(object):
 		]
 		if state is not None:
 			authorize_query_params.append(("state", state))
-		if tenant is not None:
-			authorize_query_params.append(("tenant", tenant))
 
 		# Build the redirect URI back to this endpoint and add it to auth URL params
 		authorize_redirect_uri = "{}{}?{}".format(
