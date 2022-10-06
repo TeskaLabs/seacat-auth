@@ -38,15 +38,10 @@ async def authz_session_builder(tenant_service, role_service, credentials_id, te
 	Add 'tenants' list with complete list of credential's tenants
 	"""
 	authz = await build_credentials_authz(tenant_service, role_service, credentials_id, tenants)
-	user_tenants = await tenant_service.get_tenants(credentials_id)
-	# TODO: Nicer
-	for tenant in tenants:
-		if tenant not in user_tenants:
-			user_tenants.append(tenant)
+	user_tenants = list(set(await tenant_service.get_tenants(credentials_id)).union(tenants))
 	return (
-		(SessionAdapter.FN.Authorization.Authz, await build_credentials_authz(
-			tenant_service, role_service, credentials_id, tenants)),
-		(SessionAdapter.FN.Authorization.Tenants, await tenant_service.get_tenants(credentials_id)),
+		(SessionAdapter.FN.Authorization.Authz, authz),
+		(SessionAdapter.FN.Authorization.Tenants, user_tenants),
 	)
 
 
