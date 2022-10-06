@@ -282,7 +282,7 @@ class AuthorizeHandler(object):
 					"access_denied",
 					redirect_uri,
 					state=state,
-					error_description="Unauthorized tenant: ''".format(tenant),
+					error_description="Unauthorized tenant: '{}'".format(tenant),
 				)
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
