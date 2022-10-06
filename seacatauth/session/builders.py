@@ -37,6 +37,12 @@ async def authz_session_builder(tenant_service, role_service, credentials_id, te
 	Add 'authz' dict with currently authorized tenants and their resources
 	Add 'tenants' list with complete list of credential's tenants
 	"""
+	authz = await build_credentials_authz(tenant_service, role_service, credentials_id, tenants)
+	user_tenants = await tenant_service.get_tenants(credentials_id)
+	# TODO: Nicer
+	for tenant in tenants:
+		if tenant not in user_tenants:
+			user_tenants.append(tenant)
 	return (
 		(SessionAdapter.FN.Authorization.Authz, await build_credentials_authz(
 			tenant_service, role_service, credentials_id, tenants)),
