@@ -290,4 +290,3 @@ class TokenHandler(object):
 			return asab.web.rest.json_response(request, {"error": "Cannot parse token claims"}, status=400)
 
 		return asab.web.rest.json_response(request, token_payload)
-
