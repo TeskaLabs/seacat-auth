@@ -7,6 +7,11 @@ import aiohttp.web
 import asab
 import asab.web.rest
 import asab.web.rest.json
+import asab.exceptions
+
+import jwcrypto.jws
+import jwcrypto.jwt
+import json
 
 from seacatauth.session import SessionAdapter
 
@@ -28,12 +33,14 @@ class TokenHandler(object):
 		web_app.router.add_post('/openidconnect/token', self.token_request)
 		web_app.router.add_post('/openidconnect/token/revoke', self.token_revoke)
 		web_app.router.add_post('/openidconnect/token/refresh', self.token_refresh)
+		web_app.router.add_put('/openidconnect/token/validate', self.validate_id_token)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post('/openidconnect/token', self.token_request)
 		web_app_public.router.add_post('/openidconnect/token/revoke', self.token_revoke)
 		web_app_public.router.add_post('/openidconnect/token/refresh', self.token_refresh)
+		web_app_public.router.add_put('/openidconnect/token/validate', self.validate_id_token)
 
 
 	async def token_request(self, request):
@@ -252,3 +259,35 @@ class TokenHandler(object):
 			'Cache-Control': 'no-store',
 			'Pragma': 'no-cache',
 		}, status=400)
+
+
+	async def validate_id_token(self, request):
+		"""
+		Read the JWT token either from the request body or from the Authorization header.
+		Validate the token; send back the contents if successful.
+		"""
+		body = await request.read()
+		auth_header: str = request.headers.get("Authorization", "")
+		if len(body) > 0:
+			token_string = body.decode("ascii")
+		elif auth_header.startswith("Bearer "):
+			token_string = request.headers["Authorization"][len("Bearer "):]
+		else:
+			raise asab.exceptions.ValidationError("No ID token found in request body or Authorization header.")
+
+		try:
+			token = jwcrypto.jwt.JWT(jwt=token_string, key=self.OpenIdConnectService.PrivateKey)
+		except ValueError as e:
+			return asab.web.rest.json_response(request, {"error": str(e)}, status=400)
+		except jwcrypto.jwt.JWTExpired:
+			return asab.web.rest.json_response(request, {"error": "ID token expired"}, status=401)
+		except jwcrypto.jws.InvalidJWSSignature:
+			return asab.web.rest.json_response(request, {"error": "Invalid ID token signature"}, status=401)
+
+		try:
+			token_payload = json.loads(token.claims)
+		except ValueError:
+			return asab.web.rest.json_response(request, {"error": "Cannot parse token claims"}, status=400)
+
+		return asab.web.rest.json_response(request, token_payload)
+
