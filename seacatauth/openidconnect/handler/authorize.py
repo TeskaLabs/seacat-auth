@@ -6,6 +6,7 @@ import aiohttp
 import aiohttp.web
 import asab
 
+from ...audit import AuditCode
 from ...cookie.utils import set_cookie, delete_cookie
 from ...client import exceptions
 
@@ -325,6 +326,16 @@ class AuthorizeHandler(object):
 		# TODO: Create a new child session with the requested scope
 		session = await self.OpenIdConnectService.create_oidc_session(
 			root_session, client_id, scope, tenants, requested_expiration)
+
+		# Audit the auth success
+		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
+			"cid": session.Credentials.Id,
+			"tenants": list(tenants) or None,
+			"oidc": {
+				"client_id": client_id,
+				"scope": list(scope),
+			}
+		})
 
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
 

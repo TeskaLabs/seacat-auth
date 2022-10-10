@@ -10,3 +10,5 @@ class AuditCode(enum.Enum):
 	LOGIN_FAILED = enum.auto()
 	PASSWORD_CHANGE_SUCCESS = enum.auto()
 	PASSWORD_CHANGE_FAILED = enum.auto()
+	AUTHORIZE_SUCCESS = enum.auto()
+	AUTHORIZE_ERROR = enum.auto()
