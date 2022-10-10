@@ -24,6 +24,7 @@ class RolesHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
 		web_app.router.add_put('/roles/{tenant}/{credentials_id}', self.set_roles)
+		web_app.router.add_put("/roles/{tenant}", self.get_roles_batch)
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
@@ -41,6 +42,19 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(
 			request, result
 		)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "array",
+		"items": {"type": "string"}
+	})
+	async def get_roles_batch(self, request, *, tenant, json_data):
+		response = {
+			cid: await self.RoleService.get_roles_by_credentials(cid, tenant)
+			for cid in json_data
+		}
+		return asab.web.rest.json_response(request, response)
+
 
 	@asab.web.rest.json_schema_handler({
 		'type': 'object',
