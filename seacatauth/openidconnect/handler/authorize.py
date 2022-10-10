@@ -248,20 +248,23 @@ class AuthorizeHandler(object):
 
 		# We are authenticated!
 
-		# Check if requested tenants are accessible to the user
+		# Authorize access to tenants
+		# - "tenant:<tenant_name>" in scope requests access to a specific tenant
+		# - "tenant:*" in scope requests access to all the user's tenants
+		# - "tenant" in scope requests access to the user's last authorized tenant if no specific tenant is requested
+		tenants = set()
 		user_tenants = await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id)
 		user_has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
 			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
 			or self.OpenIdConnectService.RBACService.has_resource_access(
 			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
-		tenants = set()
 		for resource in scope:
 			if not resource.startswith("tenant:"):
 				continue
 			tenant = resource[len("tenant:"):]
 			if tenant == "*":
 				# Client is requesting access to all of the user's tenants
-				# TODO: Check if the client is allowed to do this
+				# TODO: Check if the client is allowed to request this
 				tenants.update(user_tenants)
 			elif tenant in user_tenants:
 				tenants.add(tenant)
@@ -284,6 +287,11 @@ class AuthorizeHandler(object):
 					state=state,
 					error_description="Unauthorized tenant: '{}'".format(tenant),
 				)
+
+		if len(tenants) == 0 and "tenant" in scope:
+			# TODO: Get user's last authorized tenant
+			tenants.add(user_tenants[0])
+
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
