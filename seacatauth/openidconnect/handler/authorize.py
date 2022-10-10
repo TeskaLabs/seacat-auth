@@ -252,7 +252,8 @@ class AuthorizeHandler(object):
 		# Authorize access to tenants
 		# - "tenant:<tenant_name>" in scope requests access to a specific tenant
 		# - "tenant:*" in scope requests access to all the user's tenants
-		# - "tenant" in scope requests access to the user's last authorized tenant if no specific tenant is requested
+		# - "tenant" in scope ensures at least one tenant is authorized. If no specific tenant is in scope
+		#      user's last authorized tenant is requested.
 		tenants = set()
 		user_tenants = await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id)
 		user_has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
@@ -290,9 +291,19 @@ class AuthorizeHandler(object):
 				)
 
 		if len(tenants) == 0 and "tenant" in scope:
-			# TODO: Get user's last authorized tenant
-			tenants.add(user_tenants[0])
-
+			last_tenants = await self.OpenIdConnectService.AuditService.get_last_authorized_tenants(
+				root_session.Credentials.Id)
+			if last_tenants is not None:
+				tenants.add(last_tenants[0])
+			elif len(user_tenants) > 0:
+				tenants.add(user_tenants[0])
+			else:
+				return self.reply_with_authentication_error(
+					"access_denied",
+					redirect_uri,
+					state=state,
+					error_description="User has no tenant.",
+				)
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
