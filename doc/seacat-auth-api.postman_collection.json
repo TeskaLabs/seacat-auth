@@ -1004,6 +1004,30 @@
 							"response": []
 						},
 						{
+							"name": "Validate token",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": ""
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/openidconnect/token/validate",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"openidconnect",
+										"token",
+										"validate"
+									]
+								},
+								"description": "Non-standard extension that allows smooth NGINX integration using auth_request module."
+							},
+							"response": []
+						},
+						{
 							"name": "Token revoke",
 							"request": {
 								"method": "POST",
