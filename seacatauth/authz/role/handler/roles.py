@@ -48,6 +48,7 @@ class RolesHandler(object):
 		"type": "array",
 		"items": {"type": "string"}
 	})
+	@access_control()
 	async def get_roles_batch(self, request, *, tenant, json_data):
 		response = {
 			cid: await self.RoleService.get_roles_by_credentials(cid, tenant)
