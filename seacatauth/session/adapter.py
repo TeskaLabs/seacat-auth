@@ -171,6 +171,8 @@ class SessionAdapter:
 			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
 			cls.FN.Authorization.Authz: id_token_dict.get("authz") or id_token_dict.get("resources"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
+			cls.FN.OAuth2.ClientId: id_token_dict.get("aud"),
+			cls.FN.OAuth2.Scope: id_token_dict.get("scope"),
 		}
 		return cls(session_svc, session_dict)
 
