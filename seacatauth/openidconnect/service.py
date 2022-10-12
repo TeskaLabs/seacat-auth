@@ -276,6 +276,9 @@ class OpenIdConnectService(asab.Service):
 			userinfo["aud"] = session.OAuth2.ClientId
 			userinfo["azp"] = session.OAuth2.ClientId
 
+		if session.OAuth2.Scope is not None:
+			userinfo["scope"] = session.OAuth2.Scope
+
 		if session.Credentials.Username is not None:
 			userinfo["preferred_username"] = session.Credentials.Username
 
