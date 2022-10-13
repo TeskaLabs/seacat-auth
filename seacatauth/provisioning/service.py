@@ -97,7 +97,7 @@ class ProvisioningService(asab.Service):
 		# Assign superuser role to the provisioning user
 		await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
 
-		await self._initialize_webui_client(app.get_service("seacatauth.ClientService"))
+		await self._initialize_admin_ui_client(app.get_service("seacatauth.ClientService"))
 
 
 	async def finalize(self, app):
@@ -121,7 +121,7 @@ class ProvisioningService(asab.Service):
 		await super().finalize(app)
 
 
-	async def _initialize_webui_client(self, client_service):
+	async def _initialize_admin_ui_client(self, client_service):
 		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
 		admin_ui_client_id = self.Config["admin_ui_client_id"]
 
