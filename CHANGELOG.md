@@ -8,6 +8,10 @@
 ### Features
 - New MongoDB credential provider with configurable queries (#90, PLUM Sprint 220909)
 - Client list searches both by _id and client_name (#91, PLUM Sprint 220923)
+- Endpoint for ID token validation (#93, PLUM Sprint 220923)
+
+### Refactoring
+- Simplified Admin UI client provisioning setup (#95, PLUM Sprint 221007)
 
 ---
 
