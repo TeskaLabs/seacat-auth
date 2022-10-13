@@ -24,12 +24,24 @@ class ResourceService(asab.Service):
 		},
 		{
 			"id": "authz:superuser",
-			"description": "Grants superuser access, including the access to all tenants.",
+			"description": "Grants superuser access, including the access to all tenants. Global-only.",
 		},
 		{
 			"id": "authz:tenant:admin",
 			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
 		},
+		{
+			"id": "authz:tenant:access",
+			"description": "Grants non-superuser access to all tenants. Global-only.",
+		},
+		# {
+		# 	"id": "authz:impersonator",
+		# 	"description": "Allows the user to open a session as another credentials.",
+		# },
+		# {
+		# 	"id": "authn:anonymous",
+		# 	"description": "Marks credentials used for anonymous access.",
+		# },
 	]
 
 
