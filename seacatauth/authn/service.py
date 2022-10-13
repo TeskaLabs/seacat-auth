@@ -302,9 +302,12 @@ class AuthenticationService(asab.Service):
 
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
+		# TODO: Define root session scope
+		scope = frozenset(["userinfo:*"])
+
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId),
+			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
@@ -368,13 +371,12 @@ class AuthenticationService(asab.Service):
 		Direct authentication for M2M access (without login sessions)
 		This is NOT OpenIDConnect/OAuth2 compliant!
 		"""
-		# TODO: Where to get the tenant from
-		#   - in request? (header?)
-		#   - in M2M credentials? (this implies single-tenant credentials)
+		# TODO: Get tenant, scope and other necessary OIDC info from credentials
 		tenants = None
+		scope = frozenset(["userinfo:*"])
 
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, credentials_id),
+			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
