@@ -173,7 +173,6 @@ class ClientService(asab.Service):
 			query_filter = {}
 		else:
 			query_filter = self.build_filter(query_filter)
-		L.warning(str(query_filter))
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
