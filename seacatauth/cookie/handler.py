@@ -120,13 +120,11 @@ class CookieHandler(object):
 
 		# TODO: Where to get the tenants from?
 		tenants = None
+		scope = frozenset(["userinfo:*"])
 
 		# TODO: Choose builders based on scope
 		session_builders = [
-			credentials_session_builder(
-				self.CredentialsService,
-				root_session.Credentials.Id
-			),
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
 				tenant_service=self.CookieService.TenantService,
 				role_service=self.CookieService.RoleService,

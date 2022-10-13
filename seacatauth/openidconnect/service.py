@@ -18,9 +18,9 @@ from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
-	cookie_session_builder,
 	login_descriptor_session_builder,
 	external_login_session_builder,
+	available_factors_session_builder
 )
 from .session import oauth2_session_builder
 
@@ -234,17 +234,20 @@ class OpenIdConnectService(asab.Service):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id),
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 			),
-			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
-			cookie_session_builder(),
-			await external_login_session_builder(ext_login_svc, root_session.Credentials.Id),
+			# cookie_session_builder(),  # TODO: This shouldn't be in OIDC session
 		]
+
+		if "userinfo:authn" in scope or "userinfo:*" in scope:
+			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
+			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
+			session_builders.append(await available_factors_session_builder(self, root_session.CredentialsId))
 
 		# TODO: if 'openid' in scope
 		oauth2_data = {
