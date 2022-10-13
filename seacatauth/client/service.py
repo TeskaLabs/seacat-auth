@@ -173,7 +173,6 @@ class ClientService(asab.Service):
 			query_filter = {}
 		else:
 			query_filter = self.build_filter(query_filter)
-		L.warning(str(query_filter))
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
@@ -379,7 +378,9 @@ class ClientService(asab.Service):
 			upsertor.set(k, v)
 
 		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "Client updated", struct_data={"client_id": client_id})
+		L.log(asab.LOG_NOTICE, "Client updated", struct_data={
+			"client_id": client_id,
+			"fields": " ".join(client_update.keys())})
 
 
 	async def delete(self, client_id: str):
