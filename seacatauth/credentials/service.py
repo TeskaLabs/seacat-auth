@@ -430,15 +430,13 @@ class CredentialsService(asab.Service):
 			validated_data["data"] = custom_data
 
 		# Update in provider
-		result = await provider.update(credentials_id, validated_data)
+		await provider.update(credentials_id, validated_data)
+		L.log(asab.LOG_NOTICE, "Credentials successfully updated", struct_data={
+			"cid": credentials_id,
+			"agent_cid": agent_cid,
+		})
 
-		if result == "OK":
-			L.log(asab.LOG_NOTICE, "Credentials successfully updated", struct_data={
-				"cid": credentials_id,
-				"agent_cid": agent_cid,
-			})
-
-		return {"status": result}
+		return {"status": "OK"}
 
 
 	async def delete_credentials(self, credentials_id: str, agent_cid: str = None):

@@ -153,7 +153,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			"cid": credentials_id,
 			"fields": updated_fields
 		})
-		return "OK"
 
 
 	async def delete(self, credentials_id) -> Optional[str]:

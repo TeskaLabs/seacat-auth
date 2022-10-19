@@ -102,7 +102,6 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		credentials["_v"] += 1
 		credentials["_m"] = datetime.datetime.now(datetime.timezone.utc)
 
-		return "OK"
 
 	async def delete(self, credentials_id) -> Optional[str]:
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
