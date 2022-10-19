@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import logging
 import re
@@ -9,6 +8,7 @@ from passlib.hash import bcrypt
 import asab
 import asab.storage.mongodb
 import asab.storage.exceptions
+import asab.exceptions
 
 import bson
 import bson.errors
@@ -17,7 +17,6 @@ import pymongo
 import pymongo.errors
 
 from .abc import EditableCredentialsProviderABC
-from ...session import SessionAdapter
 
 #
 
@@ -123,6 +122,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			raise ValueError("Cannot determine user ID")
 
 		u = self.MongoDBStorageService.upsertor(self.CredentialsCollection, obj_id)
+
 		for field, value in credentials.items():
 			u.set(field, value)
 
@@ -134,26 +134,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		})
 
 		return "{}{}".format(self.Prefix, credentials_id)
-
-
-	async def _construct_credentials(self, register_info):
-		credentials = {}
-		if 'email' in register_info['features']:
-			username = register_info["request"].get("email")
-		elif 'username' in register_info['features']:
-			username = register_info["request"].get("username")
-		else:
-			return
-		if username is None:
-			return
-		credentials['username'] = username
-
-		password = register_info["request"].get("password")
-		if password is None:
-			return
-		credentials['password'] = password
-
-		return credentials
 
 
 	async def update(self, credentials_id, update: dict) -> Optional[str]:
@@ -175,31 +155,17 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			version=credentials['_v']
 		)
 
-		# Update basic credentials
-		for field in ("username", "email", "phone", "data"):
-			value = update.pop(field, None)
-			if value is not None:
-				u.set(field, value)
-
 		# Update password
 		v = update.pop("password", None)
 		if v is not None:
 			u.set("__password", bcrypt.hash(v.encode('utf-8')))
 
-		# Update suspension status
-		v = update.pop("suspended", None)
-		if v is not None:
-			u.set("suspended", v is True)
-
-		# Update TOTP secret
-		v = update.pop("__totp", None)
-		if v is not None:
-			u.set("__totp", v)
-
-		# Update enforced factors
-		v = update.pop("enforce_factors", None)
-		if v is not None:
-			u.set("enforce_factors", v)
+		# Update basic credentials
+		for key, value in update.items():
+			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors"):
+				L.warning("Unknown field: {}".format(key))
+			if value is not None:
+				u.set(key, value)
 
 		if len(update) != 0:
 			raise KeyError("Unsupported credentials fields: {}".format(", ".join(update.keys())))
@@ -210,26 +176,12 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				"cid": credentials_id,
 				"fields": updated_fields,
 			})
-			result = "OK"
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
-				L.error("Cannot update credentials: Duplicate key", struct_data={
-					"cid": credentials_id,
-					"conflict": e.KeyValue
-				})
-				result = {
-					"error": "ALREADY-IN-USE",
-					"conflict": e.KeyValue,
-				}
+				key, value = e.KeyValue.popitem()
+				raise asab.exceptions.Conflict(key=key, value=value)
 			else:
-				L.error("Cannot update credentials: Duplicate key", struct_data={
-					"cid": credentials_id
-				})
-				result = {
-					"error": "ALREADY-IN-USE"
-				}
-
-		return result
+				raise asab.exceptions.Conflict()
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
