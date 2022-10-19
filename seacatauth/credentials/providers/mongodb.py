@@ -117,7 +117,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		for attribute in ("username", "email", "phone"):
 			value = credentials.get(attribute)
 			if value is not None and len(value) > 0:
-				obj_id = self.normalize_username(value)
+				obj_id = self._create_credential_id(value)
 				break
 		else:
 			raise ValueError("Cannot determine user ID")
@@ -134,44 +134,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		})
 
 		return "{}{}".format(self.Prefix, credentials_id)
-
-
-	# TODO: refactor to credentials service
-	async def register(self, register_info: dict) -> Optional[str]:
-
-		# credentials
-		authorization_bytes = register_info.get('request_authorization', b"")
-		if authorization_bytes != b"":
-			# validate acess token for existing user
-			if not authorization_bytes.startswith(b'Bearer '):
-				L.warning("Authorization header parsing failed. Probably wrong token type.")
-				return
-
-			access_token = base64.urlsafe_b64decode(authorization_bytes[7:])
-			try:
-				session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
-				credentials_id = session.Credentials.Id
-			except (KeyError, AttributeError):
-				L.warning("Credentials authorization failed.")
-				return
-		else:
-			# create new user
-			credentials = await self._construct_credentials(register_info)
-			if credentials is None:
-				L.warning("Credentials creation failed.")
-				return
-			credentials_id = await self.create(credentials)
-			if credentials_id is None:
-				L.warning("Credentials creation failed.")
-				return
-
-		# handle tenants
-		if self.Config.getboolean("tenants"):
-			tenant_assignment = await self._register_tenants(register_info, credentials_id)
-			if tenant_assignment is None:
-				return
-
-		return credentials_id
 
 
 	async def _construct_credentials(self, register_info):
@@ -463,7 +425,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return False
 
 
-	def normalize_username(self, username) -> bson.ObjectId:
+	def _create_credential_id(self, username) -> bson.ObjectId:
 		return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
 
 

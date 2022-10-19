@@ -29,6 +29,17 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		self.Order = int(order)
 
 
+	def get_info(self) -> dict:
+		'''
+		Get info about this provider.
+		'''
+		return {
+			'_type': self.Type,
+			'_provider_id': self.ProviderID,
+			'_order': self.Order,
+		}
+
+
 	async def locate(self, ident: str, ident_fields: dict = None) -> str:
 		'''
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
@@ -84,19 +95,6 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
 		return False
-
-	async def register(self, register_info: dict) -> Optional[str]:
-		pass
-
-	def get_info(self) -> dict:
-		'''
-		Get info about this provider.
-		'''
-		return {
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
-			'_order': self.Order,
-		}
 
 
 
