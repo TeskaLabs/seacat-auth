@@ -101,6 +101,7 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 class EditableCredentialsProviderABC(CredentialsProviderABC):
 
 	Editable = True
+	RegistrationEnabled = False
 
 	@abc.abstractmethod
 	async def create(self, credentials: dict) -> Optional[str]:

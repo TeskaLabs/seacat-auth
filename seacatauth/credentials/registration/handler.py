@@ -33,22 +33,14 @@ class RegistrationHandler(object):
 		web_app.router.add_get("/{tenant}/invite", self.get_invitation_features)
 		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
-		web_app.router.add_get("/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
-		# Non-encrypted registration
-		web_app.router.add_put("/public/register", self.register)
-		# Encrypted registration
-		web_app.router.add_put("/public/register/prologue", self.registration_prologue)
-		web_app.router.add_put("/public/register/{registration_session_id:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
+		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
 		web_app_public.router.add_get(
-			"/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_invitation_details)
-		# Non-encrypted registration
-		web_app_public.router.add_put("/public/register", self.register)
-		# Encrypted registration
-		web_app_public.router.add_put("/public/register/prologue", self.registration_prologue)
-		web_app_public.router.add_put("/public/register/{registration_session_id:[-_=a-zA-Z0-9]{16,}}", self.register)
+			"/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
+		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 
 	@access_control("authz:tenant:admin")
@@ -67,12 +59,10 @@ class RegistrationHandler(object):
 			"required": ["email"],
 			"additionalProperties": False,
 			"properties": {
-				"roles": {
-					"type": "array", "description": "Roles to be assigned to the new user."},
 				"email": {
 					"type": "string", "description": "User email to send the invitation to."},
-				"provider_id": {
-					"type": "string", "description": "Credentials provider used for the registration."},
+				"roles": {
+					"type": "array", "description": "Roles to be assigned to the new user."},
 				"expiration": {
 					"oneOf": [{"type": "string"}, {"type": "number"}],
 					"description": "How long until the invitation expires.",
@@ -88,23 +78,21 @@ class RegistrationHandler(object):
 		"required": ["email"],
 		"additionalProperties": False,
 		"properties": {
+			"email": {
+				"type": "string"},
 			"roles": {
 				"type": "array", "description": "Roles to assign to the new user."},
-			"email": {
-				"type": "string", "description": "User email to send the invitation to."},
-			"provider_id": {
-				"type": "string", "description": "Credentials provider used for the registration."},
 			"expiration": {
 				"oneOf": [{"type": "string"}, {"type": "number"}],
 				"description": "How long until the invitation expires.",
 				"examples": ["6 h", "3d", "1w", 7200]},
 		},
 	})
-	@access_control("authz:tenant:admin")  # TODO: Maybe create a dedicated resource for invitation
+	@access_control("authz:tenant:admin")  # TODO: Maybe create a dedicated resource for invitations
 	async def create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Admin request to register a new user and invite them to specified tenant.
-		Generate a registration token and send a registration link to the user's email.
+		Generate a registration code and send a registration link to the user's email.
 		"""
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
@@ -115,23 +103,27 @@ class RegistrationHandler(object):
 		expiration = json_data.get("expiration")
 		if expiration is not None:
 			expiration = asab.utils.convert_to_seconds(expiration)
-		else:
-			expiration = self.RegistrationService.InviteExpiration
+
+		if not request.is_superuser() and "roles" in json_data:
+			for role in json_data["roles"]:
+				if role.startswith("*/"):
+					return asab.web.rest.json_response(
+						request,
+						{"result": "FORBIDDEN", "message": "Not allowed to assign global roles."},
+						status=403)
 
 		# Create invitation
-		invitation_id = await self.RegistrationService.invite(
+		credentials_id = await self.RegistrationService.draft_credentials(
+			credential_data={"email": json_data["email"]},
 			tenant=tenant,
 			roles=json_data.get("roles"),
-			email=json_data.get("email"),
-			provider_id=json_data.get("provider_id"),
 			expiration=expiration,
 			invited_by_cid=credentials_id,
-			invited_by_ips=access_ips,
+			invited_from_ips=access_ips,
 		)
 
 		payload = {
-			"invitation_code": invitation_id,
-			"registration_uri": self.RegistrationService.format_registration_uri(invitation_id),
+			"credentials_id": credentials_id,
 		}
 
 		return asab.web.rest.json_response(request, payload)
@@ -159,12 +151,13 @@ class RegistrationHandler(object):
 			access_ips.extend(forwarded_for.split(", "))
 
 		# TODO: Limit the number of self-registrations with the same IP / same email address
+		# TODO: Limit the total number of active registrations
 
 		# Create invitation
-		await self.RegistrationService.invite(
+		credentials_id = await self.RegistrationService.draft_credentials(
+			credential_data={"email": json_data["email"]},
 			tenant=None,
-			email=json_data.get("email"),
-			invited_by_ips=access_ips,
+			invited_from_ips=access_ips,
 		)
 
 		payload = {
@@ -175,49 +168,14 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, payload)
 
 
-	async def get_invitation_details(self, request):
+	async def get_registration(self, request):
 		"""
 		Get information about the specified registration token
 		"""
-		# TODO: Limit the total number of active registrations
-		# TODO: Limit the number of active registrations from a single IP
-		invitation_id = request.match_info["invitation_code"]
-		invitation = await self.RegistrationService.get_invitation_detail(invitation_id)
-		credentials = invitation.get("c")
-		response = {
-			"id": invitation_id,
-			"email": credentials["email"],
-		}
+		registration_code = request.match_info["registration_code"]
+		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
 
-		if credentials.get("tenant") is not None:
-			# Invited by tenant admin
-			response["tenant"] = credentials["tenant"]
-		else:
-			# Request for self-registration
-			if not self.RegistrationService.SelfRegistrationAllowed:
-				# Self-registration is not allowed
-				raise aiohttp.web.HTTPForbidden()
-
-		return asab.web.rest.json_response(request, response)
-
-
-	async def registration_prologue(self, request):
-		"""
-
-		"""
-		invitation_id = request.query.get("invitation_code")
-		registration_session = await self.RegistrationService.create_registration_session(invitation_id)
-		response = {
-			"rsid": registration_session.Id,
-		}
-
-		if self.RegistrationService.RegistrationEncrypted:
-			# TODO: Initiate E2E-encrypted session
-			# key = jwcrypto.jwk.JWK.from_pyca(registration_session.PublicKey)
-			# response["key"] = key.export_public(as_dict=True)
-			raise NotImplementedError()
-
-		return asab.web.rest.json_response(request, response)
+		return asab.web.rest.json_response(request, credentials)
 
 
 	async def register(self, request):
@@ -225,23 +183,20 @@ class RegistrationHandler(object):
 		Validate registration data and create credentials (and tenant, if needed)
 		"""
 		request_data = await request.read()
-
-		if "registration_session_id" in request.match_info:
-			# Encrypted registration session
-			assert self.RegistrationService.RegistrationEncrypted
-			rsid = request.match_info["registration_session_id"]
-			registration_session = await self.RegistrationService.get_registration_session(rsid)
-			registration_data = registration_session.decrypt(request_data)
-			result = await self.RegistrationService.register_encrypted(registration_session, registration_data)
-		elif "registration_session_id" in request.query:
-			# Plain registration
-			invitation_id = request.query["registration_session_id"]
+		if self.RegistrationService.RegistrationEncrypted:
+			raise NotImplementedError("Registration encryption not implemented.")
+		else:
 			try:
-				registration_data = json.loads(request_data)
+				credential_data = json.loads(request_data)
 			except json.decoder.JSONDecodeError:
 				return asab.exceptions.ValidationError("Invalid JSON.")
-			result = await self.RegistrationService.register_simple(invitation_id, registration_data)
-		else:
-			raise aiohttp.web.HTTPBadRequest()
 
-		return asab.web.rest.json_response(request, result)
+		registration_code = request.match_info["registration_code"]
+		await self.RegistrationService.update_credential_by_registration_code(
+			registration_code, credential_data)
+
+		try:
+			await self.RegistrationService.complete_registration(registration_code)
+			return asab.web.rest.json_response(request, {"result": "REGISTRATION-COMPLETE"})
+		except asab.exceptions.ValidationError:
+			return asab.web.rest.json_response(request, {"result": "OK"})
