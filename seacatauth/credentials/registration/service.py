@@ -16,10 +16,6 @@ L = logging.getLogger(__name__)
 
 class RegistrationService(asab.Service):
 
-	InvitationCollection = "i"
-	InvitationCodeByteLength = 32
-	RegistrationSessionCollection = "rg"
-	RegistrationCodeByteLength = 32
 	RegistrationKeyByteLength = 32
 	RegistrationUriFormat = "{auth_webui_base_url}#register?invite={invitation_id}"
 
@@ -34,10 +30,7 @@ class RegistrationService(asab.Service):
 
 		self.AuthWebUIBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 
-		self.InviteExpiration = asab.Config.getseconds(
-			"seacatauth:registration", "invitation_expiration", fallback=None)
-		self.RegistrationSessionExpiration = asab.Config.getseconds(
-			"seacatauth:registration", "registration_session_expiration")
+		self.RegistrationExpiration = asab.Config.getseconds("seacatauth:registration", "registration_expiration")
 
 		self.RegistrationEncrypted = asab.Config.getboolean("seacatauth:registration", "registration_encrypted")
 		if self.RegistrationEncrypted:
@@ -47,109 +40,147 @@ class RegistrationService(asab.Service):
 		if self.SelfRegistrationAllowed:
 			raise NotImplementedError("Self-registration has not been implemented yet.")
 
-
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
 	async def _on_tick(self, event_name):
-		await self.delete_expired_invitations()
+		await self.delete_expired_unregistered_credentials()
 
 
-	async def initialize(self, app):
-		collection = await self.StorageService.collection(self.RegistrationSessionCollection)
-		try:
-			await collection.create_index([("i", pymongo.ASCENDING)], unique=True)
-		except Exception as e:
-			L.warning(
-				"Could not initialize registration session collection:\n{}".format(str(e)),
-				struct_data={"collection": self.RegistrationSessionCollection})
-
-
-	async def create_invitation(
+	async def draft_credential(
 		self,
-		expiration: float,
-		credential_data: dict = None,
+		credential_data: dict,
+		provider_id: str = None,
+		tenant: str = None,
+		roles: list = None,
+		expiration: float = None,
 		invited_by_cid: str = None,
-		invited_by_ips: list = None,
+		invited_from_ips: list = None,
 	):
 		"""
-		Issue a new invitation
+		Create a new (incomplete) credential with a registration code
 
 		:param credential_data: Details of the user being invited
 		:type credential_data: dict
+		:param provider_id:
+		:type provider_id: str
+		:param tenant:
+		:type tenant: str
+		:param roles:
+		:type roles: list
 		:param expiration: Number of seconds specifying the expiration of the invitation
 		:type expiration: float
 		:param invited_by_cid: Credentials ID of the issuer.
 		:type invited_by_cid: str
-		:param invited_by_ips: IP address(es) of the issuer.
-		:type invited_by_ips: list
+		:param invited_from_ips: IP address(es) of the issuer.
+		:type invited_from_ips: list
 		:return: The ID of the generated invitation.
 		"""
-		invitation_id = secrets.token_urlsafe(self.InvitationCodeByteLength)
-		upsertor = self.StorageService.upsertor(self.InvitationCollection, invitation_id)
-
-		# TODO: The credential_data should be validated with the registration policy
-		# policy = self.CredentialsService.Policy.RegistrationPolicy
-		upsertor.set("c", credential_data)
+		registration_key = secrets.token_bytes(self.RegistrationKeyByteLength)
+		# TODO: Generate a proper encryption key. Registration code is key + signature.
+		registration_code = registration_key
+		registration_data = {
+			"code": registration_code,
+			"t": tenant,  # Tenant already validated in the handler
+		}
 
 		if invited_by_cid is not None:
-			upsertor.set("ic", invited_by_cid)
+			registration_data["ic"] = invited_by_cid
 
-		if invited_by_ips is not None:
-			upsertor.set("ii", invited_by_ips)
+		if invited_from_ips is not None:
+			registration_data["ii"] = invited_from_ips
 
+		if roles is not None:
+			for role_id in roles:
+				role = await self.RoleService.get(role_id)
+				if role.get("t") not in (tenant, None):
+					raise asab.exceptions.ValidationError()
+			registration_data["r"] = roles
+
+		if expiration is None:
+			expiration = self.RegistrationExpiration
 		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
-		upsertor.set("exp", expires_at)
+		registration_data["exp"] = expires_at
 
-		await upsertor.execute(custom_data={"event_type": "invitation_created"})
+		credential_data["suspended"] = True
+		credential_data["reg"] = registration_data
 
-		L.log(asab.LOG_NOTICE, "Invitation created", struct_data={
-			"invitation_id": invitation_id,
+		provider = self.get_provider(provider_id)
+		credential_id = await provider.create(credential_data)
+
+		L.log(asab.LOG_NOTICE, "Credential drafted", struct_data={
+			"credential_id": credential_id,
+			"t": tenant,
+			"r": roles,
 			"invited_by_cid": invited_by_cid,
-			"invited_by_ips": invited_by_ips,
+			"invited_by_ips": invited_from_ips,
 		})
 
-		return invitation_id
+		# TODO: Send invitation via mail
+		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
+		L.log(asab.LOG_NOTICE, "Sending invitation", struct_data={
+			"email": credential_data["email"],
+			"invited_by_cid": invited_by_cid,
+			"invited_from_ips": invited_from_ips,
+			"credential_id": credential_id,
+			"registration_uri": self.format_registration_uri(registration_code),
+		})
+
+		return credential_id
 
 
-	async def get_invitation_detail(self, invitation_id):
-		"""
-		Retrieve invitation from the database. If it's expired, raise KeyError.
-
-		:param invitation_id: The invitation ID
-		:return: Token data.
-		"""
-		invitation = await self.StorageService.get(self.InvitationCollection, invitation_id)
-		if invitation["exp"] < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Expired invitation")
-		return invitation
+	async def get_credential_by_registration_code(self, registration_code):
+		provider = self.get_provider()
+		credentials = await provider.get_by("reg.code", registration_code)
+		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
+			raise KeyError("Registration expired")
+		return credentials
 
 
-	async def delete_invitation(self, invitation_id):
-		"""
-		Delete an invitation from the database
-
-		:param invitation_id: The ID of the invitation
-		"""
-		await self.StorageService.delete(self.InvitationCollection, invitation_id)
-		L.log(asab.LOG_NOTICE, "Invitation deleted", struct_data={"invitation_id": invitation_id})
+	async def delete_credential_by_registration_code(self, registration_code):
+		provider = self.get_provider()
+		credentials = await provider.get_by("reg.code", registration_code)
+		await provider.delete(credentials["_id"])
+		return credentials
 
 
-	async def delete_expired_invitations(self):
-		"""
-		Delete all expired invitations
-		"""
-		collection = self.StorageService.Database[self.InvitationCollection]
-		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+	async def delete_expired_unregistered_credentials(self):
+		provider = self.get_provider()
+		collection = self.StorageService.Database[provider.CredentialsCollection]
+		query_filter = {"reg.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Expired invitations deleted", struct_data={
+			L.log(asab.LOG_NOTICE, "Expired unregistered credentials deleted", struct_data={
 				"count": result.deleted_count})
 
 
-	async def update_registration_invitation(self, invitation_id, **kwargs):
-		# TODO
-		raise NotImplementedError()
+	async def update_credential_by_registration_code(self, registration_code, credential_data):
+		if "reg" in credential_data:
+			raise asab.exceptions.ValidationError("Registration failed: No username.")
+		if "suspended" in credential_data:
+			raise asab.exceptions.ValidationError("Cannot unsuspend credential whose registration has not been completed.")
+		provider = self.get_provider()
+		credentials = await provider.get_by("reg.code", registration_code)
+		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
+			raise KeyError("Registration expired")
+		await provider.update(credentials["_id"], credential_data)
+
+
+	async def complete_registration(self, registration_code):
+		provider = self.get_provider()
+		credentials = await provider.get_by("reg.code", registration_code, include=["__pass"])
+		# TODO: Proper validation using policy and login descriptors
+		if credentials.get("username") in (None, ""):
+			raise asab.exceptions.ValidationError("Registration failed: No username.")
+		if credentials.get("email") in (None, ""):
+			raise asab.exceptions.ValidationError("Registration failed: No email.")
+		if credentials.get("__pass") in (None, ""):
+			raise asab.exceptions.ValidationError("Registration failed: No password.")
+		await provider.update(credentials["_id"], {
+			"suspended": False,
+			"reg": None
+		})
+		# TODO: Audit - user registration completed
 
 
 	def get_provider(self, provider_id: str = None):
@@ -228,7 +259,7 @@ class RegistrationService(asab.Service):
 			expiration,
 			credential_data=credential_data,
 			invited_by_cid=invited_by_cid,
-			invited_by_ips=invited_by_ips,
+			invited_from_ips=invited_by_ips,
 		)
 
 		# TODO: Send invitation via mail
@@ -269,7 +300,7 @@ class RegistrationService(asab.Service):
 		invitation_id = await self.create_invitation(
 			expiration=self.InviteExpiration,
 			credential_data=credential_data,
-			invited_by_ips=invited_from_ips,
+			invited_from_ips=invited_from_ips,
 		)
 
 		# TODO: Send invitation via mail

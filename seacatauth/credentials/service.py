@@ -5,6 +5,7 @@ import re
 
 import asab
 import asab.storage.exceptions
+import asab.exceptions
 import typing
 
 from seacatauth.credentials.policy import CredentialsPolicy
@@ -84,7 +85,7 @@ class CredentialsService(asab.Service):
 		# Sort providers by their configured order
 		providers.sort(key=lambda item: item[0])
 		for order, provider in providers:
-			self.register(provider)
+			self.register_provider(provider)
 
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
@@ -123,7 +124,7 @@ class CredentialsService(asab.Service):
 		return ident_fields
 
 
-	def register(self, credentials_provider):
+	def register_provider(self, credentials_provider):
 		self.CredentialProviders[credentials_provider.ProviderID] = credentials_provider
 
 
@@ -271,7 +272,7 @@ class CredentialsService(asab.Service):
 			from .providers.dictionary import DictCredentialsService
 			service = DictCredentialsService(self.App)
 		provider = service.create_provider(provider_id, None)
-		self.register(provider)
+		self.register_provider(provider)
 
 
 	async def create_credentials(self, provider_id: str, credentials_data: dict, session: SessionAdapter = None):
@@ -400,6 +401,10 @@ class CredentialsService(asab.Service):
 
 		# Validate that at least phone or email will be specified after update
 		current_dict = await provider.get(credentials_id)
+
+		if current_dict.get("reg") is not None and update_dict.get("suspended") is False:
+			raise asab.exceptions.ValidationError(
+				"Cannot unsuspend credential whose registration has not been completed.")
 
 		if "email" in update_dict and update_dict["email"] == "":
 			email_specified = False

@@ -72,6 +72,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			config_section_name=config_section_name
 		)
 		self.CredentialsCollection = self.Config["credentials_collection"]
+		self.RegistrationEnabled = self.Config.getboolean("registration")
 
 		app.TaskService.schedule(self.initialize())
 
@@ -110,6 +111,20 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				)
 			except Exception as e:
 				L.warning("{}; fix it and restart the app".format(e))
+
+		# Index by registration code
+		try:
+			await coll.create_index(
+				[
+					("reg.code", pymongo.ASCENDING),
+				],
+				unique=True,
+				partialFilterExpression={
+					"reg.code": {"$exists": True, "$gt": ""}
+				}
+			)
+		except Exception as e:
+			L.warning("{}; fix it and restart the app".format(e))
 
 
 	async def create(self, credentials: dict) -> Optional[str]:
@@ -163,9 +178,11 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		# Update basic credentials
 		for key, value in update.items():
 			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors"):
-				L.warning("Unknown field: {}".format(key))
+				L.warning("Updating unknown field: {}".format(key))
 			if value is not None:
 				u.set(key, value)
+			else:
+				u.unset(key)
 
 		if len(update) != 0:
 			raise KeyError("Unsupported credentials fields: {}".format(", ".join(update.keys())))
@@ -216,10 +233,12 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		return "{}{}".format(self.Prefix, obj["_id"])
 
-	async def get_by(self, key: str, value) -> Optional[dict]:
+	async def get_by(self, key: str, value, include=None) -> Optional[dict]:
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
 		obj = await coll.find_one({key: value})
-		return obj
+		if obj is None:
+			raise KeyError("Found no credentials with {}={}".format(key, repr(value)))
+		return self._nomalize_credentials(obj, include)
 
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
