@@ -1,9 +1,5 @@
 import json
-import secrets
 import logging
-
-import aiohttp
-import aiohttp.web
 
 import asab
 import asab.web.rest
