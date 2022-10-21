@@ -21,7 +21,7 @@ class TenantHandler(object):
 		web_app.router.add_get('/tenant', self.list)
 		web_app.router.add_get('/tenants', self.search)
 		web_app.router.add_get('/tenant/{tenant}', self.get)
-		web_app.router.add_put('/tenant/{tenant}/data', self.set_data)
+		web_app.router.add_put('/tenant/{tenant}', self.update_tenant)
 		web_app.router.add_put('/tenants', self.get_tenants_batch)
 
 		web_app.router.add_post('/tenant', self.create)
@@ -109,18 +109,24 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"patternProperties": {
-			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-				{"type": "string"},
-				{"type": "number"},
-				{"type": "boolean"},
-				{"type": "null"},
-			]}
-		},
+		"required": ["data"],
 		"additionalProperties": False,
+		"properties": {
+			"data": {
+				"type": "object",
+				"patternProperties": {
+					"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
+						{"type": "string"},
+						{"type": "number"},
+						{"type": "boolean"},
+						{"type": "null"},
+					]}
+				}
+			}
+		}
 	})
 	@access_control("authz:tenant:admin")
-	async def set_data(self, request, *, json_data, tenant):
+	async def update_tenant(self, request, *, json_data, tenant):
 		result = await self.TenantService.set_tenant_data(tenant, json_data)
 		return asab.web.rest.json_response(request, data=result)
 
