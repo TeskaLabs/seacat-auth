@@ -21,7 +21,7 @@ class RegistrationService(asab.Service):
 	def __init__(self, app, credentials_svc, service_name="seacatauth.RegistrationService"):
 		super().__init__(app, service_name)
 		self.CredentialsService = credentials_svc
-		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.RoleService = None
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
@@ -29,7 +29,7 @@ class RegistrationService(asab.Service):
 
 		self.AuthWebUIBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 
-		self.RegistrationExpiration = asab.Config.getseconds("seacatauth:registration", "registration_expiration")
+		self.RegistrationExpiration = asab.Config.getseconds("seacatauth:registration", "expiration")
 
 		self.RegistrationEncrypted = asab.Config.getboolean("seacatauth:registration", "registration_encrypted")
 		if self.RegistrationEncrypted:
@@ -40,6 +40,10 @@ class RegistrationService(asab.Service):
 			raise NotImplementedError("Self-registration has not been implemented yet.")
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+
+
+	async def initialize(self, app):
+		self.RoleService = app.get_service("seacatauth.RoleService")
 
 
 	async def _on_tick(self, event_name):
