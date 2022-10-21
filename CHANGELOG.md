@@ -2,6 +2,9 @@
 
 ## Release candidate
 
+### Breaking changes
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221007)
+
 ### Fix
 - Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
 
@@ -13,6 +16,7 @@
 
 ### Refactoring
 - Simplified Admin UI client provisioning setup (#95, PLUM Sprint 221007)
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221007)
 
 ---
 
