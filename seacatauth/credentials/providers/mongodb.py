@@ -409,6 +409,8 @@ def authn_password(dbcred, credentials):
 		or dbcred['__password'].startswith('$2y$'):
 		if bcrypt.verify(credentials['password'], dbcred['__password']):
 			return True
+		else:
+			return False
 	else:
 		L.warning("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
 		return False

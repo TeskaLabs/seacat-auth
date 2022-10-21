@@ -120,8 +120,7 @@ async def nginx_introspection(
 	session = await session_service.touch(session)
 
 	# TODO: Tenant-specific token (session)
-	tenant = None
-	id_token = await oidc_service.build_id_token(session, tenant)
+	id_token = await oidc_service.build_id_token(session)
 
 	# Set the authorization header
 	headers = {
