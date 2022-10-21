@@ -22,6 +22,7 @@ class TenantHandler(object):
 		web_app.router.add_get('/tenants', self.search)
 		web_app.router.add_get('/tenant/{tenant}', self.get)
 		web_app.router.add_put('/tenant/{tenant}/data', self.set_data)
+		web_app.router.add_put('/tenants', self.get_tenants_batch)
 
 		web_app.router.add_post('/tenant', self.create)
 		web_app.router.add_delete('/tenant/{tenant}', self.delete)
@@ -77,11 +78,12 @@ class TenantHandler(object):
 
 	async def get(self, request):
 		tenant_id = request.match_info.get("tenant")
-		response = await self.TenantService.get_tenant(tenant_id)
-		return asab.web.rest.json_response(
-			request, response,
-			status=200 if response["result"] == "OK" else 400
-		)
+		data = await self.TenantService.get_tenant(tenant_id)
+		response = {
+			"result": "OK",
+			"data": data
+		}
+		return asab.web.rest.json_response(request, response)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -198,6 +200,18 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(
 			request, result
 		)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "array",
+		"items": {"type": "string"}
+	})
+	async def get_tenants_batch(self, request, *, json_data):
+		response = {
+			cid: await self.TenantService.get_tenants(cid)
+			for cid in json_data
+		}
+		return asab.web.rest.json_response(request, response)
 
 
 	async def propose_tenant(self, request):

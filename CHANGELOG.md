@@ -3,7 +3,29 @@
 ## Release candidate
 
 ### Fix
+- Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
+
+### Features
+- New MongoDB credential provider with configurable queries (#90, PLUM Sprint 220909)
+- Client list searches both by _id and client_name (#91, PLUM Sprint 220923)
+- Endpoint for ID token validation (#93, PLUM Sprint 220923)
+- List tenants and roles for multiple credentials (#94, PLUM Sprint 221007)
+
+### Refactoring
+- Simplified Admin UI client provisioning setup (#95, PLUM Sprint 221007)
+
+---
+
+
+## v22.38
+
+### Breaking changes
+- Userinfo endpoint no longer accepts `tenant` parameter (#69, PLUM Sprint 220909)
+- Userinfo `resources` is now an object with tenant keys (#69, PLUM Sprint 220909)
+
+### Fix
 - Handle old assignments of nonexisting credentials (#79, PLUM Sprint 220715)
+- Check for the existence of tenant when creating a role (#88, PLUM Sprint 220909)
 
 ### Features
 - OpenID Connect client registration (#77, PLUM Sprint 220729)
@@ -11,6 +33,8 @@
 
 ### Refactoring
 - Provisioning config in a dedicated JSON file (#80, PLUM Sprint 220729)
+- Userinfo endpoint no longer accepts `tenant` parameter (#69, PLUM Sprint 220909)
+- Userinfo `resources` is now an object with tenant keys (#69, PLUM Sprint 220909)
 
 ---
 

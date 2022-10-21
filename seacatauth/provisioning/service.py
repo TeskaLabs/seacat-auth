@@ -1,9 +1,12 @@
 import json
 import logging
+import urllib.parse
 import passlib.pwd
 
 import asab.exceptions
 import asab.storage.exceptions
+
+from ..client.service import CLIENT_TEMPLATES
 
 #
 
@@ -27,7 +30,9 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_provider_id": "provisioning",
 	"role_name": "provisioning-superrole",
 	"tenant": "provisioning-tenant",
-	"webui_clients": [],
+	"admin_ui_url": "",
+	"admin_ui_client_id": "seacat-admin-ui",
+	"admin_ui_client_name": "SeaCat Admin WebUI",
 }
 
 
@@ -92,22 +97,7 @@ class ProvisioningService(asab.Service):
 		# Assign superuser role to the provisioning user
 		await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
 
-		# Initialize web UI clients
-		if len(self.Config["webui_clients"]) > 0:
-			client_svc = app.get_service("seacatauth.ClientService")
-			for client in self.Config["webui_clients"]:
-				client.update({
-					"application_type": "web",
-					"token_endpoint_auth_method": "none",
-					"grant_types": ["authorization_code"],
-					"response_types": ["code"]})
-				client_id = client.pop("client_id", None)
-				try:
-					# Overwrite the client in case it was not created correctly
-					await client_svc.delete(client_id=client_id)
-				except KeyError:
-					pass
-				await client_svc.register(_custom_client_id=client_id, **client)
+		await self._initialize_admin_ui_client(app.get_service("seacatauth.ClientService"))
 
 
 	async def finalize(self, app):
@@ -129,3 +119,41 @@ class ProvisioningService(asab.Service):
 			L.error("Failed to delete tenant", struct_data={"tenant": self.TenantID})
 
 		await super().finalize(app)
+
+
+	async def _initialize_admin_ui_client(self, client_service):
+		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
+		admin_ui_client_id = self.Config["admin_ui_client_id"]
+
+		try:
+			client = await client_service.get(admin_ui_client_id)
+		except KeyError:
+			client = None
+
+		update = {
+			k: v
+			for k, v in CLIENT_TEMPLATES["Public web application"].items()
+			if client is None or client.get(k) != v}
+
+		# Check if the client has the correct redirect URI
+		# Use default URI if none is specified and the client doesn't exist yet
+		if client is None:
+			if admin_ui_url is None:
+				auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+				url = urllib.parse.urlparse(auth_webui_base_url)
+				admin_ui_url = url._replace(path="/seacat", fragment="", query="", params="").geturl()
+				L.warning("admin_ui_url not specified. Defaulting to '{}'.".format(admin_ui_url))
+			redirect_uris = []
+		else:
+			redirect_uris = client.get("redirect_uris", [])
+		if admin_ui_url is None and admin_ui_url not in redirect_uris:
+			redirect_uris.append(admin_ui_url)
+			update["redirect_uris"] = redirect_uris
+
+		if client is None or "client_name" not in client:
+			update["client_name"] = self.Config["admin_ui_client_name"]
+
+		if client is None:
+			await client_service.register(_custom_client_id=admin_ui_client_id, **update)
+		else:
+			await client_service.update(client_id=admin_ui_client_id, **update)

@@ -47,7 +47,6 @@ class AuthenticationData:
 @dataclasses.dataclass
 class AuthorizationData:
 	Authz: dict
-	Resources: list
 	Tenants: list
 
 
@@ -170,9 +169,8 @@ class SessionAdapter:
 			cls.FN.Credentials.Email: id_token_dict.get("email"),
 			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
 			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
-			cls.FN.Authorization.Authz: id_token_dict.get("authz"),
+			cls.FN.Authorization.Authz: id_token_dict.get("authz") or id_token_dict.get("resources"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
-			cls.FN.Authorization.Resources: id_token_dict.get("resources"),
 		}
 		return cls(session_svc, session_dict)
 
@@ -225,7 +223,6 @@ class SessionAdapter:
 			session_dict.update({
 				self.FN.Authorization.Authz: self.Authorization.Authz,
 				self.FN.Authorization.Tenants: self.Authorization.Tenants,
-				self.FN.Authorization.Resources: self.Authorization.Resources,
 			})
 
 		if self.Cookie is not None:
@@ -315,11 +312,8 @@ class SessionAdapter:
 	@classmethod
 	def _deserialize_authorization_data(cls, session_dict):
 		authz = session_dict.pop(cls.FN.Authorization.Authz, None) or session_dict.pop("Authz", None)
-		if authz is None:
-			return None
 		return AuthorizationData(
 			Authz=authz,
-			Resources=session_dict.pop(cls.FN.Authorization.Resources, None) or session_dict.pop("Rs", None),
 			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
 		)
 
@@ -372,7 +366,8 @@ def rest_get(session_dict):
 		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
-		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),
+		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),  # BACK COMPAT
+		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
 	}
 	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)
 	if psid is not None:
