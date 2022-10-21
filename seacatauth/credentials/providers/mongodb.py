@@ -185,9 +185,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			else:
 				u.unset(key)
 
-		if len(update) != 0:
-			raise KeyError("Unsupported credentials fields: {}".format(", ".join(update.keys())))
-
 		try:
 			await u.execute()
 			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={

@@ -35,8 +35,8 @@ class RegistrationHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
 		web_app_public.router.add_get(
-			"/public/register/{invitation_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
-		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
+			"/public/register/{registration_code}", self.get_registration)
+		web_app_public.router.add_put("/public/register/{registration_code}", self.register)
 
 
 	@access_control("authz:tenant:admin")
@@ -109,7 +109,7 @@ class RegistrationHandler(object):
 						status=403)
 
 		# Create invitation
-		credentials_id = await self.RegistrationService.draft_credentials(
+		credentials_id = await self.RegistrationService.draft_credential(
 			credential_data={"email": json_data["email"]},
 			tenant=tenant,
 			roles=json_data.get("roles"),
@@ -150,7 +150,7 @@ class RegistrationHandler(object):
 		# TODO: Limit the total number of active registrations
 
 		# Create invitation
-		credentials_id = await self.RegistrationService.draft_credentials(
+		await self.RegistrationService.draft_credential(
 			credential_data={"email": json_data["email"]},
 			tenant=None,
 			invited_from_ips=access_ips,

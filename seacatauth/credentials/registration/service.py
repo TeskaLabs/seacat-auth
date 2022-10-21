@@ -39,6 +39,9 @@ class RegistrationService(asab.Service):
 		if self.SelfRegistrationAllowed:
 			raise NotImplementedError("Self-registration has not been implemented yet.")
 
+		# Support only one registrable credential provider for now
+		self.CredentialProvider = self._get_provider()
+
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
@@ -79,26 +82,26 @@ class RegistrationService(asab.Service):
 		:type invited_from_ips: list
 		:return: The ID of the generated invitation.
 		"""
-		registration_key = secrets.token_bytes(self.RegistrationKeyByteLength)
+		registration_key = secrets.token_urlsafe(self.RegistrationKeyByteLength)
 		# TODO: Generate a proper encryption key. Registration code is key + signature.
 		registration_code = registration_key
 		registration_data = {
 			"code": registration_code,
-			"t": tenant,  # Tenant already validated in the handler
+			"tenant": tenant,  # Tenant already validated in the handler
 		}
 
 		if invited_by_cid is not None:
-			registration_data["ic"] = invited_by_cid
+			registration_data["invited_by"] = invited_by_cid
 
 		if invited_from_ips is not None:
-			registration_data["ii"] = invited_from_ips
+			registration_data["invited_from"] = invited_from_ips
 
 		if roles is not None:
 			for role_id in roles:
 				role = await self.RoleService.get(role_id)
 				if role.get("t") not in (tenant, None):
 					raise asab.exceptions.ValidationError()
-			registration_data["r"] = roles
+			registration_data["roles"] = roles
 
 		if expiration is None:
 			expiration = self.RegistrationExpiration
@@ -108,23 +111,22 @@ class RegistrationService(asab.Service):
 		credential_data["suspended"] = True
 		credential_data["reg"] = registration_data
 
-		provider = self.get_provider(provider_id)
-		credential_id = await provider.create(credential_data)
+		credential_id = await self.CredentialProvider.create(credential_data)
 
 		L.log(asab.LOG_NOTICE, "Credential drafted", struct_data={
 			"credential_id": credential_id,
 			"t": tenant,
 			"r": roles,
-			"invited_by_cid": invited_by_cid,
-			"invited_by_ips": invited_from_ips,
+			"invited_by": invited_by_cid,
+			"invited_from": invited_from_ips,
 		})
 
 		# TODO: Send invitation via mail
 		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
 		L.log(asab.LOG_NOTICE, "Sending invitation", struct_data={
 			"email": credential_data["email"],
-			"invited_by_cid": invited_by_cid,
-			"invited_from_ips": invited_from_ips,
+			"invited_by": invited_by_cid,
+			"invited_from": invited_from_ips,
 			"credential_id": credential_id,
 			"registration_uri": self.format_registration_uri(registration_code),
 		})
@@ -133,23 +135,20 @@ class RegistrationService(asab.Service):
 
 
 	async def get_credential_by_registration_code(self, registration_code):
-		provider = self.get_provider()
-		credentials = await provider.get_by("reg.code", registration_code)
+		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
 		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
 		return credentials
 
 
 	async def delete_credential_by_registration_code(self, registration_code):
-		provider = self.get_provider()
-		credentials = await provider.get_by("reg.code", registration_code)
-		await provider.delete(credentials["_id"])
+		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
+		await self.CredentialProvider.delete(credentials["_id"])
 		return credentials
 
 
 	async def delete_expired_unregistered_credentials(self):
-		provider = self.get_provider()
-		collection = self.StorageService.Database[provider.CredentialsCollection]
+		collection = self.StorageService.Database[self.CredentialProvider.CredentialsCollection]
 		query_filter = {"reg.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
@@ -162,16 +161,14 @@ class RegistrationService(asab.Service):
 			raise asab.exceptions.ValidationError("Registration failed: No username.")
 		if "suspended" in credential_data:
 			raise asab.exceptions.ValidationError("Cannot unsuspend credential whose registration has not been completed.")
-		provider = self.get_provider()
-		credentials = await provider.get_by("reg.code", registration_code)
+		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
 		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
-		await provider.update(credentials["_id"], credential_data)
+		await self.CredentialProvider.update(credentials["_id"], credential_data)
 
 
 	async def complete_registration(self, registration_code):
-		provider = self.get_provider()
-		credentials = await provider.get_by("reg.code", registration_code, include=["__pass"])
+		credentials = await self.CredentialProvider.get_by("reg.code", registration_code, include=["__pass"])
 		# TODO: Proper validation using policy and login descriptors
 		if credentials.get("username") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No username.")
@@ -179,14 +176,14 @@ class RegistrationService(asab.Service):
 			raise asab.exceptions.ValidationError("Registration failed: No email.")
 		if credentials.get("__pass") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No password.")
-		await provider.update(credentials["_id"], {
+		await self.CredentialProvider.update(credentials["_id"], {
 			"suspended": False,
 			"reg": None
 		})
 		# TODO: Audit - user registration completed
 
 
-	def get_provider(self, provider_id: str = None):
+	def _get_provider(self, provider_id: str = None):
 		"""
 		Locate a provider that supports credentials registration
 
@@ -198,7 +195,7 @@ class RegistrationService(asab.Service):
 		# Specific provider requested
 		if provider_id is not None:
 			provider = self.CredentialsService.Providers.get(provider_id)
-			if provider.Config.getboolean("registration"):
+			if provider.RegistrationEnabled:
 				return provider
 			else:
 				L.warning("Provider does not support registration", struct_data={"provider_id": provider_id})
@@ -206,7 +203,7 @@ class RegistrationService(asab.Service):
 
 		# No specific provider requested; get the first one that supports registration
 		for provider in self.CredentialsService.CredentialProviders.values():
-			if provider.Config.getboolean("registration"):
+			if provider.RegistrationEnabled:
 				return provider
 		else:
 			L.warning("No credentials provider with enabled registration found")
