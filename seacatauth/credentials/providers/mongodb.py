@@ -178,7 +178,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		# Update basic credentials
 		for key, value in update.items():
-			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors"):
+			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors", "reg"):
 				L.warning("Updating unknown field: {}".format(key))
 			if value is not None:
 				u.set(key, value)

@@ -169,7 +169,8 @@ class RegistrationHandler(object):
 		try:
 			await self.RegistrationService.complete_registration(registration_code)
 			result["registration_complete"] = True
-		except asab.exceptions.ValidationError:
+		except asab.exceptions.ValidationError as e:
+			L.warning(str(e))
 			result["registration_complete"] = False
 
 		return asab.web.rest.json_response(request, result)

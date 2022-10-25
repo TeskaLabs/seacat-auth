@@ -149,10 +149,9 @@ class RegistrationService(asab.Service):
 
 
 	async def update_credential_by_registration_code(self, registration_code, credential_data):
-		if "reg" in credential_data:
-			raise asab.exceptions.ValidationError("Registration failed: No username.")
-		if "suspended" in credential_data:
-			raise asab.exceptions.ValidationError("Cannot unsuspend credential whose registration has not been completed.")
+		for key in credential_data:
+			if key not in ["username", "email", "phone", "password"]:
+				raise asab.exceptions.ValidationError("Updating '{}' not allowed".format(key))
 		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
 		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
@@ -160,14 +159,15 @@ class RegistrationService(asab.Service):
 
 
 	async def complete_registration(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("reg.code", registration_code, include=["__pass"])
+		credentials = await self.CredentialProvider.get_by("reg.code", registration_code, include=["__password"])
 		# TODO: Proper validation using policy and login descriptors
 		if credentials.get("username") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No username.")
 		if credentials.get("email") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No email.")
-		if credentials.get("__pass") in (None, ""):
+		if credentials.get("__password") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No password.")
+		L.log(asab.LOG_NOTICE, "Credentials registration completed", struct_data={"cid": credentials["_id"]})
 		await self.CredentialProvider.update(credentials["_id"], {
 			"suspended": False,
 			"reg": None
