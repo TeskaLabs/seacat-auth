@@ -113,10 +113,24 @@ class RegistrationService(asab.Service):
 
 
 	async def get_credential_by_registration_code(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
+		credentials = await self.CredentialProvider.get_by("reg.code", registration_code, include=["__pass"])
 		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
-		return credentials
+
+		credentials_public = {
+			key: value
+			for key, value in credentials.items()
+			if key in ["email", "phone", "username"]
+		}
+
+		# TODO: Add info about configured login factors
+		password = credentials.pop("__pass", None)
+		credentials_public["password"] = password is not None and len(password) > 0
+		credentials_public["totp"] = False
+		credentials_public["webauthn"] = False
+		credentials_public["external_login"] = False
+
+		return credentials_public
 
 
 	async def delete_credential_by_registration_code(self, registration_code):
