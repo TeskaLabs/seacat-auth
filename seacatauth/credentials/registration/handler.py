@@ -140,7 +140,7 @@ class RegistrationHandler(object):
 
 	async def get_registration(self, request):
 		"""
-		Get information about the specified registration token
+		Get credentials by registration handle
 		"""
 		registration_code = request.match_info["registration_code"]
 		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
