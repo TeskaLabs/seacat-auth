@@ -244,9 +244,8 @@ class OpenIdConnectService(asab.Service):
 			# cookie_session_builder(),  # TODO: This shouldn't be in OIDC session
 		]
 
-		authn_service = self.App.get_service("seacatauth.AuthenticationService")
-
 		if "userinfo:authn" in scope or "userinfo:*" in scope:
+			authn_service = self.App.get_service("seacatauth.AuthenticationService")
 			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
 			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
 			# TODO: Get factors from root_session?
