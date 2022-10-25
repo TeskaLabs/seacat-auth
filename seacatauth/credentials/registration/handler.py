@@ -26,47 +26,16 @@ class RegistrationHandler(object):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/{tenant}/invite", self.get_invitation_features)
 		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
+		web_app.router.add_post("/invite/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.resend_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
-		web_app_public.router.add_get(
-			"/public/register/{registration_code}", self.get_registration)
-		web_app_public.router.add_put("/public/register/{registration_code}", self.register)
-
-
-	@access_control("authz:tenant:admin")
-	async def get_invitation_features(self, request, *, tenant):
-		"""
-		Returns a JSON response with the features of the invitation
-
-		:param request: The request object
-		:param tenant: The tenant to register the new user into
-		:return: Invitation features
-		"""
-		# TODO: Get invitation features from provider + config
-		# features = self.RegistrationService.get_invitation_features(tenant)
-		features = {
-			"type": "object",
-			"required": ["email"],
-			"additionalProperties": False,
-			"properties": {
-				"email": {
-					"type": "string", "description": "User email to send the invitation to."},
-				"roles": {
-					"type": "array", "description": "Roles to be assigned to the new user."},
-				"expiration": {
-					"oneOf": [{"type": "string"}, {"type": "number"}],
-					"description": "How long until the invitation expires.",
-					"examples": ["6 h", "3d", "1w", 7200]},
-			},
-		}
-
-		return asab.web.rest.json_response(request, {"features": features})
+		web_app_public.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
+		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -76,8 +45,6 @@ class RegistrationHandler(object):
 		"properties": {
 			"email": {
 				"type": "string"},
-			"roles": {
-				"type": "array", "description": "Roles to assign to the new user."},
 			"expiration": {
 				"oneOf": [{"type": "string"}, {"type": "number"}],
 				"description": "How long until the invitation expires.",
@@ -100,29 +67,37 @@ class RegistrationHandler(object):
 		if expiration is not None:
 			expiration = asab.utils.convert_to_seconds(expiration)
 
-		if not request.is_superuser() and "roles" in json_data:
-			for role in json_data["roles"]:
-				if role.startswith("*/"):
-					return asab.web.rest.json_response(
-						request,
-						{"result": "FORBIDDEN", "message": "Not allowed to assign global roles."},
-						status=403)
-
 		# Create invitation
-		credentials_id = await self.RegistrationService.draft_credential(
+		credentials_id = await self.RegistrationService.draft_credentials(
 			credential_data={"email": json_data["email"]},
-			tenant=tenant,
-			roles=json_data.get("roles"),
 			expiration=expiration,
 			invited_by_cid=credentials_id,
 			invited_from_ips=access_ips,
 		)
+
+		await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
 
 		payload = {
 			"credentials_id": credentials_id,
 		}
 
 		return asab.web.rest.json_response(request, payload)
+
+
+	@access_control("authz:tenant:admin")
+	async def resend_invitation(self, request):
+		registration_code = request.match_info["registration_code"]
+		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
+
+		# TODO: Send invitation via mail
+		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
+		L.log(asab.LOG_NOTICE, "Sending invitation", struct_data={
+			"email": credentials["email"],
+			"credential_id": credentials["_id"],
+			"registration_uri": self.RegistrationService.format_registration_uri(registration_code),
+		})
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@asab.web.rest.json_schema_handler({
@@ -150,9 +125,8 @@ class RegistrationHandler(object):
 		# TODO: Limit the total number of active registrations
 
 		# Create invitation
-		await self.RegistrationService.draft_credential(
+		await self.RegistrationService.draft_credentials(
 			credential_data={"email": json_data["email"]},
-			tenant=None,
 			invited_from_ips=access_ips,
 		)
 
@@ -191,8 +165,11 @@ class RegistrationHandler(object):
 		await self.RegistrationService.update_credential_by_registration_code(
 			registration_code, credential_data)
 
+		result = {"credentials_updated": True}
 		try:
 			await self.RegistrationService.complete_registration(registration_code)
-			return asab.web.rest.json_response(request, {"result": "REGISTRATION-COMPLETE"})
+			result["registration_complete"] = True
 		except asab.exceptions.ValidationError:
-			return asab.web.rest.json_response(request, {"result": "OK"})
+			result["registration_complete"] = False
+
+		return asab.web.rest.json_response(request, result)

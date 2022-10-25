@@ -53,12 +53,10 @@ class RegistrationService(asab.Service):
 		await self.delete_expired_unregistered_credentials()
 
 
-	async def draft_credential(
+	async def draft_credentials(
 		self,
 		credential_data: dict,
 		provider_id: str = None,
-		tenant: str = None,
-		roles: list = None,
 		expiration: float = None,
 		invited_by_cid: str = None,
 		invited_from_ips: list = None,
@@ -70,10 +68,6 @@ class RegistrationService(asab.Service):
 		:type credential_data: dict
 		:param provider_id:
 		:type provider_id: str
-		:param tenant:
-		:type tenant: str
-		:param roles:
-		:type roles: list
 		:param expiration: Number of seconds specifying the expiration of the invitation
 		:type expiration: float
 		:param invited_by_cid: Credentials ID of the issuer.
@@ -86,9 +80,13 @@ class RegistrationService(asab.Service):
 		# TODO: Generate a proper encryption key. Registration code is key + signature.
 		registration_code = registration_key
 		registration_data = {
-			"code": registration_code,
-			"tenant": tenant,  # Tenant already validated in the handler
+			"code": registration_code
 		}
+
+		if expiration is None:
+			expiration = self.RegistrationExpiration
+		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
+		registration_data["exp"] = expires_at
 
 		if invited_by_cid is not None:
 			registration_data["invited_by"] = invited_by_cid
@@ -96,30 +94,10 @@ class RegistrationService(asab.Service):
 		if invited_from_ips is not None:
 			registration_data["invited_from"] = invited_from_ips
 
-		if roles is not None:
-			for role_id in roles:
-				role = await self.RoleService.get(role_id)
-				if role.get("t") not in (tenant, None):
-					raise asab.exceptions.ValidationError()
-			registration_data["roles"] = roles
-
-		if expiration is None:
-			expiration = self.RegistrationExpiration
-		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
-		registration_data["exp"] = expires_at
-
 		credential_data["suspended"] = True
 		credential_data["reg"] = registration_data
 
 		credential_id = await self.CredentialProvider.create(credential_data)
-
-		L.log(asab.LOG_NOTICE, "Credential drafted", struct_data={
-			"credential_id": credential_id,
-			"t": tenant,
-			"r": roles,
-			"invited_by": invited_by_cid,
-			"invited_from": invited_from_ips,
-		})
 
 		# TODO: Send invitation via mail
 		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
