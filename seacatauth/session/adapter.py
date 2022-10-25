@@ -161,13 +161,17 @@ class SessionAdapter:
 			cls.FN.SessionId: None,
 			cls.FN.Session.Type: "openidconnect",
 			cls.FN.Version: None,
-			cls.FN.CreatedAt: id_token_dict.get("iat"),  # TODO: strptime
+			cls.FN.CreatedAt:
+				datetime.datetime.fromtimestamp(id_token_dict["iat"], tz=datetime.timezone.utc)
+				if "iat" in id_token_dict else None,
 			cls.FN.ModifiedAt: None,
-			cls.FN.Session.Expiration: id_token_dict.get("exp"),  # TODO: strptime
+			cls.FN.Session.Expiration:
+				datetime.datetime.fromtimestamp(id_token_dict["exp"], tz=datetime.timezone.utc)
+				if "exp" in id_token_dict else None,
 			cls.FN.Credentials.Id: id_token_dict.get("sub"),
-			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
+			cls.FN.Credentials.Username: id_token_dict.get("username") or id_token_dict.get("preferred_username"),
 			cls.FN.Credentials.Email: id_token_dict.get("email"),
-			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
+			cls.FN.Credentials.Phone: id_token_dict.get("phone") or id_token_dict.get("phone_number"),
 			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
 			cls.FN.Authorization.Authz: id_token_dict.get("authz") or id_token_dict.get("resources"),
 			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
