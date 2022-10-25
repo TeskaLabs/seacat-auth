@@ -268,6 +268,9 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def build_userinfo(self, session):
+		# TODO: Session object should only serve as a cache
+		#   After the cache has expired, update session object with fresh credential, authn and authz data
+		#   and rebuild the userinfo
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
@@ -285,13 +288,15 @@ class OpenIdConnectService(asab.Service):
 			userinfo["scope"] = session.OAuth2.Scope
 
 		if session.Credentials.Username is not None:
-			userinfo["preferred_username"] = session.Credentials.Username
+			userinfo["username"] = session.Credentials.Username
+			userinfo["preferred_username"] = session.Credentials.Username  # BACK COMPAT, remove after 2023-01-31
 
 		if session.Credentials.Email is not None:
 			userinfo["email"] = session.Credentials.Email
 
 		if session.Credentials.Phone is not None:
-			userinfo["phone_number"] = session.Credentials.Phone
+			userinfo["phone"] = session.Credentials.Phone
+			userinfo["phone_number"] = session.Credentials.Phone   # BACK COMPAT, remove after 2023-01-31
 
 		if session.Credentials.CustomData is not None:
 			userinfo["custom"] = session.Credentials.CustomData
