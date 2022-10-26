@@ -1,5 +1,6 @@
 import json
 import logging
+import aiohttp.web
 
 import asab
 import asab.web.rest
@@ -31,11 +32,15 @@ class RegistrationHandler(object):
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app.router.add_post(
+			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register_with_current_credentials)
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
 		web_app_public.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app_public.router.add_post(
+			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register_with_current_credentials)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -115,6 +120,10 @@ class RegistrationHandler(object):
 		Anonymous user request to register themself.
 		Generate a registration token and send a registration link to the user's email.
 		"""
+		# Disable this endpoint if self-registration is not enabled
+		if not self.RegistrationService.SelfRegistrationEnabled:
+			raise aiohttp.web.HTTPNotFound()
+
 		# Log IPs from which the request was made
 		access_ips = [request.remote]
 		forwarded_for = request.headers.get("X-Forwarded-For")
@@ -152,8 +161,10 @@ class RegistrationHandler(object):
 		"""
 		Validate registration data and create credentials (and tenant, if needed)
 		"""
+		registration_code = request.match_info["registration_code"]
+
 		request_data = await request.read()
-		if self.RegistrationService.RegistrationEncrypted:
+		if self.RegistrationService.EncryptionEnabled:
 			raise NotImplementedError("Registration encryption not implemented.")
 		else:
 			try:
@@ -161,16 +172,40 @@ class RegistrationHandler(object):
 			except json.decoder.JSONDecodeError:
 				return asab.exceptions.ValidationError("Invalid JSON.")
 
-		registration_code = request.match_info["registration_code"]
 		await self.RegistrationService.update_credential_by_registration_code(
 			registration_code, credential_data)
 
-		result = {"credentials_updated": True}
+		result = "CREDENTIALS-UPDATED"
 		try:
 			await self.RegistrationService.complete_registration(registration_code)
-			result["registration_complete"] = True
+			result = "REGISTRATION-COMPLETE"
 		except asab.exceptions.ValidationError as e:
-			L.warning(str(e))
-			result["registration_complete"] = False
+			L.info("Registration not completed: {}".format(e))
 
-		return asab.web.rest.json_response(request, result)
+		return asab.web.rest.json_response(request, {"result": result})
+
+
+	@access_control()
+	async def register_with_current_credentials(self, request, *, credentials_id):
+		"""
+		Use the registration object to register current user to the tenant
+		"""
+		registration_code = request.match_info["registration_code"]
+
+		reg_credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
+		reg_credential_id = reg_credentials["_id"]
+		reg_tenants = await self.RegistrationService.TenantService.get_tenants(reg_credential_id)
+		reg_roles = await self.RegistrationService.RoleService.get_roles_by_credentials(
+			reg_credential_id, reg_tenants)
+		for tenant in reg_tenants:
+			await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
+		for role in reg_roles:
+			await self.RegistrationService.RoleService.assign_role(credentials_id, role)
+		await self.CredentialsService.delete_credentials(reg_credential_id)
+		L.log(asab.LOG_NOTICE, "Credentials registered to a new tenant", struct_data={
+			"cid": credentials_id,
+			"reg_cid": reg_credential_id,
+			"tenants": ", ".join(reg_tenants),
+			"roles": ", ".join(reg_roles),
+		})
+		return asab.web.rest.json_response(request, {"result": "OK"})

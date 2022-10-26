@@ -74,7 +74,7 @@ asab.Config.add_defaults({
 		"registration_encrypted": "no",
 
 		# Allow people to register without an invitation
-		"allow_self_registration": "no",
+		"enable_self_registration": "no",
 	},
 
 	"seacatauth:communication": {
