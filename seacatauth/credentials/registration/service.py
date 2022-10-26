@@ -16,7 +16,7 @@ L = logging.getLogger(__name__)
 class RegistrationService(asab.Service):
 
 	RegistrationKeyByteLength = 32
-	RegistrationUriFormat = "{auth_webui_base_url}#register?invite={invitation_id}"
+	RegistrationUriFormat = "{auth_webui_base_url}#register?code={registration_code}"
 
 	def __init__(self, app, credentials_svc, service_name="seacatauth.RegistrationService"):
 		super().__init__(app, service_name)
@@ -113,12 +113,16 @@ class RegistrationService(asab.Service):
 			if key in ["email", "phone", "username"]
 		}
 
-		# TODO: Add info about configured login factors
+		tenants = await self.TenantService.get_tenants(credentials["_id"])
+		if tenants is not None:
+			credentials_public["tenants"] = tenants
+
 		password = credentials.pop("__pass", None)
 		credentials_public["password"] = password is not None and len(password) > 0
-		credentials_public["totp"] = False
-		credentials_public["webauthn"] = False
-		credentials_public["external_login"] = False
+		# TODO: Add info about configured login factors
+		# credentials_public["totp"] = False
+		# credentials_public["webauthn"] = False
+		# credentials_public["external_login"] = False
 
 		return credentials_public
 
@@ -192,7 +196,7 @@ class RegistrationService(asab.Service):
 			return None
 
 
-	def format_registration_uri(self, invitation_id: str):
+	def format_registration_uri(self, registration_code: str):
 		return self.RegistrationUriFormat.format(
 			auth_webui_base_url=self.AuthWebUIBaseUrl,
-			invitation_id=invitation_id)
+			registration_code=registration_code)
