@@ -31,12 +31,12 @@ class RegistrationService(asab.Service):
 
 		self.RegistrationExpiration = asab.Config.getseconds("seacatauth:registration", "expiration")
 
-		self.RegistrationEncrypted = asab.Config.getboolean("seacatauth:registration", "registration_encrypted")
-		if self.RegistrationEncrypted:
+		self.EncryptionEnabled = asab.Config.getboolean("seacatauth:registration", "enable_encryption")
+		if self.EncryptionEnabled:
 			raise NotImplementedError("Registration encryption has not been implemented yet.")
 
-		self.SelfRegistrationAllowed = asab.Config.getboolean("seacatauth:registration", "allow_self_registration")
-		if self.SelfRegistrationAllowed:
+		self.SelfRegistrationEnabled = asab.Config.getboolean("seacatauth:registration", "enable_self_registration")
+		if self.SelfRegistrationEnabled:
 			raise NotImplementedError("Self-registration has not been implemented yet.")
 
 		# Support only one registrable credential provider for now
@@ -77,7 +77,7 @@ class RegistrationService(asab.Service):
 		:return: The ID of the generated invitation.
 		"""
 		registration_key = secrets.token_urlsafe(self.RegistrationKeyByteLength)
-		# TODO: Generate a proper encryption key. Registration code is key + signature.
+		# TODO: Generate a proper encryption key. Registration code is random string + key + signature.
 		registration_code = registration_key
 		registration_data = {
 			"code": registration_code

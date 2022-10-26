@@ -189,7 +189,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			await u.execute()
 			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
 				"cid": credentials_id,
-				"fields": updated_fields,
+				"fields": ", ".join(updated_fields or []),
 			})
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
