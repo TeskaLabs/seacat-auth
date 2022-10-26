@@ -103,7 +103,7 @@ class RegistrationHandler(object):
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id)
 
-		if credentials.get("reg", {}).get("code") is None:
+		if credentials.get("__registration", {}).get("code") is None:
 			raise KeyError("Credentials not found")
 		assert "email" in credentials
 
@@ -115,7 +115,7 @@ class RegistrationHandler(object):
 
 		await self.RegistrationService.CommunicationService.registration_link(
 			email=credentials["email"],
-			registration_uri=self.RegistrationService.format_registration_uri(credentials["reg"]["code"]),
+			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			username=credentials.get("username"),
 			tenant=tenant
 		)
@@ -212,22 +212,8 @@ class RegistrationHandler(object):
 					"To complete the registration with your current credentials, "
 					"include 'update_current=true' in the query.")
 			credentials_id = request.Session.Credentials.Id
-			reg_credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
-			reg_credential_id = reg_credentials["_id"]
-			reg_tenants = await self.RegistrationService.TenantService.get_tenants(reg_credential_id)
-			reg_roles = await self.RegistrationService.RoleService.get_roles_by_credentials(
-				reg_credential_id, reg_tenants)
-			for tenant in reg_tenants:
-				await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
-			for role in reg_roles:
-				await self.RegistrationService.RoleService.assign_role(credentials_id, role)
-			await self.CredentialsService.delete_credentials(reg_credential_id)
-			L.log(asab.LOG_NOTICE, "Credentials registered to a new tenant", struct_data={
-				"cid": credentials_id,
-				"reg_cid": reg_credential_id,
-				"tenants": ", ".join(reg_tenants),
-				"roles": ", ".join(reg_roles),
-			})
+			await self.RegistrationService.complete_registration_with_existing_credentials(
+				registration_code, credentials_id)
 
 		else:
 			# Complete the registration with the new credentials

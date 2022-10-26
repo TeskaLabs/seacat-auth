@@ -117,11 +117,11 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		try:
 			await coll.create_index(
 				[
-					("reg.code", pymongo.ASCENDING),
+					("__registration.code", pymongo.ASCENDING),
 				],
 				unique=True,
 				partialFilterExpression={
-					"reg.code": {"$exists": True, "$gt": ""}
+					"__registration.code": {"$exists": True, "$gt": ""}
 				}
 			)
 		except Exception as e:
@@ -178,7 +178,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		# Update basic credentials
 		for key, value in update.items():
-			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors", "reg"):
+			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors", "__registration"):
 				L.warning("Updating unknown field: {}".format(key))
 			if value is not None:
 				u.set(key, value)
