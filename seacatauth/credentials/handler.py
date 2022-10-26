@@ -375,6 +375,3 @@ class CredentialsHandler(object):
 		return self.CredentialsService.CredentialProviders[
 			request.match_info["provider"]
 		]
-
-
-
