@@ -31,16 +31,16 @@ class RegistrationHandler(object):
 		web_app.router.add_post("/invite/{credentials_id}", self.resend_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
-		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
 		web_app.router.add_post(
-			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register_with_current_credentials)
+			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
 		web_app_public.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
-		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
+		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
 		web_app_public.router.add_post(
-			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register_with_current_credentials)
+			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -175,9 +175,9 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, credentials)
 
 
-	async def register(self, request):
+	async def update_registration(self, request):
 		"""
-		Validate registration data and create credentials (and tenant, if needed)
+		Update drafted credentials
 		"""
 		registration_code = request.match_info["registration_code"]
 
@@ -188,42 +188,49 @@ class RegistrationHandler(object):
 			try:
 				credential_data = json.loads(request_data)
 			except json.decoder.JSONDecodeError:
-				return asab.exceptions.ValidationError("Invalid JSON.")
+				raise asab.exceptions.ValidationError("Invalid JSON.")
 
 		await self.RegistrationService.update_credential_by_registration_code(
 			registration_code, credential_data)
 
-		result = "CREDENTIALS-UPDATED"
-		try:
-			await self.RegistrationService.complete_registration(registration_code)
-			result = "REGISTRATION-COMPLETE"
-		except asab.exceptions.ValidationError as e:
-			L.info("Registration not completed: {}".format(e))
-
-		return asab.web.rest.json_response(request, {"result": result})
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control()
-	async def register_with_current_credentials(self, request, *, credentials_id):
+
+	async def complete_registration(self, request):
 		"""
-		Use the registration object to register current user to the tenant
+		Complete the registration either by activating the draft credentials
+		or by transferring their tenants and roles to the currently authenticated user.
 		"""
 		registration_code = request.match_info["registration_code"]
 
-		reg_credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
-		reg_credential_id = reg_credentials["_id"]
-		reg_tenants = await self.RegistrationService.TenantService.get_tenants(reg_credential_id)
-		reg_roles = await self.RegistrationService.RoleService.get_roles_by_credentials(
-			reg_credential_id, reg_tenants)
-		for tenant in reg_tenants:
-			await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
-		for role in reg_roles:
-			await self.RegistrationService.RoleService.assign_role(credentials_id, role)
-		await self.CredentialsService.delete_credentials(reg_credential_id)
-		L.log(asab.LOG_NOTICE, "Credentials registered to a new tenant", struct_data={
-			"cid": credentials_id,
-			"reg_cid": reg_credential_id,
-			"tenants": ", ".join(reg_tenants),
-			"roles": ", ".join(reg_roles),
-		})
+		if request.Session is not None:
+			# Use the registration data to update the currently authenticated user
+			# Make sure this is explicit
+			if request.query.get("update_current") != "true":
+				raise asab.exceptions.ValidationError(
+					"To complete the registration with your current credentials, "
+					"include 'update_current=true' in the query.")
+			credentials_id = request.Session.Credentials.Id
+			reg_credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
+			reg_credential_id = reg_credentials["_id"]
+			reg_tenants = await self.RegistrationService.TenantService.get_tenants(reg_credential_id)
+			reg_roles = await self.RegistrationService.RoleService.get_roles_by_credentials(
+				reg_credential_id, reg_tenants)
+			for tenant in reg_tenants:
+				await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
+			for role in reg_roles:
+				await self.RegistrationService.RoleService.assign_role(credentials_id, role)
+			await self.CredentialsService.delete_credentials(reg_credential_id)
+			L.log(asab.LOG_NOTICE, "Credentials registered to a new tenant", struct_data={
+				"cid": credentials_id,
+				"reg_cid": reg_credential_id,
+				"tenants": ", ".join(reg_tenants),
+				"roles": ", ".join(reg_roles),
+			})
+
+		else:
+			# Complete the registration with the new credentials
+			await self.RegistrationService.complete_registration(registration_code)
+
 		return asab.web.rest.json_response(request, {"result": "OK"})
