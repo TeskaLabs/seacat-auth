@@ -99,17 +99,7 @@ class RegistrationService(asab.Service):
 
 		credential_id = await self.CredentialProvider.create(credential_data)
 
-		# TODO: Send invitation via mail
-		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
-		L.log(asab.LOG_NOTICE, "Sending invitation", struct_data={
-			"email": credential_data["email"],
-			"invited_by": invited_by_cid,
-			"invited_from": invited_from_ips,
-			"credential_id": credential_id,
-			"registration_uri": self.format_registration_uri(registration_code),
-		})
-
-		return credential_id
+		return credential_id, registration_code
 
 
 	async def get_credential_by_registration_code(self, registration_code):
