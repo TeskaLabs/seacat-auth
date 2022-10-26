@@ -28,7 +28,7 @@ class RegistrationHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
-		web_app.router.add_post("/invite/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.resend_invitation)
+		web_app.router.add_post("/invite/{credentials_id}", self.resend_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.register)
@@ -45,7 +45,7 @@ class RegistrationHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["email"],
+		"required": ["email"],  # TODO: Enable more communication options
 		"additionalProperties": False,
 		"properties": {
 			"email": {
@@ -73,17 +73,26 @@ class RegistrationHandler(object):
 			expiration = asab.utils.convert_to_seconds(expiration)
 
 		# Create invitation
-		credentials_id = await self.RegistrationService.draft_credentials(
+		invited_credentials_id, registration_code = await self.RegistrationService.draft_credentials(
 			credential_data={"email": json_data["email"]},
 			expiration=expiration,
 			invited_by_cid=credentials_id,
 			invited_from_ips=access_ips,
 		)
 
-		await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
+		# Assign tenant
+		await self.RegistrationService.TenantService.assign_tenant(invited_credentials_id, tenant)
+
+		# Send invitation
+		await self.RegistrationService.CommunicationService.registration_link(
+			email=json_data.get("email"),
+			registration_uri=self.RegistrationService.format_registration_uri(registration_code),
+			username=json_data.get("username"),
+			tenant=tenant
+		)
 
 		payload = {
-			"credentials_id": credentials_id,
+			"credentials_id": invited_credentials_id,
 		}
 
 		return asab.web.rest.json_response(request, payload)
@@ -91,16 +100,23 @@ class RegistrationHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def resend_invitation(self, request):
-		registration_code = request.match_info["registration_code"]
-		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
+		credentials_id = request.match_info["credentials_id"]
+		credentials = await self.CredentialsService.get(credentials_id)
+		assert "email" in credentials
+		assert "reg" in credentials and "code" in credentials["reg"]
 
-		# TODO: Send invitation via mail
-		# await self.CommunicationService.registration_link(email=email, registration_uri=registration_uri)
-		L.log(asab.LOG_NOTICE, "Sending invitation", struct_data={
-			"email": credentials["email"],
-			"credential_id": credentials["_id"],
-			"registration_uri": self.RegistrationService.format_registration_uri(registration_code),
-		})
+		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
+		try:
+			tenant = tenants[0]
+		except IndexError:
+			tenant = None
+
+		await self.RegistrationService.CommunicationService.registration_link(
+			email=credentials["email"],
+			registration_uri=self.RegistrationService.format_registration_uri(credentials["reg"]["code"]),
+			username=credentials.get("username"),
+			tenant=tenant
+		)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
