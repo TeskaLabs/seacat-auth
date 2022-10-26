@@ -8,9 +8,10 @@ import asab.storage.exceptions
 import asab.exceptions
 import typing
 
-from seacatauth.credentials.policy import CredentialsPolicy
-from seacatauth.credentials.providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
-from seacatauth.session import SessionAdapter
+from .policy import CredentialsPolicy
+from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
+from ..session import SessionAdapter
+from ..audit import AuditCode
 
 #
 
@@ -31,6 +32,7 @@ LOGIN_DESCRIPTOR_FAKE = [{
 class CredentialsService(asab.Service):
 	def __init__(self, app, service_name='seacatauth.CredentialsService', tenant_service=None):
 		super().__init__(app, service_name)
+		self.AuditService = self.App.get_service("seacatauth.AuditService")
 		self.CredentialProviders: typing.Dict[str, CredentialsProviderABC] = collections.OrderedDict()
 		self.LoginDescriptorFake = LOGIN_DESCRIPTOR_FAKE
 
@@ -288,7 +290,7 @@ class CredentialsService(asab.Service):
 			L.error(
 				"Cannot create credentials: Provider is read-only", struct_data={
 					"provider_id": provider.ProviderID,
-					"agent_cid": agent_cid,
+					"by": agent_cid,
 				}
 			)
 			return {
@@ -304,7 +306,7 @@ class CredentialsService(asab.Service):
 		if validated_data is None:
 			L.error("Creation failed: Data does not comply with 'create' policy", struct_data={
 				"provider_id": provider.ProviderID,
-				"agent_cid": agent_cid,
+				"by": agent_cid,
 			})
 			return {
 				"status": "FAILED",
@@ -331,8 +333,10 @@ class CredentialsService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Credentials successfully created", struct_data={
 			"provider_id": provider.ProviderID,
 			"cid": credentials_id,
-			"agent_cid": agent_cid,
+			"by": agent_cid,
 		})
+		await self.AuditService.append(AuditCode.CREDENTIALS_CREATED, {"cid": credentials_id, "by": agent_cid})
+
 		return {
 			"status": "OK",
 			"credentials_id": credentials_id,
@@ -358,7 +362,7 @@ class CredentialsService(asab.Service):
 				L.error("Update failed: Cannot update sensitive fields", struct_data={
 					"cid": credentials_id,
 					"field": key,
-					"agent_cid": agent_cid,
+					"by": agent_cid,
 				})
 				return {
 					"status": "FAILED",
@@ -374,7 +378,7 @@ class CredentialsService(asab.Service):
 			L.error("Update failed: Provider does not support editing", struct_data={
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
-				"agent_cid": agent_cid,
+				"by": agent_cid,
 			})
 			return {
 				"status": "FAILED",
@@ -395,7 +399,7 @@ class CredentialsService(asab.Service):
 			L.error("Update failed: Data does not comply with update policy", struct_data={
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
-				"agent_cid": agent_cid,
+				"by": agent_cid,
 			})
 			return {
 				"status": "FAILED",
@@ -405,7 +409,7 @@ class CredentialsService(asab.Service):
 		# Validate that at least phone or email will be specified after update
 		current_dict = await provider.get(credentials_id)
 
-		if current_dict.get("reg") is not None and update_dict.get("suspended") is False:
+		if current_dict.get("__registration") is not None and update_dict.get("suspended") is False:
 			raise asab.exceptions.ValidationError(
 				"Cannot unsuspend credential whose registration has not been completed.")
 
@@ -427,7 +431,7 @@ class CredentialsService(asab.Service):
 			L.error("Update failed: Phone and email cannot both be empty", struct_data={
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
-				"agent_cid": agent_cid,
+				"by": agent_cid,
 			})
 			return {
 				"status": "FAILED",
@@ -441,8 +445,10 @@ class CredentialsService(asab.Service):
 		await provider.update(credentials_id, validated_data)
 		L.log(asab.LOG_NOTICE, "Credentials successfully updated", struct_data={
 			"cid": credentials_id,
-			"agent_cid": agent_cid,
+			"by": agent_cid,
 		})
+		await self.AuditService.append(AuditCode.CREDENTIALS_UPDATED, {
+			"cid": credentials_id, "by": agent_cid, "fields": list(validated_data.keys())})
 
 		return {"status": "OK"}
 
@@ -478,8 +484,10 @@ class CredentialsService(asab.Service):
 
 		L.log(asab.LOG_NOTICE, "Credentials successfully deleted", struct_data={
 			"cid": credentials_id,
-			"agent_cid": agent_cid,
+			"by": agent_cid,
 		})
+		await self.AuditService.append(AuditCode.CREDENTIALS_DELETED, {"cid": credentials_id, "by": agent_cid})
+
 		return {
 			"status": result,
 			"credentials_id": credentials_id,

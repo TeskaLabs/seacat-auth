@@ -6,6 +6,8 @@ import asab
 import asab.storage.exceptions
 import asab.exceptions
 
+from ...audit import AuditCode
+
 #
 
 L = logging.getLogger(__name__)
@@ -95,7 +97,7 @@ class RegistrationService(asab.Service):
 			registration_data["invited_from"] = invited_from_ips
 
 		credential_data["suspended"] = True
-		credential_data["reg"] = registration_data
+		credential_data["__registration"] = registration_data
 
 		credential_id = await self.CredentialProvider.create(credential_data)
 
@@ -103,8 +105,8 @@ class RegistrationService(asab.Service):
 
 
 	async def get_credential_by_registration_code(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("reg.code", registration_code, include=["__pass"])
-		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
+		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code, include=["__pass"])
+		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
 
 		credentials_public = {
@@ -128,14 +130,14 @@ class RegistrationService(asab.Service):
 
 
 	async def delete_credential_by_registration_code(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
+		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code)
 		await self.CredentialProvider.delete(credentials["_id"])
 		return credentials
 
 
 	async def delete_expired_unregistered_credentials(self):
 		collection = self.StorageService.Database[self.CredentialProvider.CredentialsCollection]
-		query_filter = {"reg.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+		query_filter = {"__registration.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.log(asab.LOG_NOTICE, "Expired unregistered credentials deleted", struct_data={
@@ -146,14 +148,14 @@ class RegistrationService(asab.Service):
 		for key in credential_data:
 			if key not in ["username", "email", "phone", "password"]:
 				raise asab.exceptions.ValidationError("Updating '{}' not allowed".format(key))
-		credentials = await self.CredentialProvider.get_by("reg.code", registration_code)
-		if credentials["reg"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
+		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code)
+		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
 		await self.CredentialProvider.update(credentials["_id"], credential_data)
 
 
 	async def complete_registration(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("reg.code", registration_code, include=["__password"])
+		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code, include=["__password"])
 		# TODO: Proper validation using policy and login descriptors
 		if credentials.get("username") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No username.")
@@ -162,11 +164,38 @@ class RegistrationService(asab.Service):
 		if credentials.get("__password") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No password.")
 		L.log(asab.LOG_NOTICE, "Credentials registration completed", struct_data={"cid": credentials["_id"]})
-		await self.CredentialProvider.update(credentials["_id"], {
+
+		update_dict = {
 			"suspended": False,
-			"reg": None
+			"registered": datetime.datetime.now(datetime.timezone.utc),
+			"__registration": None  # delete the registration code handle
+		}
+		if "invited_by" in credentials["__registration"].get("invited_by"):
+			update_dict["invited_by"] = credentials["__registration"]["invited_by"]
+
+		await self.CredentialProvider.update(credentials["_id"], update_dict)
+		self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_NEW, {"cid": credentials["_id"]})
+
+
+	async def complete_registration_with_existing_credentials(self, registration_code, credentials_id):
+		reg_credentials = await self.get_credential_by_registration_code(registration_code)
+		reg_credential_id = reg_credentials["_id"]
+		reg_tenants = await self.TenantService.get_tenants(reg_credential_id)
+		reg_roles = await self.RoleService.get_roles_by_credentials(
+			reg_credential_id, reg_tenants)
+		for tenant in reg_tenants:
+			await self.TenantService.assign_tenant(credentials_id, tenant)
+		for role in reg_roles:
+			await self.RoleService.assign_role(credentials_id, role)
+		await self.CredentialsService.delete_credentials(reg_credential_id)
+		L.log(asab.LOG_NOTICE, "Credentials registered to a new tenant", struct_data={
+			"cid": credentials_id,
+			"reg_cid": reg_credential_id,
+			"tenants": ", ".join(reg_tenants),
+			"roles": ", ".join(reg_roles),
 		})
-		# TODO: Audit - user registration completed
+		self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_EXISTING, {
+			"cid": credentials_id, "tenants": reg_tenants, "roles": reg_roles})
 
 
 	def _get_provider(self, provider_id: str = None):
