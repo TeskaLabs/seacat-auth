@@ -102,8 +102,10 @@ class RegistrationHandler(object):
 	async def resend_invitation(self, request):
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id)
+
+		if credentials.get("reg", {}).get("code") is None:
+			raise KeyError("Credentials not found")
 		assert "email" in credentials
-		assert "reg" in credentials and "code" in credentials["reg"]
 
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
 		try:
