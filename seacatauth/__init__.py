@@ -71,7 +71,7 @@ asab.Config.add_defaults({
 		"expiration": "3d",
 
 		# Use E2E encryption for registration form
-		"registration_encrypted": "no",
+		"enable_encryption": "no",
 
 		# Allow people to register without an invitation
 		"enable_self_registration": "no",
@@ -79,7 +79,6 @@ asab.Config.add_defaults({
 
 	"seacatauth:communication": {
 		"default_locale": "en",
-		"app_name": "SeacatAuth",
 		"template_path": "./etc/message_templates"
 	},
 
