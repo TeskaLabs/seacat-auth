@@ -78,9 +78,11 @@ class RegistrationHandler(object):
 		if expiration is not None:
 			expiration = asab.utils.convert_to_seconds(expiration)
 
+		credential_data = json_data["credentials"]
+
 		# Create invitation
 		invited_credentials_id, registration_code = await self.RegistrationService.draft_credentials(
-			credential_data=json_data["credentials"],
+			credential_data=credential_data,
 			expiration=expiration,
 			invited_by_cid=credentials_id,
 			invited_from_ips=access_ips,
@@ -91,9 +93,9 @@ class RegistrationHandler(object):
 
 		# Send invitation
 		await self.RegistrationService.CommunicationService.registration_link(
-			email=json_data.get("email"),
+			email=credential_data.get("email"),
 			registration_uri=self.RegistrationService.format_registration_uri(registration_code),
-			username=json_data.get("username"),
+			username=credential_data.get("username"),
 			tenant=tenant
 		)
 
