@@ -236,7 +236,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		obj = await coll.find_one({key: value})
 		if obj is None:
 			raise KeyError("Found no credentials with {}={}".format(key, repr(value)))
-		return self._nomalize_credentials(obj, include)
+		return self._normalize_credentials(obj, include)
 
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
@@ -245,7 +245,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		# Fetch the credentials from a Mongo
 		try:
-			return self._nomalize_credentials(
+			return self._normalize_credentials(
 				await self.MongoDBStorageService.get(
 					self.CredentialsCollection,
 					bson.ObjectId(credentials_id[len(self.Prefix):])
@@ -274,7 +274,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		cursor = coll.find(filter, skip=page * limit, limit=limit, sort=sort)
 		while await cursor.fetch_next:
 			result.append(
-				self._nomalize_credentials(
+				self._normalize_credentials(
 					cursor.next_object()
 				)
 			)
@@ -291,10 +291,10 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			cursor.limit(limit)
 
 		async for d in cursor:
-			yield self._nomalize_credentials(d)
+			yield self._normalize_credentials(d)
 
 
-	def _nomalize_credentials(self, db_obj, include=None):
+	def _normalize_credentials(self, db_obj, include=None):
 		obj = {
 			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj['_id']),
 			'_type': self.Type,
@@ -309,6 +309,10 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			if key in ('_id', '_type', '_provider_id'):
 				continue
 			obj[key] = db_obj[key]
+
+		if "__registration" in db_obj:
+			obj["registered"] = False
+
 		return obj
 
 
