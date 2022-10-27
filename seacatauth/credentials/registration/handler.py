@@ -45,11 +45,17 @@ class RegistrationHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["email"],  # TODO: Enable more communication options
+		"required": ["credentials"],
 		"additionalProperties": False,
 		"properties": {
-			"email": {
-				"type": "string"},
+			"credentials": {
+				"required": ["email"],  # TODO: Enable more communication options
+				"properties": {
+					"email": {"type": "string"},
+					"username": {"type": "string"},
+					"phone": {"type": "string"},
+				}
+			},
 			"expiration": {
 				"oneOf": [{"type": "string"}, {"type": "number"}],
 				"description": "How long until the invitation expires.",
