@@ -501,7 +501,7 @@ class CredentialsService(asab.Service):
 		provider = self.CredentialProviders[provider_id]
 		info = provider.get_info()
 
-		if not provider.Editable:
+		if not isinstance(provider, EditableCredentialsProviderABC):
 			return info
 
 		# Use different policy for M2M providers
@@ -516,7 +516,7 @@ class CredentialsService(asab.Service):
 			return info
 
 		# Add edit/creation policies if provider is editable
-		if len(self.Policy.RegistrationPolicy) > 0:
+		if provider.RegistrationEnabled and len(self.Policy.RegistrationPolicy) > 0:
 			info["registration"] = [
 				{
 					"type": field,
