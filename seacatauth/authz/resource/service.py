@@ -30,6 +30,10 @@ class ResourceService(asab.Service):
 			"id": "authz:tenant:admin",
 			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
 		},
+		{
+			"id": "authn:anonymous",
+			"description": "Marks credentials used for unauthenticated anonymous access.",
+		},
 	]
 
 
