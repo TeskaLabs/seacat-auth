@@ -108,11 +108,15 @@ class RegistrationService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict()
 
+		await self.AuditService.append(AuditCode.CREDENTIALS_CREATED, {
+			"cid": credential_id, "by": invited_by_cid})
+
 		return credential_id, registration_code
 
 
 	async def get_credential_by_registration_code(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code, include=["__pass"])
+		credentials = await self.CredentialProvider.get_by(
+			"__registration.code", registration_code, include=["__password", "__registration"])
 		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
 
@@ -126,8 +130,8 @@ class RegistrationService(asab.Service):
 		if tenants is not None:
 			credentials_public["tenants"] = tenants
 
-		password = credentials.pop("__pass", None)
-		credentials_public["password"] = password is not None and len(password) > 0
+		password_hash = credentials.pop("__password", None)
+		credentials_public["password"] = password_hash is not None and len(password_hash) > 0
 		# TODO: Add info about configured login factors
 		# credentials_public["totp"] = False
 		# credentials_public["webauthn"] = False
@@ -155,7 +159,8 @@ class RegistrationService(asab.Service):
 		for key in credential_data:
 			if key not in ["username", "email", "phone", "password"]:
 				raise asab.exceptions.ValidationError("Updating '{}' not allowed".format(key))
-		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code)
+		credentials = await self.CredentialProvider.get_by(
+			"__registration.code", registration_code, include=["__password", "__registration"])
 		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
 		try:
@@ -169,7 +174,8 @@ class RegistrationService(asab.Service):
 
 
 	async def complete_registration(self, registration_code):
-		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code, include=["__password"])
+		credentials = await self.CredentialProvider.get_by(
+			"__registration.code", registration_code, include=["__password", "__registration"])
 		# TODO: Proper validation using policy and login descriptors
 		if credentials.get("username") in (None, ""):
 			raise asab.exceptions.ValidationError("Registration failed: No username.")
@@ -188,7 +194,7 @@ class RegistrationService(asab.Service):
 			update_dict["invited_by"] = credentials["__registration"]["invited_by"]
 
 		await self.CredentialProvider.update(credentials["_id"], update_dict)
-		self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_NEW, {"cid": credentials["_id"]})
+		await self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_NEW, {"cid": credentials["_id"]})
 
 
 	async def complete_registration_with_existing_credentials(self, registration_code, credentials_id):
@@ -208,7 +214,7 @@ class RegistrationService(asab.Service):
 			"tenants": ", ".join(reg_tenants),
 			"roles": ", ".join(reg_roles),
 		})
-		self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_EXISTING, {
+		await self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_EXISTING, {
 			"cid": credentials_id, "tenants": reg_tenants, "roles": reg_roles})
 
 
