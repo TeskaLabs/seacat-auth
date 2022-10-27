@@ -99,7 +99,14 @@ class RegistrationService(asab.Service):
 		credential_data["suspended"] = True
 		credential_data["__registration"] = registration_data
 
-		credential_id = await self.CredentialProvider.create(credential_data)
+		try:
+			credential_id = await self.CredentialProvider.create(credential_data)
+		except asab.storage.exceptions.DuplicateError as e:
+			if e.KeyValue is not None:
+				k, v = e.KeyValue.popitem()
+				raise asab.exceptions.Conflict("{} already in use: {}".format(k, v), key=k, value=v)
+			else:
+				raise asab.exceptions.Conflict()
 
 		return credential_id, registration_code
 
@@ -151,7 +158,14 @@ class RegistrationService(asab.Service):
 		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code)
 		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
-		await self.CredentialProvider.update(credentials["_id"], credential_data)
+		try:
+			await self.CredentialProvider.update(credentials["_id"], credential_data)
+		except asab.storage.exceptions.DuplicateError as e:
+			if e.KeyValue is not None:
+				k, v = e.KeyValue.popitem()
+				raise asab.exceptions.Conflict("{} already in use: {}".format(k, v), key=k, value=v)
+			else:
+				raise asab.exceptions.Conflict()
 
 
 	async def complete_registration(self, registration_code):

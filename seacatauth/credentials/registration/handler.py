@@ -80,7 +80,7 @@ class RegistrationHandler(object):
 
 		# Create invitation
 		invited_credentials_id, registration_code = await self.RegistrationService.draft_credentials(
-			credential_data={"email": json_data["email"]},
+			credential_data=json_data["credentials"],
 			expiration=expiration,
 			invited_by_cid=credentials_id,
 			invited_from_ips=access_ips,
