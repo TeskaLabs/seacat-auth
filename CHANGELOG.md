@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.44
 
 ### Fix
 - Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
