@@ -91,10 +91,17 @@ async def nginx_introspection(
 	Optionally adds session attributes (username, tenants etc.) to X-headers.
 	"""
 
+	unauthenticated_cid = request.query.get("unauthenticated")
+
 	# Authenticate request, get session
 	session = await authenticate(request)
 	if session is None:
-		return aiohttp.web.HTTPUnauthorized()
+		if unauthenticated_cid is not None:
+			# Create a new root session with unauthenticated_cid and a cookie
+			# Set the cookie
+			...
+		else:
+			return aiohttp.web.HTTPUnauthorized()
 
 	# TODO: Check if the session is "restricted" (for setting up 2nd factor only)
 	#   if so: fail
