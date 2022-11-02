@@ -105,9 +105,10 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["data"],
 		"additionalProperties": False,
 		"properties": {
+			"description": {
+				"type": "string"},
 			"data": {
 				"type": "object",
 				"patternProperties": {
@@ -123,7 +124,7 @@ class TenantHandler(object):
 	})
 	@access_control("authz:tenant:admin")
 	async def update_tenant(self, request, *, json_data, tenant):
-		result = await self.TenantService.set_tenant_data(tenant, json_data)
+		result = await self.TenantService.update_tenant(tenant, **json_data)
 		return asab.web.rest.json_response(request, data=result)
 
 
