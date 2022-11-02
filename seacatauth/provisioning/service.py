@@ -89,7 +89,7 @@ class ProvisioningService(asab.Service):
 
 		# Create superuser role
 		await self.RoleService.create(self.SuperroleID)
-		assert (await self.RoleService.update_resources(
+		assert (await self.RoleService.update(
 			role_id=self.SuperroleID,
 			resources_to_set=["authz:superuser"]
 		) == "OK")
