@@ -79,11 +79,7 @@ class TenantHandler(object):
 	async def get(self, request):
 		tenant_id = request.match_info.get("tenant")
 		data = await self.TenantService.get_tenant(tenant_id)
-		response = {
-			"result": "OK",
-			"data": data
-		}
-		return asab.web.rest.json_response(request, response)
+		return asab.web.rest.json_response(request, data)
 
 
 	@asab.web.rest.json_schema_handler({
