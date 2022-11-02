@@ -138,17 +138,20 @@ class ProvisioningService(asab.Service):
 		# Check if the client has the correct redirect URI
 		# Use default URI if none is specified and the client doesn't exist yet
 		if client is None:
+			existing_redirect_uris = []
 			if admin_ui_url is None:
 				auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
 				url = urllib.parse.urlparse(auth_webui_base_url)
 				admin_ui_url = url._replace(path="/seacat", fragment="", query="", params="").geturl()
-				L.warning("admin_ui_url not specified. Defaulting to '{}'.".format(admin_ui_url))
-			redirect_uris = []
+				L.log(
+					asab.LOG_NOTICE,
+					"admin_ui_url not specified in provisioning config. Defaulting to '{}'.".format(admin_ui_url)
+				)
 		else:
-			redirect_uris = client.get("redirect_uris", [])
-		if admin_ui_url is None and admin_ui_url not in redirect_uris:
-			redirect_uris.append(admin_ui_url)
-			update["redirect_uris"] = redirect_uris
+			existing_redirect_uris = client.get("redirect_uris", [])
+
+		if admin_ui_url is not None and admin_ui_url not in existing_redirect_uris:
+			update["redirect_uris"] = [admin_ui_url]
 
 		if client is None or "client_name" not in client:
 			update["client_name"] = self.Config["admin_ui_client_name"]
