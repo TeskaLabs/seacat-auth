@@ -1,12 +1,13 @@
 # CHANGELOG
 
-## Release candidate
+## v22.44
 
 ### Breaking changes
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221007)
 
 ### Fix
 - Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
+- Fix client initialization in provisioning (#101, PLUM Sprint 221021)
 
 ### Features
 - New MongoDB credential provider with configurable queries (#90, PLUM Sprint 220909)
