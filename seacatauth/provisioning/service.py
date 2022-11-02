@@ -124,6 +124,7 @@ class ProvisioningService(asab.Service):
 		except KeyError:
 			client = None
 
+		# Configure admin_ui_client as a public web application
 		update = {
 			k: v
 			for k, v in CLIENT_TEMPLATES["Public web application"].items()
@@ -152,5 +153,5 @@ class ProvisioningService(asab.Service):
 
 		if client is None:
 			await client_service.register(_custom_client_id=admin_ui_client_id, **update)
-		else:
+		elif update:
 			await client_service.update(client_id=admin_ui_client_id, **update)
