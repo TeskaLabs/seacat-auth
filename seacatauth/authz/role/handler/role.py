@@ -96,6 +96,7 @@ class RoleHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
+		"additionalProperties": False,
 		"properties": {
 			"description": {
 				"type": "string"},
