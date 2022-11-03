@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Roles have an optional "description" field (#103, PLUM Sprint 221021)
+
+---
+
+
 ## v22.44
 
 ### Fix
