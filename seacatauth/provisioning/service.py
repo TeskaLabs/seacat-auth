@@ -28,7 +28,7 @@ Use the following credentials to log in:
 _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_name": "provisioning-superuser",
 	"credentials_provider_id": "provisioning",
-	"role_name": "provisioning-superrole",
+	"role_name": "superuser",
 	"tenant": "provisioning-tenant",
 	"admin_ui_url": "",
 	"admin_ui_client_id": "seacat-admin-ui",
@@ -105,12 +105,6 @@ class ProvisioningService(asab.Service):
 		# This also all its sessions and tenant+role assignments
 		await self.CredentialsService.delete_credentials(self.SuperuserID)
 
-		# Delete superuser role
-		try:
-			await self.RoleService.delete(role_id=self.SuperroleID)
-		except KeyError:
-			L.error("Failed to delete role", struct_data={"role": self.SuperroleID})
-
 		# Delete provisioning tenant with all its roles and assignments
 		tenant_provider = self.TenantService.get_provider()
 		try:
@@ -130,6 +124,7 @@ class ProvisioningService(asab.Service):
 		except KeyError:
 			client = None
 
+		# Configure admin_ui_client as a public web application
 		update = {
 			k: v
 			for k, v in CLIENT_TEMPLATES["Public web application"].items()
@@ -158,5 +153,5 @@ class ProvisioningService(asab.Service):
 
 		if client is None:
 			await client_service.register(_custom_client_id=admin_ui_client_id, **update)
-		else:
+		elif update:
 			await client_service.update(client_id=admin_ui_client_id, **update)
