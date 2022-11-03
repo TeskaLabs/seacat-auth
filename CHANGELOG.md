@@ -5,6 +5,9 @@
 ### Features
 - Roles have an optional "description" field (#103, PLUM Sprint 221021)
 
+### Refactoring
+- Keep superuser role after provisioning (#102, PLUM Sprint 221021)
+
 ---
 
 
