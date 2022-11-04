@@ -177,114 +177,6 @@
 							"response": []
 						},
 						{
-							"name": "Get registration ticket",
-							"request": {
-								"method": "GET",
-								"header": [
-									{
-										"key": "Content-Type",
-										"name": "Content-Type",
-										"value": "application/json",
-										"type": "text"
-									}
-								],
-								"url": {
-									"raw": "{{BASE_URL}}/public/register",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"public",
-										"register"
-									]
-								},
-								"description": "**Public API**"
-							},
-							"response": []
-						},
-						{
-							"name": "Get invitation ticket",
-							"request": {
-								"method": "GET",
-								"header": [
-									{
-										"key": "Content-Type",
-										"name": "Content-Type",
-										"type": "text",
-										"value": "application/json"
-									}
-								],
-								"url": {
-									"raw": "{{BASE_URL}}/public/invitation/:register_token",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"public",
-										"invitation",
-										":register_token"
-									],
-									"variable": [
-										{
-											"key": "register_token",
-											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs"
-										}
-									]
-								},
-								"description": "**Public API**"
-							},
-							"response": []
-						},
-						{
-							"name": "Register credentials",
-							"request": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"name": "Content-Type",
-										"value": "application/json",
-										"type": "text"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n\t\"email\":\"testAA\",\n\t\"password\":\"testAA\"\n}",
-									"options": {
-										"raw": {
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{BASE_URL}}/public/register/:register_token",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"public",
-										"register",
-										":register_token"
-									],
-									"query": [
-										{
-											"key": "existing",
-											"value": "1",
-											"disabled": true
-										}
-									],
-									"variable": [
-										{
-											"key": "register_token",
-											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs"
-										}
-									]
-								},
-								"description": "A public API for a creation of the credentials.\nThis is endpoint for user requests for credentials, \"Create credentials\" is call for priviledget admins.\n\n**Public API**"
-							},
-							"response": []
-						},
-						{
 							"name": "Assign Tenant",
 							"request": {
 								"method": "PUT",
@@ -473,6 +365,288 @@
 										"provider"
 									]
 								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Registration",
+					"item": [
+						{
+							"name": "Request self-invitation",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"abc@def.xyz\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/register",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register"
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Get registration details",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Update registration",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"topsecret\",\n    \"username\": \"testuser\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Complete registration with new user",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Complete registration with existing credentials",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code?update_current=true",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"query": [
+										{
+											"key": "update_current",
+											"value": "true"
+										}
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						}
+					],
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									""
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									""
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Invitation",
+					"item": [
+						{
+							"name": "Issue invitation ticket",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"abc@def.xyz\",\n    \"username\": \"testuser\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/:tenant/invite",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										":tenant",
+										"invite"
+									],
+									"variable": [
+										{
+											"key": "tenant",
+											"value": "my-tenant"
+										}
+									]
+								},
+								"description": "**Admin API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Resend invitation ticket",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/invite/:credentials_id",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"invite",
+										":credentials_id"
+									],
+									"variable": [
+										{
+											"key": "credentials_id",
+											"value": "mongodb:default:abc123def456"
+										}
+									]
+								},
+								"description": "**Admin API**"
 							},
 							"response": []
 						}
@@ -1338,7 +1512,7 @@
 								}
 							],
 							"cookie": [],
-							"body": "[\n    {\n        \"_id\": \"my-tenant\",\n        \"_v\": 1,\n        \"_c\": \"2020-03-18T12:50:52.708000\",\n        \"_m\": \"2020-03-18T12:50:52.708000\",\n        \"active\": 1\n    }\n]"
+							"body": "[\n    {\n        \"_id\": \"MyTenant\",\n        \"_v\": 1,\n        \"_c\": \"2020-03-18T12:50:52.708000\",\n        \"_m\": \"2020-03-18T12:50:52.708000\",\n        \"active\": 1\n    }\n]"
 						}
 					]
 				},
@@ -1349,7 +1523,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\t\"id\": \"my-tenant\"\n}",
+							"raw": "{\n\t\"id\": \"MyTenant\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1375,7 +1549,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -1418,7 +1592,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -1510,7 +1684,7 @@
 								}
 							],
 							"cookie": [],
-							"body": "[\n    {\n        \"_id\": \"my-tenant\",\n        \"_v\": 1,\n        \"_c\": \"2020-03-18T12:50:52.708000\",\n        \"_m\": \"2020-03-18T12:50:52.708000\",\n        \"active\": 1\n    }\n]"
+							"body": "[\n    {\n        \"_id\": \"MyTenant\",\n        \"_v\": 1,\n        \"_c\": \"2020-03-18T12:50:52.708000\",\n        \"_m\": \"2020-03-18T12:50:52.708000\",\n        \"active\": 1\n    }\n]"
 						}
 					]
 				},
@@ -1575,7 +1749,7 @@
 								}
 							],
 							"cookie": [],
-							"body": "[\n    {\n        \"_id\": \"my-tenant\",\n        \"_v\": 1,\n        \"_c\": \"2020-03-18T12:50:52.708000\",\n        \"_m\": \"2020-03-18T12:50:52.708000\",\n        \"active\": 1\n    }\n]"
+							"body": "[\n    {\n        \"_id\": \"MyTenant\",\n        \"_v\": 1,\n        \"_c\": \"2020-03-18T12:50:52.708000\",\n        \"_m\": \"2020-03-18T12:50:52.708000\",\n        \"active\": 1\n    }\n]"
 						}
 					]
 				},
@@ -1596,7 +1770,7 @@
 							"variable": [
 								{
 									"key": "tenant_id",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								}
 							]
 						},
@@ -1610,7 +1784,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -1653,7 +1827,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -1734,7 +1908,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"tenants\": [\n        \"my-tenant\"\n    ]\n}",
+							"raw": "{\n    \"tenants\": [\n        \"MyTenant\"\n    ]\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1794,13 +1968,13 @@
 					"response": []
 				},
 				{
-					"name": "Set value of a tenant data field",
+					"name": "Set tenant data",
 					"request": {
 						"method": "PUT",
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"value\": \"Cindy Ownerson\"\n}",
+							"raw": "{\n    \"data\": {\n        \"maintainer\": \"support@my-tenant.xyz\"\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1808,27 +1982,22 @@
 							}
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/tenant/:tenant_id/:field",
+							"raw": "{{BASE_URL}}/tenant/:tenant_id",
 							"host": [
 								"{{BASE_URL}}"
 							],
 							"path": [
 								"tenant",
-								":tenant_id",
-								":field"
+								":tenant_id"
 							],
 							"variable": [
 								{
 									"key": "tenant_id",
 									"value": "my-tenant"
-								},
-								{
-									"key": "field",
-									"value": "owner"
 								}
 							]
 						},
-						"description": "*Requires `authz:tenant:admin` resource.*\n\nSet a value of a field in tenant data. These fields can be read in tenant detail (`GET /tenant/{tenant_id}`)."
+						"description": "*Requires `authz:tenant:admin` resource.*\n\nSet custom tenant data."
 					},
 					"response": []
 				},
@@ -1857,45 +2026,6 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "Delete data field from a tenant",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{BASE_URL}}/tenant/:tenant_id/:field",
-							"host": [
-								"{{BASE_URL}}"
-							],
-							"path": [
-								"tenant",
-								":tenant_id",
-								":field"
-							],
-							"variable": [
-								{
-									"key": "tenant_id",
-									"value": "my-tenant"
-								},
-								{
-									"key": "field",
-									"value": "owner"
-								}
-							]
-						},
-						"description": "*Requires `authz:tenant:admin` resource.*\n\nRemove a field from tenant data."
-					},
-					"response": []
 				}
 			]
 		},
@@ -1919,7 +2049,7 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								}
 							]
 						}
@@ -1944,11 +2074,11 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "role_name",
-									"value": "editor"
+									"value": "Editor"
 								}
 							]
 						}
@@ -1973,11 +2103,11 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "role",
-									"value": "editor"
+									"value": "Editor"
 								}
 							]
 						}
@@ -2002,11 +2132,11 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "role",
-									"value": "editor"
+									"value": "Editor"
 								}
 							]
 						},
@@ -2041,11 +2171,11 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "role",
-									"value": "editor"
+									"value": "Editor"
 								}
 							]
 						},
@@ -2080,11 +2210,11 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "role",
-									"value": "editor"
+									"value": "Editor"
 								}
 							]
 						},
@@ -2110,7 +2240,7 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "credentials_id",
@@ -2161,7 +2291,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"roles\": [\n        \"my-tenant/role\",\n        \"*/admin\"\n    ]\n}",
+							"raw": "{\n    \"roles\": [\n        \"MyTenant/role\",\n        \"*/admin\"\n    ]\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2181,7 +2311,7 @@
 							"variable": [
 								{
 									"key": "tenant",
-									"value": "my-tenant"
+									"value": "MyTenant"
 								},
 								{
 									"key": "credentials_id",
@@ -2930,7 +3060,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -2973,7 +3103,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3044,7 +3174,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3087,7 +3217,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3157,7 +3287,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3200,7 +3330,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3279,7 +3409,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3322,7 +3452,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3393,7 +3523,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3436,7 +3566,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3506,7 +3636,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",
@@ -3549,7 +3679,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "my-tenant"
+									"raw": "MyTenant"
 								},
 								"url": {
 									"raw": "{{BASE_URL}}/tenant",

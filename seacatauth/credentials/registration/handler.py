@@ -212,6 +212,8 @@ class RegistrationHandler(object):
 		"""
 		registration_code = request.match_info["registration_code"]
 
+		# TODO: Make sure that self-registered users create their new tenant
+
 		if request.Session is not None:
 			# Use the registration data to update the currently authenticated user
 			# Make sure this is explicit
