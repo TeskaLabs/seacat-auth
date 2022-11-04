@@ -87,7 +87,7 @@ class TenantService(asab.Service):
 			# Create admin role in tenant
 			await role_service.create(role_id)
 			# Assign "authz:tenant:admin" resource
-			await role_service.update_resources(role_id, resources_to_set=["authz:tenant:admin"])
+			await role_service.update(role_id, resources_to_set=["authz:tenant:admin"])
 			role_created = True
 		except Exception as e:
 			role_created = False

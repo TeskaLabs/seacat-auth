@@ -2,8 +2,20 @@
 
 ## Release candidate
 
+### Features
+- Roles have an optional "description" field (#103, PLUM Sprint 221021)
+
+### Refactoring
+- Keep superuser role after provisioning (#102, PLUM Sprint 221021)
+
+---
+
+
+## v22.44
+
 ### Fix
 - Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
+- Fix client initialization in provisioning (#101, PLUM Sprint 221021)
 
 ### Features
 - New MongoDB credential provider with configurable queries (#90, PLUM Sprint 220909)
