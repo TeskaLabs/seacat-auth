@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import logging
 import re
@@ -9,6 +8,7 @@ from passlib.hash import bcrypt
 import asab
 import asab.storage.mongodb
 import asab.storage.exceptions
+import asab.exceptions
 
 import bson
 import bson.errors
@@ -17,7 +17,6 @@ import pymongo
 import pymongo.errors
 
 from .abc import EditableCredentialsProviderABC
-from ...session import SessionAdapter
 
 #
 
@@ -61,6 +60,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 	ConfigDefaults = {
 		"credentials_collection": "c",
 		"tenants": "no",
+		"registration": "no",
 	}
 
 
@@ -73,6 +73,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			config_section_name=config_section_name
 		)
 		self.CredentialsCollection = self.Config["credentials_collection"]
+		self.RegistrationEnabled = self.Config.getboolean("registration")
 
 		app.TaskService.schedule(self.initialize())
 
@@ -112,17 +113,32 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			except Exception as e:
 				L.warning("{}; fix it and restart the app".format(e))
 
+		# Index by registration code
+		try:
+			await coll.create_index(
+				[
+					("__registration.code", pymongo.ASCENDING),
+				],
+				unique=True,
+				partialFilterExpression={
+					"__registration.code": {"$exists": True, "$gt": ""}
+				}
+			)
+		except Exception as e:
+			L.warning("{}; fix it and restart the app".format(e))
+
 
 	async def create(self, credentials: dict) -> Optional[str]:
 		for attribute in ("username", "email", "phone"):
 			value = credentials.get(attribute)
 			if value is not None and len(value) > 0:
-				obj_id = self.normalize_username(value)
+				obj_id = self._create_credential_id(value)
 				break
 		else:
 			raise ValueError("Cannot determine user ID")
 
 		u = self.MongoDBStorageService.upsertor(self.CredentialsCollection, obj_id)
+
 		for field, value in credentials.items():
 			u.set(field, value)
 
@@ -134,64 +150,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		})
 
 		return "{}{}".format(self.Prefix, credentials_id)
-
-
-	# TODO: refactor to credentials service
-	async def register(self, register_info: dict) -> Optional[str]:
-
-		# credentials
-		authorization_bytes = register_info.get('request_authorization', b"")
-		if authorization_bytes != b"":
-			# validate acess token for existing user
-			if not authorization_bytes.startswith(b'Bearer '):
-				L.warning("Authorization header parsing failed. Probably wrong token type.")
-				return
-
-			access_token = base64.urlsafe_b64decode(authorization_bytes[7:])
-			try:
-				session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
-				credentials_id = session.Credentials.Id
-			except (KeyError, AttributeError):
-				L.warning("Credentials authorization failed.")
-				return
-		else:
-			# create new user
-			credentials = await self._construct_credentials(register_info)
-			if credentials is None:
-				L.warning("Credentials creation failed.")
-				return
-			credentials_id = await self.create(credentials)
-			if credentials_id is None:
-				L.warning("Credentials creation failed.")
-				return
-
-		# handle tenants
-		if self.Config.getboolean("tenants"):
-			tenant_assignment = await self._register_tenants(register_info, credentials_id)
-			if tenant_assignment is None:
-				return
-
-		return credentials_id
-
-
-	async def _construct_credentials(self, register_info):
-		credentials = {}
-		if 'email' in register_info['features']:
-			username = register_info["request"].get("email")
-		elif 'username' in register_info['features']:
-			username = register_info["request"].get("username")
-		else:
-			return
-		if username is None:
-			return
-		credentials['username'] = username
-
-		password = register_info["request"].get("password")
-		if password is None:
-			return
-		credentials['password'] = password
-
-		return credentials
 
 
 	async def update(self, credentials_id, update: dict) -> Optional[str]:
@@ -213,61 +171,32 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			version=credentials['_v']
 		)
 
-		# Update basic credentials
-		for field in ("username", "email", "phone", "data"):
-			value = update.pop(field, None)
-			if value is not None:
-				u.set(field, value)
-
 		# Update password
 		v = update.pop("password", None)
 		if v is not None:
 			u.set("__password", bcrypt.hash(v.encode('utf-8')))
 
-		# Update suspension status
-		v = update.pop("suspended", None)
-		if v is not None:
-			u.set("suspended", v is True)
-
-		# Update TOTP secret
-		v = update.pop("__totp", None)
-		if v is not None:
-			u.set("__totp", v)
-
-		# Update enforced factors
-		v = update.pop("enforce_factors", None)
-		if v is not None:
-			u.set("enforce_factors", v)
-
-		if len(update) != 0:
-			raise KeyError("Unsupported credentials fields: {}".format(", ".join(update.keys())))
+		# Update basic credentials
+		for key, value in update.items():
+			if key not in ("username", "email", "phone", "suspended", "data", "__totp", "enforce_factors", "__registration"):
+				L.warning("Updating unknown field: {}".format(key))
+			if value is not None:
+				u.set(key, value)
+			else:
+				u.unset(key)
 
 		try:
 			await u.execute()
 			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
 				"cid": credentials_id,
-				"fields": updated_fields,
+				"fields": ", ".join(updated_fields or []),
 			})
-			result = "OK"
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
-				L.error("Cannot update credentials: Duplicate key", struct_data={
-					"cid": credentials_id,
-					"conflict": e.KeyValue
-				})
-				result = {
-					"error": "ALREADY-IN-USE",
-					"conflict": e.KeyValue,
-				}
+				key, value = e.KeyValue.popitem()
+				raise asab.exceptions.Conflict(key=key, value=value)
 			else:
-				L.error("Cannot update credentials: Duplicate key", struct_data={
-					"cid": credentials_id
-				})
-				result = {
-					"error": "ALREADY-IN-USE"
-				}
-
-		return result
+				raise asab.exceptions.Conflict()
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
@@ -302,10 +231,12 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		return "{}{}".format(self.Prefix, obj["_id"])
 
-	async def get_by(self, key: str, value) -> Optional[dict]:
+	async def get_by(self, key: str, value, include=None) -> Optional[dict]:
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
 		obj = await coll.find_one({key: value})
-		return obj
+		if obj is None:
+			raise KeyError("Found no credentials with {}={}".format(key, repr(value)))
+		return self._normalize_credentials(obj, include)
 
 
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
@@ -314,7 +245,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		# Fetch the credentials from a Mongo
 		try:
-			return self._nomalize_credentials(
+			return self._normalize_credentials(
 				await self.MongoDBStorageService.get(
 					self.CredentialsCollection,
 					bson.ObjectId(credentials_id[len(self.Prefix):])
@@ -343,7 +274,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		cursor = coll.find(filter, skip=page * limit, limit=limit, sort=sort)
 		while await cursor.fetch_next:
 			result.append(
-				self._nomalize_credentials(
+				self._normalize_credentials(
 					cursor.next_object()
 				)
 			)
@@ -360,10 +291,10 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			cursor.limit(limit)
 
 		async for d in cursor:
-			yield self._nomalize_credentials(d)
+			yield self._normalize_credentials(d)
 
 
-	def _nomalize_credentials(self, db_obj, include=None):
+	def _normalize_credentials(self, db_obj, include=None):
 		obj = {
 			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj['_id']),
 			'_type': self.Type,
@@ -378,6 +309,10 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			if key in ('_id', '_type', '_provider_id'):
 				continue
 			obj[key] = db_obj[key]
+
+		if "__registration" in db_obj:
+			obj["registered"] = False
+
 		return obj
 
 
@@ -463,7 +398,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return False
 
 
-	def normalize_username(self, username) -> bson.ObjectId:
+	def _create_credential_id(self, username) -> bson.ObjectId:
 		return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
 
 
