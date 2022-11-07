@@ -35,20 +35,22 @@ class RoleHandler(object):
 		limit = request.query.get('i', None)
 		if limit is not None:
 			limit = int(limit)
+		resource = request.query.get("resource")
 
-		result = await self.RoleService.list(None, page, limit)
+		result = await self.RoleService.list(None, page, limit, resource=resource)
 		return asab.web.rest.json_response(
 			request, result
 		)
 
 	@access_control()
 	async def list(self, request, *, tenant):
-		page = int(request.query.get('p', 1)) - 1
-		limit = request.query.get('i', None)
+		page = int(request.query.get("p", 1)) - 1
+		limit = request.query.get("i")
 		if limit is not None:
 			limit = int(limit)
+		resource = request.query.get("resource")
 
-		result = await self.RoleService.list(tenant, page, limit)
+		result = await self.RoleService.list(tenant, page, limit, resource=resource)
 		return asab.web.rest.json_response(request, result)
 
 	@access_control()

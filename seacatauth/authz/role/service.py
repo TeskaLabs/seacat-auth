@@ -38,12 +38,14 @@ class RoleService(asab.Service):
 			role=self.RoleNamePattern
 		))
 
-	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
+	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *, resource: str = None):
 		collection = self.StorageService.Database[self.RoleCollection]
+		query_filter = {}
 		if tenant is not None:
-			query_filter = {"tenant": {"$in": [tenant, None]}}
-		else:
-			query_filter = {}
+			query_filter["tenant"] = {"$in": [tenant, None]}
+		if resource is not None:
+			query_filter["resources"] = resource
+
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
