@@ -195,7 +195,7 @@ class RoleService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
 		return "OK"
 
-	async def get_roles_by_credentials(self, credentials_id: str, tenant: str = None):
+	async def get_roles_by_credentials(self, credentials_id: str, tenants: list = None):
 		"""
 		Returns a list of roles assigned to the given `credentials_id`.
 		Includes roles that match the given `tenant` plus global roles.
@@ -204,7 +204,7 @@ class RoleService(asab.Service):
 		coll = await self.StorageService.collection(self.CredentialsRolesCollection)
 		async for obj in coll.find({
 			'c': credentials_id,
-			't': {"$in": [tenant, None]}
+			't': {"$in": [None, *(tenants or [])]}
 		}):
 			result.append(obj["r"])
 		return result
