@@ -1,6 +1,5 @@
 import logging
 import re
-from json import JSONDecodeError
 
 import asab
 import asab.web.rest
