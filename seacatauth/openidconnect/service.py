@@ -266,7 +266,11 @@ class OpenIdConnectService(asab.Service):
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
 			"exp": session.Session.Expiration,
 			"iat": datetime.datetime.now(datetime.timezone.utc),
+			"sid": session.SessionId,
 		}
+
+		if session.Session.ParentSessionId is not None:
+			userinfo["psid"] = session.Session.ParentSessionId
 
 		if session.OAuth2.ClientId is not None:
 			# aud indicates who is allowed to consume the token

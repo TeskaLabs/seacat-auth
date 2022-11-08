@@ -158,7 +158,8 @@ class SessionAdapter:
 	@classmethod
 	def from_id_token(cls, session_svc, id_token_dict):
 		session_dict = {
-			cls.FN.SessionId: None,
+			cls.FN.SessionId: id_token_dict.get("sid"),
+			cls.FN.Session.ParentSessionId: id_token_dict.get("psid"),
 			cls.FN.Session.Type: "openidconnect",
 			cls.FN.Version: None,
 			cls.FN.CreatedAt: id_token_dict.get("iat"),  # TODO: strptime
