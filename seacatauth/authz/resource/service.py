@@ -219,4 +219,3 @@ class ResourceService(asab.Service):
 			"new_resource": resource_id,
 			"n_roles": roles["count"],
 		})
-
