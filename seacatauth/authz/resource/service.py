@@ -177,7 +177,7 @@ class ResourceService(asab.Service):
 
 	async def undelete(self, resource_id: str):
 		resource = await self.get(resource_id)
-		if resource.get("deleted") not in [None, False]:
+		if resource.get("deleted") is not True:
 			raise asab.exceptions.Conflict("Cannot undelete a resource that has not been soft-deleted.")
 
 		upsertor = self.StorageService.upsertor(
