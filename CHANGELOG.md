@@ -2,20 +2,21 @@
 
 ## Release candidate
 
+### Breaking changes
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+
 ### Features
 - Roles have an optional "description" field (#103, PLUM Sprint 221021)
 - User registration (invitation only) (#86, PLUM Sprint 221021)
 
 ### Refactoring
 - Keep superuser role after provisioning (#102, PLUM Sprint 221021)
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
 
 ---
 
 
 ## v22.44
-
-### Breaking changes
-- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221007)
 
 ### Fix
 - Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
