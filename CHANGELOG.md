@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Roles have an optional "description" field (#103, PLUM Sprint 221021)
+- User registration (invitation only) (#86, PLUM Sprint 221021)
+
+### Refactoring
+- Keep superuser role after provisioning (#102, PLUM Sprint 221021)
+
+---
+
+
 ## v22.44
 
 ### Breaking changes

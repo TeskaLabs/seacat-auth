@@ -4,8 +4,6 @@ import asab
 
 asab.Config.add_defaults({
 	"general": {
-		"registration_encrypted": "false",
-
 		# Public API base URL lets the app know from what URL is its public API served.
 		# It is used by the OpenIDConnect authorize handler for generating loopback redirect URIs.
 		"public_api_base_url": "http://localhost/auth/api",
@@ -68,9 +66,19 @@ asab.Config.add_defaults({
 		"ident_fields": "username:ignorecase email:ignorecase",
 	},
 
+	"seacatauth:registration": {
+		# How long until invitation expires
+		"expiration": "3d",
+
+		# Use E2E encryption for registration form
+		"enable_encryption": "no",
+
+		# Allow people to register without an invitation
+		"enable_self_registration": "no",
+	},
+
 	"seacatauth:communication": {
 		"default_locale": "en",
-		"app_name": "SeacatAuth",
 		"template_path": "./etc/message_templates"
 	},
 
