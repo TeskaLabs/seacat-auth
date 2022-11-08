@@ -34,13 +34,14 @@ class ResourceHandler(object):
 			limit = int(limit)
 
 		# Filter by ID.startswith()
-		query_filter = request.query.get("f", None)
-		if query_filter is not None:
-			query_filter = {
-				"_id": re.compile("^{}".format(
-					re.escape(query_filter)
-				))
-			}
+		query_filter = {}
+		if "f" in request.query:
+			query_filter["_id"] = re.compile(
+				"^{}".format(re.escape(request.query["f"])))
+
+		# Do not include soft-deleted resources unless requested
+		if request.query.get("include_deleted") != "true":
+			query_filter["deleted"] = {"$in": [None, False]}
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
