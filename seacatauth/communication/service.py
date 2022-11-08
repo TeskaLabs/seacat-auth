@@ -1,13 +1,14 @@
 import logging
 import re
+import typing
 
 import asab
+import urllib.parse
 
 from .abc import CommunicationProviderABC
 from .builders import MessageBuilderABC
 
 #
-import typing
 
 L = logging.getLogger(__name__)
 
@@ -52,7 +53,11 @@ class CommunicationService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.CommunicationService"):
 		super().__init__(app, service_name)
 		self.DefaultLocale = asab.Config.get("seacatauth:communication", "default_locale")
-		self.AppName = asab.Config.get("seacatauth:communication", "app_name")
+		self.AppName = asab.Config.get("seacatauth:communication", "app_name", fallback=None)
+		if self.AppName is None:
+			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			parsed = urllib.parse.urlparse(auth_webui_base_url)
+			self.AppName = parsed.netloc
 		self.CommunicationProviders: typing.Dict[str, CommunicationProviderABC] = {}
 		self.MessageBuilders: typing.Dict[str, MessageBuilderABC] = {}
 		relevant_sections = [s for s in asab.Config.sections() if s.startswith("seacatauth:communication:")]
@@ -169,6 +174,49 @@ class CommunicationService(asab.Service):
 			})
 			return False
 		return True
+
+
+	async def registration_link(
+		self, *,
+		phone=None, email=None, locale=None, username=None, tenant=None, registration_uri
+	):
+		channel = "email"
+		message_id = "registration_link"
+		locale = locale or self.DefaultLocale
+
+		success = False
+		try:
+			provider = self.get_communication_provider(channel)
+			message_builder = self.get_message_builder(channel)
+		except KeyError as e:
+			L.warning("Cannot send {} message: {}".format(channel, e))
+			return False
+
+		# Template provider produces a message object with "message_body"
+		# and other attributes characteristic for the channel
+		try:
+			message_dict = message_builder.build_message(
+				template_name=message_id,
+				locale=locale,
+				phone=phone,
+				email=email,
+				username=username,
+				tenant=tenant,
+				registration_uri=registration_uri,
+				app_name=self.AppName
+			)
+		except Exception as e:
+			L.error("Message build failed: {} ({})".format(type(e).__name__, str(e)))
+			return False
+
+		# Communication provider sends the message
+		try:
+			success = success or await provider.send_message(**message_dict)
+		except Exception as e:
+			L.error("Message delivery failed: {} ({})".format(type(e).__name__, str(e)))
+
+		return True
+
 
 	async def sms_login(
 		self, *,

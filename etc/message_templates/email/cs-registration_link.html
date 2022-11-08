@@ -1,0 +1,63 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="content-yype" content="text/html; charset=UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<meta email-subject="Nová registrace do {{ app_name }}" />
+		<title>Nová registrace do {{ app_name }}</title>
+	</head>
+	<style>
+		* {
+			font-family: Helvetica;
+		}
+		body {
+			margin: 1em;
+			padding: 0;
+			backgroud-color: #e4e5e;
+		}
+		a.button {
+			display: inline-block;
+			margin: 0;
+			padding: .5rem 5rem;
+			vertical-align: middle;
+			text-align: center;
+			line-height: 1.5;
+			text-decoration: none;
+			border-radius: .3rem;
+			color: #ffffff;
+			background-color: #20a8d8;
+			border-color: #20a8d8;
+		}
+		small {
+			color: lightgrey;
+		}
+	</style>
+	<body>
+		<p>
+			{% if username %}Vítejte, <b>{{ username }}</b>!
+			{% else %}Vítejte!
+			{% endif %}<br /><br />
+			{% if tenant %}Byli jste pozváni do <b>{{ tenant }}</b> ve službě {{ app_name }}.
+			{% else %}Byli jste pozváni do služby {{ app_name }}.
+			{% endif %}
+		</p>
+		<p>
+			<a href="{{ registration_uri }}" class="button">
+				Dokončit registraci
+			</a>
+		</p>
+		<p>
+			<small>Pokud vám tlačítko nefunguje, otevřete si v prohlížeči následující odkaz: <a href="{{ registration_uri }}">{{ registration_uri }}</a></small>
+		<p>
+		<p>
+			Pokud jste o registraci nežádali, tuto zprávu můžete ignorovat.
+		</p>
+		<p>
+			Přejeme hezký den.
+		</p>
+		<hr />
+		<p>
+			<small>Zpráva byla vytvořena v TeskaLabs SeaCat Auth.</small>
+		<p>
+	</body>
+</html>

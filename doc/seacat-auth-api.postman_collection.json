@@ -177,114 +177,6 @@
 							"response": []
 						},
 						{
-							"name": "Get registration ticket",
-							"request": {
-								"method": "GET",
-								"header": [
-									{
-										"key": "Content-Type",
-										"name": "Content-Type",
-										"value": "application/json",
-										"type": "text"
-									}
-								],
-								"url": {
-									"raw": "{{BASE_URL}}/public/register",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"public",
-										"register"
-									]
-								},
-								"description": "**Public API**"
-							},
-							"response": []
-						},
-						{
-							"name": "Get invitation ticket",
-							"request": {
-								"method": "GET",
-								"header": [
-									{
-										"key": "Content-Type",
-										"name": "Content-Type",
-										"type": "text",
-										"value": "application/json"
-									}
-								],
-								"url": {
-									"raw": "{{BASE_URL}}/public/invitation/:register_token",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"public",
-										"invitation",
-										":register_token"
-									],
-									"variable": [
-										{
-											"key": "register_token",
-											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs"
-										}
-									]
-								},
-								"description": "**Public API**"
-							},
-							"response": []
-						},
-						{
-							"name": "Register credentials",
-							"request": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"name": "Content-Type",
-										"value": "application/json",
-										"type": "text"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n\t\"email\":\"testAA\",\n\t\"password\":\"testAA\"\n}",
-									"options": {
-										"raw": {
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{BASE_URL}}/public/register/:register_token",
-									"host": [
-										"{{BASE_URL}}"
-									],
-									"path": [
-										"public",
-										"register",
-										":register_token"
-									],
-									"query": [
-										{
-											"key": "existing",
-											"value": "1",
-											"disabled": true
-										}
-									],
-									"variable": [
-										{
-											"key": "register_token",
-											"value": "UtMSHytS3CQuwPqmdIdodhyemx_4vQHxTTUduL_7Ohs"
-										}
-									]
-								},
-								"description": "A public API for a creation of the credentials.\nThis is endpoint for user requests for credentials, \"Create credentials\" is call for priviledget admins.\n\n**Public API**"
-							},
-							"response": []
-						},
-						{
 							"name": "Assign Tenant",
 							"request": {
 								"method": "PUT",
@@ -473,6 +365,288 @@
 										"provider"
 									]
 								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Registration",
+					"item": [
+						{
+							"name": "Request self-invitation",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"abc@def.xyz\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/register",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register"
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Get registration details",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Update registration",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"topsecret\",\n    \"username\": \"testuser\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Complete registration with new user",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Complete registration with existing credentials",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/public/register/:registration_code?update_current=true",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"public",
+										"register",
+										":registration_code"
+									],
+									"query": [
+										{
+											"key": "update_current",
+											"value": "true"
+										}
+									],
+									"variable": [
+										{
+											"key": "registration_code",
+											"value": "abc123def456"
+										}
+									]
+								},
+								"description": "**Public API**"
+							},
+							"response": []
+						}
+					],
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									""
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									""
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Invitation",
+					"item": [
+						{
+							"name": "Issue invitation ticket",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"abc@def.xyz\",\n    \"username\": \"testuser\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/:tenant/invite",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										":tenant",
+										"invite"
+									],
+									"variable": [
+										{
+											"key": "tenant",
+											"value": "my-tenant"
+										}
+									]
+								},
+								"description": "**Admin API**"
+							},
+							"response": []
+						},
+						{
+							"name": "Resend invitation ticket",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"name": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/invite/:credentials_id",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"invite",
+										":credentials_id"
+									],
+									"variable": [
+										{
+											"key": "credentials_id",
+											"value": "mongodb:default:abc123def456"
+										}
+									]
+								},
+								"description": "**Admin API**"
 							},
 							"response": []
 						}

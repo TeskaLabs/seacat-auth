@@ -59,7 +59,11 @@ def private_auth_middleware_factory(app):
 		def has_resource_access(tenant: str, resource: str) -> bool:
 			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
 
+		def is_superuser() -> bool:
+			return has_resource_access("*", "authz:superuser")
+
 		request.has_resource_access = has_resource_access
+		request.is_superuser = is_superuser
 
 		if require_authentication is False:
 			return await handler(request)
