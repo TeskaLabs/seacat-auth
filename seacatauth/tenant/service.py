@@ -113,8 +113,8 @@ class TenantService(asab.Service):
 		}
 
 
-	async def set_tenant_data(self, tenant_id: str, data: dict):
-		result = await self.TenantsProvider.set_data(tenant_id, data)
+	async def update_tenant(self, tenant_id: str, **kwargs):
+		result = await self.TenantsProvider.update(tenant_id, **kwargs)
 		return {"result": result}
 
 
