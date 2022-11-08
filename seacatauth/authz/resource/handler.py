@@ -96,17 +96,15 @@ class ResourceHandler(object):
 	@access_control("authz:superuser")
 	async def update(self, request, *, json_data):
 		"""
-		Update resource name or description
+		Update resource description or rename resource
 		"""
 		resource_id = request.match_info["resource_id"]
-		description = json_data["description"]
-		data = await self.ResourceService.update_description(resource_id, description)
-		status = 200 if data["result"] == "OK" else 400
-		return asab.web.rest.json_response(
-			request,
-			status=status,
-			data=data,
-		)
+		if "description" in json_data:
+			await self.ResourceService.update(resource_id, json_data["description"])
+		if "name" in json_data:
+			await self.ResourceService.rename(resource_id, json_data["name"])
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@access_control("authz:superuser")

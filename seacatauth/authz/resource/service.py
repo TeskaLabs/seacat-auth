@@ -66,7 +66,7 @@ class ResourceService(asab.Service):
 
 			# Update resource description
 			if resource_description is not None and db_resource.get("description") != resource_description:
-				await self.update_description(resource_id, resource_description)
+				await self.update(resource_id, resource_description)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -121,16 +121,8 @@ class ResourceService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource": resource_id})
 
 
-	async def update_description(self, resource_id: str, description: str):
-		try:
-			resource = await self.get(resource_id)
-		except KeyError:
-			L.error("Resource not found", struct_data={"resource": resource_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": "Resource '{}' not found".format(resource_id),
-			}
-
+	async def update(self, resource_id: str, description: str):
+		resource = await self.get(resource_id)
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
 			obj_id=resource_id,
@@ -144,25 +136,13 @@ class ResourceService(asab.Service):
 		else:
 			upsertor.set("description", description)
 
-		try:
-			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={
-				"resource_id": resource_id,
-				"description": description,
-			})
-		except KeyError:
-			L.error("Resource not found", struct_data={"resource": resource_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": "Resource '{}' not found".format(resource_id),
-			}
-
-		return {"result": "OK"}
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={"resource": resource_id})
 
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
 		if resource_id in map(lambda x: x["id"], self.BuiltinResources):
-			raise RuntimeError("System resource cannot be deleted")
+			raise ValueError("System resource cannot be deleted")
 
 		resource = await self.get(resource_id)
 
@@ -209,5 +189,34 @@ class ResourceService(asab.Service):
 		await upsertor.execute()
 		L.log(asab.LOG_NOTICE, "Resource undeleted", struct_data={
 			"resource": resource_id,
+		})
+
+
+	async def rename(self, resource_id: str, new_resource_id: str):
+		"""
+		Shortcut for creating a new resource with the desired name,
+		assigning it to roles that have the original resource and deleting the original resource
+		"""
+		if resource_id in map(lambda x: x["id"], self.BuiltinResources):
+			raise ValueError("System resource cannot be renamed")
+
+		role_svc = self.App.get_service("seacatauth.RoleService")
+
+		resource = await self.get(resource_id)
+		await self.create(new_resource_id, resource["description"])
+
+		roles = await role_svc.list(resource=resource_id)
+		if roles["count"] > 0:
+			for role in roles["data"]:
+				await role_svc.update(
+					role["_id"],
+					resources_to_remove=[resource_id],
+					resources_to_add=[new_resource_id])
+
+		await self.StorageService.delete(self.ResourceCollection, resource_id)
+		L.log(asab.LOG_NOTICE, "Resource renamed", struct_data={
+			"old_resource": resource_id,
+			"new_resource": resource_id,
+			"n_roles": roles["count"],
 		})
 
