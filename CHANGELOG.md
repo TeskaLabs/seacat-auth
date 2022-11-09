@@ -5,9 +5,13 @@
 ### Breaking changes
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
 
+### Fix
+- Logout with ID token (#116, PLUM Sprint 221104)
+
 ### Features
 - Roles have an optional "description" field (#103, PLUM Sprint 221021)
 - User registration (invitation only) (#86, PLUM Sprint 221021)
+- Include session ID and parent session ID in ID token (#116, PLUM Sprint 221104)
 
 ### Refactoring
 - Keep superuser role after provisioning (#102, PLUM Sprint 221021)
