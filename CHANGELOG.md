@@ -4,6 +4,7 @@
 
 ### Breaking changes
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+- Unset credential phone/email by setting it to null instead of empty string (#117, PLUM Sprint 221104)
 
 ### Features
 - Roles have an optional "description" field (#103, PLUM Sprint 221021)
@@ -12,6 +13,7 @@
 ### Refactoring
 - Keep superuser role after provisioning (#102, PLUM Sprint 221021)
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+- Unset credential phone/email by setting it to null instead of empty string (#117, PLUM Sprint 221104)
 
 ---
 
