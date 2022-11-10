@@ -38,12 +38,20 @@ class RoleService(asab.Service):
 			role=self.RoleNamePattern
 		))
 
-	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
+	async def list(
+		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *,
+		resource: str = None,
+		active_only: bool = False,
+	):
 		collection = self.StorageService.Database[self.RoleCollection]
+		query_filter = {}
 		if tenant is not None:
-			query_filter = {"tenant": {"$in": [tenant, None]}}
-		else:
-			query_filter = {}
+			query_filter["tenant"] = {"$in": [tenant, None]}
+		if resource is not None:
+			query_filter["resources"] = resource
+		if active_only is True:
+			query_filter["deleted"] = {"$in": [False, None]}
+
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
@@ -158,8 +166,10 @@ class RoleService(asab.Service):
 			resources_to_set = set(resources_to_set)
 			for res_id in resources_to_set:
 				try:
-					await self.ResourceService.get(res_id)
+					resource = await self.ResourceService.get(res_id)
 				except KeyError:
+					raise KeyError(res_id)
+				if resource.get("deleted") is True:
 					raise KeyError(res_id)
 
 		if resources_to_add is not None:
