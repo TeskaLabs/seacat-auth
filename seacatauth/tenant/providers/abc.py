@@ -38,5 +38,5 @@ class EditableTenantsProviderABC(TenantsProviderABC):
 		pass
 
 	@abc.abstractmethod
-	async def set_data(self, tenant_id: str, data: dict) -> Optional[str]:
+	async def update(self, tenant_id: str, **kwargs) -> Optional[str]:
 		pass
