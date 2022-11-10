@@ -2,6 +2,7 @@ import logging
 import re
 
 import asab.storage.exceptions
+import asab.exceptions
 
 #
 
@@ -65,7 +66,7 @@ class ResourceService(asab.Service):
 
 			# Update resource description
 			if resource_description is not None and db_resource.get("description") != resource_description:
-				await self.update_description(resource_id, resource_description)
+				await self.update(resource_id, resource_description)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -94,21 +95,15 @@ class ResourceService(asab.Service):
 
 	async def get(self, resource_id: str):
 		data = await self.StorageService.get(self.ResourceCollection, resource_id)
-		data["result"] = "OK"
 		return data
 
 
 	async def create(self, resource_id: str, description: str = None):
 		if self.ResourceIdRegex.match(resource_id) is None:
-			L.error("Invalid ID format", struct_data={"resource_id": resource_id})
-			return {
-				"result": "INVALID-VALUE",
-				"message":
-					"Resource ID must consist only of characters 'a-z0-9.:_-', "
-					"start with a letter, end with a letter or digit, "
-					"and be between 2 and 128 characters long.",
-			}
-
+			raise asab.exceptions.ValidationError(
+				"Resource ID must consist only of characters 'a-z0-9.:_-', "
+				"start with a letter, end with a letter or digit, "
+				"and be between 2 and 128 characters long.")
 		upsertor = self.StorageService.upsertor(self.ResourceCollection, obj_id=resource_id)
 
 		if description is not None:
@@ -116,27 +111,18 @@ class ResourceService(asab.Service):
 
 		try:
 			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource_id": resource_id})
-		except asab.storage.exceptions.DuplicateError:
-			L.warning("Resource already exists", struct_data={"resource_id": resource_id})
-			return {
-				"result": "CONFLICT",
-				"message": "Resource already exists",
-			}
+		except asab.storage.exceptions.DuplicateError as e:
+			if e.KeyValue is not None:
+				key, value = e.KeyValue
+				raise asab.exceptions.Conflict(key=key, value=value)
+			else:
+				raise asab.exceptions.Conflict()
 
-		return {"result": "OK"}
+		L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource": resource_id})
 
 
-	async def update_description(self, resource_id: str, description: str):
-		try:
-			resource = await self.get(resource_id)
-		except KeyError:
-			L.error("Resource not found", struct_data={"resource_id": resource_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": "Resource '{}' not found".format(resource_id),
-			}
-
+	async def update(self, resource_id: str, description: str):
+		resource = await self.get(resource_id)
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
 			obj_id=resource_id,
@@ -150,17 +136,86 @@ class ResourceService(asab.Service):
 		else:
 			upsertor.set("description", description)
 
-		try:
-			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={
-				"resource_id": resource_id,
-				"description": description,
-			})
-		except KeyError:
-			L.error("Resource not found", struct_data={"resource_id": resource_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": "Resource '{}' not found".format(resource_id),
-			}
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={"resource": resource_id})
 
-		return {"result": "OK"}
+
+	async def delete(self, resource_id: str, hard_delete: bool = False):
+		if resource_id in map(lambda x: x["id"], self.BuiltinResources):
+			raise ValueError("System resource cannot be deleted")
+
+		resource = await self.get(resource_id)
+
+		# Remove the resource from all roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		roles = await role_svc.list(resource=resource_id)
+		if roles["count"] > 0:
+			for role in roles["data"]:
+				await role_svc.update(role["_id"], resources_to_remove=[resource_id])
+			L.log(asab.LOG_NOTICE, "Resource unassigned", struct_data={
+				"resource": resource_id,
+				"n_roles": roles["count"],
+			})
+
+		if hard_delete:
+			await self.StorageService.delete(self.ResourceCollection, resource_id)
+			L.warning("Resource deleted", struct_data={
+				"resource": resource_id,
+			})
+		else:
+			upsertor = self.StorageService.upsertor(
+				self.ResourceCollection,
+				obj_id=resource_id,
+				version=resource["_v"]
+			)
+			upsertor.set("deleted", True)
+			await upsertor.execute()
+			L.log(asab.LOG_NOTICE, "Resource soft-deleted", struct_data={
+				"resource": resource_id,
+			})
+
+
+	async def undelete(self, resource_id: str):
+		resource = await self.get(resource_id)
+		if resource.get("deleted") is not True:
+			raise asab.exceptions.Conflict("Cannot undelete a resource that has not been soft-deleted.")
+
+		upsertor = self.StorageService.upsertor(
+			self.ResourceCollection,
+			obj_id=resource_id,
+			version=resource["_v"]
+		)
+		upsertor.unset("deleted")
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Resource undeleted", struct_data={
+			"resource": resource_id,
+		})
+
+
+	async def rename(self, resource_id: str, new_resource_id: str):
+		"""
+		Shortcut for creating a new resource with the desired name,
+		assigning it to roles that have the original resource and deleting the original resource
+		"""
+		if resource_id in map(lambda x: x["id"], self.BuiltinResources):
+			raise ValueError("System resource cannot be renamed")
+
+		role_svc = self.App.get_service("seacatauth.RoleService")
+
+		resource = await self.get(resource_id)
+		await self.create(new_resource_id, resource["description"])
+
+		roles = await role_svc.list(resource=resource_id)
+		if roles["count"] > 0:
+			for role in roles["data"]:
+				await role_svc.update(
+					role["_id"],
+					resources_to_remove=[resource_id],
+					resources_to_add=[new_resource_id])
+
+		await self.StorageService.delete(self.ResourceCollection, resource_id)
+		L.log(asab.LOG_NOTICE, "Resource renamed", struct_data={
+			"old_resource": resource_id,
+			"new_resource": resource_id,
+			"n_roles": roles["count"],
+		})

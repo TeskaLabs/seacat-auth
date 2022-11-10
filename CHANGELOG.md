@@ -11,6 +11,8 @@
 ### Features
 - Roles have an optional "description" field (#103, PLUM Sprint 221021)
 - User registration (invitation only) (#86, PLUM Sprint 221021)
+- Delete and rename resources (#113, PLUM Sprint 221104)
+- List roles that contain a specific resource (#113, PLUM Sprint 221104)
 - Include session ID and parent session ID in ID token (#116, PLUM Sprint 221104)
 
 ### Refactoring
