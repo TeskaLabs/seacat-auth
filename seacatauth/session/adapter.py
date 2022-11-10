@@ -17,7 +17,7 @@ class SessionData:
 	CreatedAt: datetime.datetime
 	ModifiedAt: datetime.datetime
 	Version: int
-	ParentId: typing.Optional[str]
+	ParentSessionId: typing.Optional[str]
 	Type: typing.Optional[str]
 	Expiration: datetime.datetime
 	MaxExpiration: datetime.datetime
@@ -195,7 +195,7 @@ class SessionAdapter:
 			self.FN.ModifiedAt: self.Session.ModifiedAt,
 			self.FN.Version: self.Session.Version,
 			self.FN.Session.Type: self.Session.Type,
-			self.FN.Session.ParentSessionId: self.Session.ParentId,
+			self.FN.Session.ParentSessionId: self.Session.ParentSessionId,
 			self.FN.Session.Expiration: self.Session.Expiration,
 			self.FN.Session.MaxExpiration: self.Session.MaxExpiration,
 			self.FN.Session.ExpirationExtension: self.Session.ExpirationExtension,
@@ -273,7 +273,7 @@ class SessionAdapter:
 			CreatedAt=session_dict.pop(cls.FN.CreatedAt),
 			ModifiedAt=session_dict.pop(cls.FN.ModifiedAt),
 			Type=session_dict.pop(cls.FN.Session.Type, None),
-			ParentId=session_dict.pop(cls.FN.Session.ParentSessionId, None),
+			ParentSessionId=session_dict.pop(cls.FN.Session.ParentSessionId, None),
 			Expiration=session_dict.pop(cls.FN.Session.Expiration, None),
 			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
 			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),
