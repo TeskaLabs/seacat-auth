@@ -29,27 +29,25 @@ class RoleHandler(object):
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
 
+
 	@access_control("authz:superuser")
 	async def list_all(self, request):
-		page = int(request.query.get('p', 1)) - 1
-		limit = request.query.get('i', None)
-		if limit is not None:
-			limit = int(limit)
-
-		result = await self.RoleService.list(None, page, limit)
-		return asab.web.rest.json_response(
-			request, result
-		)
+		return await self._list(request, tenant=None)
 
 	@access_control()
 	async def list(self, request, *, tenant):
-		page = int(request.query.get('p', 1)) - 1
-		limit = request.query.get('i', None)
+		return await self._list(request, tenant=tenant)
+
+	async def _list(self, request, *, tenant):
+		page = int(request.query.get("p", 1)) - 1
+		limit = request.query.get("i")
 		if limit is not None:
 			limit = int(limit)
+		resource = request.query.get("resource")
 
-		result = await self.RoleService.list(tenant, page, limit)
+		result = await self.RoleService.list(tenant, page, limit, resource=resource)
 		return asab.web.rest.json_response(request, result)
+
 
 	@access_control()
 	async def get(self, request, *, tenant):
@@ -67,6 +65,7 @@ class RoleHandler(object):
 			request, result
 		)
 
+
 	@access_control("authz:tenant:admin")
 	async def create(self, request, *, tenant):
 		role_name = request.match_info["role_name"]
@@ -76,6 +75,7 @@ class RoleHandler(object):
 			request, result,
 			status=200 if result == "OK" else 400
 		)
+
 
 	@access_control("authz:tenant:admin")
 	async def delete(self, request, *, tenant):
@@ -93,6 +93,7 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(
 			request, result
 		)
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
