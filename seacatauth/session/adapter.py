@@ -155,25 +155,6 @@ class SessionAdapter:
 		else:
 			self.Data = None
 
-	@classmethod
-	def from_id_token(cls, session_svc, id_token_dict):
-		session_dict = {
-			cls.FN.SessionId: id_token_dict.get("sid"),
-			cls.FN.Session.ParentSessionId: id_token_dict.get("psid"),
-			cls.FN.Session.Type: "openidconnect",
-			cls.FN.Version: None,
-			cls.FN.CreatedAt: id_token_dict.get("iat"),  # TODO: strptime
-			cls.FN.ModifiedAt: None,
-			cls.FN.Session.Expiration: id_token_dict.get("exp"),  # TODO: strptime
-			cls.FN.Credentials.Id: id_token_dict.get("sub"),
-			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
-			cls.FN.Credentials.Email: id_token_dict.get("email"),
-			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
-			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
-			cls.FN.Authorization.Authz: id_token_dict.get("authz") or id_token_dict.get("resources"),
-			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
-		}
-		return cls(session_svc, session_dict)
 
 	def __repr__(self):
 		return ("<{} {} t:{} c:{} m:{} exp:{} cid:{} ({}{})>".format(
