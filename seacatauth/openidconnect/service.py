@@ -192,7 +192,7 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	def build_session_from_id_token(self, token_value):
+	async def build_session_from_id_token(self, token_value):
 		try:
 			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
 		except jwcrypto.jwt.JWTExpired:
@@ -204,14 +204,18 @@ class OpenIdConnectService(asab.Service):
 
 		try:
 			data_dict = json.loads(token.claims)
+			session_id = data_dict["sid"]
 		except ValueError:
 			L.warning("Cannot read ID token claims")
 			return None
+		except KeyError:
+			L.warning("ID token claims do not contain 'sid'")
+			return None
 
 		try:
-			session = SessionAdapter.from_id_token(self.SessionService, data_dict)
+			session = await self.SessionService.get(session_id)
 		except ValueError:
-			L.warning("Cannot build session from ID token data")
+			L.warning("Session not found")
 			return None
 
 		return session
