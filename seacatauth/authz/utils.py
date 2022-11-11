@@ -18,7 +18,7 @@ async def get_credentials_authz(credentials_id, tenant_service, role_service):
 	authz = {}
 	tenant = "*"
 	authz[tenant] = set()
-	for role in await role_service.get_roles_by_credentials(credentials_id, tenant):
+	for role in await role_service.get_roles_by_credentials(credentials_id, [tenant]):
 		authz[tenant].update(await role_service.get_role_resources(role))
 	authz[tenant] = list(authz[tenant])
 
@@ -26,7 +26,7 @@ async def get_credentials_authz(credentials_id, tenant_service, role_service):
 	if tenant_service.is_enabled():
 		for tenant in await tenant_service.get_tenants(credentials_id):
 			authz[tenant] = set()
-			for role in await role_service.get_roles_by_credentials(credentials_id, tenant):
+			for role in await role_service.get_roles_by_credentials(credentials_id, [tenant]):
 				authz[tenant].update(await role_service.get_role_resources(role))
 			authz[tenant] = list(authz[tenant])
 

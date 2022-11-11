@@ -107,12 +107,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		return credentials_id
 
 
-	async def register(self, register_info: dict) -> Optional[str]:
-		if not self.Editable:
-			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
-		raise NotImplementedError()
-
-
 	async def update(self, credentials_id, update: dict) -> Optional[str]:
 		if not self.Editable:
 			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
@@ -159,7 +153,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			"cid": credentials_id,
 			"fields": updated_fields
 		})
-		return "OK"
 
 
 	async def delete(self, credentials_id) -> Optional[str]:
