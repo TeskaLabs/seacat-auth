@@ -15,6 +15,7 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 
 	Type = "abc"
 	Editable = False
+	RegistrationEnabled = False
 
 	ConfigDefaults = {
 		'tenants': 'no',
