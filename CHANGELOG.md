@@ -7,6 +7,7 @@
 
 ### Fix
 - Logout with ID token (#116, PLUM Sprint 221104)
+- Disable registration service when no credential provider supports registration (#118, PLUM Sprint 221104)
 
 ### Features
 - Roles have an optional "description" field (#103, PLUM Sprint 221021)
