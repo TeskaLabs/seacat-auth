@@ -272,7 +272,6 @@ class RegistrationService(asab.Service):
 		:type provider_id: str
 		:return: A provider object
 		"""
-		assert self.Enabled
 		# Specific provider requested
 		if provider_id is not None:
 			provider = self.CredentialsService.Providers.get(provider_id)
