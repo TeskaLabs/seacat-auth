@@ -44,7 +44,11 @@ class RegistrationService(asab.Service):
 		# Support only one registrable credential provider for now
 		self.CredentialProvider = self._get_provider()
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		# Disable service if there is no registrable provider
+		self.Enabled = self.CredentialProvider is not None
+
+		if self.Enabled:
+			self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
 	async def initialize(self, app):
