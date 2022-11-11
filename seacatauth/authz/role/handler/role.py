@@ -27,29 +27,27 @@ class RoleHandler(object):
 		web_app.router.add_get("/role/{tenant}/{role_name}", self.get)
 		web_app.router.add_post("/role/{tenant}/{role_name}", self.create)
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete)
-		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_resources)
+		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
+
 
 	@access_control("authz:superuser")
 	async def list_all(self, request):
-		page = int(request.query.get('p', 1)) - 1
-		limit = request.query.get('i', None)
-		if limit is not None:
-			limit = int(limit)
-
-		result = await self.RoleService.list(None, page, limit)
-		return asab.web.rest.json_response(
-			request, result
-		)
+		return await self._list(request, tenant=None)
 
 	@access_control()
 	async def list(self, request, *, tenant):
-		page = int(request.query.get('p', 1)) - 1
-		limit = request.query.get('i', None)
+		return await self._list(request, tenant=tenant)
+
+	async def _list(self, request, *, tenant):
+		page = int(request.query.get("p", 1)) - 1
+		limit = request.query.get("i")
 		if limit is not None:
 			limit = int(limit)
+		resource = request.query.get("resource")
 
-		result = await self.RoleService.list(tenant, page, limit)
+		result = await self.RoleService.list(tenant, page, limit, resource=resource)
 		return asab.web.rest.json_response(request, result)
+
 
 	@access_control()
 	async def get(self, request, *, tenant):
@@ -67,6 +65,7 @@ class RoleHandler(object):
 			request, result
 		)
 
+
 	@access_control("authz:tenant:admin")
 	async def create(self, request, *, tenant):
 		role_name = request.match_info["role_name"]
@@ -76,6 +75,7 @@ class RoleHandler(object):
 			request, result,
 			status=200 if result == "OK" else 400
 		)
+
 
 	@access_control("authz:tenant:admin")
 	async def delete(self, request, *, tenant):
@@ -94,31 +94,29 @@ class RoleHandler(object):
 			request, result
 		)
 
+
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
+		"additionalProperties": False,
 		"properties": {
+			"description": {
+				"type": "string"},
 			"add": {
 				"type": "array",
-				"items": {
-					"type": "string",
-				},
+				"items": {"type": "string"},
 			},
 			"del": {
 				"type": "array",
-				"items": {
-					"type": "string",
-				},
+				"items": {"type": "string"},
 			},
 			"set": {
 				"type": "array",
-				"items": {
-					"type": "string",
-				},
+				"items": {"type": "string"},
 			},
 		}
 	})
 	@access_control("authz:tenant:admin")
-	async def update_resources(self, request, *, json_data, tenant, resources):
+	async def update(self, request, *, json_data, tenant, resources):
 		"""
 		Sets, adds or removes resources from a specified role.
 		Global roles can be edited by superuser only.
@@ -126,9 +124,9 @@ class RoleHandler(object):
 		is_superuser = "authz:superuser" in resources
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		resources_to_set = json_data.get("set", None)
-		resources_to_add = json_data.get("add", None)
-		resources_to_remove = json_data.get("del", None)
+		resources_to_set = json_data.get("set")
+		resources_to_add = json_data.get("add")
+		resources_to_remove = json_data.get("del")
 		resources_to_assign = set().union(
 			resources_to_set or [],
 			resources_to_add or [],
@@ -145,11 +143,12 @@ class RoleHandler(object):
 			raise aiohttp.web.HTTPForbidden()
 
 		try:
-			result = await self.RoleService.update_resources(
+			result = await self.RoleService.update(
 				role_id,
-				resources_to_set,
-				resources_to_add,
-				resources_to_remove
+				description=json_data.get("description"),
+				resources_to_set=resources_to_set,
+				resources_to_add=resources_to_add,
+				resources_to_remove=resources_to_remove,
 			)
 		except ValueError:
 			raise aiohttp.web.HTTPBadRequest()

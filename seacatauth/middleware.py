@@ -48,7 +48,7 @@ def private_auth_middleware_factory(app):
 		token_value = get_bearer_token_value(request)
 		if token_value is not None:
 			try:
-				request.Session = oidc_service.build_session_from_id_token(token_value)
+				request.Session = await oidc_service.build_session_from_id_token(token_value)
 			except ValueError:
 				# If the token cannot be parsed as ID token, it may be an Access token
 				if _allow_access_token_auth:
@@ -59,7 +59,11 @@ def private_auth_middleware_factory(app):
 		def has_resource_access(tenant: str, resource: str) -> bool:
 			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
 
+		def is_superuser() -> bool:
+			return has_resource_access("*", "authz:superuser")
+
 		request.has_resource_access = has_resource_access
+		request.is_superuser = is_superuser
 
 		if require_authentication is False:
 			return await handler(request)
@@ -113,7 +117,7 @@ def public_auth_middleware_factory(app):
 		token_value = get_bearer_token_value(request)
 		if token_value is not None:
 			try:
-				request.Session = oidc_service.build_session_from_id_token(token_value)
+				request.Session = await oidc_service.build_session_from_id_token(token_value)
 			except ValueError:
 				# If the token cannot be parsed as ID token, it may be an Access token
 				# OIDC endpoints allow authorization via Access token

@@ -82,6 +82,11 @@ class SeaCatAuthApplication(asab.Application):
 		self.ChangePasswordService = ChangePasswordService(self, self.CredentialService)
 		self.ChangePasswordHandler = ChangePasswordHandler(self, self.ChangePasswordService)
 
+		from .credentials.registration import RegistrationService, RegistrationHandler
+		self.RegistrationService = RegistrationService(self, self.CredentialService)
+		if self.RegistrationService.Enabled:
+			self.RegistrationHandler = RegistrationHandler(self, self.RegistrationService, self.CredentialService)
+
 		# Load Role service
 		# depends on: ResourceService, TenantService, CredentialService
 		from .authz import RoleService, RoleHandler, RolesHandler

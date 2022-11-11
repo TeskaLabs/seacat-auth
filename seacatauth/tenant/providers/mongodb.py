@@ -92,14 +92,17 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		return tenant_id
 
 
-	async def set_data(self, tenant_id: str, data: dict) -> Optional[str]:
+	async def update(self, tenant_id: str, *, description: str = None, data: dict = None) -> Optional[str]:
 		tenant = await self.get(tenant_id)
 		u = self.MongoDBStorageService.upsertor(
 			self.TenantsCollection,
 			obj_id=tenant_id,
 			version=tenant["_v"]
 		)
-		u.set("data", data)
+		if description is not None:
+			u.set("description", description)
+		if data is not None:
+			u.set("data", data)
 		tenant_id = await u.execute()
 
 		L.log(asab.LOG_NOTICE, "Tenant data updated", struct_data={"tenant": tenant_id})
