@@ -328,8 +328,8 @@ class SessionService(asab.Service):
 		Return the updated session object.
 		"""
 		# Get parent session
-		if session.Session.ParentId is not None:
-			session = await self.get(bson.ObjectId(session.Session.ParentId))
+		if session.Session.ParentSessionId is not None:
+			session = await self.get(bson.ObjectId(session.Session.ParentSessionId))
 
 		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
 			# Session has been extended recently
