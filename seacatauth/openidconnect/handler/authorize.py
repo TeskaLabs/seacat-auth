@@ -304,7 +304,7 @@ class AuthorizeHandler(object):
 						scope=scope
 					)
 					return self.reply_with_authentication_error(
-						"access_denied",
+						"unauthorized_tenant",
 						redirect_uri,
 						state=state,
 						error_description="Unauthorized tenant: {}".format(tenant),
@@ -317,7 +317,7 @@ class AuthorizeHandler(object):
 					scope=scope
 				)
 				return self.reply_with_authentication_error(
-					"access_denied",
+					"unauthorized_tenant",
 					redirect_uri,
 					state=state,
 					error_description="Unauthorized tenant: {}".format(tenant),
@@ -337,7 +337,7 @@ class AuthorizeHandler(object):
 					scope=scope
 				)
 				return self.reply_with_authentication_error(
-					"access_denied",
+					"user_has_no_tenant",
 					redirect_uri,
 					state=state,
 					error_description="User has no tenant.",
