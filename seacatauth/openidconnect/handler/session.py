@@ -35,15 +35,15 @@ class SessionHandler(object):
 			return aiohttp.web.HTTPBadRequest()
 
 		try:
-			session = self.OpenIdConnectService.build_session_from_id_token(token_value)
+			session = await self.OpenIdConnectService.build_session_from_id_token(token_value)
 		except ValueError:
 			session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 		if session is None:
 			return aiohttp.web.HTTPNotFound()
 
-		if session.Session.ParentId is not None:
+		if session.Session.ParentSessionId is not None:
 			try:
-				parent_session = await self.SessionService.get(session.Session.ParentId)
+				parent_session = await self.SessionService.get(session.Session.ParentSessionId)
 			except KeyError:
 				parent_session = None
 		else:
@@ -56,7 +56,7 @@ class SessionHandler(object):
 			# Back compat: This can occur with old sessions
 			L.warning("OIDC session has no parent session", struct_data={
 				"sid": session.Session.Id,
-				"parent_sid": session.Session.ParentId,
+				"parent_sid": session.Session.ParentSessionId,
 			})
 			await self.SessionService.delete(session.Session.Id)
 
