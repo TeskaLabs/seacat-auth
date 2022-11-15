@@ -307,7 +307,7 @@ class AuthorizeHandler(object):
 						"access_denied",
 						redirect_uri,
 						state=state,
-						error_description="Unauthorized tenant: '{}'".format(tenant),
+						error_description="Unauthorized tenant: {}".format(tenant),
 					)
 			else:
 				await self.audit_authorize_error(
@@ -320,7 +320,7 @@ class AuthorizeHandler(object):
 					"access_denied",
 					redirect_uri,
 					state=state,
-					error_description="Unauthorized tenant: '{}'".format(tenant),
+					error_description="Unauthorized tenant: {}".format(tenant),
 				)
 
 		if len(tenants) == 0 and "tenant" in scope:
