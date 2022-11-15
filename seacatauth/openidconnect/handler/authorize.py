@@ -89,13 +89,14 @@ class AuthorizeHandler(object):
 
 		# Check the presence of required parameters
 		for parameter in frozenset(["scope", "client_id", "response_type", "redirect_uri"]):
-			if parameter not in request_parameters:
+			L.warning(f"{parameter}: {request_parameters[parameter]}")
+			if parameter not in request_parameters or len(request_parameters[parameter]) == 0:
 				L.warning("Missing required parameter: {}".format(parameter), struct_data=request_parameters)
 				return self.reply_with_authentication_error(
-					request,
-					request_parameters,
 					"invalid_request",
-					"Missing required parameter: {}".format(parameter),
+					request_parameters.get("redirect_uri") or None,
+					error_description="Missing required parameter: {}".format(parameter),
+					state=request_parameters.get("state")
 				)
 
 		# Select the proper flow based on response_type
