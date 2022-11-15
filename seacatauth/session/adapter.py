@@ -17,7 +17,7 @@ class SessionData:
 	CreatedAt: datetime.datetime
 	ModifiedAt: datetime.datetime
 	Version: int
-	ParentId: typing.Optional[str]
+	ParentSessionId: typing.Optional[str]
 	Type: typing.Optional[str]
 	Expiration: datetime.datetime
 	MaxExpiration: datetime.datetime
@@ -155,24 +155,6 @@ class SessionAdapter:
 		else:
 			self.Data = None
 
-	@classmethod
-	def from_id_token(cls, session_svc, id_token_dict):
-		session_dict = {
-			cls.FN.SessionId: None,
-			cls.FN.Session.Type: "openidconnect",
-			cls.FN.Version: None,
-			cls.FN.CreatedAt: id_token_dict.get("iat"),  # TODO: strptime
-			cls.FN.ModifiedAt: None,
-			cls.FN.Session.Expiration: id_token_dict.get("exp"),  # TODO: strptime
-			cls.FN.Credentials.Id: id_token_dict.get("sub"),
-			cls.FN.Credentials.Username: id_token_dict.get("preferred_username"),
-			cls.FN.Credentials.Email: id_token_dict.get("email"),
-			cls.FN.Credentials.Phone: id_token_dict.get("phone_number"),
-			cls.FN.Credentials.CustomData: id_token_dict.get("custom"),
-			cls.FN.Authorization.Authz: id_token_dict.get("authz") or id_token_dict.get("resources"),
-			cls.FN.Authorization.Tenants: id_token_dict.get("tenants"),
-		}
-		return cls(session_svc, session_dict)
 
 	def __repr__(self):
 		return ("<{} {} t:{} c:{} m:{} exp:{} cid:{} ({}{})>".format(
@@ -194,7 +176,7 @@ class SessionAdapter:
 			self.FN.ModifiedAt: self.Session.ModifiedAt,
 			self.FN.Version: self.Session.Version,
 			self.FN.Session.Type: self.Session.Type,
-			self.FN.Session.ParentSessionId: self.Session.ParentId,
+			self.FN.Session.ParentSessionId: self.Session.ParentSessionId,
 			self.FN.Session.Expiration: self.Session.Expiration,
 			self.FN.Session.MaxExpiration: self.Session.MaxExpiration,
 			self.FN.Session.ExpirationExtension: self.Session.ExpirationExtension,
@@ -272,7 +254,7 @@ class SessionAdapter:
 			CreatedAt=session_dict.pop(cls.FN.CreatedAt),
 			ModifiedAt=session_dict.pop(cls.FN.ModifiedAt),
 			Type=session_dict.pop(cls.FN.Session.Type, None),
-			ParentId=session_dict.pop(cls.FN.Session.ParentSessionId, None),
+			ParentSessionId=session_dict.pop(cls.FN.Session.ParentSessionId, None),
 			Expiration=session_dict.pop(cls.FN.Session.Expiration, None),
 			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
 			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),

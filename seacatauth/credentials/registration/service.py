@@ -44,7 +44,11 @@ class RegistrationService(asab.Service):
 		# Support only one registrable credential provider for now
 		self.CredentialProvider = self._get_provider()
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		# Disable service if there is no registrable provider
+		self.Enabled = self.CredentialProvider is not None
+
+		if self.Enabled:
+			self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 
 	async def initialize(self, app):
@@ -64,7 +68,7 @@ class RegistrationService(asab.Service):
 		invited_from_ips: list = None,
 	):
 		"""
-		Create a new (incomplete) credential with a registration code
+		Create new (incomplete) credentials with a registration code
 
 		:param credential_data: Details of the user being invited
 		:type credential_data: dict
@@ -78,6 +82,7 @@ class RegistrationService(asab.Service):
 		:type invited_from_ips: list
 		:return: The ID of the generated invitation.
 		"""
+		assert self.Enabled
 		registration_key = secrets.token_urlsafe(self.RegistrationKeyByteLength)
 		# TODO: Generate a proper encryption key. Registration code is random string + key + signature.
 		registration_code = registration_key
@@ -115,6 +120,14 @@ class RegistrationService(asab.Service):
 
 
 	async def get_credential_by_registration_code(self, registration_code):
+		"""
+		Return the current state of unregistered credentials, including their tenants
+		and whether they have a password set
+
+		:param registration_code: The registration code that was sent to the user
+		:return: The credential object without sensitive fields
+		"""
+		assert self.Enabled
 		credentials = await self.CredentialProvider.get_by(
 			"__registration.code", registration_code, include=["__password", "__registration"])
 		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
@@ -140,13 +153,23 @@ class RegistrationService(asab.Service):
 		return credentials_public
 
 
-	async def delete_credential_by_registration_code(self, registration_code):
+	async def delete_credential_by_registration_code(self, registration_code: str):
+		"""
+		Delete credentials by registration code
+
+		:param registration_code: The registration code that was sent to the user
+		:type registration_code: str
+		"""
+		assert self.Enabled
 		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code)
 		await self.CredentialProvider.delete(credentials["_id"])
-		return credentials
 
 
 	async def delete_expired_unregistered_credentials(self):
+		"""
+		Delete all credentials that have expired registration time
+		"""
+		assert self.Enabled
 		collection = self.StorageService.Database[self.CredentialProvider.CredentialsCollection]
 		query_filter = {"__registration.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
@@ -155,7 +178,14 @@ class RegistrationService(asab.Service):
 				"count": result.deleted_count})
 
 
-	async def update_credential_by_registration_code(self, registration_code, credential_data):
+	async def update_credential_by_registration_code(self, registration_code: str, credential_data: dict):
+		"""
+		Update the credential by registration code
+
+		:param registration_code: The registration code that was sent to the user
+		:param credential_data: a dictionary with the update data
+		"""
+		assert self.Enabled
 		for key in credential_data:
 			if key not in ["username", "email", "phone", "password"]:
 				raise asab.exceptions.ValidationError("Updating '{}' not allowed".format(key))
@@ -173,7 +203,14 @@ class RegistrationService(asab.Service):
 				raise asab.exceptions.Conflict()
 
 
-	async def complete_registration(self, registration_code):
+	async def complete_registration(self, registration_code: str):
+		"""
+		Find the credentials that are associated with the registration code and update them to
+		mark them as registered.
+
+		:param registration_code: The registration code that was sent to the user
+		"""
+		assert self.Enabled
 		credentials = await self.CredentialProvider.get_by(
 			"__registration.code", registration_code, include=["__password", "__registration"])
 		# TODO: Proper validation using policy and login descriptors
@@ -197,7 +234,15 @@ class RegistrationService(asab.Service):
 		await self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_NEW, {"cid": credentials["_id"]})
 
 
-	async def complete_registration_with_existing_credentials(self, registration_code, credentials_id):
+	async def complete_registration_with_existing_credentials(self, registration_code: str, credentials_id: str):
+		"""
+		Find the credentials associated with the registration code and assign the currently authenticated
+		credentials to the tenant and roles associated with the registration code.
+
+		:param registration_code: The registration code that was sent to the user
+		:param credentials_id: The ID of the currently authenticated credentials that will be registered
+		"""
+		assert self.Enabled
 		reg_credentials = await self.get_credential_by_registration_code(registration_code)
 		reg_credential_id = reg_credentials["_id"]
 		reg_tenants = await self.TenantService.get_tenants(reg_credential_id)
@@ -246,6 +291,7 @@ class RegistrationService(asab.Service):
 
 
 	def format_registration_uri(self, registration_code: str):
+		assert self.Enabled
 		return self.RegistrationUriFormat.format(
 			auth_webui_base_url=self.AuthWebUIBaseUrl,
 			registration_code=registration_code)
