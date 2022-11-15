@@ -4,6 +4,7 @@
 
 ### Breaking changes
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+- Unset credential phone/email by setting it to null instead of empty string (#117, PLUM Sprint 221104)
 
 ### Fix
 - Logout with ID token (#116, PLUM Sprint 221104)
@@ -19,6 +20,7 @@
 ### Refactoring
 - Keep superuser role after provisioning (#102, PLUM Sprint 221021)
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+- Unset credential phone/email by setting it to null instead of empty string (#117, PLUM Sprint 221104)
 
 ---
 
