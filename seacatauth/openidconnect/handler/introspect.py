@@ -119,11 +119,8 @@ class TokenIntrospectionHandler(object):
 		}
 		"""
 
-		response = await nginx_introspection(
-			request,
-			self.authenticate_request,
-			self.OpenIdConnectService.App
-		)
+		session = await self.authenticate_request(request)
+		response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
 
 		if response.status_code != 200:
 			response.headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
