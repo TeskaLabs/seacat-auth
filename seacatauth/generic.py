@@ -25,7 +25,7 @@ def get_bearer_token_value(request):
 		return None
 
 
-async def add_to_header(headers, attributes_to_add, session, credentials_service, requested_tenant=None):
+async def add_to_header(headers, attributes_to_add, session, requested_tenant=None):
 	"""
 	Prepare a common header with:
 	* X-Credentials: htpasswd:id:foobar
@@ -37,11 +37,9 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 
 	# obtain username to append add in headers
 	if "credentials" in attributes_to_add:
-		credentials = await credentials_service.get(session.Credentials.Id)
-		headers["X-Credentials"] = credentials["_id"]
-		v = credentials.get("username")
-		if v is not None:
-			headers["X-Username"] = v
+		headers["X-Credentials"] = session.Credentials.Id
+		if session.Credentials.Username is not None:
+			headers["X-Username"] = session.Credentials.Username
 
 	# Obtain assigned tenants from session object
 	if "tenants" in attributes_to_add:
@@ -87,7 +85,6 @@ async def nginx_introspection(
 	Optionally checks for resources. Missing resource access results in 403 response.
 	Optionally adds session attributes (username, tenants etc.) to X-headers.
 	"""
-	credentials_service = app.get_service("seacatauth.CredentialsService")
 	session_service = app.get_service("seacatauth.SessionService")
 	rbac_service = app.get_service("seacatauth.RBACService")
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
@@ -148,7 +145,6 @@ async def nginx_introspection(
 		headers=headers,
 		attributes_to_add=attributes_to_add,
 		session=session,
-		credentials_service=credentials_service,
 		requested_tenant=requested_tenant
 	)
 
