@@ -10,19 +10,17 @@ _FIELDS = {
 		"description": "Username",
 	},
 	"email": {
-		"type": "string",
 		"description": "Email address",
 		"anyOf": [
-			{"format": "email"},
-			{"const": ""},
+			{"type": "null"},
+			{"type": "string", "format": "email"},
 		],
 	},
 	"phone": {
-		"type": "string",
 		"description": "Mobile number",
 		"anyOf": [
-			{"pattern": r"^\+?[0-9 ]+$"},
-			{"const": ""},
+			{"type": "null"},
+			{"type": "string", "pattern": r"^\+?[0-9 ]+$"},
 		],
 	},
 	"data": {
