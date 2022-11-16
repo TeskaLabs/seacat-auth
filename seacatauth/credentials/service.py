@@ -413,16 +413,16 @@ class CredentialsService(asab.Service):
 			raise asab.exceptions.ValidationError(
 				"Cannot unsuspend credential whose registration has not been completed.")
 
-		if "email" in update_dict and update_dict["email"] == "":
-			email_specified = False
-		elif "email" not in current_dict or current_dict["email"] == "":
+		if "email" in update_dict:
+			email_specified = update_dict["email"] is not None
+		elif "email" not in current_dict or current_dict["email"] is None:
 			email_specified = False
 		else:
 			email_specified = True
 
-		if "phone" in update_dict and update_dict["phone"] == "":
-			phone_specified = False
-		elif "phone" not in current_dict or current_dict["phone"] == "":
+		if "phone" in update_dict:
+			phone_specified = update_dict["phone"] is not None
+		elif "phone" not in current_dict or current_dict["phone"] is None:
 			phone_specified = False
 		else:
 			phone_specified = True
