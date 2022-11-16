@@ -89,27 +89,7 @@ async def nginx_introspection(
 	session_service = app.get_service("seacatauth.SessionService")
 	rbac_service = app.get_service("seacatauth.RBACService")
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
-	authn_service = app.get_service("seacatauth.AuthenticationService")
-
-	anonymous_cid = request.query.get("anonymous")
-
-	set_cookie = False
-	if session is not None:
-		# Allow anonymous access only if it is allowed by the introspect parameters
-		if "authn:anonymous" in session.Authorization.Authz.get("*", {}):
-			raise aiohttp.web.HTTPUnauthorized()
-	else:
-		if anonymous_cid is not None:
-			# Create a new root session with anonymous_cid and a cookie
-			# Set the cookie
-			from_info = [request.remote]
-			forwarded_for = request.headers.get("X-Forwarded-For")
-			if forwarded_for is not None:
-				from_info.extend(forwarded_for.split(", "))
-			session = await authn_service.create_anonymous_session(anonymous_cid, from_info=from_info)
-			set_cookie = True
-		else:
-			raise aiohttp.web.HTTPUnauthorized()
+	cookie_service = app.get_service("seacatauth.CookieService")
 
 	attributes_to_add = request.query.getall("add", [])
 	attributes_to_verify = request.query.getall("verify", [])
@@ -139,6 +119,12 @@ async def nginx_introspection(
 		aiohttp.hdrs.AUTHORIZATION: "Bearer {}".format(id_token)
 	}
 
+	# Delete SeaCat cookie from header unless "keepcookie" param is passed in query
+	cookie_string = request.headers.get(aiohttp.hdrs.COOKIE, "")
+	if request.query.get("keepcookie") is None:
+		cookie_string = cookie_service.CookiePattern.sub("", cookie_string)
+	headers[aiohttp.hdrs.COOKIE] = cookie_string
+
 	# Add headers
 	headers = await add_to_header(
 		headers=headers,
@@ -148,14 +134,6 @@ async def nginx_introspection(
 	)
 
 	response = aiohttp.web.HTTPOk(headers=headers)
-	if set_cookie:
-		response.set_cookie(
-			"SeaCatSCI",
-			session.Cookie.Id,
-			httponly=True,
-			domain=".local.loc",  # TODO!!!
-			secure=True
-		)
 	return response
 
 

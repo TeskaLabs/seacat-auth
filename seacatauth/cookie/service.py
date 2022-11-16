@@ -29,6 +29,10 @@ class CookieService(asab.Service):
 
 		# Configure root cookie
 		self.CookieName = asab.Config.get("seacatauth:cookie", "name")
+		self.CookiePattern = re.compile(
+			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieName)
+		)
+		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
 		self.RootCookieDomain = self._validate_cookie_domain(
 			asab.Config.get("seacatauth:cookie", "domain", fallback=None)
 		)

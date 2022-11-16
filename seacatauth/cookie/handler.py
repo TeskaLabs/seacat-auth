@@ -32,10 +32,7 @@ class CookieHandler(object):
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_svc
 		self.RBACService = app.get_service("seacatauth.RBACService")
-
-		self.CookiePattern = re.compile(
-			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
-		)
+		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
@@ -78,19 +75,35 @@ class CookieHandler(object):
 		"""
 
 		session = await self.authenticate_request(request)
+
+		new_anonymous_session = False
+		anonymous_cid = request.query.get("anonymous")
+		if session is not None:
+			# Allow anonymous access only if it is allowed by the introspect parameters
+			if "authn:anonymous" in session.Authorization.Authz.get("*", {}):
+				raise aiohttp.web.HTTPUnauthorized()
+		else:
+			if anonymous_cid is not None:
+				# Create a new root session with anonymous_cid and a cookie
+				# Set the cookie
+				from_info = [request.remote]
+				forwarded_for = request.headers.get("X-Forwarded-For")
+				if forwarded_for is not None:
+					from_info.extend(forwarded_for.split(", "))
+				session = await self.AuthenticationService.create_anonymous_session(
+					anonymous_cid, from_info=from_info)
+				new_anonymous_session = True
+			else:
+				raise aiohttp.web.HTTPUnauthorized()
+
 		response = await nginx_introspection(request, session, self.App)
+
+		if new_anonymous_session:
+			set_cookie(self.App, response, session)
+
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
 			return response
-
-		# Delete SeaCat cookie from Cookie header unless "keepcookie" param is passed in query
-		# TODO: Move this to generic.nginx_introspection
-		#    (issue: dependency on self.CookiePattern)
-		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE, "")
-		if request.query.get("keepcookie") is None:
-			cookie_string = self.CookiePattern.sub("", cookie_string)
-
-		response.headers[aiohttp.hdrs.COOKIE] = cookie_string
 
 		return response
 
