@@ -78,10 +78,7 @@ async def add_to_header(headers, attributes_to_add, session, credentials_service
 async def nginx_introspection(
 	request: aiohttp.web.Request,
 	authenticate: typing.Callable,
-	credentials_service: asab.Service,
-	session_service: asab.Service,
-	rbac_service: asab.Service,
-	oidc_service: asab.Service,
+	app: asab.Application
 ):
 	"""
 	Helper function for different types of nginx introspection (Cookie, OAuth token, Basic auth).
@@ -90,21 +87,33 @@ async def nginx_introspection(
 	Optionally checks for resources. Missing resource access results in 403 response.
 	Optionally adds session attributes (username, tenants etc.) to X-headers.
 	"""
+	credentials_service = app.get_service("seacatauth.CredentialsService")
+	session_service = app.get_service("seacatauth.SessionService")
+	rbac_service = app.get_service("seacatauth.RBACService")
+	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
+	authn_service = app.get_service("seacatauth.AuthenticationService")
 
-	unauthenticated_cid = request.query.get("unauthenticated")
+	anonymous_cid = request.query.get("anonymous")
 
 	# Authenticate request, get session
 	session = await authenticate(request)
-	if session is None:
-		if unauthenticated_cid is not None:
-			# Create a new root session with unauthenticated_cid and a cookie
+	set_cookie = False
+	if session is not None:
+		# Allow anonymous access only if it is allowed by the introspect parameters
+		if "authn:anonymous" in session.Authorization.Authz.get("*", {}):
+			raise aiohttp.web.HTTPUnauthorized()
+	else:
+		if anonymous_cid is not None:
+			# Create a new root session with anonymous_cid and a cookie
 			# Set the cookie
-			...
+			from_info = [request.remote]
+			forwarded_for = request.headers.get("X-Forwarded-For")
+			if forwarded_for is not None:
+				from_info.extend(forwarded_for.split(", "))
+			session = await authn_service.create_anonymous_session(anonymous_cid, from_info=from_info)
+			set_cookie = True
 		else:
-			return aiohttp.web.HTTPUnauthorized()
-
-	# TODO: Check if the session is "restricted" (for setting up 2nd factor only)
-	#   if so: fail
+			raise aiohttp.web.HTTPUnauthorized()
 
 	attributes_to_add = request.query.getall("add", [])
 	attributes_to_verify = request.query.getall("verify", [])
@@ -143,7 +152,16 @@ async def nginx_introspection(
 		requested_tenant=requested_tenant
 	)
 
-	return aiohttp.web.HTTPOk(headers=headers)
+	response = aiohttp.web.HTTPOk(headers=headers)
+	if set_cookie:
+		response.set_cookie(
+			"SeaCatSCI",
+			session.Cookie.Id,
+			httponly=True,
+			domain=".local.loc",  # TODO!!!
+			secure=True
+		)
+	return response
 
 
 def generate_ergonomic_token(length: int):

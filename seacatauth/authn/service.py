@@ -333,20 +333,19 @@ class AuthenticationService(asab.Service):
 			asab.LOG_NOTICE,
 			"Authentication/login successful.",
 			struct_data={
-				'cid': login_session.CredentialsId,
-				'sid': str(session.Session.Id),
-				'fi': from_info,
+				"cid": login_session.CredentialsId,
+				"sid": str(session.Session.Id),
+				"fi": from_info,
 			}
 		)
 
 		# Add an audit entry
-		# TODO: Add the IP address
 		await self.AuditService.append(
 			AuditCode.LOGIN_SUCCESS,
 			{
-				'cid': login_session.CredentialsId,
-				'sid': str(session.Session.Id),
-				'fi': from_info,
+				"cid": login_session.CredentialsId,
+				"sid": str(session.Session.Id),
+				"fi": from_info,
 			}
 		)
 
@@ -356,7 +355,7 @@ class AuthenticationService(asab.Service):
 		return session
 
 
-	async def m2m_login(
+	async def create_m2m_session(
 		self,
 		credentials_id: str,
 		login_descriptor: LoginDescriptor,
@@ -394,22 +393,84 @@ class AuthenticationService(asab.Service):
 		)
 		L.log(
 			asab.LOG_NOTICE,
-			"Authentication/login successful.",
+			"M2M authentication successful.",
 			struct_data={
+				"cid": credentials_id,
+				"sid": str(session.Session.Id),
+				"fi": from_info,
+			}
+		)
+
+		# Add an audit entry
+		await self.AuditService.append(
+			AuditCode.M2M_AUTHENTICATION_SUCCESSFUL,
+			{
 				'cid': credentials_id,
 				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
 		)
 
+		return session
+
+
+	async def create_anonymous_session(
+		self,
+		credentials_id: str,
+		session_expiration: float = None,
+		from_info: list = None
+	):
+		"""
+		Create session for unauthenticated/anonymous access
+		"""
+		authz_builder = await authz_session_builder(
+			tenant_service=self.TenantService,
+			role_service=self.RoleService,
+			credentials_id=credentials_id
+		)
+
+		# Assert that the credentials are configured for anonymous sessions
+		rbac_svc = self.App.get_service("seacatauth.RBACService")
+		if not rbac_svc.has_resource_access(authz_builder[0][1], tenant=None, requested_resources=["authn:anonymous"]):
+			raise Exception("Cannot create anonymous session: Credentials '{}' do not have access to 'authn:anonymous'.")
+
+		session_builders = [
+			await credentials_session_builder(self.CredentialsService, credentials_id),
+			authz_builder,
+			cookie_session_builder(),
+			await available_factors_session_builder(self, credentials_id)
+		]
+
+		# TODO: Temporary solution. Root session should have no OAuth2 data.
+		#   Remove once ID token support is fully implemented.
+		oauth2_data = {
+			"scope": ["cookie"],
+			"client_id": None,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		session = await self.SessionService.create_session(
+			session_type="root",
+			expiration=session_expiration,
+			session_builders=session_builders,
+		)
+		L.log(
+			asab.LOG_NOTICE,
+			"Unauthenticated session created.",
+			struct_data={
+				"cid": credentials_id,
+				"sid": str(session.Session.Id),
+				"fi": from_info,
+			}
+		)
+
 		# Add an audit entry
-		# TODO: Add the IP address
 		await self.AuditService.append(
-			AuditCode.LOGIN_SUCCESS,
+			AuditCode.ANONYMOUS_SESSION_CREATED,
 			{
-				'cid': credentials_id,
-				'sid': str(session.Session.Id),
-				'fi': from_info,
+				"cid": credentials_id,
+				"sid": str(session.Session.Id),
+				"fi": from_info,
 			}
 		)
 

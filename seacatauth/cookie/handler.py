@@ -80,10 +80,7 @@ class CookieHandler(object):
 		response = await nginx_introspection(
 			request,
 			self.authenticate_request,
-			self.CredentialsService,
-			self.SessionService,
-			self.RBACService,
-			self.App.get_service("seacatauth.OpenIdConnectService"),
+			self.App
 		)
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
@@ -92,10 +89,8 @@ class CookieHandler(object):
 		# Delete SeaCat cookie from Cookie header unless "keepcookie" param is passed in query
 		# TODO: Move this to generic.nginx_introspection
 		#    (issue: dependency on self.CookiePattern)
-		keep_cookie = request.query.get("keepcookie", None)
-		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE)
-
-		if keep_cookie is None:
+		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE, "")
+		if request.query.get("keepcookie") is None:
 			cookie_string = self.CookiePattern.sub("", cookie_string)
 
 		response.headers[aiohttp.hdrs.COOKIE] = cookie_string

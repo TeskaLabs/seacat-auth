@@ -122,10 +122,7 @@ class TokenIntrospectionHandler(object):
 		response = await nginx_introspection(
 			request,
 			self.authenticate_request,
-			self.CredentialsService,
-			self.SessionService,
-			self.RBACService,
-			self.OpenIdConnectService,
+			self.OpenIdConnectService.App
 		)
 
 		if response.status_code != 200:
