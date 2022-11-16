@@ -121,12 +121,8 @@ class M2MIntrospectHandler(object):
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth
-
-		response = await nginx_introspection(
-			request,
-			self.authenticate_request,
-			self.App
-		)
+		session = await self.authenticate_request(request)
+		response = await nginx_introspection(request, session, self.App)
 
 		if response.status_code != 200:
 			response.headers["WWW-Authenticate"] = 'Basic realm="{}"'.format(self.BasicRealm)

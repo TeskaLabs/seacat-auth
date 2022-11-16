@@ -1,9 +1,10 @@
 import random
 import logging
-import typing
 
 import aiohttp.web
 import asab
+
+from .session import SessionAdapter
 
 #
 
@@ -75,7 +76,7 @@ async def add_to_header(headers, attributes_to_add, session, requested_tenant=No
 
 async def nginx_introspection(
 	request: aiohttp.web.Request,
-	authenticate: typing.Callable,
+	session: SessionAdapter,
 	app: asab.Application
 ):
 	"""
@@ -92,8 +93,6 @@ async def nginx_introspection(
 
 	anonymous_cid = request.query.get("anonymous")
 
-	# Authenticate request, get session
-	session = await authenticate(request)
 	set_cookie = False
 	if session is not None:
 		# Allow anonymous access only if it is allowed by the introspect parameters
