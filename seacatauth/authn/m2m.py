@@ -79,7 +79,7 @@ class M2MIntrospectHandler(object):
 			ff = request.headers.get("X-Forwarded-For")
 			if ff is not None:
 				access_ips.extend(ff.split(", "))
-			session = await self.AuthnService.m2m_login(
+			session = await self.AuthnService.create_m2m_session(
 				credentials_id,
 				login_descriptor=None,
 				session_expiration=None,  # TODO: Short expiration
@@ -125,10 +125,7 @@ class M2MIntrospectHandler(object):
 		response = await nginx_introspection(
 			request,
 			self.authenticate_request,
-			self.CredentialsService,
-			self.SessionService,
-			self.RBACService,
-			self.App.get_service("seacatauth.OpenIdConnectService"),
+			self.App
 		)
 
 		if response.status_code != 200:
