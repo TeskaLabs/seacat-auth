@@ -16,7 +16,7 @@ from ..session import (
 	cookie_session_builder,
 	login_descriptor_session_builder,
 	available_factors_session_builder,
-	external_login_session_builder,
+	external_login_session_builder, SessionAdapter,
 )
 
 #
@@ -438,10 +438,11 @@ class AuthenticationService(asab.Service):
 			await credentials_session_builder(self.CredentialsService, credentials_id),
 			authz_builder,
 			cookie_session_builder(),
-			await available_factors_session_builder(self, credentials_id)
+			await available_factors_session_builder(self, credentials_id),
+			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
 		]
 
-		# TODO: Temporary solution. Root session should have no OAuth2 data.
+		# TODO: Root session should have no OAuth2 data.
 		#   Remove once ID token support is fully implemented.
 		oauth2_data = {
 			"scope": ["cookie"],
