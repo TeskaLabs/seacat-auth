@@ -298,29 +298,27 @@ class AuthorizeHandler(object):
 				except KeyError:
 					# Tenant does not exist
 					await self.audit_authorize_error(
-						client_id, "tenant_not_found",
+						client_id, "access_denied:tenant_not_found",
 						credential_id=root_session.Credentials.Id,
 						tenant=tenant,
 						scope=scope
 					)
 					return self.reply_with_authentication_error(
-						"unauthorized_tenant",
+						"access_denied",
 						redirect_uri,
 						state=state,
-						error_description="Unauthorized tenant: {}".format(tenant),
 					)
 			else:
 				await self.audit_authorize_error(
-					client_id, "unauthorized_tenant",
+					client_id, "access_denied:unauthorized_tenant",
 					credential_id=root_session.Credentials.Id,
 					tenant=tenant,
 					scope=scope
 				)
 				return self.reply_with_authentication_error(
-					"unauthorized_tenant",
+					"access_denied",
 					redirect_uri,
 					state=state,
-					error_description="Unauthorized tenant: {}".format(tenant),
 				)
 
 		if len(tenants) == 0 and "tenant" in scope:
@@ -336,15 +334,14 @@ class AuthorizeHandler(object):
 				tenants.add(user_tenants[0])
 			else:
 				await self.audit_authorize_error(
-					client_id, "user_has_no_tenant",
+					client_id, "access_denied:user_has_no_tenant",
 					credential_id=root_session.Credentials.Id,
 					scope=scope
 				)
 				return self.reply_with_authentication_error(
-					"user_has_no_tenant",
+					"access_denied",
 					redirect_uri,
 					state=state,
-					error_description="User has no tenant.",
 				)
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
