@@ -1,14 +1,10 @@
 import logging
-import re
-
 import aiohttp
 import aiohttp.web
 
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
-
 from ..openidconnect.session import oauth2_session_builder
-
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
@@ -95,7 +91,11 @@ class CookieHandler(object):
 			else:
 				raise aiohttp.web.HTTPUnauthorized()
 
-		response = await nginx_introspection(request, session, self.App)
+		try:
+			response = await nginx_introspection(request, session, self.App)
+		except Exception as e:
+			L.warning("Request authentication failed: {}".format(e), exc_info=True)
+			response = aiohttp.web.HTTPUnauthorized()
 
 		if new_anonymous_session:
 			set_cookie(self.App, response, session)

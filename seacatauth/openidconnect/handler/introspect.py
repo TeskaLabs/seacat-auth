@@ -1,5 +1,6 @@
 import urllib
 import logging
+import aiohttp.web
 
 import asab
 import asab.web.rest
@@ -120,7 +121,12 @@ class TokenIntrospectionHandler(object):
 		"""
 
 		session = await self.authenticate_request(request)
-		response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
+
+		try:
+			response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
+		except Exception as e:
+			L.warning("Request authentication failed: {}".format(e), exc_info=True)
+			response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
 			response.headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
