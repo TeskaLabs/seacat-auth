@@ -324,8 +324,12 @@ class AuthorizeHandler(object):
 				)
 
 		if len(tenants) == 0 and "tenant" in scope:
-			last_tenants = await self.OpenIdConnectService.AuditService.get_last_authorized_tenants(
-				root_session.Credentials.Id)
+			last_tenants = [
+				tenant
+				for tenant in await self.OpenIdConnectService.AuditService.get_last_authorized_tenants(
+					root_session.Credentials.Id)
+				if tenant in user_tenants
+			]
 			if last_tenants:
 				tenants.add(last_tenants[0])
 			elif len(user_tenants) > 0:
