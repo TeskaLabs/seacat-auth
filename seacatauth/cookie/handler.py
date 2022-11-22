@@ -32,7 +32,6 @@ class CookieHandler(object):
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_svc
 		self.RBACService = app.get_service("seacatauth.RBACService")
-		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
@@ -90,7 +89,7 @@ class CookieHandler(object):
 				forwarded_for = request.headers.get("X-Forwarded-For")
 				if forwarded_for is not None:
 					from_info.extend(forwarded_for.split(", "))
-				session = await self.AuthenticationService.create_anonymous_session(
+				session = await self.CookieService.AuthenticationService.create_anonymous_session(
 					anonymous_cid, from_info=from_info)
 				new_anonymous_session = True
 			else:
