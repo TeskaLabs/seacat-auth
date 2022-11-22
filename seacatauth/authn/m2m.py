@@ -1,5 +1,6 @@
 import base64
 import logging
+import aiohttp.web
 
 from ..generic import nginx_introspection
 from ..session import SessionAdapter
@@ -122,7 +123,11 @@ class M2MIntrospectHandler(object):
 		# TODO: API key auth
 		# TODO: Certificate auth
 		session = await self.authenticate_request(request)
-		response = await nginx_introspection(request, session, self.App)
+		try:
+			response = await nginx_introspection(request, session, self.App)
+		except Exception as e:
+			L.warning("Request authentication failed: {}".format(e), exc_info=True)
+			response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
 			response.headers["WWW-Authenticate"] = 'Basic realm="{}"'.format(self.BasicRealm)
