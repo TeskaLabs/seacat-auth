@@ -123,10 +123,13 @@ class M2MIntrospectHandler(object):
 		# TODO: API key auth
 		# TODO: Certificate auth
 		session = await self.authenticate_request(request)
-		try:
-			response = await nginx_introspection(request, session, self.App)
-		except Exception as e:
-			L.warning("Request authentication failed: {}".format(e), exc_info=True)
+		if session is not None:
+			try:
+				response = await nginx_introspection(request, session, self.App)
+			except Exception as e:
+				L.warning("Request authentication failed: {}".format(e), exc_info=True)
+				response = aiohttp.web.HTTPUnauthorized()
+		else:
 			response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
