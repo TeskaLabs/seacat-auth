@@ -15,6 +15,7 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 
 	Type = "abc"
 	Editable = False
+	RegistrationEnabled = False
 
 	ConfigDefaults = {
 		'tenants': 'no',
@@ -27,6 +28,17 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		self.Prefix = "{}:{}:".format(self.Type, self.ProviderID)
 		order = self.Config.get("order", 10)
 		self.Order = int(order)
+
+
+	def get_info(self) -> dict:
+		'''
+		Get info about this provider.
+		'''
+		return {
+			'_type': self.Type,
+			'_provider_id': self.ProviderID,
+			'_order': self.Order,
+		}
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> str:
@@ -85,24 +97,12 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
 		return False
 
-	async def register(self, register_info: dict) -> Optional[str]:
-		pass
-
-	def get_info(self) -> dict:
-		'''
-		Get info about this provider.
-		'''
-		return {
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
-			'_order': self.Order,
-		}
-
 
 
 class EditableCredentialsProviderABC(CredentialsProviderABC):
 
 	Editable = True
+	RegistrationEnabled = False
 
 	@abc.abstractmethod
 	async def create(self, credentials: dict) -> Optional[str]:

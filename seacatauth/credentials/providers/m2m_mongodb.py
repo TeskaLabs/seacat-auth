@@ -70,7 +70,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 	async def create(self, credentials: dict) -> Optional[str]:
 		value = credentials.get("username")
 		if value is not None and len(value) > 0:
-			obj_id = self.normalize_username(value)
+			obj_id = self._create_credential_id(value)
 		else:
 			raise ValueError("Cannot determine user ID")
 
@@ -88,8 +88,6 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 
 		return "{}{}".format(self.Prefix, credentials_id)
 
-	async def register(self, register_info: dict) -> Optional[str]:
-		return None
 
 	async def get_login_descriptors(self, credentials_id):
 		return None

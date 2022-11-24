@@ -49,8 +49,6 @@ ENV/
 # idea
 .idea/
 
-etc/
-
 docker/log/*.log
 docker/mongo-data
 .vscode

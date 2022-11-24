@@ -38,12 +38,20 @@ class RoleService(asab.Service):
 			role=self.RoleNamePattern
 		))
 
-	async def list(self, tenant: Optional[str] = None, page: int = 0, limit: int = None):
+	async def list(
+		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *,
+		resource: str = None,
+		active_only: bool = False,
+	):
 		collection = self.StorageService.Database[self.RoleCollection]
+		query_filter = {}
 		if tenant is not None:
-			query_filter = {"tenant": {"$in": [tenant, None]}}
-		else:
-			query_filter = {}
+			query_filter["tenant"] = {"$in": [tenant, None]}
+		if resource is not None:
+			query_filter["resources"] = resource
+		if active_only is True:
+			query_filter["deleted"] = {"$in": [False, None]}
+
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
@@ -121,11 +129,12 @@ class RoleService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Role deleted", struct_data={'role_id': role_id})
 		return "OK"
 
-	async def update_resources(
-		self, role_id: str,
-		resources_to_set: Optional[list] = None,
-		resources_to_add: Optional[list] = None,
-		resources_to_remove: Optional[list] = None
+	async def update(
+		self, role_id: str, *,
+		description: str = None,
+		resources_to_set: list = None,
+		resources_to_add: list = None,
+		resources_to_remove: list = None
 	):
 		# Verify that role exists
 		role_current = await self.get(role_id)
@@ -151,42 +160,52 @@ class RoleService(asab.Service):
 					L.warning(message)
 					raise ValueError(message)
 
-		version = role_current["_v"]
-		upsertor = self.StorageService.upsertor(
-			self.RoleCollection,
-			role_id,
-			version=version
-		)
-		if resources_to_set is not None:
+		if resources_to_set is None:
+			resources_to_set = set(role_current["resources"])
+		else:
 			resources_to_set = set(resources_to_set)
-			# Check if resource exists, otherwise raise KeyError
 			for res_id in resources_to_set:
+				try:
+					resource = await self.ResourceService.get(res_id)
+				except KeyError:
+					raise KeyError(res_id)
+				if resource.get("deleted") is True:
+					raise KeyError(res_id)
+
+		if resources_to_add is not None:
+			for res_id in resources_to_add:
 				try:
 					await self.ResourceService.get(res_id)
 				except KeyError:
-					message = "Unknown resource: '{}'".format(res_id)
-					L.warning(message)
-					raise KeyError(message)
-			upsertor.set("resources", list(resources_to_set))
+					raise KeyError(res_id)
+				resources_to_set.add(res_id)
 
-		# TODO: add and remove, check for duplicate entries
-		# if resources_to_add is not None:
-		# 	for res in resources_to_add:
-		# 		upsertor.push("resources", res)
-		# if resources_to_remove is not None:
-		# 	for res in resources_to_remove:
-		# 		upsertor.pull("resources", res)  # TODO: implement MongoUpsertor.pull()
+		if resources_to_remove is not None:
+			for res_id in resources_to_remove:
+				# Do not check if resource exists to allow deleting leftovers
+				resources_to_set.remove(res_id)
+
+		upsertor = self.StorageService.upsertor(
+			self.RoleCollection,
+			role_id,
+			version=role_current["_v"]
+		)
+
+		log_data = {"role": role_id}
+
+		if resources_to_set != set(role_current["resources"]):
+			upsertor.set("resources", list(resources_to_set))
+			log_data["resources"] = ", ".join(resources_to_set)
+
+		if description is not None:
+			upsertor.set("description", description)
+			log_data["description"] = description
 
 		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "Resources assigned", struct_data={
-			'role': role_id,
-			'set': resources_to_set,
-			'add': resources_to_add,
-			'del': resources_to_remove
-		})
+		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
 		return "OK"
 
-	async def get_roles_by_credentials(self, credentials_id: str, tenant: str = None):
+	async def get_roles_by_credentials(self, credentials_id: str, tenants: list = None):
 		"""
 		Returns a list of roles assigned to the given `credentials_id`.
 		Includes roles that match the given `tenant` plus global roles.
@@ -195,7 +214,7 @@ class RoleService(asab.Service):
 		coll = await self.StorageService.collection(self.CredentialsRolesCollection)
 		async for obj in coll.find({
 			'c': credentials_id,
-			't': {"$in": [tenant, None]}
+			't': {"$in": [None, *(tenants or [])]}
 		}):
 			result.append(obj["r"])
 		return result
