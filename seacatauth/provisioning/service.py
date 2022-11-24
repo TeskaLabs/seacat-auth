@@ -28,7 +28,7 @@ Use the following credentials to log in:
 _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_name": "provisioning-superuser",
 	"credentials_provider_id": "provisioning",
-	"role_name": "provisioning-superrole",
+	"role_name": "superuser",
 	"tenant": "provisioning-tenant",
 	"admin_ui_url": "",
 	"admin_ui_client_id": "seacat-admin-ui",
@@ -89,7 +89,7 @@ class ProvisioningService(asab.Service):
 
 		# Create superuser role
 		await self.RoleService.create(self.SuperroleID)
-		assert (await self.RoleService.update_resources(
+		assert (await self.RoleService.update(
 			role_id=self.SuperroleID,
 			resources_to_set=["authz:superuser"]
 		) == "OK")
@@ -104,12 +104,6 @@ class ProvisioningService(asab.Service):
 		# Delete the superuser
 		# This also all its sessions and tenant+role assignments
 		await self.CredentialsService.delete_credentials(self.SuperuserID)
-
-		# Delete superuser role
-		try:
-			await self.RoleService.delete(role_id=self.SuperroleID)
-		except KeyError:
-			L.error("Failed to delete role", struct_data={"role": self.SuperroleID})
 
 		# Delete provisioning tenant with all its roles and assignments
 		tenant_provider = self.TenantService.get_provider()
@@ -130,6 +124,7 @@ class ProvisioningService(asab.Service):
 		except KeyError:
 			client = None
 
+		# Configure admin_ui_client as a public web application
 		update = {
 			k: v
 			for k, v in CLIENT_TEMPLATES["Public web application"].items()
@@ -138,22 +133,25 @@ class ProvisioningService(asab.Service):
 		# Check if the client has the correct redirect URI
 		# Use default URI if none is specified and the client doesn't exist yet
 		if client is None:
+			existing_redirect_uris = []
 			if admin_ui_url is None:
 				auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
 				url = urllib.parse.urlparse(auth_webui_base_url)
 				admin_ui_url = url._replace(path="/seacat", fragment="", query="", params="").geturl()
-				L.warning("admin_ui_url not specified. Defaulting to '{}'.".format(admin_ui_url))
-			redirect_uris = []
+				L.log(
+					asab.LOG_NOTICE,
+					"admin_ui_url not specified in provisioning config. Defaulting to '{}'.".format(admin_ui_url)
+				)
 		else:
-			redirect_uris = client.get("redirect_uris", [])
-		if admin_ui_url is None and admin_ui_url not in redirect_uris:
-			redirect_uris.append(admin_ui_url)
-			update["redirect_uris"] = redirect_uris
+			existing_redirect_uris = client.get("redirect_uris", [])
+
+		if admin_ui_url is not None and admin_ui_url not in existing_redirect_uris:
+			update["redirect_uris"] = [admin_ui_url]
 
 		if client is None or "client_name" not in client:
 			update["client_name"] = self.Config["admin_ui_client_name"]
 
 		if client is None:
 			await client_service.register(_custom_client_id=admin_ui_client_id, **update)
-		else:
+		elif update:
 			await client_service.update(client_id=admin_ui_client_id, **update)

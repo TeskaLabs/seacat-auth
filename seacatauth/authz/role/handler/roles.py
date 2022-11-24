@@ -32,7 +32,7 @@ class RolesHandler(object):
 	async def get_roles_by_credentials(self, request, *, tenant):
 		creds_id = request.match_info["credentials_id"]
 		try:
-			result = await self.RoleService.get_roles_by_credentials(creds_id, tenant)
+			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
 		except ValueError as e:
 			L.log(asab.LOG_NOTICE, str(e))
 			raise aiohttp.web.HTTPBadRequest()
@@ -51,7 +51,7 @@ class RolesHandler(object):
 	@access_control()
 	async def get_roles_batch(self, request, *, tenant, json_data):
 		response = {
-			cid: await self.RoleService.get_roles_by_credentials(cid, tenant)
+			cid: await self.RoleService.get_roles_by_credentials(cid, [tenant])
 			for cid in json_data
 		}
 		return asab.web.rest.json_response(request, response)

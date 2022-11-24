@@ -1,9 +1,35 @@
 # CHANGELOG
 
-## Release candidate
+## v22.46
+
+### Breaking changes
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+- Unset credential phone/email by setting it to null instead of empty string (#117, PLUM Sprint 221104)
+
+### Fix
+- Logout with ID token (#116, PLUM Sprint 221104)
+- Disable registration service when no credential provider supports registration (#118, PLUM Sprint 221104)
+
+### Features
+- Roles have an optional "description" field (#103, PLUM Sprint 221021)
+- User registration (invitation only) (#86, PLUM Sprint 221021)
+- Delete and rename resources (#113, PLUM Sprint 221104)
+- List roles that contain a specific resource (#113, PLUM Sprint 221104)
+- Include session ID and parent session ID in ID token (#116, PLUM Sprint 221104)
+
+### Refactoring
+- Keep superuser role after provisioning (#102, PLUM Sprint 221021)
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
+- Unset credential phone/email by setting it to null instead of empty string (#117, PLUM Sprint 221104)
+
+---
+
+
+## v22.44
 
 ### Fix
 - Removed client values that are not implemented yet (#91, PLUM Sprint 220923)
+- Fix client initialization in provisioning (#101, PLUM Sprint 221021)
 
 ### Features
 - New MongoDB credential provider with configurable queries (#90, PLUM Sprint 220909)
@@ -13,6 +39,7 @@
 
 ### Refactoring
 - Simplified Admin UI client provisioning setup (#95, PLUM Sprint 221007)
+- Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221007)
 
 ---
 
