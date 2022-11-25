@@ -188,6 +188,7 @@ class OpenIdConnectService(asab.Service):
 		try:
 			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
 		except KeyError:
+			L.info(f"Session not found by access token {access_token}")
 			return None
 
 		return session
