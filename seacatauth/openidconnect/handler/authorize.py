@@ -198,6 +198,15 @@ class AuthorizeHandler(object):
 
 		root_session = request.Session
 
+		if root_session is not None:
+			if root_session.Session.Type != "root":
+				# Only root sessions can be used to obtain auth code
+				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
+				root_session = None
+			if root_session.Authentication.IsAnonymous:
+				L.warning("Cannot authorize with anonymous session", struct_data={"sid": root_session.Id})
+				root_session = None
+
 		# Only root sessions can be used to obtain auth code
 		if root_session is not None and root_session.Session.Type != "root":
 			L.warning("Session type must be 'root'", struct_data={"session_type": root_session.Session.Type})

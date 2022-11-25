@@ -42,6 +42,7 @@ class AuthenticationData:
 	LoginDescriptor: typing.Optional[dict]
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
+	IsAnonymous: typing.Optional[bool]
 
 
 @dataclasses.dataclass
@@ -110,6 +111,7 @@ class SessionAdapter:
 			LoginDescriptor = "an_ld"
 			AvailableFactors = "an_af"
 			LastLogin = "an_ll"
+			IsAnonymous = "an_ano"
 
 		class OAuth2:
 			_prefix = "oa"
@@ -289,6 +291,7 @@ class SessionAdapter:
 			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None)
 			or session_dict.pop("AF", None),
 			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
+			IsAnonymous=session_dict.pop(cls.FN.Authentication.IsAnonymous, None),
 		)
 
 	@classmethod
@@ -359,5 +362,11 @@ def rest_get(session_dict):
 		data["oauth2"] = True
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
+
+	flags = []
+	if session_dict.get(SessionAdapter.FN.Authentication.IsAnonymous) is True:
+		flags.append("anonymous")
+	if len(flags) > 0:
+		data["flags"] = flags
 
 	return data
