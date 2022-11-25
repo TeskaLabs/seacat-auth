@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Sessions for unauthenticated/anonymous access (#120, PLUM Sprint 221118)
+
+---
+
+
+### Breaking changes
+
 ## v22.46
 
 ### Breaking changes
