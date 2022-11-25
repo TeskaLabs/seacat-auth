@@ -360,6 +360,14 @@ class OpenIdConnectService(asab.Service):
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
 
+		# Add session flags
+		flags = []
+		if session.Authentication.IsAnonymous:
+			flags.append("anonymous")
+
+		if len(flags) > 0:
+			userinfo["flags"] = flags
+
 		# RFC 7519 states that the exp and iat claim values must be NumericDate values
 		# Convert ALL datetimes to UTC timestamps for consistency
 		for k, v in userinfo.items():

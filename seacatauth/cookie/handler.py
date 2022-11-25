@@ -1,14 +1,10 @@
 import logging
-import re
-
 import aiohttp
 import aiohttp.web
 
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
-
 from ..openidconnect.session import oauth2_session_builder
-
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
@@ -32,10 +28,6 @@ class CookieHandler(object):
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_svc
 		self.RBACService = app.get_service("seacatauth.RBACService")
-
-		self.CookiePattern = re.compile(
-			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieService.CookieName)
-		)
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
@@ -77,28 +69,36 @@ class CookieHandler(object):
 		```
 		"""
 
-		response = await nginx_introspection(
-			request,
-			self.authenticate_request,
-			self.CredentialsService,
-			self.SessionService,
-			self.RBACService,
-			self.App.get_service("seacatauth.OpenIdConnectService"),
-		)
+		session = await self.authenticate_request(request)
+
+		new_anonymous_session = False
+		anonymous_cid = request.query.get("anonymous")
+		if session is None:
+			if anonymous_cid is not None:
+				# Create a new root session with anonymous_cid and a cookie
+				# Set the cookie
+				from_info = [request.remote]
+				forwarded_for = request.headers.get("X-Forwarded-For")
+				if forwarded_for is not None:
+					from_info.extend(forwarded_for.split(", "))
+				session = await self.CookieService.AuthenticationService.create_anonymous_session(
+					anonymous_cid, from_info=from_info)
+				new_anonymous_session = True
+			else:
+				raise aiohttp.web.HTTPUnauthorized()
+
+		try:
+			response = await nginx_introspection(request, session, self.App)
+		except Exception as e:
+			L.warning("Request authorization failed: {}".format(e), exc_info=True)
+			response = aiohttp.web.HTTPUnauthorized()
+
+		if new_anonymous_session:
+			set_cookie(self.App, response, session)
+
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
 			return response
-
-		# Delete SeaCat cookie from Cookie header unless "keepcookie" param is passed in query
-		# TODO: Move this to generic.nginx_introspection
-		#    (issue: dependency on self.CookiePattern)
-		keep_cookie = request.query.get("keepcookie", None)
-		cookie_string = request.headers.get(aiohttp.hdrs.COOKIE)
-
-		if keep_cookie is None:
-			cookie_string = self.CookiePattern.sub("", cookie_string)
-
-		response.headers[aiohttp.hdrs.COOKIE] = cookie_string
 
 		return response
 

@@ -1,7 +1,6 @@
 import datetime
 import logging
 
-
 #
 
 L = logging.getLogger(__name__)
@@ -9,7 +8,7 @@ L = logging.getLogger(__name__)
 #
 
 
-def set_cookie(app, response, session, cookie_domain_id=None):
+def set_cookie(app, response, session, cookie_domain_id=None, secure=None):
 	"""
 	Add a Set-Cookie header to the response.
 	The cookie serves as an identifier of a Seacat Auth session and is used for authentication.
@@ -25,6 +24,8 @@ def set_cookie(app, response, session, cookie_domain_id=None):
 	"""
 	cookie_svc = app.get_service("seacatauth.CookieService")
 	cookie_domain = cookie_svc.get_cookie_domain(cookie_domain_id)
+	if secure is None:
+		secure = cookie_svc.CookieSecure
 
 	cookie_value = "{}:{}".format(cookie_domain, session.Cookie.Id)
 
@@ -38,10 +39,10 @@ def set_cookie(app, response, session, cookie_domain_id=None):
 	response.set_cookie(
 		cookie_svc.CookieName,
 		cookie_value,
-		httponly=True,  # Not accessible from a Javascript
+		httponly=True,  # Not accessible from Javascript
 		domain=cookie_domain,
 		max_age=max_age,
-		# TODO: Secure if the original connection was HTTPS
+		secure=secure,
 	)
 
 
