@@ -73,11 +73,7 @@ class CookieHandler(object):
 
 		new_anonymous_session = False
 		anonymous_cid = request.query.get("anonymous")
-		if session is not None:
-			# Allow anonymous access only if it is allowed by the introspect parameters
-			if "authn:anonymous" in session.Authorization.Authz.get("*", {}):
-				raise aiohttp.web.HTTPUnauthorized()
-		else:
+		if session is None:
 			if anonymous_cid is not None:
 				# Create a new root session with anonymous_cid and a cookie
 				# Set the cookie
@@ -91,13 +87,10 @@ class CookieHandler(object):
 			else:
 				raise aiohttp.web.HTTPUnauthorized()
 
-		if session is not None:
-			try:
-				response = await nginx_introspection(request, session, self.App)
-			except Exception as e:
-				L.warning("Request authentication failed: {}".format(e), exc_info=True)
-				response = aiohttp.web.HTTPUnauthorized()
-		else:
+		try:
+			response = await nginx_introspection(request, session, self.App)
+		except Exception as e:
+			L.warning("Request authorization failed: {}".format(e), exc_info=True)
 			response = aiohttp.web.HTTPUnauthorized()
 
 		if new_anonymous_session:

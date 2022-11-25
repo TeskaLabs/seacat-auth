@@ -127,7 +127,7 @@ class M2MIntrospectHandler(object):
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.warning("Request authentication failed: {}".format(e), exc_info=True)
+				L.warning("Request authorization failed: {}".format(e), exc_info=True)
 				response = aiohttp.web.HTTPUnauthorized()
 		else:
 			response = aiohttp.web.HTTPUnauthorized()
