@@ -428,12 +428,6 @@ class AuthenticationService(asab.Service):
 			role_service=self.RoleService,
 			credentials_id=credentials_id
 		)
-
-		# Assert that the credentials are configured for anonymous sessions
-		rbac_svc = self.App.get_service("seacatauth.RBACService")
-		if not rbac_svc.has_resource_access(authz_builder[0][1], tenant=None, requested_resources=["authn:anonymous"]):
-			raise Exception("Cannot create anonymous session: Credentials '{}' do not have access to 'authn:anonymous'.")
-
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, credentials_id),
 			authz_builder,
