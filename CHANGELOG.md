@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v22.46
 
 ### Breaking changes
 - Endpoint for updating custom tenant data changed (#98, PLUM Sprint 221104)
