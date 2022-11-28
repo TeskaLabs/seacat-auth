@@ -11,7 +11,7 @@ import typing
 
 import bson.json_util
 
-from .abc import EditableCredentialsProviderABC
+from .abc import CredentialsProviderABC
 
 #
 
@@ -26,18 +26,21 @@ class XMongoDBCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return XMongoDBCredentialsProvider(self.App, provider_id, config_section_name)
+		if asab.Config.getboolean(config_section_name, "editable", fallback=False):
+			# TODO: Implement editable provider
+			raise NotImplementedError("EditableXMongoDBCredentialsProvider")
+		else:
+			return XMongoDBCredentialsProvider(self.App, provider_id, config_section_name)
 
 
-class XMongoDBCredentialsProvider(EditableCredentialsProviderABC):
+class XMongoDBCredentialsProvider(CredentialsProviderABC):
 	"""
-	Customizable MongoDB provider
+	Customizable read-only MongoDB provider
 	"""
 
 	Type = "xmongodb"
 
 	ConfigDefaults = {
-		"editable": "no",
 		"mongodb_uri": "mongodb://localhost:27017",
 		"database": "test",
 		"collection": "users",
@@ -47,9 +50,6 @@ class XMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(provider_id, config_section_name)
-		self.Editable = self.Config.getboolean("editable")
-		if self.Editable:
-			raise NotImplementedError("Custom MongoDB credentials provider does not support editing")
 
 		self.ConnectionParams = {
 			"host": self.Config.get("mongodb_uri"),
@@ -83,22 +83,6 @@ class XMongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				query_args[k] = '"{}"'.format(v)
 		bound_query = query % query_args
 		return bson.json_util.loads(bound_query)
-
-
-	async def create(self, credentials: dict) -> Optional[str]:
-		raise NotImplementedError("XMongoDB credentials provider is read-only.")
-
-
-	async def register(self, register_info: dict) -> Optional[str]:
-		raise NotImplementedError("XMongoDB credentials provider is read-only.")
-
-
-	async def update(self, credentials_id, update: dict) -> Optional[str]:
-		raise NotImplementedError("XMongoDB credentials provider is read-only.")
-
-
-	async def delete(self, credentials_id) -> Optional[str]:
-		raise NotImplementedError("XMongoDB credentials provider is read-only.")
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
