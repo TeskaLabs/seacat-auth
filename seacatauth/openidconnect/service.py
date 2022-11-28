@@ -192,7 +192,7 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	async def build_session_from_id_token(self, token_value):
+	async def get_session_by_id_token(self, token_value):
 		try:
 			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
 		except jwcrypto.jwt.JWTExpired:
@@ -299,6 +299,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Credentials.CreatedAt is not None:
 			userinfo["created_at"] = session.Credentials.CreatedAt
+
+		if session.Authentication.IsAnonymous:
+			userinfo["anonymous"] = True
 
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet

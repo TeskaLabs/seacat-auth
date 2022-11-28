@@ -1,5 +1,6 @@
 import base64
 import logging
+import aiohttp.web
 
 from ..generic import nginx_introspection
 from ..session import SessionAdapter
@@ -79,7 +80,7 @@ class M2MIntrospectHandler(object):
 			ff = request.headers.get("X-Forwarded-For")
 			if ff is not None:
 				access_ips.extend(ff.split(", "))
-			session = await self.AuthnService.m2m_login(
+			session = await self.AuthnService.create_m2m_session(
 				credentials_id,
 				login_descriptor=None,
 				session_expiration=None,  # TODO: Short expiration
@@ -121,15 +122,15 @@ class M2MIntrospectHandler(object):
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth
-
-		response = await nginx_introspection(
-			request,
-			self.authenticate_request,
-			self.CredentialsService,
-			self.SessionService,
-			self.RBACService,
-			self.App.get_service("seacatauth.OpenIdConnectService"),
-		)
+		session = await self.authenticate_request(request)
+		if session is not None:
+			try:
+				response = await nginx_introspection(request, session, self.App)
+			except Exception as e:
+				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				response = aiohttp.web.HTTPUnauthorized()
+		else:
+			response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
 			response.headers["WWW-Authenticate"] = 'Basic realm="{}"'.format(self.BasicRealm)

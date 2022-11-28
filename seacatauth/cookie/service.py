@@ -26,9 +26,14 @@ class CookieService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.AuthenticationService = None
 
 		# Configure root cookie
 		self.CookieName = asab.Config.get("seacatauth:cookie", "name")
+		self.CookiePattern = re.compile(
+			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieName)
+		)
+		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
 		self.RootCookieDomain = self._validate_cookie_domain(
 			asab.Config.get("seacatauth:cookie", "domain", fallback=None)
 		)
@@ -65,6 +70,10 @@ class CookieService(asab.Service):
 				"domain": domain
 			}
 			self.ApplicationCookieDomains.add(domain)
+
+
+	async def initialize(self, app):
+		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 
 	@staticmethod
