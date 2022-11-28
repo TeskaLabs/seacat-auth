@@ -194,7 +194,7 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	async def build_session_from_id_token(self, token_value):
+	async def get_session_by_id_token(self, token_value):
 		try:
 			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
 		except jwcrypto.jwt.JWTExpired:
@@ -316,6 +316,9 @@ class OpenIdConnectService(asab.Service):
 		if session.Credentials.CreatedAt is not None:
 			userinfo["created_at"] = session.Credentials.CreatedAt
 
+		if session.Authentication.IsAnonymous:
+			userinfo["anonymous"] = True
+
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet
 
@@ -359,14 +362,6 @@ class OpenIdConnectService(asab.Service):
 				userinfo["last_failed_login"] = last_login["fat"]
 			if "sat" in last_login:
 				userinfo["last_successful_login"] = last_login["sat"]
-
-		# Add session flags
-		flags = []
-		if session.Authentication.IsAnonymous:
-			flags.append("anonymous")
-
-		if len(flags) > 0:
-			userinfo["flags"] = flags
 
 		# RFC 7519 states that the exp and iat claim values must be NumericDate values
 		# Convert ALL datetimes to UTC timestamps for consistency

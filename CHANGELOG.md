@@ -3,7 +3,7 @@
 ## Release candidate
 
 ### Features
-- Sessions for unauthenticated/anonymous access (#120, PLUM Sprint 221118)
+- Anonymous sessions for unauthenticated user access (#120, PLUM Sprint 221118)
 
 ---
 

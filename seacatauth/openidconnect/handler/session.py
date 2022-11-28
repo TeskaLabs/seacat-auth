@@ -35,7 +35,7 @@ class SessionHandler(object):
 			return aiohttp.web.HTTPBadRequest()
 
 		try:
-			session = await self.OpenIdConnectService.build_session_from_id_token(token_value)
+			session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
 		except ValueError:
 			session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 		if session is None:
