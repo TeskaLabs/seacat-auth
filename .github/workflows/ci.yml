@@ -55,8 +55,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install git+https://github.com/TeskaLabs/asab#egg=asab[storage_encryption]
         pip install bson
-        pip install git+https://github.com/TeskaLabs/asab
     
     - name: Test with unittest
       run: |
