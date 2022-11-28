@@ -433,8 +433,6 @@ class AuthorizeHandler(object):
 			# then use the exact value received from the client.
 			url_qs["state"] = state
 
-		# TODO: Include tenant in response query?
-
 		# Add the Authorization Code into the session ...
 		if "cookie" not in scope:
 			url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
@@ -446,7 +444,7 @@ class AuthorizeHandler(object):
 			url.path,
 			url.params,
 			urllib.parse.urlencode(url_qs, doseq=True),
-			url.fragment
+			url.fragment  # TODO: There should be no fragment in redirect URI
 		))
 
 		response = aiohttp.web.HTTPFound(
@@ -557,6 +555,7 @@ class AuthorizeHandler(object):
 			("redirect_uri", urllib.parse.quote(authorize_redirect_uri))
 		]
 		# Add the query params to the #fragment part
+		# TODO: There should be no fragment in redirect URI. Move to regular query.
 		fragment = "{}?{}".format(sfa_url.fragment, urllib.parse.urlencode(auth_url_params, doseq=True))
 
 		sfa_url = urllib.parse.urlunparse((
@@ -605,25 +604,27 @@ class AuthorizeHandler(object):
 		if state is not None:
 			qs["state"] = state
 
-		response_qs = urllib.parse.urlencode(qs)
-
 		if redirect_uri is not None:
 			# Redirect to redirect_uri
-			redirect_uri_qs = urllib.parse.urlparse(redirect_uri).query
-			if len(redirect_uri_qs) > 0:
-				response_qs = "{}&{}".format(redirect_uri_qs, response_qs)
-			redirect = "{redirect_uri}?{qs}".format(
-				redirect_uri=redirect_uri,
-				qs=response_qs
-			)
+			parts = urllib.parse.urlparse(redirect_uri)
+			for k, v in urllib.parse.parse_qs(parts.query).items():
+				if k not in qs:
+					qs[k] = v.pop()
+			redirect = urllib.parse.urlunparse((
+				parts.scheme,
+				parts.netloc,
+				parts.path,
+				None,  # params
+				urllib.parse.urlencode(qs),
+				None,
+			))
 		else:
 			# TODO: Use the /message page on frontend
 			redirect = "{public_base_url}{path}?{qs}".format(
 				public_base_url=self.PublicApiBaseUrl,
 				path=self.AuthorizePath,
-				qs=response_qs
+				qs=urllib.parse.urlencode(qs)
 			)
-
 		return aiohttp.web.HTTPFound(redirect)
 
 
