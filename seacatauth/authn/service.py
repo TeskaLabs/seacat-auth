@@ -421,7 +421,7 @@ class AuthenticationService(asab.Service):
 		from_info: list = None
 	):
 		"""
-		Create session for unauthenticated/anonymous access
+		Create anonymous session for unauthenticated access
 		"""
 		authz_builder = await authz_session_builder(
 			tenant_service=self.TenantService,
@@ -451,7 +451,7 @@ class AuthenticationService(asab.Service):
 		)
 		L.log(
 			asab.LOG_NOTICE,
-			"Unauthenticated session created.",
+			"Anonymous session created.",
 			struct_data={
 				"cid": credentials_id,
 				"sid": str(session.Session.Id),
