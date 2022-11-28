@@ -302,7 +302,6 @@ class AuthenticationService(asab.Service):
 
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
-		# TODO: Define root session scope
 		scope = frozenset(["userinfo:*"])
 
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
@@ -319,14 +318,6 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, login_session.CredentialsId),
 			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
 		]
-
-		# TODO: Temporary solution. Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
-		oauth2_data = {
-			"scope": ["openid", "cookie"],
-			"client_id": None,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="root",
@@ -387,14 +378,6 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id)
 		]
 
-		# TODO: Temporary solution. Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
-		oauth2_data = {
-			"scope": ["openid"],
-			"client_id": None,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
-
 		session = await self.SessionService.create_session(
 			session_type="m2m",
 			expiration=session_expiration,
@@ -444,14 +427,6 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id),
 			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
 		]
-
-		# TODO: Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
-		oauth2_data = {
-			"scope": ["cookie"],
-			"client_id": None,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="root",
