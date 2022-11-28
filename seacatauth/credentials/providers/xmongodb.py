@@ -26,7 +26,7 @@ class XMongoDBCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		if asab.Config.getboolean(config_section_name, "editable"):
+		if asab.Config.getboolean(config_section_name, "editable", fallback=False):
 			# TODO: Implement editable provider
 			raise NotImplementedError("EditableXMongoDBCredentialsProvider")
 		else:
