@@ -28,6 +28,8 @@ asab.Config.add_defaults({
 	"seacatauth:cookie": {
 		"name": "SeaCatSCI",
 
+		"secure": "yes",
+
 		# Cookie domain specifies the domain scope where the cookie is valid
 		# MUST NOT BE EMPTY!
 		# NOTE:
