@@ -378,6 +378,13 @@ def _normalize_entry(prefix, ptype, provider_id, dn, entry, attrusername: str = 
 	if v is not None:
 		ret['phone'] = v
 
+	v = ldap_obj.pop('userAccountControl', None)
+	if v is not None:
+		# userAccountControl is an array of binary flags returned as a decimal integer
+		# byte #2 is ACCOUNTDISABLE
+		# https://learn.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
+		ret['suspended'] = int(v) & 2 == 2
+
 	v = ldap_obj.pop('createTimestamp', None)
 	if v is not None:
 		ret['_c'] = _parse_timestamp(v)
