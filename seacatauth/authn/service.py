@@ -8,7 +8,6 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
-from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
