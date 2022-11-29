@@ -7,7 +7,7 @@ import passlib.hash
 import pymysql
 import re
 
-from .abc import EditableCredentialsProviderABC
+from .abc import CredentialsProviderABC, EditableCredentialsProviderABC
 
 #
 
@@ -22,16 +22,16 @@ class MySQLCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return MySQLCredentialsProvider(self.App, provider_id, config_section_name)
+		if asab.Config.getboolean(config_section_name, "editable", fallback=False):
+			return EditableMySQLCredentialsProvider(self.App, provider_id, config_section_name)
+		else:
+			return MySQLCredentialsProvider(self.App, provider_id, config_section_name)
 
 
-class MySQLCredentialsProvider(EditableCredentialsProviderABC):
-	# TODO: Use bind variables (https://legacy.python.org/dev/peps/pep-0249/#paramstyle)
-
+class MySQLCredentialsProvider(CredentialsProviderABC):
 	Type = "mysql"
 
 	ConfigDefaults = {
-		"editable": "no",
 		"host": "localhost",
 		"port": "3306",
 		"database": "auth",
@@ -41,10 +41,8 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		"data_fields": ""
 	}
 
-
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(provider_id, config_section_name)
-		self.Editable = self.Config.getboolean("editable")
 		self.ConnectionParams = {
 			"host": self.Config.get("host"),
 			"port": self.Config.getint("port"),
@@ -62,14 +60,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		self.LocateQuery = self.Config.get("locate")
 		assert self.LocateQuery, "MySQL credentials: 'locate' query must be specified"
 
-		if self.Editable:
-			self.CreateQuery = self.Config.get("create")
-			assert self.CreateQuery, "MySQL credentials: 'create' query must be specified"
-			self.UpdateQuery = self.Config.get("update")
-			assert self.UpdateQuery, "MySQL credentials: 'update' query must be specified"
-			self.DeleteQuery = self.Config.get("delete")
-			assert self.DeleteQuery, "MySQL credentials: 'delete' query must be specified"
-
 		self.IdField = "_id"
 		self.PasswordField = "__password"
 
@@ -78,101 +68,6 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 			self.DataFields = data_fields.split(" ")
 		else:
 			self.DataFields = None
-
-
-	async def create(self, credentials: dict) -> Optional[str]:
-		if not self.Editable:
-			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
-
-		# Set unspecified parameters to None
-		for param in re.findall(r"[^%]%\((.+?)\)", self.CreateQuery) or []:
-			if param not in credentials:
-				credentials[param] = None
-
-		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(self.CreateQuery, credentials)
-				await cursor.execute("SELECT LAST_INSERT_ID();")
-				obj_id = await cursor.fetchone()
-			try:
-				await connection.commit()
-			except pymysql.err.IntegrityError as e:
-				raise ValueError("Cannot create credentials: {}".format(e)) from e
-
-		credentials_id = "{}{}".format(self.Prefix, obj_id.get("LAST_INSERT_ID()"))
-		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
-			"provider_id": self.ProviderID,
-			"cid": credentials_id
-		})
-		return credentials_id
-
-
-	async def update(self, credentials_id, update: dict) -> Optional[str]:
-		if not self.Editable:
-			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
-
-		mysql_id = credentials_id[len(self.Prefix):]
-		updated_fields = list(update.keys())
-
-		current_credentials = await self.get(credentials_id, include=[self.PasswordField])
-		new_credentials = {}
-		expected_fields = frozenset(re.findall(r"[^%]%\((.+?)\)", self.UpdateQuery) or [])
-
-		# Set unspecified parameters to their current value
-		for field in expected_fields:
-			value = update.pop(field, None)
-			if value not in frozenset(["", None]):
-				new_credentials[field] = value
-			else:
-				new_credentials[field] = current_credentials.get(field)
-
-		value = update.pop("password", None)
-		if value is not None:
-			new_credentials["__password"] = passlib.hash.bcrypt.hash(value.encode("utf-8"))
-
-		value = update.pop("enforce_factors", None)
-		if value is not None:
-			# TODO: Implement factor enforcement
-			L.warning("MySQL: Cannot set field 'enforce_factors'")
-
-		new_credentials[self.IdField] = mysql_id
-
-		if len(update) != 0:
-			raise KeyError("Some credentials fields cannot be updated: {}".format(", ".join(update.keys())))
-
-		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(self.UpdateQuery, new_credentials)
-			try:
-				await connection.commit()
-			except pymysql.err.IntegrityError as e:
-				raise ValueError("Cannot update credentials: {}".format(e)) from e
-
-		L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
-			"provider_id": self.ProviderID,
-			"cid": credentials_id,
-			"fields": updated_fields
-		})
-
-
-	async def delete(self, credentials_id) -> Optional[str]:
-		if not self.Editable:
-			raise ValueError("Provider '{}:{}' is read-only.".format(self.Type, self.ProviderID))
-
-		mysql_id = credentials_id[len(self.Prefix):]
-		async with aiomysql.connect(**self.ConnectionParams) as connection:
-			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(self.DeleteQuery, {"_id": mysql_id})
-			try:
-				await connection.commit()
-			except pymysql.err.IntegrityError as e:
-				raise ValueError("Cannot delete credentials: {}".format(e)) from e
-
-		L.log(asab.LOG_NOTICE, "Credentials deleted", struct_data={
-			"provider_id": self.ProviderID,
-			"cid": credentials_id
-		})
-		return "OK"
 
 
 	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
@@ -327,3 +222,104 @@ class MySQLCredentialsProvider(EditableCredentialsProviderABC):
 		else:
 			L.warning("Unknown password hash function: {}".format(dbcred[self.PasswordField][:4]))
 			return False
+
+
+class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCredentialsProvider):
+	def __init__(self, app, provider_id, config_section_name):
+		super().__init__(provider_id, config_section_name)
+		self.CreateQuery = self.Config.get("create")
+		assert self.CreateQuery, "MySQL credentials: 'create' query must be specified"
+		self.UpdateQuery = self.Config.get("update")
+		assert self.UpdateQuery, "MySQL credentials: 'update' query must be specified"
+		self.DeleteQuery = self.Config.get("delete")
+		assert self.DeleteQuery, "MySQL credentials: 'delete' query must be specified"
+
+
+	async def get_by(self, key: str, value) -> Optional[dict]:
+		raise NotImplementedError()
+
+
+	async def create(self, credentials: dict) -> Optional[str]:
+		# Set unspecified parameters to None
+		for param in re.findall(r"[^%]%\((.+?)\)", self.CreateQuery) or []:
+			if param not in credentials:
+				credentials[param] = None
+
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(self.CreateQuery, credentials)
+				await cursor.execute("SELECT LAST_INSERT_ID();")
+				obj_id = await cursor.fetchone()
+			try:
+				await connection.commit()
+			except pymysql.err.IntegrityError as e:
+				raise ValueError("Cannot create credentials: {}".format(e)) from e
+
+		credentials_id = "{}{}".format(self.Prefix, obj_id.get("LAST_INSERT_ID()"))
+		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id
+		})
+		return credentials_id
+
+
+	async def update(self, credentials_id, update: dict) -> Optional[str]:
+		mysql_id = credentials_id[len(self.Prefix):]
+		updated_fields = list(update.keys())
+
+		current_credentials = await self.get(credentials_id, include=[self.PasswordField])
+		new_credentials = {}
+		expected_fields = frozenset(re.findall(r"[^%]%\((.+?)\)", self.UpdateQuery) or [])
+
+		# Set unspecified parameters to their current value
+		for field in expected_fields:
+			value = update.pop(field, None)
+			if value not in frozenset(["", None]):
+				new_credentials[field] = value
+			else:
+				new_credentials[field] = current_credentials.get(field)
+
+		value = update.pop("password", None)
+		if value is not None:
+			new_credentials["__password"] = passlib.hash.bcrypt.hash(value.encode("utf-8"))
+
+		value = update.pop("enforce_factors", None)
+		if value is not None:
+			# TODO: Implement factor enforcement
+			L.warning("MySQL: Cannot set field 'enforce_factors'")
+
+		new_credentials[self.IdField] = mysql_id
+
+		if len(update) != 0:
+			raise KeyError("Some credentials fields cannot be updated: {}".format(", ".join(update.keys())))
+
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(self.UpdateQuery, new_credentials)
+			try:
+				await connection.commit()
+			except pymysql.err.IntegrityError as e:
+				raise ValueError("Cannot update credentials: {}".format(e)) from e
+
+		L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id,
+			"fields": updated_fields
+		})
+
+
+	async def delete(self, credentials_id) -> Optional[str]:
+		mysql_id = credentials_id[len(self.Prefix):]
+		async with aiomysql.connect(**self.ConnectionParams) as connection:
+			async with connection.cursor(aiomysql.DictCursor) as cursor:
+				await cursor.execute(self.DeleteQuery, {"_id": mysql_id})
+			try:
+				await connection.commit()
+			except pymysql.err.IntegrityError as e:
+				raise ValueError("Cannot delete credentials: {}".format(e)) from e
+
+		L.log(asab.LOG_NOTICE, "Credentials deleted", struct_data={
+			"provider_id": self.ProviderID,
+			"cid": credentials_id
+		})
+		return "OK"
