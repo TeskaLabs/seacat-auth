@@ -4,6 +4,7 @@
 
 ### Features
 - Anonymous sessions for unauthenticated user access (#120, PLUM Sprint 221118)
+- Display blocked LDAP credentials as suspended (#123, PLUM Sprint 221118)
 
 ### Refactoring
 - MySQL and XMongoDB inherit from read-only provider class (#122, PLUM Sprint 221118)
