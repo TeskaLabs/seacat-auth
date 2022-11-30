@@ -226,7 +226,6 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 			for res_type, res_data, res_msgid, res_controls in result_iter:
 				for dn, entry in res_data:
-					# Ignore refferals
 					if dn is not None:
 						result.append(_normalize_entry(
 							prefix,
@@ -377,6 +376,16 @@ def _normalize_entry(prefix, ptype, provider_id, dn, entry, attrusername: str = 
 	v = ldap_obj.pop('mobile', None)
 	if v is not None:
 		ret['phone'] = v
+
+	v = ldap_obj.pop('userAccountControl', None)
+	if v is not None:
+		# userAccountControl is an array of binary flags returned as a decimal integer
+		# byte #2 is ACCOUNTDISABLE
+		# https://learn.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
+		try:
+			ret["suspended"] = int(v) & 2 == 2
+		except ValueError:
+			pass
 
 	v = ldap_obj.pop('createTimestamp', None)
 	if v is not None:
