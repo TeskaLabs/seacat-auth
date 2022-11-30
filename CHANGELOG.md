@@ -2,13 +2,19 @@
 
 ## Release candidate
 
+### Breaking changes
+- Access to tenants must be requested in authorization scope (#92, PLUM Sprint 221118)
+
 ### Features
 - Anonymous sessions for unauthenticated user access (#120, PLUM Sprint 221118)
 - Display blocked LDAP credentials as suspended (#123, PLUM Sprint 221118)
+- Access to tenants must be requested in authorization scope (#92, PLUM Sprint 221118)
+- Resource `authz:tenant:access` grants access to any tenant (#92, PLUM Sprint 221118)
 
 ### Refactoring
 - MySQL and XMongoDB inherit from read-only provider class (#122, PLUM Sprint 221118)
-- 
+- Userinfo fields `preferred_username` and `phone_number` have been renamed (#92, PLUM Sprint 221118)
+
 ---
 
 
