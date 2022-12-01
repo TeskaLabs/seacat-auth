@@ -18,9 +18,9 @@ from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
-	cookie_session_builder,
 	login_descriptor_session_builder,
 	external_login_session_builder,
+	available_factors_session_builder
 )
 from .session import oauth2_session_builder
 
@@ -47,6 +47,7 @@ class OpenIdConnectService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
 
@@ -187,6 +188,7 @@ class OpenIdConnectService(asab.Service):
 		try:
 			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
 		except KeyError:
+			L.info(f"Session not found by access token {access_token}")
 			return None
 
 		return session
@@ -233,20 +235,26 @@ class OpenIdConnectService(asab.Service):
 		raise aiohttp.web.HTTPNotImplemented()
 
 
-	async def create_oidc_session(self, root_session, client_id, scope, requested_expiration=None):
+	async def create_oidc_session(self, root_session, client_id, scope, tenants=None, requested_expiration=None):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id),
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id
+				credentials_id=root_session.Credentials.Id,
+				tenants=tenants,
 			),
-			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
-			cookie_session_builder(),
-			await external_login_session_builder(ext_login_svc, root_session.Credentials.Id),
+			# cookie_session_builder(),  # TODO: This shouldn't be in OIDC session
 		]
+
+		if "userinfo:authn" in scope or "userinfo:*" in scope:
+			authn_service = self.App.get_service("seacatauth.AuthenticationService")
+			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
+			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
+			# TODO: Get factors from root_session?
+			session_builders.append(await available_factors_session_builder(authn_service, root_session.Credentials.Id))
 
 		# TODO: if 'openid' in scope
 		oauth2_data = {
@@ -265,6 +273,9 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def build_userinfo(self, session):
+		# TODO: Session object should only serve as a cache
+		#   After the cache has expired, update session object with fresh credential, authn and authz data
+		#   and rebuild the userinfo
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
@@ -282,14 +293,19 @@ class OpenIdConnectService(asab.Service):
 			userinfo["aud"] = session.OAuth2.ClientId
 			userinfo["azp"] = session.OAuth2.ClientId
 
+		if session.OAuth2.Scope is not None:
+			userinfo["scope"] = session.OAuth2.Scope
+
 		if session.Credentials.Username is not None:
-			userinfo["preferred_username"] = session.Credentials.Username
+			userinfo["username"] = session.Credentials.Username
+			userinfo["preferred_username"] = session.Credentials.Username  # BACK COMPAT, remove after 2023-01-31
 
 		if session.Credentials.Email is not None:
 			userinfo["email"] = session.Credentials.Email
 
 		if session.Credentials.Phone is not None:
-			userinfo["phone_number"] = session.Credentials.Phone
+			userinfo["phone"] = session.Credentials.Phone
+			userinfo["phone_number"] = session.Credentials.Phone   # BACK COMPAT, remove after 2023-01-31
 
 		if session.Credentials.CustomData is not None:
 			userinfo["custom"] = session.Credentials.CustomData
@@ -327,12 +343,6 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Authorization.Authz is not None:
 			userinfo["resources"] = session.Authorization.Authz
-
-		if session.Authorization.Authz is not None:
-			# Include the list of ALL the user's tenants (excluding "*")
-			tenants = [t for t in session.Authorization.Authz.keys() if t != "*"]
-			if len(tenants) > 0:
-				userinfo["tenants"] = tenants
 
 		if session.Authorization.Tenants is not None:
 			userinfo["tenants"] = session.Authorization.Tenants

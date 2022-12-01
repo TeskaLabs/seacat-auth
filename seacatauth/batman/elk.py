@@ -1,11 +1,10 @@
 import re
 import logging
 import typing
-
 import aiohttp
 import asab.config
 
-from ..authz import get_credentials_authz
+from ..authz import build_credentials_authz
 
 #
 
@@ -161,7 +160,7 @@ class ELKIntegration(asab.config.Configurable):
 		)
 
 		# Get authz dict
-		authz = await get_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
+		authz = await build_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
 
 		# ELK roles from SCA resources
 		# Use only global "*" roles for now

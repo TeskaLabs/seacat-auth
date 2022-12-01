@@ -87,3 +87,15 @@ class AuditService(asab.Service):
 			result['fpct'] = entry['_c']
 
 		return result
+
+
+	async def get_last_authorized_tenants(self, credentials_id: str):
+		entry = await self._get_latest_entry(
+			AuditCode.AUTHORIZE_SUCCESS.name,
+			cid=credentials_id,
+			tenants={"$ne": None}
+		)
+		if entry is not None:
+			return entry["tenants"]
+		else:
+			return None

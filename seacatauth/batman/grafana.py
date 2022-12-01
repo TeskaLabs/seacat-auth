@@ -1,11 +1,11 @@
 import re
 import logging
-
 import aiohttp
 import asab.config
 
+from seacatauth.authz import build_credentials_authz
+
 #
-from seacatauth.authz import get_credentials_authz
 
 L = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class GrafanaIntegration(asab.config.Configurable):
 			return
 
 		# Get authz dict
-		authz = await get_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
+		authz = await build_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
 
 		# Grafana roles from SCA resources
 		# Use only global "*" roles for now

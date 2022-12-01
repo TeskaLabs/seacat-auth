@@ -8,7 +8,6 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
-from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
@@ -302,27 +301,22 @@ class AuthenticationService(asab.Service):
 
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
+		scope = frozenset(["userinfo:*"])
+
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId),
+			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=login_session.CredentialsId
+				credentials_id=login_session.CredentialsId,
+				tenants=None  # Root session is tenant-agnostic
 			),
 			login_descriptor_session_builder(login_session.AuthenticatedVia),
 			cookie_session_builder(),
 			await available_factors_session_builder(self, login_session.CredentialsId),
 			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
 		]
-
-		# TODO: Temporary solution. Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
-		oauth2_data = {
-			"scope": ["openid", "cookie"],
-			"client_id": None,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="root",
@@ -366,25 +360,22 @@ class AuthenticationService(asab.Service):
 		Direct authentication for M2M access (without login sessions)
 		This is NOT OpenIDConnect/OAuth2 compliant!
 		"""
+		# TODO: Get tenant, scope and other necessary OIDC info from credentials
+		tenants = None
+		scope = frozenset(["userinfo:*"])
+
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, credentials_id),
+			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=credentials_id
+				credentials_id=credentials_id,
+				tenants=tenants,
 			),
 			# login_descriptor_session_builder(login_descriptor),  # TODO: Add login descriptor
 			cookie_session_builder(),
 			await available_factors_session_builder(self, credentials_id)
 		]
-
-		# TODO: Temporary solution. Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
-		oauth2_data = {
-			"scope": ["openid"],
-			"client_id": None,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="m2m",
@@ -435,14 +426,6 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id),
 			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
 		]
-
-		# TODO: Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
-		oauth2_data = {
-			"scope": ["cookie"],
-			"client_id": None,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="root",

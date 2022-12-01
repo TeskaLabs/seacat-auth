@@ -44,6 +44,7 @@ RUN apk add --no-cache  \
     pyotp \
     webauthn \
     pyyaml \
+    bson \
     git+https://github.com/TeskaLabs/asab.git
 
 RUN mkdir -p /app/seacat-auth
