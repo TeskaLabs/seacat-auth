@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v22.46
+## v22.48
 
 ### Breaking changes
 - Access to tenants must be requested in authorization scope (#92, PLUM Sprint 221118)
@@ -17,8 +17,6 @@
 
 ---
 
-
-### Breaking changes
 
 ## v22.46
 
