@@ -352,6 +352,7 @@ def rest_get(session_dict):
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
 		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),  # BACK COMPAT
+		"tenants": session_dict.get(SessionAdapter.FN.Authorization.Tenants),
 		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
 	}
 	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)

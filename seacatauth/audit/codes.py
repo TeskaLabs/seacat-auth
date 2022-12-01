@@ -12,6 +12,8 @@ class AuditCode(enum.Enum):
 	ANONYMOUS_SESSION_CREATED = enum.auto()
 	PASSWORD_CHANGE_SUCCESS = enum.auto()
 	PASSWORD_CHANGE_FAILED = enum.auto()
+	AUTHORIZE_SUCCESS = enum.auto()
+	AUTHORIZE_ERROR = enum.auto()
 	CREDENTIALS_CREATED = enum.auto()
 	CREDENTIALS_UPDATED = enum.auto()
 	CREDENTIALS_DELETED = enum.auto()
