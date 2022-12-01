@@ -380,7 +380,7 @@ def _normalize_entry(prefix, ptype, provider_id, dn, entry, attrusername: str = 
 	v = ldap_obj.pop('userAccountControl', None)
 	if v is not None:
 		# userAccountControl is an array of binary flags returned as a decimal integer
-		# byte #2 is ACCOUNTDISABLE
+		# byte #1 is ACCOUNTDISABLE which corresponds to "suspended" status
 		# https://learn.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
 		try:
 			ret["suspended"] = int(v) & 2 == 2
