@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+# Fix
+- Remove set_cookie from authorize response (#125, PLUM Sprint 221202)
+
+---
+
+
 ## v22.48
 
 ### Breaking changes

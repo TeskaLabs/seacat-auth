@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 
 from ...audit import AuditCode
-from ...cookie.utils import set_cookie, delete_cookie
+from ...cookie.utils import delete_cookie
 from ...client import exceptions
 
 #
@@ -458,9 +458,6 @@ class AuthorizeHandler(object):
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
 
-		if 'cookie' in scope:
-			set_cookie(self.App, response, session)
-
 		return response
 
 
@@ -575,9 +572,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-
-		if "cookie" in scope:
-			set_cookie(self.App, response, session)
 
 		return response
 
