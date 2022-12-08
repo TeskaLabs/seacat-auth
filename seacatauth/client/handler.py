@@ -75,6 +75,10 @@ class ClientHandler(object):
 	@asab.web.rest.json_schema_handler(CLIENT_METADATA_SCHEMA)
 	@access_control("authz:superuser")
 	async def register(self, request, *, json_data):
+		if "preferred_client_id" in json_data:
+			if not self.ClientService._AllowCustomClientIDs:
+				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
+			json_data["_custom_client_id"] = json_data["preferred_client_id"]
 		data = await self.ClientService.register(**json_data)
 		return asab.web.rest.json_response(request, data=data)
 
