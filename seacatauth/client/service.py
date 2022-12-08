@@ -165,14 +165,14 @@ class ClientService(asab.Service):
 		#   OAuth recommends that the client_id be a random string so that it is not easily guessable.
 		#   Allowing the client to choose their own ID may make the client application more vulnerable.
 		#   We decided to enable this by default for the convenience of simplifying the deployment process.
-		self._AllowCustomClientIDs = asab.Config.getboolean(
-			"seacatauth:client", "_allow_custom_client_ids", fallback=True)
+		self._AllowCustomClientID = asab.Config.getboolean(
+			"seacatauth:client", "_allow_custom_client_id", fallback=True)
 		# _allow_insecure_web_client_uris
 		#   Public non-secure http addresses should never be allowed in production environments.
 		self._AllowInsecureWebClientURIs = asab.Config.getboolean(
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
-		if not self._AllowCustomClientIDs:
+		if not self._AllowCustomClientID:
 			CLIENT_METADATA_SCHEMA["properties"].pop("preferred_client_id")
 
 
