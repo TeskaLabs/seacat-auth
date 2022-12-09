@@ -5,6 +5,9 @@
 # Fix
 - Remove set_cookie from authorize response (#125, PLUM Sprint 221202)
 
+### Features
+- Client registration allows custom client ID (#128, PLUM Sprint 221202)
+
 ---
 
 
