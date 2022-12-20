@@ -143,8 +143,9 @@ def _authorize_tenant(request):
 		available_resources = available_resources.union(request.Session.Authorization.Authz.get(requested_tenant))
 	elif "authz:superuser" in available_resources:
 		# Bypassing tenant-access check as superuser
-		# No resources to add
-		pass
+		# Only check if tenant exists
+		# TODO: How to get tenant service here?
+		await tenant_service.get_tenant(requested_tenant)
 	else:
 		# Tenant access denied
 		L.warning("Unauthorized access", struct_data={
