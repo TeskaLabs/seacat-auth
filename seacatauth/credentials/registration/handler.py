@@ -109,10 +109,10 @@ class RegistrationHandler(object):
 	@access_control("authz:tenant:admin")
 	async def resend_invitation(self, request):
 		credentials_id = request.match_info["credentials_id"]
-		credentials = await self.CredentialsService.get(credentials_id)
+		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
 
-		if credentials.get("__registration", {}).get("code") is None:
-			raise KeyError("Credentials not found")
+		if "__registration" not in credentials:
+			raise asab.exceptions.ValidationError("Credentials already registered.")
 		assert "email" in credentials
 
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
