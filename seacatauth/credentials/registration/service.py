@@ -18,7 +18,7 @@ L = logging.getLogger(__name__)
 class RegistrationService(asab.Service):
 
 	RegistrationKeyByteLength = 32
-	RegistrationUriFormat = "{auth_webui_base_url}#register?code={registration_code}"
+	RegistrationUriFormat = "{auth_webui_base_url}/#/register?rt={registration_code}"
 
 	def __init__(self, app, credentials_svc, service_name="seacatauth.RegistrationService"):
 		super().__init__(app, service_name)
