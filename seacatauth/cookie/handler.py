@@ -76,7 +76,6 @@ class CookieHandler(object):
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
-			# TODO: Do not allow sessions with {"anonymous": true} ?
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
@@ -91,21 +90,22 @@ class CookieHandler(object):
 
 
 	async def nginx_anonymous(self, request):
+		anonymous_cid = request.query.get("cid")
+		if anonymous_cid is None:
+			raise ValueError("No 'cid' parameter specified in anonymous introspection query.")
 		session = await self.authenticate_request(request)
 		anonymous_session_created = False
 
 		if session is None:
-			anonymous_cid = request.query.get("anonymous")
-			if anonymous_cid is not None:
-				# Create a new root session with anonymous_cid and a cookie
-				# Set the cookie
-				from_info = [request.remote]
-				forwarded_for = request.headers.get("X-Forwarded-For")
-				if forwarded_for is not None:
-					from_info.extend(forwarded_for.split(", "))
-				session = await self.CookieService.AuthenticationService.create_anonymous_session(
-					anonymous_cid, from_info=from_info)
-				anonymous_session_created = True
+			# Create a new root session with anonymous_cid and a cookie
+			# Set the cookie
+			from_info = [request.remote]
+			forwarded_for = request.headers.get("X-Forwarded-For")
+			if forwarded_for is not None:
+				from_info.extend(forwarded_for.split(", "))
+			session = await self.CookieService.AuthenticationService.create_anonymous_session(
+				anonymous_cid, from_info=from_info)
+			anonymous_session_created = True
 
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
