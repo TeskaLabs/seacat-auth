@@ -133,46 +133,24 @@ class RegistrationService(asab.Service):
 		if credentials["__registration"]["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Registration expired")
 
-		credentials_public = {}
-		# TODO: Get "required" and "editable" values from credential policy
-		credentials_public["email"] = {
-			"required": True,
-			"editable": False,
+		credentials_public = {
+			key: value
+			for key, value in credentials.items()
+			if key in ["email", "phone", "username"]
 		}
-		if "email" in credentials:
-			credentials_public["email"]["value"] = credentials["email"]
 
-		credentials_public["phone"] = {
-			"required": False,
-			"editable": True,
-		}
-		if "phone" in credentials:
-			credentials_public["phone"]["value"] = credentials["phone"]
-
-		credentials_public["username"] = {
-			"required": True,
-			"editable": True,
-		}
-		if "username" in credentials:
-			credentials_public["username"]["value"] = credentials["username"]
+		tenants = await self.TenantService.get_tenants(credentials["_id"])
+		if tenants is not None:
+			credentials_public["tenants"] = tenants
 
 		password_hash = credentials.pop("__password", None)
-		credentials_public["password"] = {
-			"set": password_hash is not None and len(password_hash) > 0,
-			"required": True,
-			"editable": True,
-		}
+		credentials_public["password"] = password_hash is not None and len(password_hash) > 0
 		# TODO: Add info about configured login factors
 		# credentials_public["totp"] = False
 		# credentials_public["webauthn"] = False
 		# credentials_public["external_login"] = False
 
-		response_data = {"credentials": credentials_public}
-		tenants = await self.TenantService.get_tenants(credentials["_id"])
-		if tenants is not None:
-			response_data["tenants"] = tenants
-
-		return response_data
+		return credentials_public
 
 
 	async def delete_credential_by_registration_code(self, registration_code: str):
