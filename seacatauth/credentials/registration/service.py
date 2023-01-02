@@ -136,7 +136,7 @@ class RegistrationService(asab.Service):
 		credentials_public = {
 			key: value
 			for key, value in credentials.items()
-			if key in ["email", "phone", "username"]
+			if key in ["_id", "email", "phone", "username"]
 		}
 
 		tenants = await self.TenantService.get_tenants(credentials["_id"])
