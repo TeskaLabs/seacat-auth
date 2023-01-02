@@ -94,7 +94,7 @@ def access_control(resource=None):
 			# Use the session object to extend the request with credentials_id, requested tenant and set of resources.
 			# If no tenant is present in the request, the request is considered global (i.e. `request.Tenant = "*"`)
 			# and tenant access authorization always passes.
-			request = _authorize_tenant(request)
+			request = await _authorize_tenant(request)
 
 			# 3) Authorize resource
 			# (if the decorator specifies a required `resource`)
@@ -123,7 +123,7 @@ def access_control(resource=None):
 	return decorator
 
 
-def _authorize_tenant(request):
+async def _authorize_tenant(request):
 	"""
 	Extract and authorize the requested tenant
 	If there's no tenant in the request or if the tenant is "*", no tenant-authorization happens
