@@ -130,6 +130,13 @@ def _authorize_tenant(request):
 	"""
 	requested_tenant = request.match_info.get("tenant")
 
+	# Check if tenant exists
+	tenant_service = request.App.get_service("seacatauth.TenantService")
+	try:
+		await tenant_service.get_tenant(requested_tenant)
+	except KeyError as e:
+		raise aiohttp.web.HTTPForbidden() from e
+
 	# Gather resources from all global roles
 	available_resources = set(request.Session.Authorization.Authz.get("*"))
 
@@ -143,9 +150,7 @@ def _authorize_tenant(request):
 		available_resources = available_resources.union(request.Session.Authorization.Authz.get(requested_tenant))
 	elif "authz:superuser" in available_resources:
 		# Bypassing tenant-access check as superuser
-		# Only check if tenant exists
-		# TODO: How to get tenant service here?
-		await tenant_service.get_tenant(requested_tenant)
+		pass
 	else:
 		# Tenant access denied
 		L.warning("Unauthorized access", struct_data={
