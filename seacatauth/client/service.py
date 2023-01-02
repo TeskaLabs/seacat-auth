@@ -45,6 +45,10 @@ CLIENT_METADATA_SCHEMA = {
 	"additionalProperties": False,
 	"properties": {
 		# The order of the properties is preserved in the UI form
+		"preferred_client_id": {
+			"type": "string",
+			"pattern": "^[-_a-zA-Z0-9]{8,64}$",
+			"description": "(Non-canonical) Preferred client ID."},
 		"client_name": {  # Can have language tags (e.g. "client_name#cs")
 			"type": "string",
 			"description": "Name of the Client to be presented to the End-User."},
@@ -56,9 +60,9 @@ CLIENT_METADATA_SCHEMA = {
 			"description": "Array of Redirection URI values used by the Client."},
 		#  "contacts": {},
 		# "custom_data": {  # NON-CANONICAL
-		# 	"type": "object", "description": "Additional client data."},
+		# 	"type": "object", "description": "(Non-canonical) Additional client data."},
 		# "logout_uri": {  # NON-CANONICAL
-		# 	"type": "string", "description": "URI that will be called on session logout."},
+		# 	"type": "string", "description": "(Non-canonical) URI that will be called on session logout."},
 		"application_type": {
 			"type": "string",
 			"description": "Kind of the application. The default, if omitted, is `web`.",
@@ -154,9 +158,22 @@ class ClientService(asab.Service):
 			"seacatauth:client", "client_secret_expiration", fallback=None)
 		if self.ClientSecretExpiration <= 0:
 			self.ClientSecretExpiration = None
+
 		# DEV OPTIONS
+		# _allow_custom_client_ids
+		#   https://www.oauth.com/oauth2-servers/client-registration/client-id-secret/
+		#   OAuth recommends that the client_id be a random string so that it is not easily guessable.
+		#   Allowing the client to choose their own ID may make the client application more vulnerable.
+		#   We decided to enable this by default for the convenience of simplifying the deployment process.
+		self._AllowCustomClientID = asab.Config.getboolean(
+			"seacatauth:client", "_allow_custom_client_id", fallback=True)
+		# _allow_insecure_web_client_uris
+		#   Public non-secure http addresses should never be allowed in production environments.
 		self._AllowInsecureWebClientURIs = asab.Config.getboolean(
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
+
+		if not self._AllowCustomClientID:
+			CLIENT_METADATA_SCHEMA["properties"].pop("preferred_client_id")
 
 
 	def build_filter(self, match_string):
@@ -240,7 +257,7 @@ class ClientService(asab.Service):
 		:type logout_uri: str
 		:param custom_data: NON-CANONICAL. Additional client data.
 		:type custom_data: str
-		:param _custom_client_id: NON-CANONICAL, INTERNAL ONLY. Request a specific ID for the client.
+		:param _custom_client_id: NON-CANONICAL. Request a specific ID for the client.
 		:type _custom_client_id: str
 		:return: Response containing the issued client_id and client_secret.
 		"""
