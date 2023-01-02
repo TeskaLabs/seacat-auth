@@ -94,7 +94,7 @@ def access_control(resource=None):
 			# Use the session object to extend the request with credentials_id, requested tenant and set of resources.
 			# If no tenant is present in the request, the request is considered global (i.e. `request.Tenant = "*"`)
 			# and tenant access authorization always passes.
-			request = _authorize_tenant(request)
+			request = await _authorize_tenant(request)
 
 			# 3) Authorize resource
 			# (if the decorator specifies a required `resource`)
@@ -123,12 +123,19 @@ def access_control(resource=None):
 	return decorator
 
 
-def _authorize_tenant(request):
+async def _authorize_tenant(request):
 	"""
 	Extract and authorize the requested tenant
 	If there's no tenant in the request or if the tenant is "*", no tenant-authorization happens
 	"""
 	requested_tenant = request.match_info.get("tenant")
+
+	# Check if tenant exists
+	tenant_service = request.App.get_service("seacatauth.TenantService")
+	try:
+		await tenant_service.get_tenant(requested_tenant)
+	except KeyError as e:
+		raise aiohttp.web.HTTPForbidden() from e
 
 	# Gather resources from all global roles
 	available_resources = set(request.Session.Authorization.Authz.get("*"))
@@ -143,7 +150,6 @@ def _authorize_tenant(request):
 		available_resources = available_resources.union(request.Session.Authorization.Authz.get(requested_tenant))
 	elif "authz:superuser" in available_resources:
 		# Bypassing tenant-access check as superuser
-		# No resources to add
 		pass
 	else:
 		# Tenant access denied
