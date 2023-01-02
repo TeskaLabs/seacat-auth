@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Release candidate
+
+# Fix
+- Remove set_cookie from authorize response (#125, PLUM Sprint 221202)
+- Attempts to access a nonexistent tenant result in 403 (#133, PLUM Sprint 221216)
+
+### Features
+- Client registration allows custom client ID (#128, PLUM Sprint 221202)
+
+---
+
+
 ## v22.48
 
 ### Breaking changes

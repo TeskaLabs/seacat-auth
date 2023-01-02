@@ -75,7 +75,7 @@ class RegistrationHandler(object):
 			access_ips.extend(forwarded_for.split(", "))
 
 		expiration = json_data.get("expiration")
-		if expiration is not None:
+		if isinstance(expiration, str):
 			expiration = asab.utils.convert_to_seconds(expiration)
 
 		credential_data = json_data["credentials"]
