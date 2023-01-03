@@ -3,6 +3,7 @@ import logging
 import secrets
 
 import bson
+import uuid
 
 import hashlib
 import cryptography.hazmat.primitives.ciphers
@@ -180,6 +181,12 @@ class SessionService(asab.Service):
 		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
 		upsertor.set(SessionAdapter.FN.Session.MaxExpiration, max_expiration)
 		upsertor.set(SessionAdapter.FN.Session.ExpirationExtension, touch_extension_seconds)
+
+		# Session transition
+		if prev_session is not None:
+			upsertor.set(SessionAdapter.FN.TrackId, prev_session.TrackId)
+		else:
+			upsertor.set(SessionAdapter.FN.TrackId, str(uuid.uuid4()))
 
 		# Add builder fields
 		if session_builders is None:
