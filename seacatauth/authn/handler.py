@@ -172,6 +172,9 @@ class AuthenticationHandler(object):
 		if ff is not None:
 			access_ips.extend(ff.split(', '))
 
+		# get prev session /wt uuid!
+		prev_session = await self.CookieService.get_session_by_sci(request)
+
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
@@ -199,7 +202,7 @@ class AuthenticationHandler(object):
 			)
 
 		# Do the actual login
-		session = await self.AuthenticationService.login(login_session, from_info=access_ips)
+		session = await self.AuthenticationService.login(login_session, from_info=access_ips, prev_session = prev_session)
 
 		# TODO: Note the last successful login time
 		# TODO: Log also the IP address

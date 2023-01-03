@@ -148,6 +148,7 @@ class SessionService(asab.Service):
 		self,
 		session_type: str,
 		parent_session: SessionAdapter = None,
+		prev_session: SessionAdapter = None,
 		expiration: float = None,
 		session_builders: list = None
 	):
