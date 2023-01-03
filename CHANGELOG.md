@@ -9,6 +9,9 @@
 ### Features
 - Client registration allows custom client ID (#128, PLUM Sprint 221202)
 
+### Refactoring
+- Cookie introspection for anonymous access is moved to a separate endpoint (#124, PLUM Sprint 221216)
+
 ---
 
 
