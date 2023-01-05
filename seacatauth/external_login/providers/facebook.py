@@ -25,7 +25,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		"access_token_uri": "https://graph.facebook.com/v15.0/oauth/access_token",
 		"userinfo_uri": "https://graph.facebook.com/me",
 		"login_redirect_uri": "https://facebook.com/connect/login_success.html",
-		"scope": "email,public_profile", 
+		"scope": "email,public_profile",
 		"fields": "id,name,email",
 		"label": "Sign in with Facebook",
 	}
