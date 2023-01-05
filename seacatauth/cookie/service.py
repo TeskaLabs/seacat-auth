@@ -126,13 +126,13 @@ class CookieService(asab.Service):
 		return None
 
 
-	async def get_session_by_sci(self, request):
+	async def get_session_by_sci(self, request, client_id=None):
 		session_cookie_id = self._get_session_cookie_id(request)
 		if session_cookie_id is None:
 			return None
 
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, session_cookie_id)
+			session = await self.SessionService.get_by({SessionAdapter.FN.Cookie.Id: session_cookie_id})
 		except KeyError:
 			L.info("Session not found", struct_data={"sci": session_cookie_id})
 			return None
