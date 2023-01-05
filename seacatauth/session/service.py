@@ -12,6 +12,7 @@ import cryptography.hazmat.primitives.ciphers.modes
 
 import asab
 import asab.storage
+import pymongo
 
 from .adapter import SessionAdapter, rest_get
 
@@ -77,6 +78,36 @@ class SessionService(asab.Service):
 		self.TaskService = app.get_service('asab.TaskService')
 		self.SessionGauge = self.MetricsService.create_gauge("sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
+
+
+	async def initialize(self, app):
+		# Initialize indexes
+		collection = await self.StorageService.collection(self.SessionCollection)
+
+		# Access token
+		try:
+			await collection.create_index(
+				[(SessionAdapter.FN.OAuth2.AccessToken, pymongo.ASCENDING)],
+				unique=True,
+				partialFilterExpression={
+					SessionAdapter.FN.OAuth2.AccessToken: {"$exists": True, "$gt": b""}}
+			)
+		except Exception as e:
+			L.error("Failed to create index (access token): {}".format(e))
+
+		# Cookie ID + client ID
+		try:
+			await collection.create_index(
+				[
+					(SessionAdapter.FN.Cookie.Id, pymongo.ASCENDING),
+					(SessionAdapter.FN.OAuth2.ClientId, pymongo.ASCENDING),
+				],
+				unique=True,
+				partialFilterExpression={
+					SessionAdapter.FN.Cookie.Id: {"$exists": True, "$gt": b""}}
+			)
+		except Exception as e:
+			L.error("Failed to create compound index (cookie ID, client ID): {}".format(e))
 
 
 	async def _on_start(self, event_name):
@@ -190,31 +221,27 @@ class SessionService(asab.Service):
 		return await self.get(session_id)
 
 
-	async def get_by(self, key, value):
+	async def get_by(self, criteria: dict):
 		# Encrypt sensitive fields
-		# BACK COMPAT: Do not encrypt old tokens (36 bytes long)
-		# TODO: Remove support once proper m2m tokens are in place
-		is_old_token = False
-		if key in SessionAdapter.SensitiveFields:
-			if len(value) < 48:
-				is_old_token = True
+		query_filter = {}
+		for key, value in criteria.items():
+			if key in SessionAdapter.SensitiveFields:
+				query_filter[key] = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 			else:
-				value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-		session_dict = await self.StorageService.get_by(self.SessionCollection, key=key, value=value)
+				query_filter[key] = value
+
+		collection = self.StorageService.Database[self.SessionCollection]
+		session_dict = await collection.find_one(query_filter)
+		if session_dict is None:
+			raise KeyError("Session not found")
+
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
 			L.error("Failed to create SessionAdapter from database object", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise e
-
-		if is_old_token:
-			L.warning("Access with obsolete access token.", struct_data={
-				"at": value,
-				"sid": session.Session.Id,
-				"cid": session.Credentials.Id
-			})
+			raise KeyError("Session not found") from e
 
 		return session
 
