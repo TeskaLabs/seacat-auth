@@ -5,6 +5,7 @@ import asab
 import asab.web
 import asab.web.rest
 import asab.storage
+import asab.proactor
 
 from . import middleware
 
@@ -25,6 +26,7 @@ class SeaCatAuthApplication(asab.Application):
 		# Load modules
 		self.add_module(asab.web.Module)
 		self.add_module(asab.storage.Module)
+		self.add_module(asab.proactor.Module)
 
 		# Locate web service
 		self.WebService = self.get_service("asab.WebService")
