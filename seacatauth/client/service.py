@@ -55,6 +55,10 @@ CLIENT_METADATA_SCHEMA = {
 		"client_uri": {  # Can have language tags
 			"type": "string",
 			"description": "URL of the home page of the Client."},
+		"cookie_domain": {
+			"type": "string",
+			"description":
+				"Domain of the client cookie. Defaults to the application's global cookie domain."},
 		"redirect_uris": {
 			"type": "array",
 			"description": "Array of Redirection URI values used by the Client."},
