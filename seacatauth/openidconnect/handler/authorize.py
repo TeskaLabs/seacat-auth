@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 
 from ...audit import AuditCode
-from ...cookie.utils import delete_cookie
+from ...cookie.utils import delete_cookie, set_cookie
 from ...client import exceptions
 
 #
@@ -161,11 +161,21 @@ class AuthorizeHandler(object):
 			)
 		# TODO: Fail with error response if client authorization fails
 		except KeyError:
-			L.info("Client ID not found", struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_id")
+			L.warning("Client ID not found", struct_data={"client_id": client_id})
+			return self.reply_with_authentication_error(
+				"invalid_client_id",
+				redirect_uri,
+				error_description="Invalid client_id",
+				state=state
+			)
 		except exceptions.InvalidClientSecret as e:
-			L.info(str(e), struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
+			L.warning(str(e), struct_data={"client_id": client_id})
+			return self.reply_with_authentication_error(
+				"unauthorized_client",
+				redirect_uri,
+				error_description="Unauthorized client",
+				state=state
+			)
 		except exceptions.InvalidRedirectURI as e:
 			L.error(str(e), struct_data={"client_id": client_id, "redirect_uri": e.RedirectURI})
 			await self.audit_authorize_error(
@@ -382,9 +392,12 @@ class AuthorizeHandler(object):
 		if requested_expiration is not None:
 			requested_expiration = int(requested_expiration)
 
-		# TODO: Create a new child session with the requested scope
-		session = await self.OpenIdConnectService.create_oidc_session(
-			root_session, client_id, scope, tenants, requested_expiration)
+		if "cookie" in scope:
+			session = await self.CookieService.create_cookie_client_session(
+				root_session, client_id, scope, tenants, requested_expiration)
+		else:
+			session = await self.OpenIdConnectService.create_oidc_session(
+				root_session, client_id, scope, tenants, requested_expiration)
 
 		await self.audit_authorize_success(session)
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
@@ -457,6 +470,9 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
+
+		if "cookie" in scope:
+			set_cookie(self.App, response, session)
 
 		return response
 
