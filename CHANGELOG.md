@@ -8,6 +8,7 @@
 
 ### Features
 - Client registration allows custom client ID (#128, PLUM Sprint 221202)
+- Login with external OAuth2 (Facebook) (#129, PLUM Sprint 221216)
 
 ### Refactoring
 - Cookie introspection for anonymous access is moved to a separate endpoint (#124, PLUM Sprint 221216)
