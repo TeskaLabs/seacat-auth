@@ -63,6 +63,7 @@ class OAuth2Data:
 @dataclasses.dataclass
 class CookieData:
 	Id: typing.Optional[str]
+	Domain: typing.Optional[str]
 
 
 class SessionAdapter:
@@ -124,6 +125,7 @@ class SessionAdapter:
 		class Cookie:
 			_prefix = "ck"
 			Id = "ck_sci"
+			Domain = "ck_d"
 
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
@@ -336,7 +338,8 @@ class SessionAdapter:
 		if sci is None:
 			return None
 		return CookieData(
-			Id=base64.urlsafe_b64encode(sci).decode("ascii")
+			Id=base64.urlsafe_b64encode(sci).decode("ascii"),
+			Domain=session_dict.pop(cls.FN.Cookie.Domain, None),
 		)
 
 

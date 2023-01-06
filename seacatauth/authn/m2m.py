@@ -122,6 +122,7 @@ class M2MIntrospectHandler(object):
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth
+		# TODO: Require client_id in query string
 		session = await self.authenticate_request(request)
 		if session is not None:
 			try:

@@ -188,7 +188,7 @@ class OpenIdConnectService(asab.Service):
 		try:
 			session = await self.SessionService.get_by({SessionAdapter.FN.OAuth2.AccessToken: access_token})
 		except KeyError:
-			L.info(f"Session not found by access token {access_token}")
+			L.info("Session not found by access token: {}".format(access_token))
 			return None
 
 		return session
@@ -245,8 +245,7 @@ class OpenIdConnectService(asab.Service):
 				role_service=self.RoleService,
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
-			),
-			# cookie_session_builder(),  # TODO: This shouldn't be in OIDC session
+			)
 		]
 
 		if "userinfo:authn" in scope or "userinfo:*" in scope:
