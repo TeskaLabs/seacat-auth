@@ -27,6 +27,7 @@ def set_cookie(app, response, session, cookie_domain_id=None, secure=None):
 	if secure is None:
 		secure = cookie_svc.CookieSecure
 
+	# TODO: Remove domain from the value. It is not needed anymore.
 	cookie_value = "{}:{}".format(cookie_domain, session.Cookie.Id)
 
 	# Set cookie max age equal to session max age
