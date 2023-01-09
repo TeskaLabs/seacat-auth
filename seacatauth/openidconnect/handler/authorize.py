@@ -632,4 +632,3 @@ class AuthorizeHandler(object):
 			raise exceptions.AccessDenied(subject=session.Credentials.Id)
 
 		return tenants
-
