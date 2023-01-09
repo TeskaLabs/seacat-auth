@@ -5,6 +5,8 @@ import uuid
 import asab
 import asab.storage.exceptions
 
+from .. import exceptions
+
 #
 
 L = logging.getLogger(__name__)
@@ -19,6 +21,7 @@ class TenantService(asab.Service):
 		super().__init__(app, service_name)
 		self.TenantsProvider = None
 		self.TenantNameRegex = re.compile("^{}$".format(self.TenantNamePattern))
+		self.AuditService = app.get_service("seacatauth.AuditService")
 
 
 	def create_provider(self, provider_id, config_section_name):
@@ -244,3 +247,49 @@ class TenantService(asab.Service):
 		Tenants are optional, SeaCat Auth can operate without tenant.
 		'''
 		return self.TenantsProvider is not None
+
+
+	async def get_tenants_by_scope(self, scope: list, credential_id: str, has_access_to_all_tenants: bool = False):
+		"""
+		Returns a set of tenants for given credentials and scope and validates tenant access.
+
+		"tenant:<tenant_name>" in scope requests access to a specific tenant
+		"tenant:*" in scope requests access to all the credentials' tenants
+		"tenant" in scope ensures at least one tenant is authorized. If no specific tenant is in scope,
+			user's last authorized tenant is requested.
+		"""
+		tenants = set()
+		user_tenants = await self.get_tenants(credential_id)
+		for resource in scope:
+			if not resource.startswith("tenant:"):
+				continue
+			tenant = resource[len("tenant:"):]
+			if tenant == "*":
+				# Client is requesting access to all of the user's tenants
+				# TODO: Check if the client is allowed to request this
+				tenants.update(user_tenants)
+			elif tenant in user_tenants:
+				tenants.add(tenant)
+			elif has_access_to_all_tenants:
+				try:
+					await self.get_tenant(tenant)
+					tenants.add(tenant)
+				except KeyError:
+					raise exceptions.TenantNotFound(tenant)
+			else:
+				raise exceptions.TenantAccessDenied(tenant, credential_id)
+
+		if len(tenants) == 0 and "tenant" in scope:
+			last_tenants = [
+				tenant
+				for tenant in (await self.AuditService.get_last_authorized_tenants(credential_id) or [])
+				if tenant in user_tenants
+			]
+			if last_tenants:
+				tenants.add(last_tenants[0])
+			elif len(user_tenants) > 0:
+				tenants.add(user_tenants[0])
+			else:
+				raise exceptions.NoTenants(credential_id)
+
+		return tenants

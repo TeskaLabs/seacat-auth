@@ -8,7 +8,8 @@ import asab
 
 from ...audit import AuditCode
 from ...cookie.utils import delete_cookie, set_cookie
-from ...client import exceptions
+from ...client import exceptions as client_exceptions
+from ... import exceptions
 
 #
 
@@ -168,7 +169,7 @@ class AuthorizeHandler(object):
 				error_description="Invalid client_id",
 				state=state
 			)
-		except exceptions.InvalidClientSecret as e:
+		except client_exceptions.InvalidClientSecret as e:
 			L.warning(str(e), struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				"unauthorized_client",
@@ -176,7 +177,7 @@ class AuthorizeHandler(object):
 				error_description="Unauthorized client",
 				state=state
 			)
-		except exceptions.InvalidRedirectURI as e:
+		except client_exceptions.InvalidRedirectURI as e:
 			L.error(str(e), struct_data={"client_id": client_id, "redirect_uri": e.RedirectURI})
 			await self.audit_authorize_error(
 				client_id, "invalid_redirect_uri",
@@ -188,7 +189,7 @@ class AuthorizeHandler(object):
 				error_description="redirect_uri is not valid for given client_id",
 				state=state
 			)
-		except exceptions.ClientError as e:
+		except client_exceptions.ClientError as e:
 			L.info(str(e), struct_data={"client_id": client_id})
 			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 
@@ -289,79 +290,16 @@ class AuthorizeHandler(object):
 
 		# We are authenticated!
 
-		# Authorize access to tenants
-		# - "tenant:<tenant_name>" in scope requests access to a specific tenant
-		# - "tenant:*" in scope requests access to all the user's tenants
-		# - "tenant" in scope ensures at least one tenant is authorized. If no specific tenant is in scope
-		#      user's last authorized tenant is requested.
-		tenants = set()
-		user_tenants = await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id)
-		user_has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
-			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
-			or self.OpenIdConnectService.RBACService.has_resource_access(
-			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
-		for resource in scope:
-			if not resource.startswith("tenant:"):
-				continue
-			tenant = resource[len("tenant:"):]
-			if tenant == "*":
-				# Client is requesting access to all of the user's tenants
-				# TODO: Check if the client is allowed to request this
-				tenants.update(user_tenants)
-			elif tenant in user_tenants:
-				tenants.add(tenant)
-			elif user_has_access_to_all_tenants:
-				try:
-					await self.OpenIdConnectService.TenantService.get_tenant(tenant)
-					tenants.add(tenant)
-				except KeyError:
-					# Tenant does not exist
-					await self.audit_authorize_error(
-						client_id, "access_denied:tenant_not_found",
-						credential_id=root_session.Credentials.Id,
-						tenant=tenant,
-						scope=scope
-					)
-					return self.reply_with_authentication_error(
-						"access_denied",
-						redirect_uri,
-						state=state,
-					)
-			else:
-				await self.audit_authorize_error(
-					client_id, "access_denied:unauthorized_tenant",
-					credential_id=root_session.Credentials.Id,
-					tenant=tenant,
-					scope=scope
-				)
-				return self.reply_with_authentication_error(
-					"access_denied",
-					redirect_uri,
-					state=state,
-				)
+		# Authorize access to tenants by scope
+		try:
+			tenants = await self._authorize_tenants_by_scope(scope, root_session, client_id)
+		except exceptions.AccessDenied:
+			return self.reply_with_authentication_error(
+				"access_denied",
+				redirect_uri,
+				state=state,
+			)
 
-		if len(tenants) == 0 and "tenant" in scope:
-			last_tenants = [
-				tenant
-				for tenant in (await self.OpenIdConnectService.AuditService.get_last_authorized_tenants(
-					root_session.Credentials.Id) or [])
-				if tenant in user_tenants
-			]
-			if last_tenants:
-				tenants.add(last_tenants[0])
-			elif len(user_tenants) > 0:
-				tenants.add(user_tenants[0])
-			else:
-				await self.audit_authorize_error(
-					client_id, "access_denied:user_has_no_tenant",
-					credential_id=root_session.Credentials.Id,
-					scope=scope
-				)
-				return self.reply_with_authentication_error(
-					"access_denied",
-					redirect_uri,
-					state=state,
-				)
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
@@ -656,3 +594,42 @@ class AuthorizeHandler(object):
 		if credential_id is not None:
 			d["cid"] = credential_id
 		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+
+
+	async def _authorize_tenants_by_scope(self, scope, session, client_id):
+		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			or self.OpenIdConnectService.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		try:
+			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
+				scope, session.Credentials.Id, has_access_to_all_tenants)
+		except exceptions.TenantNotFound as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			await self.audit_authorize_error(
+				client_id, "access_denied:tenant_not_found",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+		except exceptions.TenantAccessDenied as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:unauthorized_tenant",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+		except exceptions.NoTenants:
+			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:user_has_no_tenant",
+				credential_id=session.Credentials.Id,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+
+		return tenants
+
