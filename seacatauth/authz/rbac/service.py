@@ -3,7 +3,7 @@ import typing
 
 import asab
 
-from ...exceptions import TenantRequired
+from ...exceptions import TenantNotSpecified
 
 #
 
@@ -61,7 +61,7 @@ class RBACService(asab.Service):
 			if resource == "tenant:access":
 				if tenant is None:
 					# "tenant:access" must be checked against a specific tenant
-					raise TenantRequired()
+					raise TenantNotSpecified()
 				if tenant == "*":
 					# Soft-check: Pass if at least one tenant is accessible
 					# (Authz must contain "*" plus at least one more tenant)
