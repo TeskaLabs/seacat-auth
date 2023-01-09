@@ -24,6 +24,8 @@ from ..session import (
 )
 from .session import oauth2_session_builder
 
+from .. import exceptions
+
 #
 
 L = logging.getLogger(__name__)
@@ -393,3 +395,42 @@ class OpenIdConnectService(asab.Service):
 		id_token = token.serialize()
 
 		return id_token
+
+
+	async def authorize_tenants_by_scope(self, scope, session, client_id):
+		has_access_to_all_tenants = self.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			or self.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		try:
+			tenants = await self.TenantService.get_tenants_by_scope(
+				scope, session.Credentials.Id, has_access_to_all_tenants)
+		except exceptions.TenantNotFound as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			await self.audit_authorize_error(
+				client_id, "access_denied:tenant_not_found",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+		except exceptions.TenantAccessDenied as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:unauthorized_tenant",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+		except exceptions.NoTenants:
+			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:user_has_no_tenant",
+				credential_id=session.Credentials.Id,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+
+		return tenants
+
