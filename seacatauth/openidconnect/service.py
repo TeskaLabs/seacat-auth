@@ -23,7 +23,7 @@ from ..session import (
 	available_factors_session_builder
 )
 from .session import oauth2_session_builder
-
+from ..audit import AuditCode
 from .. import exceptions
 
 #
@@ -433,3 +433,23 @@ class OpenIdConnectService(asab.Service):
 			raise exceptions.AccessDenied(subject=session.Credentials.Id)
 
 		return tenants
+
+
+	async def audit_authorize_success(self, session):
+		await self.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
+			"cid": session.Credentials.Id,
+			"tenants": [t for t in session.Authorization.Authz if t != "*"],
+			"client_id": session.OAuth2.ClientId,
+			"scope": session.OAuth2.Scope,
+		})
+
+
+	async def audit_authorize_error(self, client_id, error, credential_id=None, **kwargs):
+		d = {
+			"client_id": client_id,
+			"error": error,
+			**kwargs
+		}
+		if credential_id is not None:
+			d["cid"] = credential_id
+		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
