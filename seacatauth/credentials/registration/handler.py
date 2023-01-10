@@ -92,7 +92,7 @@ class RegistrationHandler(object):
 		await self.RegistrationService.TenantService.assign_tenant(invited_credentials_id, tenant)
 
 		# Send invitation
-		await self.RegistrationService.CommunicationService.registration_link(
+		await self.RegistrationService.CommunicationService.invitation(
 			email=credential_data.get("email"),
 			registration_uri=self.RegistrationService.format_registration_uri(registration_code),
 			username=credential_data.get("username"),
@@ -121,7 +121,7 @@ class RegistrationHandler(object):
 		except IndexError:
 			tenant = None
 
-		await self.RegistrationService.CommunicationService.registration_link(
+		await self.RegistrationService.CommunicationService.invitation(
 			email=credentials["email"],
 			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			username=credentials.get("username"),
