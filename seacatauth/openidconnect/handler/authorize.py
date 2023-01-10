@@ -293,7 +293,7 @@ class AuthorizeHandler(object):
 		# Authorize access to tenants by scope
 		try:
 			tenants = await self.authorize_tenants_by_scope(scope, root_session, client_id)
-		except exceptions.AccessDenied:
+		except exceptions.AccessDeniedError:
 			return self.reply_with_authentication_error(
 				"access_denied",
 				redirect_uri,
@@ -604,7 +604,7 @@ class AuthorizeHandler(object):
 		try:
 			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
 				scope, session.Credentials.Id, has_access_to_all_tenants)
-		except exceptions.TenantNotFound as e:
+		except exceptions.TenantNotFoundError as e:
 			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
 			await self.audit_authorize_error(
 				client_id, "access_denied:tenant_not_found",
@@ -612,8 +612,8 @@ class AuthorizeHandler(object):
 				tenant=e.Tenant,
 				scope=scope
 			)
-			raise exceptions.AccessDenied(subject=session.Credentials.Id)
-		except exceptions.TenantAccessDenied as e:
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+		except exceptions.TenantAccessDeniedError as e:
 			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
 			await self.audit_authorize_error(
 				client_id, "access_denied:unauthorized_tenant",
@@ -621,14 +621,14 @@ class AuthorizeHandler(object):
 				tenant=e.Tenant,
 				scope=scope
 			)
-			raise exceptions.AccessDenied(subject=session.Credentials.Id)
-		except exceptions.NoTenants:
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+		except exceptions.NoTenantsError:
 			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
 			await self.audit_authorize_error(
 				client_id, "access_denied:user_has_no_tenant",
 				credential_id=session.Credentials.Id,
 				scope=scope
 			)
-			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 
 		return tenants
