@@ -18,7 +18,7 @@ L = logging.getLogger(__name__)
 class RegistrationService(asab.Service):
 
 	RegistrationKeyByteLength = 32
-	RegistrationUriFormat = "{auth_webui_base_url}#register?code={registration_code}"
+	RegistrationUriFormat = "{auth_webui_base_url}/#/register?rt={registration_code}"
 
 	def __init__(self, app, credentials_svc, service_name="seacatauth.RegistrationService"):
 		super().__init__(app, service_name)
@@ -136,7 +136,7 @@ class RegistrationService(asab.Service):
 		credentials_public = {
 			key: value
 			for key, value in credentials.items()
-			if key in ["email", "phone", "username"]
+			if key in ["_id", "email", "phone", "username"]
 		}
 
 		tenants = await self.TenantService.get_tenants(credentials["_id"])
