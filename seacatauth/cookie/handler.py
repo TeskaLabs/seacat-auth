@@ -31,11 +31,13 @@ class CookieHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
+		web_app.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
 		web_app.router.add_get('/cookie/entry/{domain_id}', self.cookie_request)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post('/cookie/nginx', self.nginx)
+		web_app_public.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
 		web_app_public.router.add_get('/cookie/entry/{domain_id}', self.cookie_request)
 
 
@@ -71,34 +73,55 @@ class CookieHandler(object):
 
 		session = await self.authenticate_request(request)
 
-		new_anonymous_session = False
-		anonymous_cid = request.query.get("anonymous")
 		if session is None:
-			if anonymous_cid is not None:
-				# Create a new root session with anonymous_cid and a cookie
-				# Set the cookie
-				from_info = [request.remote]
-				forwarded_for = request.headers.get("X-Forwarded-For")
-				if forwarded_for is not None:
-					from_info.extend(forwarded_for.split(", "))
-				session = await self.CookieService.AuthenticationService.create_anonymous_session(
-					anonymous_cid, from_info=from_info)
-				new_anonymous_session = True
-			else:
-				raise aiohttp.web.HTTPUnauthorized()
-
-		try:
-			response = await nginx_introspection(request, session, self.App)
-		except Exception as e:
-			L.warning("Request authorization failed: {}".format(e), exc_info=True)
 			response = aiohttp.web.HTTPUnauthorized()
-
-		if new_anonymous_session:
-			set_cookie(self.App, response, session)
+		else:
+			try:
+				response = await nginx_introspection(request, session, self.App)
+			except Exception as e:
+				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
 			return response
+
+		return response
+
+
+	async def nginx_anonymous(self, request):
+		anonymous_cid = request.query.get("cid")
+		if anonymous_cid is None:
+			raise ValueError("No 'cid' parameter specified in anonymous introspection query.")
+		session = await self.authenticate_request(request)
+		anonymous_session_created = False
+
+		if session is None:
+			# Create a new root session with anonymous_cid and a cookie
+			# Set the cookie
+			from_info = [request.remote]
+			forwarded_for = request.headers.get("X-Forwarded-For")
+			if forwarded_for is not None:
+				from_info.extend(forwarded_for.split(", "))
+			session = await self.CookieService.AuthenticationService.create_anonymous_session(
+				anonymous_cid, from_info=from_info)
+			anonymous_session_created = True
+
+		if session is None:
+			response = aiohttp.web.HTTPUnauthorized()
+		else:
+			try:
+				response = await nginx_introspection(request, session, self.App)
+			except Exception as e:
+				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				response = aiohttp.web.HTTPUnauthorized()
+
+		if response.status_code != 200:
+			delete_cookie(self.App, response)
+			return response
+
+		if anonymous_session_created:
+			set_cookie(self.App, response, session)
 
 		return response
 
