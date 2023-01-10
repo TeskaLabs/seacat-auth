@@ -92,7 +92,7 @@ class RegistrationHandler(object):
 		await self.RegistrationService.TenantService.assign_tenant(invited_credentials_id, tenant)
 
 		# Send invitation
-		await self.RegistrationService.CommunicationService.registration_link(
+		await self.RegistrationService.CommunicationService.invitation(
 			email=credential_data.get("email"),
 			registration_uri=self.RegistrationService.format_registration_uri(registration_code),
 			username=credential_data.get("username"),
@@ -109,10 +109,10 @@ class RegistrationHandler(object):
 	@access_control("authz:tenant:admin")
 	async def resend_invitation(self, request):
 		credentials_id = request.match_info["credentials_id"]
-		credentials = await self.CredentialsService.get(credentials_id)
+		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
 
-		if credentials.get("__registration", {}).get("code") is None:
-			raise KeyError("Credentials not found")
+		if "__registration" not in credentials:
+			raise asab.exceptions.ValidationError("Credentials already registered.")
 		assert "email" in credentials
 
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
@@ -121,7 +121,7 @@ class RegistrationHandler(object):
 		except IndexError:
 			tenant = None
 
-		await self.RegistrationService.CommunicationService.registration_link(
+		await self.RegistrationService.CommunicationService.invitation(
 			email=credentials["email"],
 			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			username=credentials.get("username"),
@@ -180,7 +180,52 @@ class RegistrationHandler(object):
 		registration_code = request.match_info["registration_code"]
 		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
 
-		return asab.web.rest.json_response(request, credentials)
+		# TODO: Get "required" and "editable" values from credential policy
+		email_data = {
+			"required": True,
+			"editable": False,
+		}
+		if "email" in credentials:
+			email_data["value"] = credentials["email"]
+
+		phone_data = {
+			"required": False,
+			"editable": True,
+		}
+		if "phone" in credentials:
+			phone_data["value"] = credentials["phone"]
+
+		username_data = {
+			"required": True,
+			"editable": True,
+		}
+		if "username" in credentials:
+			username_data["value"] = credentials["username"]
+
+		password_hash = credentials.pop("__password", None)
+		password_data = {
+			"set": password_hash is not None and len(password_hash) > 0,
+			"required": True,
+			"editable": True,
+		}
+		# TODO: Add info about configured login factors
+		# credentials_public["totp"] = False
+		# credentials_public["webauthn"] = False
+		# credentials_public["external_login"] = False
+
+		response_data = {
+			"credentials": {
+				"email": email_data,
+				"username": username_data,
+				"phone": phone_data,
+				"password": password_data,
+			}
+		}
+		tenants = await self.TenantService.get_tenants(credentials["_id"])
+		if tenants is not None:
+			response_data["tenants"] = tenants
+
+		return asab.web.rest.json_response(request, response_data)
 
 
 	async def update_registration(self, request):
