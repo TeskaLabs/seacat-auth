@@ -3,8 +3,8 @@
 	<head>
 		<meta http-equiv="content-yype" content="text/html; charset=UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-		<meta email-subject="Nová registrace do {{ app_name }}" />
-		<title>Nová registrace do {{ app_name }}</title>
+		<meta email-subject="Registrace na {{ app_name }}" />
+		<title>Registrace na {{ app_name }}</title>
 	</head>
 	<style>
 		* {
@@ -37,13 +37,11 @@
 			{% if username %}Vítejte, <b>{{ username }}</b>!
 			{% else %}Vítejte!
 			{% endif %}<br /><br />
-			{% if tenant %}Byli jste pozváni do <b>{{ tenant }}</b> ve službě {{ app_name }}.
-			{% else %}Byli jste pozváni do služby {{ app_name }}.
-			{% endif %}
+			Požádali jste o založení účtu na webu {{ app_name }}.
 		</p>
 		<p>
 			<a href="{{ registration_uri }}" class="button">
-				Dokončit registraci
+				Pokračovat k registraci
 			</a>
 		</p>
 		<p>
