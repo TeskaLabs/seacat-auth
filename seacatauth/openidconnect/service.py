@@ -433,4 +433,3 @@ class OpenIdConnectService(asab.Service):
 			raise exceptions.AccessDenied(subject=session.Credentials.Id)
 
 		return tenants
-
