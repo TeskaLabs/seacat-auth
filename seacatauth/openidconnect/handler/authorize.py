@@ -292,7 +292,7 @@ class AuthorizeHandler(object):
 
 		# Authorize access to tenants by scope
 		try:
-			tenants = await self.OpenIdConnectService.authorize_tenants_by_scope(scope, root_session, client_id)
+			tenants = await self.authorize_tenants_by_scope(scope, root_session, client_id)
 		except exceptions.AccessDenied:
 			return self.reply_with_authentication_error(
 				"access_denied",
@@ -594,3 +594,41 @@ class AuthorizeHandler(object):
 		if credential_id is not None:
 			d["cid"] = credential_id
 		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+
+
+	async def authorize_tenants_by_scope(self, scope, session, client_id):
+		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			or self.OpenIdConnectService.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		try:
+			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
+				scope, session.Credentials.Id, has_access_to_all_tenants)
+		except exceptions.TenantNotFound as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			await self.audit_authorize_error(
+				client_id, "access_denied:tenant_not_found",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+		except exceptions.TenantAccessDenied as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:unauthorized_tenant",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+		except exceptions.NoTenants:
+			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:user_has_no_tenant",
+				credential_id=session.Credentials.Id,
+				scope=scope
+			)
+			raise exceptions.AccessDenied(subject=session.Credentials.Id)
+
+		return tenants
