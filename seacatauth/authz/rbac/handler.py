@@ -3,7 +3,7 @@ import logging
 import asab.web.rest
 
 from ...decorators import access_control
-from ...exceptions import TenantNotSpecified
+from ...exceptions import TenantNotSpecifiedError
 
 ###
 
@@ -42,7 +42,7 @@ class RBACHandler(object):
 					data={"result": "NOT-AUTHORIZED"},
 					reason=401
 				)
-		except TenantNotSpecified:
+		except TenantNotSpecifiedError:
 			return asab.web.rest.json_response(
 				request,
 				data={"result": "TENANT-NOT-SPECIFIED"},

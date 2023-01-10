@@ -1,17 +1,8 @@
-class TenantNotSpecified(Exception):
+class TenantNotSpecifiedError(Exception):
 	pass
 
 
-class AuthenticationRequired(Exception):
-	"""
-	Accessing this resource (or tenant, operation...) requires that the subject be authenticated.
-
-	Equivalent to HTTP 401 Unauthorized.
-	"""
-	pass
-
-
-class AccessDenied(Exception):
+class AccessDeniedError(Exception):
 	"""
 	Subject is not authorized to access requested resource (or tenant, operation...).
 
@@ -32,7 +23,7 @@ class AccessDenied(Exception):
 			super().__init__(*args)
 
 
-class TenantAccessDenied(AccessDenied):
+class TenantAccessDeniedError(AccessDeniedError):
 	"""
 	Subject is not authorized to access requested tenant.
 	"""
@@ -41,7 +32,7 @@ class TenantAccessDenied(AccessDenied):
 		super().__init__(subject=subject, resource=tenant)
 
 
-class NoTenants(AccessDenied):
+class NoTenantsError(AccessDeniedError):
 	"""
 	Subject has access to no tenants.
 	"""
@@ -54,7 +45,7 @@ class NoTenants(AccessDenied):
 		super().__init__(message, *args)
 
 
-class TenantNotFound(KeyError):
+class TenantNotFoundError(KeyError):
 	def __init__(self, tenant, *args):
 		self.Tenant = tenant
 		super().__init__("Tenant {!r} not found.".format(tenant), *args)

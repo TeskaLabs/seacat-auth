@@ -1,7 +1,7 @@
 import unittest
 
 from seacatauth.authz import RBACService
-from seacatauth.exceptions import TenantNotSpecified
+from seacatauth.exceptions import TenantNotSpecifiedError
 
 
 class RBACTestCase(unittest.TestCase):
@@ -31,7 +31,7 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(self.authz_test_data, "second-tenant", ["tenant:access"])
 		self.assertFalse(access)
 
-		with self.assertRaises(TenantNotSpecified):
+		with self.assertRaises(TenantNotSpecifiedError):
 			RBACService.has_resource_access(self.authz_test_data, None, ["tenant:access"])
 
 		# Check superuser

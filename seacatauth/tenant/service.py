@@ -275,9 +275,9 @@ class TenantService(asab.Service):
 					await self.get_tenant(tenant)
 					tenants.add(tenant)
 				except KeyError:
-					raise exceptions.TenantNotFound(tenant)
+					raise exceptions.TenantNotFoundError(tenant)
 			else:
-				raise exceptions.TenantAccessDenied(tenant, credential_id)
+				raise exceptions.TenantAccessDeniedError(tenant, credential_id)
 
 		if len(tenants) == 0 and "tenant" in scope:
 			last_tenants = [
@@ -290,6 +290,6 @@ class TenantService(asab.Service):
 			elif len(user_tenants) > 0:
 				tenants.add(user_tenants[0])
 			else:
-				raise exceptions.NoTenants(credential_id)
+				raise exceptions.NoTenantsError(credential_id)
 
 		return tenants
