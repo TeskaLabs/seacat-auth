@@ -176,12 +176,12 @@ class CommunicationService(asab.Service):
 		return True
 
 
-	async def registration_link(
+	async def invitation(
 		self, *,
-		phone=None, email=None, locale=None, username=None, tenant=None, registration_uri
+		phone=None, email=None, locale=None, username=None, tenant, registration_uri
 	):
 		channel = "email"
-		message_id = "registration_link"
+		message_id = "invitation"
 		locale = locale or self.DefaultLocale
 
 		success = False
