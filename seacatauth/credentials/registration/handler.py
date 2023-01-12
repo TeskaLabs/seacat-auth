@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import aiohttp.web
@@ -96,7 +97,8 @@ class RegistrationHandler(object):
 			email=credential_data.get("email"),
 			registration_uri=self.RegistrationService.format_registration_uri(registration_code),
 			username=credential_data.get("username"),
-			tenant=tenant
+			tenants=[tenant],
+			expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 		)
 
 		payload = {
@@ -116,16 +118,13 @@ class RegistrationHandler(object):
 		assert "email" in credentials
 
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
-		try:
-			tenant = tenants[0]
-		except IndexError:
-			tenant = None
 
 		await self.RegistrationService.CommunicationService.invitation(
 			email=credentials["email"],
 			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			username=credentials.get("username"),
-			tenant=tenant
+			tenants=tenants,
+			expires_at=credentials["__registration"]["exp"],
 		)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
