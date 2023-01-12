@@ -178,7 +178,7 @@ class CommunicationService(asab.Service):
 
 	async def invitation(
 		self, *,
-		phone=None, email=None, locale=None, username=None, tenants, registration_uri
+		phone=None, email=None, locale=None, username=None, tenants, registration_uri, expires_at=None
 	):
 		channel = "email"
 		message_id = "invitation"
@@ -203,6 +203,7 @@ class CommunicationService(asab.Service):
 				username=username,
 				tenants=tenants,
 				registration_uri=registration_uri,
+				expires_at=expires_at,
 				app_name=self.AppName
 			)
 		except Exception as e:
