@@ -37,7 +37,10 @@
 			{% if username %}Vítejte, <b>{{ username }}</b>!
 			{% else %}Vítejte!
 			{% endif %}<br /><br />
-			Byli jste pozváni do <b>{{ tenant }}</b> ve službě {{ app_name }}.
+			Byli jste pozváni do {% for tenant in tenants -%}
+				{%- if loop.first %}{% elif loop.last %} a {% else %}, {% endif -%}
+				<b>{{ tenant }}</b>
+			{%- endfor %} ve službě {{ app_name }}.
 		</p>
 		<p>
 			<a href="{{ registration_uri }}" class="button">

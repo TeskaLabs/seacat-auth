@@ -37,7 +37,10 @@
 			{% if username %}Welcome <b>{{ username }}</b>!
 			{% else %}Welcome!
 			{% endif %}<br /><br />
-			You have been invited to join <b>{{ tenant }}</b> at {{ app_name }}.
+			You have been invited to join {% for tenant in tenants -%}
+				{%- if loop.first %}{% elif loop.last %} and {% else %}, {% endif -%}
+				<b>{{ tenant }}</b>
+			{%- endfor %} at {{ app_name }}.
 		</p>
 		<p>
 			<a href="{{ registration_uri }}" class="button">

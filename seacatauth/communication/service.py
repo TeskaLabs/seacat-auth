@@ -178,7 +178,7 @@ class CommunicationService(asab.Service):
 
 	async def invitation(
 		self, *,
-		phone=None, email=None, locale=None, username=None, tenant, registration_uri
+		phone=None, email=None, locale=None, username=None, tenants, registration_uri
 	):
 		channel = "email"
 		message_id = "invitation"
@@ -201,7 +201,7 @@ class CommunicationService(asab.Service):
 				phone=phone,
 				email=email,
 				username=username,
-				tenant=tenant,
+				tenants=tenants,
 				registration_uri=registration_uri,
 				app_name=self.AppName
 			)
