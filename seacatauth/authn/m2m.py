@@ -31,7 +31,7 @@ class M2MIntrospectHandler(object):
 		web_app_public.router.add_post('/m2m/nginx', self.nginx)
 
 
-	async def authenticate_request(self, request):
+	async def authenticate_request(self, request, client_id):
 		# Get credentials from request
 		authorization_bytes = await request.read()
 
@@ -80,17 +80,21 @@ class M2MIntrospectHandler(object):
 			ff = request.headers.get("X-Forwarded-For")
 			if ff is not None:
 				access_ips.extend(ff.split(", "))
+			login_descriptor = {
+				"id": "!m2m",
+				"factors": [{"type": "!m2m-basic-auth"}]
+			}
 			session = await self.AuthnService.create_m2m_session(
 				credentials_id,
-				login_descriptor=None,
+				login_descriptor=login_descriptor,
 				session_expiration=None,  # TODO: Short expiration
 				from_info=access_ips
 			)
-			if session is None:
-				L.warning("M2M login failed", struct_data={
-					"cid": credentials_id
-				})
-				return None
+		if session is None:
+			L.warning("M2M login failed", struct_data={
+				"cid": credentials_id
+			})
+			return None
 
 		return session
 
@@ -123,7 +127,8 @@ class M2MIntrospectHandler(object):
 		# TODO: API key auth
 		# TODO: Certificate auth
 		# TODO: Require client_id in query string
-		session = await self.authenticate_request(request)
+		client_id = request.query.get("client_id")
+		session = await self.authenticate_request(request, client_id)
 		if session is not None:
 			try:
 				response = await nginx_introspection(request, session, self.App)
