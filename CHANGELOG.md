@@ -5,6 +5,7 @@
 # Fix
 - Remove set_cookie from authorize response (#125, PLUM Sprint 221202)
 - Attempts to access a nonexistent tenant result in 403 (#133, #138, PLUM Sprint 221216)
+- Fixed default registration expiration (#142, PLUM Sprint 230113)
 
 ### Features
 - Client registration allows custom client ID (#128, PLUM Sprint 221202)
