@@ -78,6 +78,8 @@ class RegistrationHandler(object):
 		expiration = json_data.get("expiration")
 		if isinstance(expiration, str):
 			expiration = asab.utils.convert_to_seconds(expiration)
+		else:
+			expiration = self.RegistrationService.RegistrationExpiration
 
 		credential_data = json_data["credentials"]
 
