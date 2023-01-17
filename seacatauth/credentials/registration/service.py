@@ -139,6 +139,8 @@ class RegistrationService(asab.Service):
 			if key in ["_id", "email", "phone", "username"]
 		}
 
+		credentials_public["expires_at"] = credentials["__registration"]["exp"]
+
 		tenants = await self.TenantService.get_tenants(credentials["_id"])
 		if tenants is not None:
 			credentials_public["tenants"] = tenants
