@@ -1,6 +1,3 @@
-from enum import Enum
-
-
 class AuthErrorResponseCode:
 	# OAuth2.0 error response codes defined in RFC6749
 	# https://www.ietf.org/rfc/rfc6749.txt  section 4.1.2.1.
