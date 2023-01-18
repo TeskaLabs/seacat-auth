@@ -210,7 +210,7 @@ class CookieService(asab.Service):
 			(SessionAdapter.FN.Cookie.Domain, cookie_domain),
 		])
 
-		if "userinfo:authn" in scope or "userinfo:*" in scope:
+		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
 				(SessionAdapter.FN.Authentication.ExternalLoginOptions, root_session.Authentication.ExternalLoginOptions),

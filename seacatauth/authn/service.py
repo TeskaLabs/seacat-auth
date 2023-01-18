@@ -301,7 +301,7 @@ class AuthenticationService(asab.Service):
 
 	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
-		scope = frozenset(["userinfo:*"])
+		scope = frozenset(["profile", "email", "phone"])
 
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
@@ -362,7 +362,7 @@ class AuthenticationService(asab.Service):
 		"""
 		# TODO: Get tenant, scope and other necessary OIDC info from credentials
 		tenants = None
-		scope = frozenset(["userinfo:*"])
+		scope = frozenset(["profile", "email", "phone"])
 
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, credentials_id, scope),

@@ -19,15 +19,19 @@ async def credentials_session_builder(credentials_service, credentials_id, scope
 		(SessionAdapter.FN.Credentials.CreatedAt, credentials.get("_c")),
 		(SessionAdapter.FN.Credentials.ModifiedAt, credentials.get("_m")),
 	]
-	if "userinfo:username" in scope or "userinfo:*" in scope:
+	# "profile", "email" and "phone" are scope values defined by OIDC
+	# (https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims)
+	# The values prefixed with "userinfo:" are kept for backwards compatibility
+	# TODO: Remove the "userinfo:" scope values
+	if "profile" in scope or "userinfo:username" in scope or "userinfo:*" in scope:
 		data.append((SessionAdapter.FN.Credentials.Username, credentials.get("username")))
-	if "userinfo:email" in scope or "userinfo:*" in scope:
+	if "email" in scope or "userinfo:email" in scope or "userinfo:*" in scope:
 		data.append((SessionAdapter.FN.Credentials.Email, credentials.get("email")))
-	if "userinfo:phone" in scope or "userinfo:*" in scope:
+	if "phone" in scope or "userinfo:phone" in scope or "userinfo:*" in scope:
 		data.append((SessionAdapter.FN.Credentials.Phone, credentials.get("phone")))
-	if "userinfo:data" in scope or "userinfo:*" in scope:
+	if "profile" in scope or "userinfo:data" in scope or "userinfo:*" in scope:
 		data.append((SessionAdapter.FN.Credentials.CustomData, credentials.get("data")))
-	if "userinfo:authn" in scope or "userinfo:*" in scope:
+	if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 		data.append((SessionAdapter.FN.Authentication.TOTPSet, credentials.get("__totp") not in (None, "")))
 	return data
 
