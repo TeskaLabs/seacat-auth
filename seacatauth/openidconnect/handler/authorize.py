@@ -7,8 +7,10 @@ import aiohttp.web
 import asab
 
 from ...audit import AuditCode
-from ...cookie.utils import delete_cookie
-from ...client import exceptions
+from ...cookie.utils import delete_cookie, set_cookie
+from ...client import exceptions as client_exceptions
+from ... import exceptions
+from ..utils import AuthErrorResponseCode
 
 #
 
@@ -92,7 +94,7 @@ class AuthorizeHandler(object):
 			if parameter not in request_parameters or len(request_parameters[parameter]) == 0:
 				L.warning("Missing required parameter: {}".format(parameter), struct_data=request_parameters)
 				return self.reply_with_authentication_error(
-					"invalid_request",
+					AuthErrorResponseCode.InvalidRequest,
 					request_parameters.get("redirect_uri") or None,
 					error_description="Missing required parameter: {}".format(parameter),
 					state=request_parameters.get("state")
@@ -130,7 +132,7 @@ class AuthorizeHandler(object):
 		)
 		return self.reply_with_authentication_error(
 			request_parameters,
-			"invalid_request",
+			AuthErrorResponseCode.InvalidRequest,
 			"Invalid response_type: {}".format(response_type),
 		)
 
@@ -152,37 +154,47 @@ class AuthorizeHandler(object):
 		Authentication Code Flow
 		"""
 
+		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
 			await self.OpenIdConnectService.ClientService.authorize_client(
 				client_id=client_id,
 				client_secret=client_secret,
 				redirect_uri=redirect_uri,
 				scope=scope,
+				response_type="code"
 			)
-		# TODO: Fail with error response if client authorization fails
-		except KeyError:
-			L.info("Client ID not found", struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "invalid_client_id")
-		except exceptions.InvalidClientSecret as e:
-			L.info(str(e), struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
-		except exceptions.InvalidRedirectURI as e:
-			L.error(str(e), struct_data={"client_id": client_id, "redirect_uri": e.RedirectURI})
+		except client_exceptions.ClientNotFoundError:
+			L.error("Client ID not found", struct_data={"client_id": client_id})
+			return self.reply_with_authentication_error(
+				AuthErrorResponseCode.InvalidRequest,
+				redirect_uri,
+				error_description="Invalid client_id",
+				state=state
+			)
+		except client_exceptions.InvalidClientSecret:
+			L.error("Invalid client secret", struct_data={"client_id": client_id})
+			return self.reply_with_authentication_error(
+				AuthErrorResponseCode.UnauthorizedClient,
+				redirect_uri,
+				error_description="Unauthorized client",
+				state=state
+			)
+		# TODO: Check for invalid redirect URI
+		except client_exceptions.ClientError as e:
+			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			await self.audit_authorize_error(
-				client_id, "invalid_redirect_uri",
+				client_id, "client_error",
 				redirect_uri=redirect_uri,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_redirect_uri",
-				redirect_uri=None,
-				error_description="redirect_uri is not valid for given client_id",
+				AuthErrorResponseCode.InvalidRequest,
+				redirect_uri=redirect_uri,
+				error_description="Client error.",
 				state=state
 			)
-		except exceptions.ClientError as e:
-			L.info(str(e), struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 
 		# OpenID Connect requests MUST contain the openid scope value.
+		# Otherwise, the request is not considered OpenID and its behavior is unspecified
 		if "openid" not in scope:
 			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope)})
 			await self.audit_authorize_error(
@@ -190,7 +202,7 @@ class AuthorizeHandler(object):
 				scope=scope,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_scope",
+				AuthErrorResponseCode.InvalidScope,
 				redirect_uri,
 				error_description="Scope must contain 'openid'",
 				state=state
@@ -198,19 +210,14 @@ class AuthorizeHandler(object):
 
 		root_session = request.Session
 
+		# Only root sessions can be used to authorize client sessions
 		if root_session is not None:
 			if root_session.Session.Type != "root":
-				# Only root sessions can be used to obtain auth code
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
 			if root_session.Authentication.IsAnonymous:
 				L.warning("Cannot authorize with anonymous session", struct_data={"sid": root_session.Id})
 				root_session = None
-
-		# Only root sessions can be used to obtain auth code
-		if root_session is not None and root_session.Session.Type != "root":
-			L.warning("Session type must be 'root'", struct_data={"session_type": root_session.Session.Type})
-			root_session = None
 
 		if prompt not in frozenset([None, "none", "login", "select_account"]):
 			L.warning("Invalid parameter value for prompt", struct_data={"prompt": prompt})
@@ -219,7 +226,7 @@ class AuthorizeHandler(object):
 				prompt=prompt,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_request",
+				AuthErrorResponseCode.InvalidRequest,
 				redirect_uri,
 				error_description="Invalid parameter value for prompt: {}".format(prompt),
 				state=state
@@ -251,7 +258,7 @@ class AuthorizeHandler(object):
 			)
 			return self.reply_with_authentication_error(
 				request,
-				"login_required",
+				AuthErrorResponseCode.LoginRequired,
 				redirect_uri,
 				state=state
 			)
@@ -279,79 +286,16 @@ class AuthorizeHandler(object):
 
 		# We are authenticated!
 
-		# Authorize access to tenants
-		# - "tenant:<tenant_name>" in scope requests access to a specific tenant
-		# - "tenant:*" in scope requests access to all the user's tenants
-		# - "tenant" in scope ensures at least one tenant is authorized. If no specific tenant is in scope
-		#      user's last authorized tenant is requested.
-		tenants = set()
-		user_tenants = await self.OpenIdConnectService.TenantService.get_tenants(root_session.Credentials.Id)
-		user_has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
-			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
-			or self.OpenIdConnectService.RBACService.has_resource_access(
-			root_session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
-		for resource in scope:
-			if not resource.startswith("tenant:"):
-				continue
-			tenant = resource[len("tenant:"):]
-			if tenant == "*":
-				# Client is requesting access to all of the user's tenants
-				# TODO: Check if the client is allowed to request this
-				tenants.update(user_tenants)
-			elif tenant in user_tenants:
-				tenants.add(tenant)
-			elif user_has_access_to_all_tenants:
-				try:
-					await self.OpenIdConnectService.TenantService.get_tenant(tenant)
-					tenants.add(tenant)
-				except KeyError:
-					# Tenant does not exist
-					await self.audit_authorize_error(
-						client_id, "access_denied:tenant_not_found",
-						credential_id=root_session.Credentials.Id,
-						tenant=tenant,
-						scope=scope
-					)
-					return self.reply_with_authentication_error(
-						"access_denied",
-						redirect_uri,
-						state=state,
-					)
-			else:
-				await self.audit_authorize_error(
-					client_id, "access_denied:unauthorized_tenant",
-					credential_id=root_session.Credentials.Id,
-					tenant=tenant,
-					scope=scope
-				)
-				return self.reply_with_authentication_error(
-					"access_denied",
-					redirect_uri,
-					state=state,
-				)
+		# Authorize access to tenants by scope
+		try:
+			tenants = await self.authorize_tenants_by_scope(scope, root_session, client_id)
+		except exceptions.AccessDeniedError:
+			return self.reply_with_authentication_error(
+				AuthErrorResponseCode.AccessDenied,
+				redirect_uri,
+				state=state,
+			)
 
-		if len(tenants) == 0 and "tenant" in scope:
-			last_tenants = [
-				tenant
-				for tenant in (await self.OpenIdConnectService.AuditService.get_last_authorized_tenants(
-					root_session.Credentials.Id) or [])
-				if tenant in user_tenants
-			]
-			if last_tenants:
-				tenants.add(last_tenants[0])
-			elif len(user_tenants) > 0:
-				tenants.add(user_tenants[0])
-			else:
-				await self.audit_authorize_error(
-					client_id, "access_denied:user_has_no_tenant",
-					credential_id=root_session.Credentials.Id,
-					scope=scope
-				)
-				return self.reply_with_authentication_error(
-					"access_denied",
-					redirect_uri,
-					state=state,
-				)
 
 		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
@@ -382,9 +326,12 @@ class AuthorizeHandler(object):
 		if requested_expiration is not None:
 			requested_expiration = int(requested_expiration)
 
-		# TODO: Create a new child session with the requested scope
-		session = await self.OpenIdConnectService.create_oidc_session(
-			root_session, client_id, scope, tenants, requested_expiration)
+		if "cookie" in scope:
+			session = await self.CookieService.create_cookie_client_session(
+				root_session, client_id, scope, tenants, requested_expiration)
+		else:
+			session = await self.OpenIdConnectService.create_oidc_session(
+				root_session, client_id, scope, tenants, requested_expiration)
 
 		await self.audit_authorize_success(session)
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
@@ -457,6 +404,11 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
+
+		if "cookie" in scope:
+			# TODO: Check that the cookie domain matches
+			#   Setting cookies for mismatching domains is a security flaw
+			set_cookie(self.App, response, session)
 
 		return response
 
@@ -640,3 +592,41 @@ class AuthorizeHandler(object):
 		if credential_id is not None:
 			d["cid"] = credential_id
 		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+
+
+	async def authorize_tenants_by_scope(self, scope, session, client_id):
+		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			or self.OpenIdConnectService.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		try:
+			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
+				scope, session.Credentials.Id, has_access_to_all_tenants)
+		except exceptions.TenantNotFoundError as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			await self.audit_authorize_error(
+				client_id, "access_denied:tenant_not_found",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+		except exceptions.TenantAccessDeniedError as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:unauthorized_tenant",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+		except exceptions.NoTenantsError:
+			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:user_has_no_tenant",
+				credential_id=session.Credentials.Id,
+				scope=scope
+			)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+
+		return tenants
