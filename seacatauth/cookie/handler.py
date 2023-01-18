@@ -41,8 +41,8 @@ class CookieHandler(object):
 		web_app_public.router.add_get('/cookie/entry/{domain_id}', self.cookie_request)
 
 
-	async def authenticate_request(self, request):
-		return await self.CookieService.get_session_by_sci(request)
+	async def authenticate_request(self, request, client_id=None):
+		return await self.CookieService.get_session_by_sci(request, client_id)
 
 
 	async def nginx(self, request):
@@ -71,8 +71,7 @@ class CookieHandler(object):
 		```
 		"""
 
-		session = await self.authenticate_request(request)
-
+		session = await self.authenticate_request(request, client_id=request.query.get("client_id"))
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
@@ -93,9 +92,13 @@ class CookieHandler(object):
 		anonymous_cid = request.query.get("cid")
 		if anonymous_cid is None:
 			raise ValueError("No 'cid' parameter specified in anonymous introspection query.")
-		session = await self.authenticate_request(request)
 		anonymous_session_created = False
 
+		# TODO: Consider client-specific anonymous sessions
+		if "client_id" in request.query:
+			raise ValueError("Anonymous introspection does not support 'client_id' parameter.")
+
+		session = await self.authenticate_request(request, client_id=None)
 		if session is None:
 			# Create a new root session with anonymous_cid and a cookie
 			# Set the cookie

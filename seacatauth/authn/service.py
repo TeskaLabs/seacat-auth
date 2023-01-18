@@ -373,7 +373,6 @@ class AuthenticationService(asab.Service):
 				tenants=tenants,
 			),
 			# login_descriptor_session_builder(login_descriptor),  # TODO: Add login descriptor
-			cookie_session_builder(),
 			await available_factors_session_builder(self, credentials_id)
 		]
 

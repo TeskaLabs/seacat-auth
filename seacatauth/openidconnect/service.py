@@ -23,6 +23,8 @@ from ..session import (
 	available_factors_session_builder
 )
 from .session import oauth2_session_builder
+from ..audit import AuditCode
+from .. import exceptions
 
 #
 
@@ -186,9 +188,9 @@ class OpenIdConnectService(asab.Service):
 
 		# Locate the session
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
+			session = await self.SessionService.get_by({SessionAdapter.FN.OAuth2.AccessToken: access_token})
 		except KeyError:
-			L.info(f"Session not found by access token {access_token}")
+			L.info("Session not found by access token: {}".format(access_token))
 			return None
 
 		return session
@@ -245,8 +247,7 @@ class OpenIdConnectService(asab.Service):
 				role_service=self.RoleService,
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
-			),
-			# cookie_session_builder(),  # TODO: This shouldn't be in OIDC session
+			)
 		]
 
 		if "userinfo:authn" in scope or "userinfo:*" in scope:
@@ -394,3 +395,61 @@ class OpenIdConnectService(asab.Service):
 		id_token = token.serialize()
 
 		return id_token
+
+
+	async def authorize_tenants_by_scope(self, scope, session, client_id):
+		has_access_to_all_tenants = self.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			or self.RBACService.has_resource_access(
+			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		try:
+			tenants = await self.TenantService.get_tenants_by_scope(
+				scope, session.Credentials.Id, has_access_to_all_tenants)
+		except exceptions.TenantNotFoundError as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			await self.audit_authorize_error(
+				client_id, "access_denied:tenant_not_found",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+		except exceptions.TenantAccessDeniedError as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:unauthorized_tenant",
+				credential_id=session.Credentials.Id,
+				tenant=e.Tenant,
+				scope=scope
+			)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+		except exceptions.NoTenantsError:
+			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			await self.audit_authorize_error(
+				client_id, "access_denied:user_has_no_tenant",
+				credential_id=session.Credentials.Id,
+				scope=scope
+			)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+
+		return tenants
+
+
+	async def audit_authorize_success(self, session):
+		await self.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
+			"cid": session.Credentials.Id,
+			"tenants": [t for t in session.Authorization.Authz if t != "*"],
+			"client_id": session.OAuth2.ClientId,
+			"scope": session.OAuth2.Scope,
+		})
+
+
+	async def audit_authorize_error(self, client_id, error, credential_id=None, **kwargs):
+		d = {
+			"client_id": client_id,
+			"error": error,
+			**kwargs
+		}
+		if credential_id is not None:
+			d["cid"] = credential_id
+		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)

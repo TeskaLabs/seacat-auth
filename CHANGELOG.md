@@ -2,6 +2,10 @@
 
 ## Release candidate
 
+### Breaking changes
+- Authorize endpoint no longer authorizes unregistered clients (#137, PLUM Sprint 230113)
+- Introspecting a cookie-based client session requires client_id in query (#137, PLUM Sprint 230113)
+
 # Fix
 - Remove set_cookie from authorize response (#125, PLUM Sprint 221202)
 - Attempts to access a nonexistent tenant result in 403 (#133, #138, PLUM Sprint 221216)
@@ -10,6 +14,8 @@
 ### Features
 - Client registration allows custom client ID (#128, PLUM Sprint 221202)
 - Login with external OAuth2 (Facebook) (#129, PLUM Sprint 221216)
+- Cookie-based client sessions can now authorize for a specific scope and tenant (#137, PLUM Sprint 230113)
+- Standardized error codes in authorize response (#137, PLUM Sprint 230113)
 
 ### Refactoring
 - Cookie introspection for anonymous access is moved to a separate endpoint (#124, PLUM Sprint 221216)

@@ -10,6 +10,11 @@ import asab
 import asab.storage
 
 from ..session import SessionAdapter
+from ..session import (
+	credentials_session_builder,
+	authz_session_builder,
+)
+from ..openidconnect.session import oauth2_session_builder
 
 
 #
@@ -126,13 +131,22 @@ class CookieService(asab.Service):
 		return None
 
 
-	async def get_session_by_sci(self, request):
+	async def get_session_by_sci(self, request, client_id=None):
+		"""
+		Find session by the combination of SCI (cookie ID) and client ID
+
+		To search for root session, keep client_id=None.
+		Root sessions have no client_id attribute, which MongoDB matches as None.
+		"""
 		session_cookie_id = self._get_session_cookie_id(request)
 		if session_cookie_id is None:
 			return None
 
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, session_cookie_id)
+			session = await self.SessionService.get_by({
+				SessionAdapter.FN.Cookie.Id: session_cookie_id,
+				SessionAdapter.FN.OAuth2.ClientId: client_id,
+			})
 		except KeyError:
 			L.info("Session not found", struct_data={"sci": session_cookie_id})
 			return None
@@ -165,5 +179,55 @@ class CookieService(asab.Service):
 		except KeyError:
 			L.error("Session not found", struct_data={"sid": session_id})
 			return None
+
+		return session
+
+
+	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
+		session_builders = [
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=root_session.Credentials.Id,
+				tenants=tenants,
+			),
+		]
+
+		# Get cookie value and domain
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		try:
+			client = await client_svc.get(client_id)
+		except KeyError:
+			raise KeyError("Client '{}' not found".format(client_id))
+
+		if "cookie_domain" in client:
+			cookie_domain = client["cookie_domain"]
+		else:
+			cookie_domain = self.RootCookieDomain
+		session_builders.append([
+			(SessionAdapter.FN.Cookie.Id, base64.urlsafe_b64decode(root_session.Cookie.Id)),
+			(SessionAdapter.FN.Cookie.Domain, cookie_domain),
+		])
+
+		if "userinfo:authn" in scope or "userinfo:*" in scope:
+			session_builders.append([
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.ExternalLoginOptions, root_session.Authentication.ExternalLoginOptions),
+				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
+			])
+
+		oauth2_data = {
+			"scope": scope,
+			"client_id": client_id,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		session = await self.SessionService.create_session(
+			session_type="cookie",
+			parent_session=root_session,
+			expiration=requested_expiration,
+			session_builders=session_builders,
+		)
 
 		return session

@@ -22,3 +22,9 @@ class InvalidClientSecret(ClientError):
 	def __init__(self, client_id, *args):
 		message = "Invalid client secret for client '{client_id}'".format(client_id=client_id)
 		super().__init__(message, *args, client_id=client_id)
+
+
+class ClientNotFoundError(ClientError):
+	def __init__(self, client_id, *args):
+		message = "Client '{client_id}' not found".format(client_id=client_id)
+		super().__init__(message, *args, client_id=client_id)

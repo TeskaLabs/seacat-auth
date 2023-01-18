@@ -31,8 +31,8 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"role_name": "superuser",
 	"tenant": "provisioning-tenant",
 	"admin_ui_url": "",
-	"admin_ui_client_id": "seacat-admin-ui",
-	"admin_ui_client_name": "SeaCat Admin WebUI",
+	"admin_ui_client_id": "asab-webui-auth",
+	"admin_ui_client_name": "ASAB WebUI",
 }
 
 
