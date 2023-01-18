@@ -10,6 +10,7 @@ from ...audit import AuditCode
 from ...cookie.utils import delete_cookie, set_cookie
 from ...client import exceptions as client_exceptions
 from ... import exceptions
+from ..utils import AuthErrorResponseCode
 
 #
 
@@ -93,7 +94,7 @@ class AuthorizeHandler(object):
 			if parameter not in request_parameters or len(request_parameters[parameter]) == 0:
 				L.warning("Missing required parameter: {}".format(parameter), struct_data=request_parameters)
 				return self.reply_with_authentication_error(
-					"invalid_request",
+					AuthErrorResponseCode.InvalidRequest,
 					request_parameters.get("redirect_uri") or None,
 					error_description="Missing required parameter: {}".format(parameter),
 					state=request_parameters.get("state")
@@ -131,7 +132,7 @@ class AuthorizeHandler(object):
 		)
 		return self.reply_with_authentication_error(
 			request_parameters,
-			"invalid_request",
+			AuthErrorResponseCode.InvalidRequest,
 			"Invalid response_type: {}".format(response_type),
 		)
 
@@ -153,47 +154,47 @@ class AuthorizeHandler(object):
 		Authentication Code Flow
 		"""
 
+		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
 			await self.OpenIdConnectService.ClientService.authorize_client(
 				client_id=client_id,
 				client_secret=client_secret,
 				redirect_uri=redirect_uri,
 				scope=scope,
+				response_type="code"
 			)
-		# TODO: Fail with error response if client authorization fails
-		except KeyError:
-			L.warning("Client ID not found", struct_data={"client_id": client_id})
+		except client_exceptions.ClientNotFoundError:
+			L.error("Client ID not found", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
-				"invalid_client_id",
+				AuthErrorResponseCode.InvalidRequest,
 				redirect_uri,
 				error_description="Invalid client_id",
 				state=state
 			)
-		except client_exceptions.InvalidClientSecret as e:
-			L.warning(str(e), struct_data={"client_id": client_id})
+		except client_exceptions.InvalidClientSecret:
+			L.error("Invalid client secret", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
-				"unauthorized_client",
+				AuthErrorResponseCode.UnauthorizedClient,
 				redirect_uri,
 				error_description="Unauthorized client",
 				state=state
 			)
-		except client_exceptions.InvalidRedirectURI as e:
-			L.error(str(e), struct_data={"client_id": client_id, "redirect_uri": e.RedirectURI})
+		# TODO: Check for invalid redirect URI
+		except client_exceptions.ClientError as e:
+			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			await self.audit_authorize_error(
-				client_id, "invalid_redirect_uri",
+				client_id, "client_error",
 				redirect_uri=redirect_uri,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_redirect_uri",
-				redirect_uri=None,
-				error_description="redirect_uri is not valid for given client_id",
+				AuthErrorResponseCode.InvalidRequest,
+				redirect_uri=redirect_uri,
+				error_description="Client error.",
 				state=state
 			)
-		except client_exceptions.ClientError as e:
-			L.info(str(e), struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 
 		# OpenID Connect requests MUST contain the openid scope value.
+		# Otherwise, the request is not considered OpenID and its behavior is unspecified
 		if "openid" not in scope:
 			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope)})
 			await self.audit_authorize_error(
@@ -201,7 +202,7 @@ class AuthorizeHandler(object):
 				scope=scope,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_scope",
+				AuthErrorResponseCode.InvalidScope,
 				redirect_uri,
 				error_description="Scope must contain 'openid'",
 				state=state
@@ -209,19 +210,14 @@ class AuthorizeHandler(object):
 
 		root_session = request.Session
 
+		# Only root sessions can be used to authorize client sessions
 		if root_session is not None:
 			if root_session.Session.Type != "root":
-				# Only root sessions can be used to obtain auth code
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
 			if root_session.Authentication.IsAnonymous:
 				L.warning("Cannot authorize with anonymous session", struct_data={"sid": root_session.Id})
 				root_session = None
-
-		# Only root sessions can be used to obtain auth code
-		if root_session is not None and root_session.Session.Type != "root":
-			L.warning("Session type must be 'root'", struct_data={"session_type": root_session.Session.Type})
-			root_session = None
 
 		if prompt not in frozenset([None, "none", "login", "select_account"]):
 			L.warning("Invalid parameter value for prompt", struct_data={"prompt": prompt})
@@ -230,7 +226,7 @@ class AuthorizeHandler(object):
 				prompt=prompt,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_request",
+				AuthErrorResponseCode.InvalidRequest,
 				redirect_uri,
 				error_description="Invalid parameter value for prompt: {}".format(prompt),
 				state=state
@@ -262,7 +258,7 @@ class AuthorizeHandler(object):
 			)
 			return self.reply_with_authentication_error(
 				request,
-				"login_required",
+				AuthErrorResponseCode.LoginRequired,
 				redirect_uri,
 				state=state
 			)
@@ -295,7 +291,7 @@ class AuthorizeHandler(object):
 			tenants = await self.authorize_tenants_by_scope(scope, root_session, client_id)
 		except exceptions.AccessDeniedError:
 			return self.reply_with_authentication_error(
-				"access_denied",
+				AuthErrorResponseCode.AccessDenied,
 				redirect_uri,
 				state=state,
 			)
@@ -410,6 +406,8 @@ class AuthorizeHandler(object):
 		)
 
 		if "cookie" in scope:
+			# TODO: Check that the cookie domain matches
+			#   Setting cookies for mismatching domains is a security flaw
 			set_cookie(self.App, response, session)
 
 		return response

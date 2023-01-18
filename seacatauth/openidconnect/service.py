@@ -250,7 +250,7 @@ class OpenIdConnectService(asab.Service):
 			)
 		]
 
-		if "userinfo:authn" in scope or "userinfo:*" in scope:
+		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			authn_service = self.App.get_service("seacatauth.AuthenticationService")
 			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
 			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
