@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.3
 
 ### Breaking changes
 - Authorize endpoint no longer authorizes unregistered clients (#137, PLUM Sprint 230113)
