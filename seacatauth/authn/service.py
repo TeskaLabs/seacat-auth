@@ -64,6 +64,7 @@ class AuthenticationService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
@@ -352,7 +353,7 @@ class AuthenticationService(asab.Service):
 	async def create_m2m_session(
 		self,
 		credentials_id: str,
-		login_descriptor: LoginDescriptor,
+		login_descriptor: dict,
 		session_expiration: float = None,
 		from_info: list = None
 	):
@@ -362,7 +363,7 @@ class AuthenticationService(asab.Service):
 		"""
 		# TODO: Get tenant, scope and other necessary OIDC info from credentials
 		tenants = None
-		scope = frozenset(["profile", "email", "phone"])
+		scope = frozenset(["tenant:*", "profile", "email"])
 
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
@@ -372,7 +373,7 @@ class AuthenticationService(asab.Service):
 				credentials_id=credentials_id,
 				tenants=tenants,
 			),
-			# login_descriptor_session_builder(login_descriptor),  # TODO: Add login descriptor
+			login_descriptor_session_builder(login_descriptor),
 			await available_factors_session_builder(self, credentials_id)
 		]
 
