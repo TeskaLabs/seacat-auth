@@ -159,39 +159,37 @@ class AuthorizeHandler(object):
 				client_secret=client_secret,
 				redirect_uri=redirect_uri,
 				scope=scope,
+				response_type="code"
 			)
-		# TODO: Fail with error response if client authorization fails
-		except KeyError:
-			L.warning("Client ID not found", struct_data={"client_id": client_id})
+		except client_exceptions.ClientNotFoundError:
+			L.error("Client ID not found", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				"invalid_client_id",
 				redirect_uri,
 				error_description="Invalid client_id",
 				state=state
 			)
-		except client_exceptions.InvalidClientSecret as e:
-			L.warning(str(e), struct_data={"client_id": client_id})
+		except client_exceptions.InvalidClientSecret:
+			L.error("Invalid client secret", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				"unauthorized_client",
 				redirect_uri,
 				error_description="Unauthorized client",
 				state=state
 			)
-		except client_exceptions.InvalidRedirectURI as e:
-			L.error(str(e), struct_data={"client_id": client_id, "redirect_uri": e.RedirectURI})
+		# TODO: Check for invalid redirect URI
+		except client_exceptions.ClientError as e:
+			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			await self.audit_authorize_error(
-				client_id, "invalid_redirect_uri",
+				client_id, "client_error",
 				redirect_uri=redirect_uri,
 			)
 			return self.reply_with_authentication_error(
-				"invalid_redirect_uri",
-				redirect_uri=None,
-				error_description="redirect_uri is not valid for given client_id",
+				"client_error",
+				redirect_uri=redirect_uri,
+				error_description="Client error.",
 				state=state
 			)
-		except client_exceptions.ClientError as e:
-			L.info(str(e), struct_data={"client_id": client_id})
-			# return self.reply_with_authentication_error(request, request_parameters, "unauthorized_client")
 
 		# OpenID Connect requests MUST contain the openid scope value.
 		if "openid" not in scope:
@@ -410,6 +408,8 @@ class AuthorizeHandler(object):
 		)
 
 		if "cookie" in scope:
+			# TODO: Check that the cookie domain matches
+			#   Setting cookies for mismatching domains is a security flaw
 			set_cookie(self.App, response, session)
 
 		return response

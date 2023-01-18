@@ -418,15 +418,20 @@ class ClientService(asab.Service):
 		grant_type: str = None,
 		response_type: str = None,
 	):
-		registered_client = await self.get(client_id)
+		try:
+			registered_client = await self.get(client_id)
+		except KeyError:
+			raise exceptions.ClientNotFoundError(client_id=client_id)
 
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
 			client_secret = ""
-		if redirect_uri not in registered_client["redirect_uris"]:
-			raise exceptions.ClientError(client_id=client_id, redirect_uri=redirect_uri)
-		if grant_type not in registered_client["grant_types"]:
+		# TODO: Find a way to allow dynamic redirect URIs for some clients
+		#   (possibly only for cookie clients)
+		# if redirect_uri not in registered_client["redirect_uris"]:
+		# 	raise exceptions.InvalidRedirectURI(client_id=client_id, redirect_uri=redirect_uri)
+		if grant_type is not None and grant_type not in registered_client["grant_types"]:
 			raise exceptions.ClientError(client_id=client_id, grant_type=grant_type)
 		if response_type not in registered_client["response_types"]:
 			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
