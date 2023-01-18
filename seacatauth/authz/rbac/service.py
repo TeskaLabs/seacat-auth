@@ -26,6 +26,14 @@ class RBACService(asab.Service):
 		return "authz:superuser" in global_resources
 
 	@staticmethod
+	def can_access_all_tenants(authz: dict):
+		global_resources = set(
+			resource
+			for resource in authz["*"]
+		)
+		return "authz:superuser" in global_resources or "authz:tenant:access" in global_resources
+
+	@staticmethod
 	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list):
 		# Superuser passes without further checks
 		if RBACService.is_superuser(authz):

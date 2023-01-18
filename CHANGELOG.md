@@ -17,6 +17,7 @@
 - Cookie-based client sessions can now authorize for a specific scope and tenant (#137, PLUM Sprint 230113)
 - Standardized error codes in authorize response (#137, PLUM Sprint 230113)
 - OIDC-standardized scope values (#143, PLUM Sprint 230113)
+- M2M sessions are now authorized for all the assigned tenants (#141, PLUM Sprint 230113)
 
 ### Refactoring
 - Cookie introspection for anonymous access is moved to a separate endpoint (#124, PLUM Sprint 221216)
