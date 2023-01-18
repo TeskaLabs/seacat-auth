@@ -45,7 +45,8 @@
 			</a>
 		</p>
 		<p>
-			<small>Pokud vám tlačítko nefunguje, otevřete si v prohlížeči následující odkaz: <a href="{{ registration_uri }}">{{ registration_uri }}</a></small>
+			<small>{% if expires_at %}Tato žádost o registraci platí do {{ expires_at.strftime('%d/%m/%Y %H:%M %Z') }}. {% endif %}
+				Pokud vám tlačítko nefunguje, otevřete si v prohlížeči následující odkaz: <a href="{{ registration_uri }}">{{ registration_uri }}</a></small>
 		<p>
 		<p>
 			Pokud jste o registraci nežádali, tuto zprávu můžete ignorovat.

@@ -94,7 +94,11 @@ class CookieHandler(object):
 			raise ValueError("No 'cid' parameter specified in anonymous introspection query.")
 		anonymous_session_created = False
 
-		session = await self.authenticate_request(request, client_id=request.query.get("client_id"))
+		# TODO: Consider client-specific anonymous sessions
+		if "client_id" in request.query:
+			raise ValueError("Anonymous introspection does not support 'client_id' parameter.")
+
+		session = await self.authenticate_request(request, client_id=None)
 		if session is None:
 			# Create a new root session with anonymous_cid and a cookie
 			# Set the cookie
@@ -142,7 +146,7 @@ class CookieHandler(object):
 
 		# TODO: Where to get the tenants from?
 		tenants = None
-		scope = frozenset(["userinfo:*"])
+		scope = frozenset(["profile", "email", "phone"])
 
 		# TODO: Choose builders based on scope
 		session_builders = [
