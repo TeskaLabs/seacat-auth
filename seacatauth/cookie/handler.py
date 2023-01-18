@@ -146,7 +146,7 @@ class CookieHandler(object):
 
 		# TODO: Where to get the tenants from?
 		tenants = None
-		scope = frozenset(["userinfo:*"])
+		scope = frozenset(["profile", "email", "phone"])
 
 		# TODO: Choose builders based on scope
 		session_builders = [
