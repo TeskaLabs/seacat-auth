@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## Release candidate
+
+# Fix
+- Removed required fields from client update (#144, PLUM Sprint 230113)
+
+### Refactoring
+- Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
+
+---
+
+
 ## v23.3
 
 ### Breaking changes
