@@ -40,84 +40,87 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	# "private_key_jwt"
 ]
 CLIENT_METADATA_SCHEMA = {
+	# The order of the properties is preserved in the UI form
+	"preferred_client_id": {
+		"type": "string",
+		"pattern": "^[-_a-zA-Z0-9]{8,64}$",
+		"description": "(Non-canonical) Preferred client ID."},
+	"client_name": {  # Can have language tags (e.g. "client_name#cs")
+		"type": "string",
+		"description": "Name of the Client to be presented to the End-User."},
+	"client_uri": {  # Can have language tags
+		"type": "string",
+		"description": "URL of the home page of the Client."},
+	"cookie_domain": {
+		"type": "string",
+		"pattern": "^[a-z0-9-]{1,61}\.[a-z]{2,}$",
+		"description":
+			"Domain of the client cookie. Defaults to the application's global cookie domain."},
+	"redirect_uris": {
+		"type": "array",
+		"description": "Array of Redirection URI values used by the Client."},
+	#  "contacts": {},
+	# "custom_data": {  # NON-CANONICAL
+	# 	"type": "object", "description": "(Non-canonical) Additional client data."},
+	# "logout_uri": {  # NON-CANONICAL
+	# 	"type": "string", "description": "(Non-canonical) URI that will be called on session logout."},
+	"application_type": {
+		"type": "string",
+		"description": "Kind of the application. The default, if omitted, is `web`.",
+		"enum": APPLICATION_TYPES},
+	"response_types": {
+		"type": "array",
+		"description":
+			"JSON array containing a list of the OAuth 2.0 response_type values "
+			"that the Client is declaring that it will restrict itself to using. "
+			"If omitted, the default is that the Client will use only the `code` Response Type.",
+		"items": {
+			"type": "string",
+			"enum": RESPONSE_TYPES}},
+	"grant_types": {
+		"type": "array",
+		"description":
+			"JSON array containing a list of the OAuth 2.0 Grant Types "
+			"that the Client is declaring that it will restrict itself to using. "
+			"If omitted, the default is that the Client will use only the `authorization_code` Grant Type.",
+		"items": {
+			"type": "string",
+			"enum": GRANT_TYPES}},
+	# "logo_uri": {},  # Can have language tags
+	# "policy_uri": {},  # Can have language tags
+	# "tos_uri": {},  # Can have language tags
+	# "jwks_uri": {},
+	# "jwks": {},
+	# "sector_identifier_uri": {},
+	# "subject_type": {},
+	# "id_token_signed_response_alg": {},
+	# "id_token_encrypted_response_alg": {},
+	# "id_token_encrypted_response_enc": {},
+	# "userinfo_signed_response_alg": {},
+	# "userinfo_encrypted_response_alg": {},
+	# "userinfo_encrypted_response_enc": {},
+	# "request_object_signing_alg": {},
+	# "request_object_encryption_alg": {},
+	# "request_object_encryption_enc": {},
+	"token_endpoint_auth_method": {
+		"type": "string",
+		"description":
+			"Requested Client Authentication method for the Token Endpoint. "
+			"If omitted, the default is `client_secret_basic`.",
+		"enum": TOKEN_ENDPOINT_AUTH_METHODS},
+	# "token_endpoint_auth_signing_alg": {},
+	# "default_max_age": {},
+	# "require_auth_time": {},
+	# "default_acr_values": {},
+	# "initiate_login_uri": {},
+	# "request_uris": {},
+}
+
+CREATE_CLIENT_SCHEMA = {
 	"type": "object",
 	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
-	"properties": {
-		# The order of the properties is preserved in the UI form
-		"preferred_client_id": {
-			"type": "string",
-			"pattern": "^[-_a-zA-Z0-9]{8,64}$",
-			"description": "(Non-canonical) Preferred client ID."},
-		"client_name": {  # Can have language tags (e.g. "client_name#cs")
-			"type": "string",
-			"description": "Name of the Client to be presented to the End-User."},
-		"client_uri": {  # Can have language tags
-			"type": "string",
-			"description": "URL of the home page of the Client."},
-		"cookie_domain": {
-			"type": "string",
-			"description":
-				"Domain of the client cookie. Defaults to the application's global cookie domain."},
-		"redirect_uris": {
-			"type": "array",
-			"description": "Array of Redirection URI values used by the Client."},
-		#  "contacts": {},
-		# "custom_data": {  # NON-CANONICAL
-		# 	"type": "object", "description": "(Non-canonical) Additional client data."},
-		# "logout_uri": {  # NON-CANONICAL
-		# 	"type": "string", "description": "(Non-canonical) URI that will be called on session logout."},
-		"application_type": {
-			"type": "string",
-			"description": "Kind of the application. The default, if omitted, is `web`.",
-			"enum": APPLICATION_TYPES},
-		"response_types": {
-			"type": "array",
-			"description":
-				"JSON array containing a list of the OAuth 2.0 response_type values "
-				"that the Client is declaring that it will restrict itself to using. "
-				"If omitted, the default is that the Client will use only the `code` Response Type.",
-			"items": {
-				"type": "string",
-				"enum": RESPONSE_TYPES}},
-		"grant_types": {
-			"type": "array",
-			"description":
-				"JSON array containing a list of the OAuth 2.0 Grant Types "
-				"that the Client is declaring that it will restrict itself to using. "
-				"If omitted, the default is that the Client will use only the `authorization_code` Grant Type.",
-			"items": {
-				"type": "string",
-				"enum": GRANT_TYPES}},
-		# "logo_uri": {},  # Can have language tags
-		# "policy_uri": {},  # Can have language tags
-		# "tos_uri": {},  # Can have language tags
-		# "jwks_uri": {},
-		# "jwks": {},
-		# "sector_identifier_uri": {},
-		# "subject_type": {},
-		# "id_token_signed_response_alg": {},
-		# "id_token_encrypted_response_alg": {},
-		# "id_token_encrypted_response_enc": {},
-		# "userinfo_signed_response_alg": {},
-		# "userinfo_encrypted_response_alg": {},
-		# "userinfo_encrypted_response_enc": {},
-		# "request_object_signing_alg": {},
-		# "request_object_encryption_alg": {},
-		# "request_object_encryption_enc": {},
-		"token_endpoint_auth_method": {
-			"type": "string",
-			"description":
-				"Requested Client Authentication method for the Token Endpoint. "
-				"If omitted, the default is `client_secret_basic`.",
-			"enum": TOKEN_ENDPOINT_AUTH_METHODS},
-		# "token_endpoint_auth_signing_alg": {},
-		# "default_max_age": {},
-		# "require_auth_time": {},
-		# "default_acr_values": {},
-		# "initiate_login_uri": {},
-		# "request_uris": {},
-	},
+	"properties": CLIENT_METADATA_SCHEMA,
 	# "patternProperties": {
 	#   # Language-specific metadata with RFC 5646 language tags
 	# 	"^client_name#[-a-zA-Z0-9]+$": {"type": "string"},
@@ -126,6 +129,12 @@ CLIENT_METADATA_SCHEMA = {
 	# 	"^policy_uri#[-a-zA-Z0-9]+$": {"type": "string"},
 	# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
 	# }
+}
+
+UPDATE_CLIENT_SCHEMA = {
+	"type": "object",
+	"additionalProperties": False,
+	"properties": CLIENT_METADATA_SCHEMA
 }
 
 # TODO: Configurable templates
@@ -177,7 +186,7 @@ class ClientService(asab.Service):
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 		if not self._AllowCustomClientID:
-			CLIENT_METADATA_SCHEMA["properties"].pop("preferred_client_id")
+			CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
 
 
 	def build_filter(self, match_string):
@@ -380,7 +389,7 @@ class ClientService(asab.Service):
 		client = await self.get(client_id)
 		client_update = {}
 		for k, v in kwargs.items():
-			if k not in CLIENT_METADATA_SCHEMA["properties"]:
+			if k not in CLIENT_METADATA_SCHEMA:
 				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
 			client_update[k] = v
 
