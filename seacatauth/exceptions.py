@@ -38,14 +38,16 @@ class NoTenantsError(AccessDeniedError):
 	"""
 	def __init__(self, subject=None, *args):
 		self.Subject = subject
-		if subject is not None:
-			message = "Subject {!r} has access to no tenant.".format(subject)
-		else:
-			message = "Subject has access to no tenant."
-		super().__init__(message, *args)
+		super().__init__("Subject has access to no tenant.", *args)
 
 
 class TenantNotFoundError(KeyError):
 	def __init__(self, tenant, *args):
 		self.Tenant = tenant
-		super().__init__("Tenant {!r} not found.".format(tenant), *args)
+		super().__init__("Tenant not found.", *args)
+
+
+class RoleNotFoundError(KeyError):
+	def __init__(self, role, *args):
+		self.Role = role
+		super().__init__("Role not found.", *args)
