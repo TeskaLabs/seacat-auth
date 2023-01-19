@@ -5,7 +5,7 @@ import asab.web.rest
 import asab.exceptions
 
 from seacatauth.decorators import access_control
-from .service import CREATE_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES
+from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES
 
 #
 
@@ -64,7 +64,7 @@ class ClientHandler(object):
 	@access_control("authz:superuser")
 	async def features(self, request):
 		result = {
-			"metadata_schema": CREATE_CLIENT_SCHEMA,
+			"metadata_schema": REGISTER_CLIENT_SCHEMA,
 			"templates": CLIENT_TEMPLATES,
 		}
 		return asab.web.rest.json_response(
@@ -72,7 +72,7 @@ class ClientHandler(object):
 		)
 
 
-	@asab.web.rest.json_schema_handler(CREATE_CLIENT_SCHEMA)
+	@asab.web.rest.json_schema_handler(REGISTER_CLIENT_SCHEMA)
 	@access_control("authz:superuser")
 	async def register(self, request, *, json_data):
 		if "preferred_client_id" in json_data:

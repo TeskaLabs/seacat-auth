@@ -116,7 +116,7 @@ CLIENT_METADATA_SCHEMA = {
 	# "request_uris": {},
 }
 
-CREATE_CLIENT_SCHEMA = {
+REGISTER_CLIENT_SCHEMA = {
 	"type": "object",
 	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
