@@ -53,7 +53,7 @@ CLIENT_METADATA_SCHEMA = {
 		"description": "URL of the home page of the Client."},
 	"cookie_domain": {
 		"type": "string",
-		"pattern": "^[a-z0-9-]{1,61}\.[a-z]{2,}$",
+		"pattern": r"^[a-z0-9-]{1,61}\.[a-z]{2,}$",
 		"description":
 			"Domain of the client cookie. Defaults to the application's global cookie domain."},
 	"redirect_uris": {
