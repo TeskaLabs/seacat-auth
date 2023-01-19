@@ -3,6 +3,7 @@ import re
 from typing import Optional
 
 import asab.storage.exceptions
+from ...exceptions import RoleNotFoundError
 
 #
 
@@ -348,7 +349,10 @@ class RoleService(asab.Service):
 
 	async def assign_role(self, credentials_id: str, role_id: str):
 		# Verify that role exists
-		await self.get(role_id)
+		try:
+			await self.get(role_id)
+		except KeyError:
+			raise RoleNotFoundError(role_id)
 
 		# Verify that role tenant exists
 		try:

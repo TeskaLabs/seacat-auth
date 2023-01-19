@@ -7,6 +7,7 @@ import asab.web.authz
 import asab.web.tenant
 
 from ....decorators import access_control
+from ....exceptions import RoleNotFoundError
 
 #
 
@@ -25,6 +26,7 @@ class RolesHandler(object):
 		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
 		web_app.router.add_put('/roles/{tenant}/{credentials_id}', self.set_roles)
 		web_app.router.add_put("/roles/{tenant}", self.get_roles_batch)
+		web_app.router.add_post("/roles", self.bulk_assign_roles)
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
@@ -176,3 +178,64 @@ class RolesHandler(object):
 			data=data,
 			status=200 if data["result"] == "OK" else 400
 		)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"additionalProperties": False,
+		"required": ["filter", "roles"],
+		"properties": {
+			"filter": {
+				"type": "object",
+				"minProperties": 1,
+				"maxProperties": 1,
+				"additionalProperties": False,
+				"properties": {
+					"has_tenant": {
+						"type": "string"
+					},
+					"has_role": {
+						"type": "string"
+					},
+				},
+			},
+			"roles": {
+				"type": "array",
+				"items": {
+					"type": "string",
+				},
+			},
+		}
+	})
+	@access_control("authz:superuser")
+	async def bulk_assign_roles(self, request, *, json_data):
+
+		# Iterate through them, assigning roles
+		# Record errors
+		# Return error log in response
+		roles = json_data["roles"]
+
+		# Query credentials by filter
+		credential_ids = []  # TODO
+
+		error_details = []
+		successful_count = 0
+		for role in roles:
+			for credential_id in credential_ids:
+				try:
+					await self.RoleService.assign_role(credential_id, role)
+					successful_count += 1
+				except RoleNotFoundError:
+					error_details.append({"cid": credential_id, "role": role, "error": "Credentials not found"})
+				# TODO
+				# Creds not found
+				# Credentials not authorized in tenant
+				# Role already assigned
+
+		data = {
+			"successful_count": successful_count,
+			"error_count": len(error_details),
+			"error_details": error_details
+		}
+
+		return asab.web.rest.json_response(request, data=data)
