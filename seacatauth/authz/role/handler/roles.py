@@ -175,22 +175,17 @@ class RolesHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
+		"minProperties": 1,
+		"maxProperties": 1,
 		"additionalProperties": False,
-		"required": ["filter"],
 		"properties": {
-			"filter": {
-				"type": "object",
-				"minProperties": 1,
-				"maxProperties": 1,
-				"additionalProperties": False,
-				"properties": {
-					"has_tenant": {"type": "string"},
-					"has_role": {"type": "string"}}}}})
+			"has_tenant": {"type": "string"},
+			"has_role": {"type": "string"}}})
 	@access_control("authz:superuser")
 	async def bulk_assign_role(self, request, *, json_data, tenant):
 		# Query credentials by filter
 		# Only a single-condition filter is supported
-		credential_ids = await self._list_assigned_credential_ids(json_data["filter"])
+		credential_ids = await self._list_assigned_credential_ids(json_data)
 		if len(credential_ids) == 0:
 			data = {
 				"credentials_matched": [],
@@ -233,23 +228,18 @@ class RolesHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
+		"minProperties": 1,
+		"maxProperties": 1,
 		"additionalProperties": False,
-		"required": ["filter"],
 		"properties": {
-			"filter": {
-				"type": "object",
-				"minProperties": 1,
-				"maxProperties": 1,
-				"additionalProperties": False,
-				"properties": {
-					"has_tenant": {"type": "string"},
-					"has_role": {"type": "string"}}}}})
+			"has_tenant": {"type": "string"},
+			"has_role": {"type": "string"}}})
 	@access_control("authz:superuser")
 	async def bulk_unassign_role(self, request, *, json_data, tenant):
 		# List credentials that both fit the user filter and have the requested role assigned
 		role = "{}/{}".format(tenant, request.match_info["role_name"])
 		credential_ids = set.intersection(
-			await self._list_assigned_credential_ids(json_data["filter"]),
+			await self._list_assigned_credential_ids(json_data),
 			await self._list_assigned_credential_ids({"has_role": role}),
 		)
 		if len(credential_ids) == 0:
