@@ -375,10 +375,13 @@ class RoleService(asab.Service):
 				raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		if verify_credentials_has_tenant and tenant != "*":
-			if not await self.TenantService.has_tenant_access(credentials_id, tenant):
+			# NOTE: This check does not take into account tenant access granted via global resources
+			# such as "authz:superuser" or "authz:tenant:access", which is correct.
+			# To get a tenant role assigned, the user needs to have the tenant explicitly assigned.
+			if not await self.TenantService.has_tenant_assigned(credentials_id, tenant):
 				raise exceptions.TenantNotAuthorizedError(credentials_id, tenant)
 
-		return await self._do_assign_role(credentials_id, role_id, tenant)
+		await self._do_assign_role(credentials_id, role_id, tenant)
 
 
 	async def _do_assign_role(self, credentials_id: str, role_id: str, tenant: str):
@@ -393,23 +396,16 @@ class RoleService(asab.Service):
 		try:
 			await upsertor.execute()
 		except asab.storage.exceptions.DuplicateError as e:
-			message = "Role already assigned to these credentials"
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
 				key, value = e.KeyValue.popitem()
 				raise asab.exceptions.Conflict("Role already assigned.", key=key, value=value) from e
 			else:
 				raise asab.exceptions.Conflict("Role already assigned.") from e
-			L.warning(message, struct_data={"cid": credentials_id, "role": role_id})
-			return {
-				"result": "ALREADY-EXISTS",
-				"message": message,
-			}
 
 		L.log(asab.LOG_NOTICE, "Role assigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,
 		})
-		return {"result": "OK"}
 
 
 	async def unassign_role(self, credentials_id: str, role_id: str):

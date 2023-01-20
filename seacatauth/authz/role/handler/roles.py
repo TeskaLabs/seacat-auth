@@ -137,16 +137,12 @@ class RolesHandler(object):
 					status=403
 				)
 
-		data = await self.RoleService.assign_role(
+		await self.RoleService.assign_role(
 			credentials_id=request.match_info["credentials_id"],
 			role_id=role_id
 		)
 
-		return asab.web.rest.json_response(
-			request,
-			data=data,
-			status=200 if data["result"] == "OK" else 400
-		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
 	@access_control("authz:tenant:admin")
@@ -184,7 +180,9 @@ class RolesHandler(object):
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
 		"additionalProperties": False,
-		"required": ["filter", "roles"],
+		"required": ["filter"],
+		"minProperties": 2,
+		"maxProperties": 2,
 		"properties": {
 			"filter": {
 				"type": "object",
@@ -192,22 +190,14 @@ class RolesHandler(object):
 				"maxProperties": 1,
 				"additionalProperties": False,
 				"properties": {
-					"has_tenant": {
-						"type": "string"
-					},
-					"has_role": {
-						"type": "string"
-					},
-				},
-			},
-			"roles": {
+					"has_tenant": {"type": "string"},
+					"has_role": {"type": "string"}}},
+			"assign_roles": {
 				"type": "array",
-				"items": {
-					"type": "string",
-				},
-			},
-		}
-	})
+				"items": {"type": "string"}},
+			"unassign_roles": {
+				"type": "array",
+				"items": {"type": "string"}}}})
 	@access_control("authz:superuser")
 	async def bulk_assign_roles(self, request, *, json_data):
 		# Query credentials by filter
@@ -226,10 +216,15 @@ class RolesHandler(object):
 			data = {"credentials_matched": 0}
 			return asab.web.rest.json_response(request, data=data)
 
-		roles = json_data["roles"]
-		# If any of the requested roles does not exist, throw error
-		for role in roles:
-			await self.RoleService.get(role)
+		if "assign_roles" in json_data:
+			roles = json_data["assign_roles"]
+			# If any of the requested roles does not exist, throw error
+			for role in roles:
+				await self.RoleService.get(role)
+		elif "unassign_roles" in json_data:
+			roles = json_data["unassign_roles"]
+		else:
+			raise asab.exceptions.ValidationError("Unknown operation")
 
 		credential_ids = [a["c"] for a in assignments["data"]]
 
