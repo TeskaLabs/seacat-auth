@@ -51,3 +51,19 @@ class RoleNotFoundError(KeyError):
 	def __init__(self, role, *args):
 		self.Role = role
 		super().__init__("Role not found.", *args)
+
+
+class CredentialsNotFoundError(KeyError):
+	def __init__(self, credentials_id, *args):
+		self.CredentialsId = credentials_id
+		super().__init__("Credentials not found.", *args)
+
+
+class TenantNotAuthorizedError(AccessDeniedError):
+	"""
+	Credentials do not have access to tenant
+	"""
+	def __init__(self, credentials_id, tenant, *args):
+		self.CredentialsId = credentials_id
+		self.Tenant = tenant
+		super().__init__("Credentials not authorized under tenant.", *args)
