@@ -27,7 +27,7 @@ class RolesHandler(object):
 		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
 		web_app.router.add_put('/roles/{tenant}/{credentials_id}', self.set_roles)
 		web_app.router.add_put("/roles/{tenant}", self.get_roles_batch)
-		web_app.router.add_post("/roles", self.bulk_assign_roles)
+		web_app.router.add_post("/roles/{tenant}/{role_name}", self.bulk_assign_role)
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
@@ -181,8 +181,6 @@ class RolesHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"required": ["filter"],
-		"minProperties": 2,
-		"maxProperties": 2,
 		"properties": {
 			"filter": {
 				"type": "object",
@@ -191,15 +189,9 @@ class RolesHandler(object):
 				"additionalProperties": False,
 				"properties": {
 					"has_tenant": {"type": "string"},
-					"has_role": {"type": "string"}}},
-			"assign_roles": {
-				"type": "array",
-				"items": {"type": "string"}},
-			"unassign_roles": {
-				"type": "array",
-				"items": {"type": "string"}}}})
+					"has_role": {"type": "string"}}}}})
 	@access_control("authz:superuser")
-	async def bulk_assign_roles(self, request, *, json_data):
+	async def bulk_assign_role(self, request, *, json_data, tenant):
 		# Query credentials by filter
 		# Only a single-condition filter is supported
 		if "has_tenant" in json_data["filter"]:
@@ -213,48 +205,43 @@ class RolesHandler(object):
 			raise asab.exceptions.ValidationError("Unsupported filter: {!r}".format(json_data["filter"]))
 
 		if assignments["count"] == 0:
-			data = {"credentials_matched": 0}
+			data = {
+				"credentials_matched": [],
+				"successful_count": 0,
+				"error_count": 0,
+				"result": "OK"}
 			return asab.web.rest.json_response(request, data=data)
 
-		if "assign_roles" in json_data:
-			roles = json_data["assign_roles"]
-			# If any of the requested roles does not exist, throw error
-			for role in roles:
-				await self.RoleService.get(role)
-		elif "unassign_roles" in json_data:
-			roles = json_data["unassign_roles"]
-		else:
-			raise asab.exceptions.ValidationError("Unknown operation")
-
-		credential_ids = [a["c"] for a in assignments["data"]]
+		credential_ids = set(a["c"] for a in assignments["data"])
+		role = "{}/{}".format(tenant, request.match_info["role_name"])
+		await self.RoleService.get(role)
 
 		error_details = []
 		successful_count = 0
-		for role in roles:
-			for credential_id in credential_ids:
-				try:
-					await self.RoleService.assign_role(
-						credential_id, role,
-						verify_credentials=False,
-						verify_role=False,
-						verify_tenant=False,
-					)
-					successful_count += 1
-				except asab.exceptions.Conflict:
-					error_details.append({"cid": credential_id, "role": role, "error": "Role already assigned."})
-				except exceptions.TenantNotAuthorizedError:
-					error_details.append(
-						{"cid": credential_id, "role": role, "error": "Credentials not authorized under tenant."})
-				except Exception as e:
-					L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
-						"cid": credential_id, "role": role})
-					error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
+		for credential_id in credential_ids:
+			try:
+				await self.RoleService.assign_role(
+					credential_id, role,
+					verify_role=False,
+					verify_credentials=False,
+					verify_tenant=False)
+				successful_count += 1
+			except asab.exceptions.Conflict:
+				error_details.append({"cid": credential_id, "role": role, "error": "Role already assigned."})
+			except exceptions.TenantNotAuthorizedError:
+				error_details.append(
+					{"cid": credential_id, "role": role, "error": "Credentials not authorized under tenant."})
+			except Exception as e:
+				L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
+					"cid": credential_id, "role": role})
+				error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
 
 		data = {
-			"credentials_matched": assignments["count"],
+			"credentials_matched": list(credential_ids),
 			"successful_count": successful_count,
 			"error_count": len(error_details),
-			"error_details": error_details
+			"error_details": error_details,
+			"result": "OK"
 		}
 
 		return asab.web.rest.json_response(request, data=data)
