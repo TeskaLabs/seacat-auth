@@ -5,6 +5,9 @@
 # Fix
 - Removed required fields from client update (#144, PLUM Sprint 230113)
 
+### Features
+- Assign roles and tenants to multiple credentials at once (#146, PLUM Sprint 230113)
+
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
 
