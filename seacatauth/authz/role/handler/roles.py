@@ -24,10 +24,11 @@ class RolesHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get('/roles/{tenant}/{credentials_id}', self.get_roles_by_credentials)
-		web_app.router.add_put('/roles/{tenant}/{credentials_id}', self.set_roles)
+		web_app.router.add_get("/roles/{tenant}/{credentials_id}", self.get_roles_by_credentials)
+		web_app.router.add_put("/roles/{tenant}/{credentials_id}", self.set_roles)
 		web_app.router.add_put("/roles/{tenant}", self.get_roles_batch)
-		web_app.router.add_post("/roles/{tenant}/{role_name}", self.bulk_assign_role)
+		web_app.router.add_put("/role_assign/{tenant}/{role_name}", self.bulk_assign_role)
+		web_app.router.add_put("/role_unassign/{tenant}/{role_name}", self.bulk_unassign_role)
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
@@ -165,16 +166,11 @@ class RolesHandler(object):
 					status=403
 				)
 
-		data = await self.RoleService.unassign_role(
+		await self.RoleService.unassign_role(
 			credentials_id=request.match_info["credentials_id"],
 			role_id=role_id
 		)
-
-		return asab.web.rest.json_response(
-			request,
-			data=data,
-			status=200 if data["result"] == "OK" else 400
-		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
 	@asab.web.rest.json_schema_handler({
@@ -194,17 +190,8 @@ class RolesHandler(object):
 	async def bulk_assign_role(self, request, *, json_data, tenant):
 		# Query credentials by filter
 		# Only a single-condition filter is supported
-		if "has_tenant" in json_data["filter"]:
-			tenant = json_data["filter"]["has_tenant"]
-			provider = self.RoleService.TenantService.get_provider()
-			assignments = await provider.list_tenant_assignments(tenant)
-		elif "has_role" in json_data["filter"]:
-			role = json_data["filter"]["has_role"]
-			assignments = await self.RoleService.list_role_assignments(role)
-		else:
-			raise asab.exceptions.ValidationError("Unsupported filter: {!r}".format(json_data["filter"]))
-
-		if assignments["count"] == 0:
+		credential_ids = await self._list_assigned_credential_ids(json_data["filter"])
+		if len(credential_ids) == 0:
 			data = {
 				"credentials_matched": [],
 				"successful_count": 0,
@@ -212,7 +199,6 @@ class RolesHandler(object):
 				"result": "OK"}
 			return asab.web.rest.json_response(request, data=data)
 
-		credential_ids = set(a["c"] for a in assignments["data"])
 		role = "{}/{}".format(tenant, request.match_info["role_name"])
 		await self.RoleService.get(role)
 
@@ -241,7 +227,68 @@ class RolesHandler(object):
 			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
-			"result": "OK"
-		}
-
+			"result": "OK"}
 		return asab.web.rest.json_response(request, data=data)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"additionalProperties": False,
+		"required": ["filter"],
+		"properties": {
+			"filter": {
+				"type": "object",
+				"minProperties": 1,
+				"maxProperties": 1,
+				"additionalProperties": False,
+				"properties": {
+					"has_tenant": {"type": "string"},
+					"has_role": {"type": "string"}}}}})
+	@access_control("authz:superuser")
+	async def bulk_unassign_role(self, request, *, json_data, tenant):
+		# List credentials that both fit the user filter and have the requested role assigned
+		role = "{}/{}".format(tenant, request.match_info["role_name"])
+		credential_ids = set.intersection(
+			await self._list_assigned_credential_ids(json_data["filter"]),
+			await self._list_assigned_credential_ids({"has_role": role}),
+		)
+		if len(credential_ids) == 0:
+			data = {
+				"credentials_matched": [],
+				"successful_count": 0,
+				"error_count": 0,
+				"result": "OK"}
+			return asab.web.rest.json_response(request, data=data)
+
+		error_details = []
+		successful_count = 0
+		for credential_id in credential_ids:
+			try:
+				await self.RoleService.unassign_role(credential_id, role)
+				successful_count += 1
+			except Exception as e:
+				L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
+					"cid": credential_id, "role": role})
+				error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
+
+		data = {
+			"credentials_matched": list(credential_ids),
+			"successful_count": successful_count,
+			"error_count": len(error_details),
+			"error_details": error_details,
+			"result": "OK"}
+		return asab.web.rest.json_response(request, data=data)
+
+
+	async def _list_assigned_credential_ids(self, filter):
+		if "has_tenant" in filter:
+			tenant = filter["has_tenant"]
+			provider = self.RoleService.TenantService.get_provider()
+			assignments = await provider.list_tenant_assignments(tenant)
+		elif "has_role" in filter:
+			role = filter["has_role"]
+			assignments = await self.RoleService.list_role_assignments(role)
+		else:
+			raise asab.exceptions.ValidationError("Unsupported filter: {!r}".format(filter))
+
+		return set(a["c"] for a in assignments["data"])

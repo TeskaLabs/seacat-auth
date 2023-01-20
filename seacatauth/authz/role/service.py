@@ -410,22 +410,11 @@ class RoleService(asab.Service):
 
 	async def unassign_role(self, credentials_id: str, role_id: str):
 		assignment_id = "{} {}".format(credentials_id, role_id)
-
-		try:
-			await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
-		except KeyError:
-			message = "Credentials are not assigned to this role"
-			L.warning(message, struct_data={"cid": credentials_id, "role": role_id})
-			return {
-				"result": "NOT-FOUND",
-				"message": message,
-			}
-
+		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
 		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,
 		})
-		return {"result": "OK"}
 
 
 	async def delete_role_assignments(self, role_id):
