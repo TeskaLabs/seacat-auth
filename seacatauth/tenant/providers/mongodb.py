@@ -278,3 +278,12 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 			"tenant": tenant,
 			"deleted_count": result.deleted_count
 		})
+
+
+	async def get_assignment(self, credatials_id: str, tenant: str):
+		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
+		query = {"c": credatials_id, "t": tenant}
+		result = await collection.find_one(query)
+		if result is None:
+			raise KeyError("Tenant assignment not found")
+		return result

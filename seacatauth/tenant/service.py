@@ -293,3 +293,11 @@ class TenantService(asab.Service):
 				raise exceptions.NoTenantsError(credential_id)
 
 		return tenants
+
+
+	async def has_tenant_access(self, credatials_id: str, tenant: str):
+		try:
+			await self.TenantsProvider.get_assignment(credatials_id, tenant)
+		except KeyError:
+			return False
+		return True
