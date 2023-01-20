@@ -5,9 +5,10 @@ import asab
 import asab.web.rest
 import asab.web.authz
 import asab.web.tenant
+import asab.exceptions
 
 from ....decorators import access_control
-from ....exceptions import RoleNotFoundError
+from .... import exceptions
 
 #
 
@@ -209,30 +210,53 @@ class RolesHandler(object):
 	})
 	@access_control("authz:superuser")
 	async def bulk_assign_roles(self, request, *, json_data):
-
-		# Iterate through them, assigning roles
-		# Record errors
-		# Return error log in response
-		roles = json_data["roles"]
-
 		# Query credentials by filter
-		credential_ids = []  # TODO
+		# Only a single-condition filter is supported
+		if "has_tenant" in json_data["filter"]:
+			tenant = json_data["filter"]["has_tenant"]
+			provider = self.RoleService.TenantService.get_provider()
+			assignments = await provider.list_tenant_assignments(tenant)
+		elif "has_role" in json_data["filter"]:
+			role = json_data["filter"]["has_role"]
+			assignments = await self.RoleService.list_role_assignments(role)
+		else:
+			raise asab.exceptions.ValidationError("Unsupported filter: {!r}".format(json_data["filter"]))
+
+		if assignments["count"] == 0:
+			data = {"credentials_matched": 0}
+			return asab.web.rest.json_response(request, data=data)
+
+		roles = json_data["roles"]
+		# If any of the requested roles does not exist, throw error
+		for role in roles:
+			await self.RoleService.get(role)
+
+		credential_ids = [a["c"] for a in assignments["data"]]
 
 		error_details = []
 		successful_count = 0
 		for role in roles:
 			for credential_id in credential_ids:
 				try:
-					await self.RoleService.assign_role(credential_id, role)
+					await self.RoleService.assign_role(
+						credential_id, role,
+						verify_credentials=False,
+						verify_role=False,
+						verify_tenant=False,
+					)
 					successful_count += 1
-				except RoleNotFoundError:
-					error_details.append({"cid": credential_id, "role": role, "error": "Credentials not found"})
-				# TODO
-				# Creds not found
-				# Credentials not authorized in tenant
-				# Role already assigned
+				except asab.exceptions.Conflict:
+					error_details.append({"cid": credential_id, "role": role, "error": "Role already assigned."})
+				except exceptions.TenantNotAuthorizedError:
+					error_details.append(
+						{"cid": credential_id, "role": role, "error": "Credentials not authorized under tenant."})
+				except Exception as e:
+					L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
+						"cid": credential_id, "role": role})
+					error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
 
 		data = {
+			"credentials_matched": assignments["count"],
 			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details

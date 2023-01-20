@@ -3,7 +3,8 @@ import re
 from typing import Optional
 
 import asab.storage.exceptions
-from ...exceptions import RoleNotFoundError
+import asab.exceptions
+from ... import exceptions
 
 #
 
@@ -75,7 +76,7 @@ class RoleService(asab.Service):
 		try:
 			result = await self.StorageService.get(self.RoleCollection, role_id)
 		except KeyError:
-			raise KeyError("Role '{}' not found".format(role_id))
+			raise exceptions.RoleNotFoundError(role_id)
 		return result
 
 	async def get_role_resources(self, role_id: str):
@@ -347,24 +348,35 @@ class RoleService(asab.Service):
 		}
 
 
-	async def assign_role(self, credentials_id: str, role_id: str):
-		# Verify that role exists
-		try:
-			await self.get(role_id)
-		except KeyError:
-			raise RoleNotFoundError(role_id)
+	async def assign_role(
+		self, credentials_id: str, role_id: str,
+		verify_role: bool = True,
+		verify_tenant: bool = True,
+		verify_credentials: bool = True,
+		verify_credentials_has_tenant: bool = True
+	):
+		if verify_role:
+			try:
+				await self.get(role_id)
+			except KeyError:
+				raise exceptions.RoleNotFoundError(role_id)
 
-		# Verify that role tenant exists
-		try:
-			tenant = await self.get_role_tenant(role_id)
-		except KeyError as e:
-			raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role_id)) from e
+		tenant, _ = role_id.split("/", 1)
+		if verify_tenant and tenant != "*":
+			try:
+				tenant = await self.TenantService.get_tenant(role_id)
+			except KeyError:
+				raise exceptions.TenantNotFoundError(tenant)
 
-		# Verify that credentials exist
-		try:
-			await self.CredentialService.detail(credentials_id)
-		except KeyError:
-			raise KeyError("Credentials '{}' not found.".format(credentials_id))
+		if verify_credentials:
+			try:
+				await self.CredentialService.detail(credentials_id)
+			except KeyError:
+				raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		if verify_credentials_has_tenant and tenant != "*":
+			if not await self.TenantService.has_tenant_access(credentials_id, tenant):
+				raise exceptions.TenantNotAuthorizedError(credentials_id, tenant)
 
 		return await self._do_assign_role(credentials_id, role_id, tenant)
 
@@ -380,8 +392,13 @@ class RoleService(asab.Service):
 
 		try:
 			await upsertor.execute()
-		except asab.storage.exceptions.DuplicateError:
+		except asab.storage.exceptions.DuplicateError as e:
 			message = "Role already assigned to these credentials"
+			if hasattr(e, "KeyValue") and e.KeyValue is not None:
+				key, value = e.KeyValue.popitem()
+				raise asab.exceptions.Conflict("Role already assigned.", key=key, value=value) from e
+			else:
+				raise asab.exceptions.Conflict("Role already assigned.") from e
 			L.warning(message, struct_data={"cid": credentials_id, "role": role_id})
 			return {
 				"result": "ALREADY-EXISTS",
