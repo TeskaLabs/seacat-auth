@@ -295,7 +295,7 @@ class TenantService(asab.Service):
 		return tenants
 
 
-	async def has_tenant_access(self, credatials_id: str, tenant: str):
+	async def has_tenant_assigned(self, credatials_id: str, tenant: str):
 		try:
 			await self.TenantsProvider.get_assignment(credatials_id, tenant)
 		except KeyError:
