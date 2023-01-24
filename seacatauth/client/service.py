@@ -243,6 +243,7 @@ class ClientService(asab.Service):
 		token_endpoint_auth_method: str = "client_secret_basic",
 		logout_uri: str = None,
 		custom_data: dict = None,
+		cookie_domain: str = None,
 		_custom_client_id: str = None,
 		**kwargs
 	):
@@ -270,6 +271,8 @@ class ClientService(asab.Service):
 		:type logout_uri: str
 		:param custom_data: NON-CANONICAL. Additional client data.
 		:type custom_data: str
+		:param cookie_domain: NON-CANONICAL. Cookie domain of the client application.
+		:type cookie_domain: str
 		:param _custom_client_id: NON-CANONICAL. Request a specific ID for the client.
 		:type _custom_client_id: str
 		:return: Response containing the issued client_id and client_secret.
@@ -340,6 +343,9 @@ class ClientService(asab.Service):
 
 		if logout_uri is not None:
 			upsertor.set("logout_uri", logout_uri)
+
+		if cookie_domain is not None:
+			upsertor.set("cookie_domain", cookie_domain)
 
 		if custom_data is not None:
 			upsertor.set("custom_data", custom_data)
