@@ -6,6 +6,7 @@ import asab.storage.mongodb
 import asab.storage.exceptions
 
 from .abc import EditableTenantsProviderABC
+from ... import exceptions
 
 #
 
@@ -194,38 +195,11 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		"""
 		Assign tenant to credentials
 		"""
-
-		# Check if tenant exists
-		try:
-			await self.get(tenant)
-		except KeyError:
-			message = "Tenant not found"
-			L.error(message, struct_data={"tenant": tenant})
-			return {
-				"result": "NOT-FOUND",
-				"message": message,
-			}
-
 		assignment_id = "{} {}".format(credentials_id, tenant)
 		upsertor = self.MongoDBStorageService.upsertor(self.AssignCollection, obj_id=assignment_id)
 		upsertor.set("c", credentials_id)
 		upsertor.set("t", tenant)
-
-		try:
-			await upsertor.execute()
-		except asab.storage.exceptions.DuplicateError:
-			message = "Credentials is already assigned to this tenant"
-			L.error(message, struct_data={"cid": credentials_id, "tenant": tenant})
-			return {
-				"result": "ALREADY-EXISTS",
-				"message": message,
-			}
-
-		L.log(asab.LOG_NOTICE, "Tenant successfully assigned to credentials", struct_data={
-			"cid": credentials_id,
-			"tenant": tenant,
-		})
-		return {"result": "OK"}
+		await upsertor.execute()
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
@@ -233,21 +207,12 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		Unassign credentials from tenant
 		"""
 		assignment_id = "{} {}".format(credentials_id, tenant)
-		try:
-			await self.MongoDBStorageService.delete(self.AssignCollection, obj_id=assignment_id)
-		except KeyError:
-			message = "Credentials is not assigned to this tenant"
-			L.error(message, struct_data={"cid": credentials_id, "tenant": tenant})
-			return {
-				"result": "NOT-FOUND",
-				"message": message,
-			}
+		await self.MongoDBStorageService.delete(self.AssignCollection, obj_id=assignment_id)
 
 		L.log(asab.LOG_NOTICE, "Tenant successfully unassigned from credentials", struct_data={
 			"cid": credentials_id,
 			"tenant": tenant,
 		})
-		return {"result": "OK"}
 
 
 	async def list_tenant_assignments(self, tenant, page: int = 0, limit: int = None):
