@@ -177,30 +177,20 @@ class TenantHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def assign_tenant(self, request, *, tenant):
-		data = await self.TenantService.assign_tenant(
+		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
 		)
-
-		return asab.web.rest.json_response(
-			request,
-			data=data,
-			status=200 if data["result"] == "OK" else 400
-		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
 	@access_control("authz:tenant:admin")
 	async def unassign_tenant(self, request, *, tenant):
-		data = await self.TenantService.unassign_tenant(
+		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
 		)
-
-		return asab.web.rest.json_response(
-			request,
-			data=data,
-			status=200 if data["result"] == "OK" else 400
-		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
 	async def get_tenants_by_credentials(self, request):
@@ -285,11 +275,10 @@ class TenantHandler(object):
 			"has_tenant": {"type": "string"},
 			"has_role": {"type": "string"}}})
 	@access_control("authz:superuser")
-	async def bulk_unassign_role(self, request, *, json_data, tenant):
+	async def bulk_unassign_tenant(self, request, *, json_data, tenant):
 		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
 
 		# List credentials that both fit the user filter and have the requested role assigned
-		role = "{}/{}".format(tenant, request.match_info["role_name"])
 		credential_ids = set.intersection(
 			await list_assigned_credential_ids(
 				self.TenantService, role_service, json_data),
