@@ -6,7 +6,6 @@ import asab.storage.mongodb
 import asab.storage.exceptions
 
 from .abc import EditableTenantsProviderABC
-from ... import exceptions
 
 #
 
