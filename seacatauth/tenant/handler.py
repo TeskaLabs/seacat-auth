@@ -311,4 +311,3 @@ class TenantHandler(object):
 			"error_details": error_details,
 			"result": "OK"}
 		return asab.web.rest.json_response(request, data=data)
-
