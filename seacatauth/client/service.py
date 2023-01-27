@@ -53,7 +53,7 @@ CLIENT_METADATA_SCHEMA = {
 		"description": "URL of the home page of the Client."},
 	"cookie_domain": {
 		"type": "string",
-		"pattern": "^[a-z0-9\\.-]{1,61}\\.[a-z]{2,}$",
+		"pattern": "^[a-z0-9\\.-]{1,61}\\.[a-z]{2,}$|^$",
 		"description":
 			"Domain of the client cookie. Defaults to the application's global cookie domain."},
 	"redirect_uris": {
@@ -243,6 +243,7 @@ class ClientService(asab.Service):
 		token_endpoint_auth_method: str = "client_secret_basic",
 		logout_uri: str = None,
 		custom_data: dict = None,
+		cookie_domain: str = None,
 		_custom_client_id: str = None,
 		**kwargs
 	):
@@ -270,6 +271,8 @@ class ClientService(asab.Service):
 		:type logout_uri: str
 		:param custom_data: NON-CANONICAL. Additional client data.
 		:type custom_data: str
+		:param cookie_domain: NON-CANONICAL. Cookie domain of the client application.
+		:type cookie_domain: str
 		:param _custom_client_id: NON-CANONICAL. Request a specific ID for the client.
 		:type _custom_client_id: str
 		:return: Response containing the issued client_id and client_secret.
@@ -332,16 +335,19 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 
-		if client_name is not None:
+		if client_name is not None and len(client_name) > 0:
 			upsertor.set("client_name", client_name)
 
-		if client_uri is not None:
+		if client_uri is not None and len(client_uri) > 0:
 			upsertor.set("client_uri", client_uri)
 
-		if logout_uri is not None:
+		if logout_uri is not None and len(logout_uri) > 0:
 			upsertor.set("logout_uri", logout_uri)
 
-		if custom_data is not None:
+		if cookie_domain is not None and len(cookie_domain) > 0:
+			upsertor.set("cookie_domain", cookie_domain)
+
+		if custom_data is not None and len(custom_data) > 0:
 			upsertor.set("custom_data", custom_data)
 
 		try:
@@ -405,7 +411,10 @@ class ClientService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
 		for k, v in client_update.items():
-			upsertor.set(k, v)
+			if v is None or len(v) == 0:
+				upsertor.unset(k)
+			else:
+				upsertor.set(k, v)
 
 		await upsertor.execute()
 		L.log(asab.LOG_NOTICE, "Client updated", struct_data={

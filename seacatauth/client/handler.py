@@ -87,6 +87,8 @@ class ClientHandler(object):
 	@access_control("authz:superuser")
 	async def update(self, request, *, json_data):
 		client_id = request.match_info["client_id"]
+		if "preferred_client_id" in json_data:
+			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
 		await self.ClientService.update(client_id, **json_data)
 		return asab.web.rest.json_response(
 			request,
