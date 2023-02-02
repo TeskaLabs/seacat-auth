@@ -39,6 +39,10 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
+CODE_CHALLENGE_METHODS = [
+	"plain",
+	"S256",
+]
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
@@ -114,6 +118,15 @@ CLIENT_METADATA_SCHEMA = {
 	# "default_acr_values": {},
 	# "initiate_login_uri": {},
 	# "request_uris": {},
+	"code_challenge_methods": {
+		"type": "array",
+		"description":
+			"JSON array containing a list of the PKCE Code Challenge Methods "
+			"that the Client is declaring that it will restrict itself to using. "
+			"If omitted, the default is that the Client will use only the `S256` method.",
+		"items": {
+			"type": "string",
+			"enum": CODE_CHALLENGE_METHODS}},
 }
 
 REGISTER_CLIENT_SCHEMA = {
@@ -235,15 +248,6 @@ class ClientService(asab.Service):
 	async def register(
 		self, *,
 		redirect_uris: list,
-		response_types: list = frozenset(["code"]),
-		grant_types: list = frozenset(["authorization_code"]),
-		application_type: str = "web",
-		client_name: str = None,
-		client_uri: str = None,
-		token_endpoint_auth_method: str = "client_secret_basic",
-		logout_uri: str = None,
-		custom_data: dict = None,
-		cookie_domain: str = None,
 		_custom_client_id: str = None,
 		**kwargs
 	):
@@ -253,35 +257,22 @@ class ClientService(asab.Service):
 
 		:param redirect_uris: Array of Redirection URI values used by the Client.
 		:type redirect_uris: list
-		:param response_types: Array containing the OAuth 2.0 response_type values that the Client is declaring
-			that it will restrict itself to using.
-		:type response_types: list
-		:param grant_types: Array containing the OAuth 2.0 Grant Types that the Client is declaring that it will
-			restrict itself to using.
-		:type grant_types: list
-		:param application_type: Kind of the application. The defined values are "native" or "web".
-		:type application_type: str
-		:param client_name: Name of the Client to be presented to the End-User.
-		:type client_name: str
-		:param client_uri: URL of the home page of the Client.
-		:type client_uri: str
-		:param token_endpoint_auth_method: Requested Client Authentication method for the Token Endpoint.
-		:type token_endpoint_auth_method: str
-		:param logout_uri: NON-CANONICAL. URI that will be called on session logout.
-		:type logout_uri: str
-		:param custom_data: NON-CANONICAL. Additional client data.
-		:type custom_data: str
-		:param cookie_domain: NON-CANONICAL. Cookie domain of the client application.
-		:type cookie_domain: str
 		:param _custom_client_id: NON-CANONICAL. Request a specific ID for the client.
 		:type _custom_client_id: str
-		:return: Response containing the issued client_id and client_secret.
+		:return: Dict containing the issued client_id and client_secret.
 		"""
+		response_types = kwargs.get("response_types", frozenset(["code"]))
 		for v in response_types:
 			assert v in RESPONSE_TYPES
+
+		grant_types = kwargs.get("grant_types", frozenset(["authorization_code"]))
 		for v in grant_types:
 			assert v in GRANT_TYPES
+
+		application_type = kwargs.get("application_type", "web")
 		assert application_type in APPLICATION_TYPES
+
+		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
 		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 
 		if _custom_client_id is not None:
@@ -324,7 +315,7 @@ class ClientService(asab.Service):
 
 		upsertor.set("token_endpoint_auth_method", token_endpoint_auth_method)
 
-		self._check_redirect_uris(redirect_uris, application_type, client_uri)
+		self._check_redirect_uris(redirect_uris, application_type)
 		upsertor.set("redirect_uris", list(redirect_uris))
 
 		self._check_grant_types(grant_types, response_types)
@@ -334,21 +325,11 @@ class ClientService(asab.Service):
 		upsertor.set("application_type", application_type)
 
 		# Optional client metadata
-
-		if client_name is not None and len(client_name) > 0:
-			upsertor.set("client_name", client_name)
-
-		if client_uri is not None and len(client_uri) > 0:
-			upsertor.set("client_uri", client_uri)
-
-		if logout_uri is not None and len(logout_uri) > 0:
-			upsertor.set("logout_uri", logout_uri)
-
-		if cookie_domain is not None and len(cookie_domain) > 0:
-			upsertor.set("cookie_domain", cookie_domain)
-
-		if custom_data is not None and len(custom_data) > 0:
-			upsertor.set("custom_data", custom_data)
+		for k in frozenset([
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "code_challenge_methods"]):
+			v = kwargs.get(k)
+			if v is not None and len(v) > 0:
+				upsertor.set(k, v)
 
 		try:
 			await upsertor.execute()
