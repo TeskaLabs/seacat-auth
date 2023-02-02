@@ -15,9 +15,9 @@ L = logging.getLogger(__name__)
 
 #
 
-# TODO: Implement support for remaining metadata
-# TODO: Implement support for other response and grant types and stuff
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+# TODO: This is not Client responsibility!
+#  Supported OAuth/OIDC param values (and their defaults) should be managed by the OpenIdConnect module.
 GRANT_TYPES = [
 	"authorization_code",
 	# "implicit",
@@ -422,9 +422,10 @@ class ClientService(asab.Service):
 		client_secret: str = None,
 		grant_type: str = None,
 		response_type: str = None,
+		code_challenge_method: str = None,
 	):
 		try:
-			registered_client = await self.get(client_id)
+			client = await self.get(client_id)
 		except KeyError:
 			raise exceptions.ClientNotFoundError(client_id=client_id)
 
@@ -432,20 +433,25 @@ class ClientService(asab.Service):
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
 			client_secret = ""
-		# TODO: Find a way to allow dynamic redirect URIs for some clients
-		#   (possibly only for cookie clients)
-		# if redirect_uri not in registered_client["redirect_uris"]:
+		if "client_secret_expires_at" in client \
+			and client["client_secret_expires_at"] != 0 \
+			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.InvalidClientSecret(client_id)
+		if client_secret != client.get("__client_secret", ""):
+			raise exceptions.InvalidClientSecret(client_id)
+
+		# TODO: Implement redirect_uri_validation option ("full_match", "startswith", "none")
+		# if redirect_uri not in client["redirect_uris"]:
 		# 	raise exceptions.InvalidRedirectURI(client_id=client_id, redirect_uri=redirect_uri)
-		if grant_type is not None and grant_type not in registered_client["grant_types"]:
+
+		if grant_type is not None and grant_type not in client["grant_types"]:
 			raise exceptions.ClientError(client_id=client_id, grant_type=grant_type)
-		if response_type not in registered_client["response_types"]:
+
+		if response_type not in client["response_types"]:
 			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
-		if "client_secret_expires_at" in registered_client \
-			and registered_client["client_secret_expires_at"] != 0 \
-			and registered_client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.InvalidClientSecret(client_id)
-		if client_secret != registered_client.get("__client_secret", ""):
-			raise exceptions.InvalidClientSecret(client_id)
+
+		if code_challenge_method is not None and code_challenge_method not in client["code_challenge_methods"]:
+			raise exceptions.ClientError(client_id=client_id, code_challenge_method=code_challenge_method)
 
 		return True
 
