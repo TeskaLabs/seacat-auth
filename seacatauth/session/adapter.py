@@ -58,8 +58,7 @@ class OAuth2Data:
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
-	CodeChallenge: typing.Optional[str]
-	CodeChallengeMethod: typing.Optional[str]
+	PKCE: typing.Optional[dict]
 
 
 @dataclasses.dataclass
@@ -123,8 +122,7 @@ class SessionAdapter:
 			RefreshToken = "oa_rt"
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
-			CodeChallenge = "oa_cc"
-			CodeChallengeMethod = "oa_ccm"
+			PKCE = "oa_pkce"
 
 		class Cookie:
 			_prefix = "ck"
@@ -227,8 +225,7 @@ class SessionAdapter:
 				self.FN.OAuth2.RefreshToken: self.OAuth2.RefreshToken,
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
-				self.FN.OAuth2.CodeChallenge: self.OAuth2.CodeChallenge,
-				self.FN.OAuth2.CodeChallengeMethod: self.OAuth2.CodeChallengeMethod,
+				self.FN.OAuth2.PKCE: self.OAuth2.PKCE,
 			})
 
 		# TODO: encrypt sensitive fields
@@ -330,10 +327,7 @@ class SessionAdapter:
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 
-		code_challenge = session_dict.pop(cls.FN.OAuth2.CodeChallenge, None)
-		code_challenge_method = session_dict.pop(cls.FN.OAuth2.CodeChallengeMethod, None)
-		if code_challenge is not None and code_challenge_method is not None:
-			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
+		pkce = session_dict.pop(cls.FN.OAuth2.PKCE, None)
 
 		return OAuth2Data(
 			IDToken=id_token,
@@ -341,8 +335,7 @@ class SessionAdapter:
 			RefreshToken=refresh_token,
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
-			CodeChallenge=code_challenge,
-			CodeChallengeMethod=code_challenge_method,
+			PKCE=pkce,
 		)
 
 	@classmethod
