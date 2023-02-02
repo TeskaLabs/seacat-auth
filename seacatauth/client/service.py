@@ -43,6 +43,7 @@ CODE_CHALLENGE_METHODS = [
 	"plain",
 	"S256",
 ]
+CODE_CHALLENGE_METHODS_DEFAULT = ["S256"]
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
@@ -324,6 +325,11 @@ class ClientService(asab.Service):
 
 		upsertor.set("application_type", application_type)
 
+		# Register allowed PKCE Code Challenge Methods
+		code_challenge_methods = kwargs.get("code_challenge_methods", CODE_CHALLENGE_METHODS_DEFAULT)
+		self. _check_code_challenge_methods(code_challenge_methods)
+		upsertor.set("code_challenge_methods", code_challenge_methods)
+
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "code_challenge_methods"]):
@@ -505,6 +511,25 @@ class ClientService(asab.Service):
 					# TODO: Proper support for custom URI schemes
 					raise asab.exceptions.ValidationError(
 						"Support for custom URI schemes has not been implemented yet.")
+
+
+	def _check_code_challenge_methods(self, code_challenge_methods):
+		"""
+		https://datatracker.ietf.org/doc/html/rfc7636#section-4.2
+		"""
+		for method in code_challenge_methods:
+			if method not in CODE_CHALLENGE_METHODS:
+				raise asab.exceptions.ValidationError(
+					"Unsupported Code Challenge Method: {!r}.".format(method))
+
+		if "plain" in code_challenge_methods and len(code_challenge_methods) > 1:
+			# If the client is capable of using "S256", it MUST use "S256", as
+			# "S256" is Mandatory To Implement (MTI) on the server.  Clients are
+			# permitted to use "plain" only if they cannot support "S256" for some
+			# technical reason and know via out-of-band configuration that the
+			# server supports "plain".
+			raise asab.exceptions.ValidationError(
+				"Cannot register the 'plain' Code Challenge Method together with more secure methods.")
 
 
 	def _generate_client_secret(self):
