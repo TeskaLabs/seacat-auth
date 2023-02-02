@@ -75,7 +75,8 @@ class AuthenticationHandler(object):
 			login_preferences = query_dict.get("ldid")
 
 		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True)
+		# TODO: Consider getting the `key` from dedicated request header
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=key)
 		if credentials_id is None or credentials_id == []:
 			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session

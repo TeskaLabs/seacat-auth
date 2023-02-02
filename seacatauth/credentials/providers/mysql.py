@@ -70,10 +70,10 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 			self.DataFields = None
 
 
-	async def locate(self, ident: str, ident_fields: dict = None) -> Optional[str]:
+	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> Optional[str]:
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
-				await cursor.execute(self.LocateQuery, {"ident": ident})
+				await cursor.execute(self.LocateQuery, dict(key))
 				result = await cursor.fetchone()
 		if result is None:
 			return None
