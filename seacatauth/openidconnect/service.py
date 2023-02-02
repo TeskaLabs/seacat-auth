@@ -237,7 +237,13 @@ class OpenIdConnectService(asab.Service):
 		raise aiohttp.web.HTTPNotImplemented()
 
 
-	async def create_oidc_session(self, root_session, client_id, scope, tenants=None, requested_expiration=None):
+	async def create_oidc_session(
+		self, root_session, client_id, scope,
+		tenants=None,
+		requested_expiration=None,
+		code_challenge: str = None,
+		code_challenge_method: str = None
+	):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
@@ -249,6 +255,12 @@ class OpenIdConnectService(asab.Service):
 				tenants=tenants,
 			)
 		]
+
+		if code_challenge is not None:
+			session_builders.append((
+				(SessionAdapter.FN.OAuth2.CodeChallenge, code_challenge),
+				(SessionAdapter.FN.OAuth2.CodeChallengeMethod, code_challenge_method),
+			))
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			authn_service = self.App.get_service("seacatauth.AuthenticationService")
