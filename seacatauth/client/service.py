@@ -450,8 +450,10 @@ class ClientService(asab.Service):
 		if response_type not in client["response_types"]:
 			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
 
-		if code_challenge_method is not None and code_challenge_method not in client["code_challenge_methods"]:
-			raise exceptions.ClientError(client_id=client_id, code_challenge_method=code_challenge_method)
+		if code_challenge_method is not None:
+			# If the client has no code_challenge_methods configured, allow only the more secure "S256" method
+			if code_challenge_method not in client.get("code_challenge_methods", ["S256"]):
+				raise exceptions.ClientError(client_id=client_id, code_challenge_method=code_challenge_method)
 
 		return True
 
