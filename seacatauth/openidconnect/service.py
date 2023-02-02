@@ -258,8 +258,7 @@ class OpenIdConnectService(asab.Service):
 
 		if code_challenge is not None:
 			session_builders.append((
-				(SessionAdapter.FN.OAuth2.CodeChallenge, code_challenge),
-				(SessionAdapter.FN.OAuth2.CodeChallengeMethod, code_challenge_method),
+				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
 			))
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
