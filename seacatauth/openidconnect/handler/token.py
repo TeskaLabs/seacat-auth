@@ -142,6 +142,9 @@ class TokenHandler(object):
 
 
 	def _evaluate_pkce_challenge(self, code_challenge_method, code_challenge, code_verifier):
+		"""
+		https://datatracker.ietf.org/doc/html/rfc7636#section-4.6
+		"""
 		if code_verifier is None:
 			L.warning("PKCE challenge failed: code_verifier missing in request.")
 			raise InvalidGrantError()
