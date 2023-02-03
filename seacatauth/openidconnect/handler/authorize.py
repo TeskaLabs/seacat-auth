@@ -172,7 +172,6 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				scope=scope,
 				response_type="code",
-				code_challenge=code_challenge,
 				code_challenge_method=code_challenge_method,
 			)
 		except client.exceptions.ClientNotFoundError:
