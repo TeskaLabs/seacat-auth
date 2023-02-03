@@ -5,7 +5,7 @@ import secrets
 import urllib.parse
 
 import asab.storage.exceptions
-import asab.exceptions
+import asab
 
 from seacatauth.client import exceptions
 
