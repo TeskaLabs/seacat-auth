@@ -451,9 +451,17 @@ class ClientService(asab.Service):
 			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
 
 		if code_challenge_method is not None:
-			# If the client has no code_challenge_methods configured, allow only the more secure "S256" method
-			if code_challenge_method not in client.get("code_challenge_methods", ["S256"]):
+			allowed_methods = client.get("code_challenge_methods")
+			if allowed_methods is None or len(allowed_methods) == 0:
+				# TODO: If the client has no code_challenge_methods registered, raise an error
+				# If the client is capable of using "S256", it MUST use "S256", as
+				# "S256" is Mandatory To Implement (MTI) on the server.
+				# https://datatracker.ietf.org/doc/html/rfc7636#section-4.2
+				L.warning("Client has no 'code_challenge_methods' registered.", struct_data={"client_id": client_id})
+			elif code_challenge_method not in allowed_methods:
 				raise exceptions.ClientError(client_id=client_id, code_challenge_method=code_challenge_method)
+			else:
+				pass
 
 		return True
 

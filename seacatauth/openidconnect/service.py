@@ -25,6 +25,7 @@ from ..session import (
 from .session import oauth2_session_builder
 from ..audit import AuditCode
 from .. import exceptions
+from . import pkce
 
 #
 
@@ -52,6 +53,7 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.PKCE = pkce.PKCE()
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
 		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)

@@ -16,7 +16,8 @@ import jwcrypto.jwt
 import json
 
 from ...session import SessionAdapter
-from ..utils import TokenRequestErrorResponseCode, InvalidGrantError
+from ..utils import TokenRequestErrorResponseCode
+from ..pkce import CodeChallengeFailedError
 
 #
 
@@ -101,11 +102,16 @@ class TokenHandler(object):
 
 		if session.OAuth2.PKCE is not None:
 			try:
-				self._evaluate_pkce_challenge(
+				self.OpenIdConnectService.PKCE.evaluate_code_challenge(
 					session.OAuth2.PKCE["method"],
 					session.OAuth2.PKCE["challenge"],
 					qs_data.get("code_verifier"))
-			except InvalidGrantError:
+			except CodeChallengeFailedError as e:
+				L.log(asab.LOG_NOTICE, "Code challenge failed.", struct_data={"reason": str(e)})
+				return asab.web.rest.json_response(
+					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+			except Exception as e:
+				L.error("Code challenge error.".format(e), exc_info=True)
 				return asab.web.rest.json_response(
 					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
@@ -139,27 +145,6 @@ class TokenHandler(object):
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
-
-
-	def _evaluate_pkce_challenge(self, code_challenge_method, code_challenge, code_verifier):
-		"""
-		https://datatracker.ietf.org/doc/html/rfc7636#section-4.6
-		"""
-		if code_verifier is None:
-			L.warning("PKCE challenge failed: code_verifier missing in request.")
-			raise InvalidGrantError()
-
-		if code_challenge_method == "plain":
-			request_challenge = code_verifier
-		elif code_challenge_method == "S256":
-			request_challenge = base64.urlsafe_b64encode(
-				hashlib.sha256(code_verifier.encode("ascii")).digest()).decode("ascii")
-		else:
-			raise ValueError("Unsupported code_challenge_method: {!r}".format(code_challenge_method))
-
-		if request_challenge != code_challenge:
-			L.warning("PKCE challenge failed: code_verifier mismatch.")
-			raise InvalidGrantError()
 
 
 	async def token_request_batman(self, request, qs_data):
