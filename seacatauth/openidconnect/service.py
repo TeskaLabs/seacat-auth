@@ -53,7 +53,7 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
-		self.PKCE = pkce.PKCE()
+		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
 		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
