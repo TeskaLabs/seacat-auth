@@ -5,7 +5,7 @@ import secrets
 import urllib.parse
 
 import asab.storage.exceptions
-import asab
+import asab.exceptions
 
 from seacatauth.client import exceptions
 
@@ -39,11 +39,6 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
-CODE_CHALLENGE_METHODS = [
-	"plain",
-	"S256",
-]
-CODE_CHALLENGE_METHODS_DEFAULT = ["S256"]
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
@@ -127,7 +122,7 @@ CLIENT_METADATA_SCHEMA = {
 			"If omitted, the default is that the Client will use only the `S256` method.",
 		"items": {
 			"type": "string",
-			"enum": CODE_CHALLENGE_METHODS}},
+			"enum": ["plain", "S256"]}},
 }
 
 REGISTER_CLIENT_SCHEMA = {
@@ -181,6 +176,7 @@ class ClientService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.ClientService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.OIDCService = None
 		self.ClientSecretExpiration = asab.Config.getseconds(
 			"seacatauth:client", "client_secret_expiration", fallback=None)
 		if self.ClientSecretExpiration <= 0:
@@ -201,6 +197,10 @@ class ClientService(asab.Service):
 
 		if not self._AllowCustomClientID:
 			CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
+
+
+	async def initialize(self, app):
+		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
 
 
 	def build_filter(self, match_string):
@@ -326,13 +326,14 @@ class ClientService(asab.Service):
 		upsertor.set("application_type", application_type)
 
 		# Register allowed PKCE Code Challenge Methods
-		code_challenge_methods = kwargs.get("code_challenge_methods", CODE_CHALLENGE_METHODS_DEFAULT)
-		self. _check_code_challenge_methods(code_challenge_methods)
-		upsertor.set("code_challenge_methods", code_challenge_methods)
+		code_challenge_methods = kwargs.get("code_challenge_methods")
+		if code_challenge_methods is not None:
+			self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
+			upsertor.set("code_challenge_methods", code_challenge_methods)
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "code_challenge_methods"]):
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data"]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
 				upsertor.set(k, v)
@@ -397,6 +398,10 @@ class ClientService(asab.Service):
 
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
+		# Register allowed PKCE Code Challenge Methods
+		if "code_challenge_methods" in kwargs:
+			self.OIDCService.PKCE.validate_code_challenge_methods_registration(kwargs["code_challenge_methods"])
+
 		for k, v in client_update.items():
 			if v is None or len(v) == 0:
 				upsertor.unset(k)
@@ -416,19 +421,13 @@ class ClientService(asab.Service):
 
 	async def authorize_client(
 		self,
-		client_id: str,
+		client: dict,
 		scope: list,
 		redirect_uri: str,
 		client_secret: str = None,
 		grant_type: str = None,
 		response_type: str = None,
-		code_challenge_method: str = None,
 	):
-		try:
-			client = await self.get(client_id)
-		except KeyError:
-			raise exceptions.ClientNotFoundError(client_id=client_id)
-
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
@@ -436,32 +435,19 @@ class ClientService(asab.Service):
 		if "client_secret_expires_at" in client \
 			and client["client_secret_expires_at"] != 0 \
 			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.InvalidClientSecret(client_id)
+			raise exceptions.InvalidClientSecret(client["_id"])
 		if client_secret != client.get("__client_secret", ""):
-			raise exceptions.InvalidClientSecret(client_id)
+			raise exceptions.InvalidClientSecret(client["_id"])
 
 		# TODO: Implement redirect_uri_validation option ("full_match", "startswith", "none")
 		# if redirect_uri not in client["redirect_uris"]:
 		# 	raise exceptions.InvalidRedirectURI(client_id=client_id, redirect_uri=redirect_uri)
 
 		if grant_type is not None and grant_type not in client["grant_types"]:
-			raise exceptions.ClientError(client_id=client_id, grant_type=grant_type)
+			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
 
 		if response_type not in client["response_types"]:
-			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
-
-		if code_challenge_method is not None:
-			allowed_methods = client.get("code_challenge_methods")
-			if allowed_methods is None or len(allowed_methods) == 0:
-				# TODO: If the client has no code_challenge_methods registered, raise an error
-				# If the client is capable of using "S256", it MUST use "S256", as
-				# "S256" is Mandatory To Implement (MTI) on the server.
-				# https://datatracker.ietf.org/doc/html/rfc7636#section-4.2
-				L.warning("Client has no 'code_challenge_methods' registered.", struct_data={"client_id": client_id})
-			elif code_challenge_method not in allowed_methods:
-				raise exceptions.ClientError(client_id=client_id, code_challenge_method=code_challenge_method)
-			else:
-				pass
+			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
 
 		return True
 
@@ -527,25 +513,6 @@ class ClientService(asab.Service):
 					# TODO: Proper support for custom URI schemes
 					raise asab.exceptions.ValidationError(
 						"Support for custom URI schemes has not been implemented yet.")
-
-
-	def _check_code_challenge_methods(self, code_challenge_methods):
-		"""
-		https://datatracker.ietf.org/doc/html/rfc7636#section-4.2
-		"""
-		for method in code_challenge_methods:
-			if method not in CODE_CHALLENGE_METHODS:
-				raise asab.exceptions.ValidationError(
-					"Unsupported Code Challenge Method: {!r}.".format(method))
-
-		if "plain" in code_challenge_methods and len(code_challenge_methods) > 1:
-			# If the client is capable of using "S256", it MUST use "S256", as
-			# "S256" is Mandatory To Implement (MTI) on the server.  Clients are
-			# permitted to use "plain" only if they cannot support "S256" for some
-			# technical reason and know via out-of-band configuration that the
-			# server supports "plain".
-			raise asab.exceptions.ValidationError(
-				"Cannot register the 'plain' Code Challenge Method together with more secure methods.")
 
 
 	def _generate_client_secret(self):

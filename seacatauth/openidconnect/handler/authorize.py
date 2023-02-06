@@ -11,6 +11,7 @@ from ...cookie.utils import delete_cookie, set_cookie
 from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
+from ..pkce import InvalidCodeChallengeMethodError
 
 #
 
@@ -158,29 +159,24 @@ class AuthorizeHandler(object):
 
 		Authentication Code Flow
 		"""
-		if code_challenge is not None and code_challenge_method is None:
-			# code_challenge_method
-			#   OPTIONAL, defaults to "plain" if not present in the request.  Code
-			#   verifier transformation method is "S256" or "plain".
-			code_challenge_method = "plain"
-
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			await self.OpenIdConnectService.ClientService.authorize_client(
-				client_id=client_id,
-				client_secret=client_secret,
-				redirect_uri=redirect_uri,
-				scope=scope,
-				response_type="code",
-				code_challenge_method=code_challenge_method,
-			)
-		except client.exceptions.ClientNotFoundError:
+			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+		except KeyError:
 			L.error("Client ID not found", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.InvalidRequest,
 				redirect_uri,
 				error_description="Invalid client_id",
 				state=state
+			)
+		try:
+			await self.OpenIdConnectService.ClientService.authorize_client(
+				client=client_dict,
+				client_secret=client_secret,
+				redirect_uri=redirect_uri,
+				scope=scope,
+				response_type="code",
 			)
 		except client.exceptions.InvalidClientSecret:
 			L.error("Invalid client secret", struct_data={"client_id": client_id})
@@ -203,6 +199,25 @@ class AuthorizeHandler(object):
 				error_description="Client error.",
 				state=state
 			)
+
+		if code_challenge is not None:
+			if code_challenge_method is None:
+				code_challenge_method = self.OpenIdConnectService.PKCE.DefaultCodeChallengeMethod
+			try:
+				self.OpenIdConnectService.PKCE.validate_code_challenge_method(client_dict, code_challenge_method)
+			except InvalidCodeChallengeMethodError:
+				L.error("Invalid code challenge method.", struct_data={
+					"client_id": client_id, "method": code_challenge_method})
+				await self.audit_authorize_error(
+					client_id, "client_error",
+					redirect_uri=redirect_uri,
+				)
+				return self.reply_with_authentication_error(
+					AuthErrorResponseCode.InvalidRequest,
+					redirect_uri=redirect_uri,
+					error_description="Client error.",
+					state=state
+				)
 
 		# OpenID Connect requests MUST contain the openid scope value.
 		# Otherwise, the request is not considered OpenID and its behavior is unspecified
