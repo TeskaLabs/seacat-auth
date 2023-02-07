@@ -266,7 +266,7 @@ class OpenIdConnectService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session=root_session,
-			prev_session=root_session,
+			track_id=root_session.TrackId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)

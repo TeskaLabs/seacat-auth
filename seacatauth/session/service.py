@@ -149,7 +149,7 @@ class SessionService(asab.Service):
 		self,
 		session_type: str,
 		parent_session: SessionAdapter = None,
-		prev_session: SessionAdapter = None,
+		track_id: str = None,
 		expiration: float = None,
 		session_builders: list = None
 	):
@@ -183,8 +183,8 @@ class SessionService(asab.Service):
 		upsertor.set(SessionAdapter.FN.Session.ExpirationExtension, touch_extension_seconds)
 
 		# Session transition
-		if prev_session is not None:
-			upsertor.set(SessionAdapter.FN.TrackId, prev_session.TrackId)
+		if track_id is not None:
+			upsertor.set(SessionAdapter.FN.TrackId, track_id)
 		else:
 			upsertor.set(SessionAdapter.FN.TrackId, str(uuid.uuid4()))
 
