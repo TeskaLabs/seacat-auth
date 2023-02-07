@@ -23,6 +23,14 @@ class InvalidCodeChallengeMethodError(Exception):
 
 
 class PKCE:
+	"""
+	Proof Key for Code Exchange
+
+	https://datatracker.ietf.org/doc/html/rfc7636
+
+	Introduces a code challenge to the OAuth 2.0 Authorization Code Flow
+	"""
+
 	CodeVerifierPattern = re.compile("^[A-Za-z0-9._~-]{43,128}$")
 	SupportedCodeChallengeMethods = frozenset(["plain", "S256"])  # TODO: Configurable
 	DefaultCodeChallengeMethod = "plain"
@@ -43,8 +51,8 @@ class PKCE:
 			# technical reason and know via out-of-band configuration that the
 			# server supports "plain".
 			raise asab.exceptions.ValidationError(
-				"Cannot register the 'plain' Code Challenge Method together with more secure methods. "
-				"Clients are permitted to use 'plain' only if they cannot support 'S256'."
+				"Cannot register the 'plain' Code Challenge Method alongside other more secure methods. "
+				"Clients are permitted to use 'plain' only if they do not support 'S256'."
 			)
 
 	@classmethod
