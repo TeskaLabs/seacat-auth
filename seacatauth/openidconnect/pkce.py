@@ -75,7 +75,7 @@ class PKCE:
 		"""
 		if cls.CodeVerifierPattern.match(code_verifier) is None:
 			raise CodeChallengeFailedError("Code Verifier does not match the required pattern (RFC7636 section 4.1).")
-	
+
 		if code_challenge_method == "plain":
 			request_challenge = code_verifier
 		elif code_challenge_method == "S256":
@@ -83,8 +83,6 @@ class PKCE:
 				hashlib.sha256(code_verifier.encode("ascii")).digest()).decode("ascii")
 		else:
 			raise CodeChallengeFailedError("Unsupported code_challenge_method: {!r}".format(code_challenge_method))
-	
+
 		if request_challenge != code_challenge:
 			raise CodeChallengeFailedError("Code Challenge does not match.")
-	
-	
