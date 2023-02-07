@@ -300,7 +300,7 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
-	async def login(self, login_session, from_info: list = None, prev_session=None):
+	async def login(self, login_session, from_info: list = None, track_id=None):
 		# TODO: Move this to LoginService
 		scope = frozenset(["profile", "email", "phone"])
 
@@ -323,7 +323,7 @@ class AuthenticationService(asab.Service):
 			session_type="root",
 			expiration=login_session.RequestedSessionExpiration,
 			session_builders=session_builders,
-			prev_session=prev_session,  # add link to previous session
+			track_id=track_id,  # add link to previous session
 		)
 		L.log(
 			asab.LOG_NOTICE,
