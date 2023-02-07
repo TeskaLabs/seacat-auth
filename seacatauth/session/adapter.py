@@ -81,11 +81,11 @@ class SessionAdapter:
 		CreatedAt = "_c"
 		ModifiedAt = "_m"
 		Version = "_v"
-		TrackId = "_tid"
 
 		class Session:
 			_prefix = "s"
 			Type = "s_t"
+			TrackId = "s_tid"
 			ParentSessionId = "s_pid"
 			Expiration = "s_exp"
 			MaxExpiration = "s_expm"
@@ -187,7 +187,7 @@ class SessionAdapter:
 			self.FN.Session.Expiration: self.Session.Expiration,
 			self.FN.Session.MaxExpiration: self.Session.MaxExpiration,
 			self.FN.Session.ExpirationExtension: self.Session.ExpirationExtension,
-			self.FN.TrackId: self.Session.TrackId,
+			self.FN.Session.TrackId: self.Session.TrackId,
 		}
 
 		if self.Credentials is not None:
@@ -266,7 +266,7 @@ class SessionAdapter:
 			Expiration=session_dict.pop(cls.FN.Session.Expiration, None),
 			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
 			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),
-			TrackId=session_dict.pop(cls.FN.TrackId, None),
+			TrackId=session_dict.pop(cls.FN.Session.TrackId, None),
 		)
 
 	@classmethod
@@ -362,7 +362,7 @@ def rest_get(session_dict):
 		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),  # BACK COMPAT
 		"tenants": session_dict.get(SessionAdapter.FN.Authorization.Tenants),
 		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
-		"trackid": session_dict.get(SessionAdapter.FN.TrackId),
+		"track_id": session_dict.get(SessionAdapter.FN.Session.TrackId),
 	}
 	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)
 	if psid is not None:
