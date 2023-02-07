@@ -5,10 +5,10 @@
 # Fix
 - Removed required fields from client update (#144, PLUM Sprint 230113)
 - Store client cookie domain (#147, PLUM Sprint 230113)
+- Efficient count in MongoDB credential provider (#150, PLUM Sprint 230127)
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
-
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
