@@ -1,5 +1,3 @@
-import base64
-import hashlib
 import logging
 import urllib.parse
 import datetime
@@ -111,7 +109,7 @@ class TokenHandler(object):
 				return asab.web.rest.json_response(
 					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 			except Exception as e:
-				L.error("Code challenge error.".format(e), exc_info=True)
+				L.error("Code challenge error: {}".format(e), exc_info=True)
 				return asab.web.rest.json_response(
 					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
