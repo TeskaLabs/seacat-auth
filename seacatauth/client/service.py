@@ -119,10 +119,14 @@ CLIENT_METADATA_SCHEMA = {
 		"description":
 			"JSON array containing a list of the PKCE Code Challenge Methods "
 			"that the Client is declaring that it will restrict itself to using. "
-			"If omitted, the default is that the Client will use only the `S256` method.",
+			"If omitted, the client is not expected to use PKCE.",
 		"items": {
 			"type": "string",
 			"enum": ["plain", "S256"]}},
+	"template": {
+		"type": "string",
+		"description": "Client template.",
+	}
 }
 
 REGISTER_CLIENT_SCHEMA = {
@@ -333,7 +337,7 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data"]):
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "template"]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
 				upsertor.set(k, v)
