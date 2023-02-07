@@ -115,19 +115,9 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		return result
 
 
-	async def count(self, filtr=None) -> typing.Optional[int]:
+	async def count(self, filtr: str = None) -> typing.Optional[int]:
 		# TODO: Filtering
-		query = self._prepare_query(self.ListQuery, {})
-		query.append({"$count": "count"})
-		cursor = self.Collection.aggregate(query)
-		result = None
-		async for obj in cursor:
-			result = obj
-			break
-		if result is None:
-			L.error("Credential count failed.")
-			return None
-		return result["count"]
+		return await self.Collection.estimated_document_count()
 
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = -1) -> list:
