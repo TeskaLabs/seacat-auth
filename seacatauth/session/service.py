@@ -184,9 +184,9 @@ class SessionService(asab.Service):
 
 		# Session transition
 		if track_id is not None:
-			upsertor.set(SessionAdapter.FN.TrackId, track_id)
+			upsertor.set(SessionAdapter.FN.Session.TrackId, track_id)
 		else:
-			upsertor.set(SessionAdapter.FN.TrackId, str(uuid.uuid4()))
+			upsertor.set(SessionAdapter.FN.Session.TrackId, str(uuid.uuid4()))
 
 		# Add builder fields
 		if session_builders is None:
