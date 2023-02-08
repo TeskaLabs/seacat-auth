@@ -16,8 +16,7 @@ L = logging.getLogger(__name__)
 #
 
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
-# TODO: This is not Client responsibility!
-#  Supported OAuth/OIDC param values (and their defaults) should be managed by the OpenIdConnect module.
+# TODO: Supported OAuth/OIDC param values should be managed by the OpenIdConnect module, not Client.
 GRANT_TYPES = [
 	"authorization_code",
 	# "implicit",
