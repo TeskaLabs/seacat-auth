@@ -9,6 +9,7 @@
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
+- OAuth PKCE challenge support (#152, PLUM Sprint 230127)
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
