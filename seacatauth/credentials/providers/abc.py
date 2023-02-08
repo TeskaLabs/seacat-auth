@@ -80,9 +80,9 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		Non-authoritative count of the credentials managed by the provider.
 		It is used for indicative information on the UI.
 
-		Should return -1 if unable to count credentials managed.
+		Should return None if unable to count credentials managed.
 		'''
-		return -1
+		return None
 
 
 	@abc.abstractmethod
