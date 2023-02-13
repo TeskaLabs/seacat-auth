@@ -93,4 +93,4 @@ class PKCE:
 			raise CodeChallengeFailedError("Unsupported code_challenge_method: {!r}".format(code_challenge_method))
 
 		if request_challenge != code_challenge:
-			raise CodeChallengeFailedError("Code Challenge does not match.")
+			raise CodeChallengeFailedError("Code Challenge does not pair with the Code Verifier.")
