@@ -44,6 +44,7 @@ SeaCat Auth provides a rich REST API [documented in a Postman collection](./doc/
 * Session management
 * [Single-sign on](https://en.wikipedia.org/wiki/Single_sign-on)
 * [OpenId Connect](https://openid.net/connect/) / [OAuth2](https://oauth.net/2/)
+* [Proof Key for Code Exchange](https://datatracker.ietf.org/doc/html/rfc7636) aka PKCE for OAuth 2.0 public clients
 * Authorization/authentication introspection backend for [NGINX](https://nginx.org)
 * Authorization/authentication interceptor for 3rd party applications (aka Batman)
   * Kibana &amp; ElasticSearch
