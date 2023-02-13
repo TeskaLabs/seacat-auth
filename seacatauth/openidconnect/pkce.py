@@ -81,6 +81,7 @@ class PKCE:
 
 		https://datatracker.ietf.org/doc/html/rfc7636#section-4.6
 		"""
+		L.warning(f"\n>>>{code_challenge_method=!r}, {code_challenge=!r}, {code_verifier=!r}")
 		if cls.CodeVerifierPattern.match(code_verifier) is None:
 			raise CodeChallengeFailedError("Code Verifier does not match the required pattern (RFC7636 section 4.1).")
 
@@ -88,9 +89,12 @@ class PKCE:
 			request_challenge = code_verifier
 		elif code_challenge_method == "S256":
 			request_challenge = base64.urlsafe_b64encode(
-				hashlib.sha256(code_verifier.encode("ascii")).digest()).decode("ascii")
+				# PKCE uses Base64url Encoding **without Padding**
+				# https://datatracker.ietf.org/doc/html/rfc7636#appendix-A
+				hashlib.sha256(code_verifier.encode("ascii")).digest()).decode("ascii").rstrip("=")
 		else:
 			raise CodeChallengeFailedError("Unsupported code_challenge_method: {!r}".format(code_challenge_method))
 
 		if request_challenge != code_challenge:
+			L.warning(f"\n>>>{code_challenge_method=!r}, {code_challenge=!r}, {request_challenge=!r}")
 			raise CodeChallengeFailedError("Code Challenge does not pair with the Code Verifier.")
