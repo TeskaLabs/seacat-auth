@@ -20,3 +20,20 @@ class AuthErrorResponseCode:
 	RequestNotSupported = "request_not_supported"
 	RequestUriNotSupported = "request_uri_not_supported"
 	RegistrationNotSupported = "registration_not_supported"
+
+
+class TokenRequestErrorResponseCode:
+	# OAuth2.0 token request error response codes defined in RFC6749
+	# https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+	InvalidRequest = "invalid_request"
+	InvalidClient = "invalid_client"
+	InvalidGrant = "invalid_grant"
+	UnauthorizedClient = "unauthorized_client"
+	UnauthorizedGranttype = "unauthorized_grant_type"
+	InvalidScope = "invalid_scope"
+
+
+class InvalidGrantError(Exception):
+	def __init__(self, *args, client_id=None):
+		self.ClientId = client_id
+		super().__init__("Invalid grant.", *args)
