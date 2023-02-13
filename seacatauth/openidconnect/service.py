@@ -335,7 +335,7 @@ class OpenIdConnectService(asab.Service):
 			userinfo["anonymous"] = True
 
 		if session.TrackId is not None:
-			userinfo["trackid"] = session.TrackId
+			userinfo["track_id"] = session.TrackId
 
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet
