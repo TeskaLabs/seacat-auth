@@ -81,7 +81,6 @@ class PKCE:
 
 		https://datatracker.ietf.org/doc/html/rfc7636#section-4.6
 		"""
-		L.warning(f"\n>>>{code_challenge_method=!r}, {code_challenge=!r}, {code_verifier=!r}")
 		if cls.CodeVerifierPattern.match(code_verifier) is None:
 			raise CodeChallengeFailedError("Code Verifier does not match the required pattern (RFC7636 section 4.1).")
 
