@@ -157,7 +157,7 @@ class CookieHandler(object):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 			),
-			login_descriptor_session_builder(root_session.LoginDescriptor),
+			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
 			cookie_session_builder(),
 		]
 
