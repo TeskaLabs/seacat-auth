@@ -175,6 +175,7 @@ class CookieHandler(object):
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
+			track_id=root_session.TrackId,
 			parent_session=root_session,
 			expiration=requested_expiration,
 			session_builders=session_builders,
