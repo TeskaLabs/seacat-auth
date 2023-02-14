@@ -279,6 +279,7 @@ class OpenIdConnectService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session=root_session,
+			track_id=root_session.TrackId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
@@ -332,6 +333,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Authentication.IsAnonymous:
 			userinfo["anonymous"] = True
+
+		if session.TrackId is not None:
+			userinfo["track_id"] = session.TrackId
 
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet
