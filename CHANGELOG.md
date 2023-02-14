@@ -2,7 +2,7 @@
 
 ## Release candidate
 
-# Fix
+### Fix
 - Removed required fields from client update (#144, PLUM Sprint 230113)
 - Store client cookie domain (#147, PLUM Sprint 230113)
 - Efficient count in MongoDB credential provider (#150, PLUM Sprint 230127)
