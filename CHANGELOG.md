@@ -7,6 +7,7 @@
 - Store client cookie domain (#147, PLUM Sprint 230113)
 - Efficient count in MongoDB credential provider (#150, PLUM Sprint 230127)
 - Fix sync method in Batman module (3c68cb8, PLUM Sprint 230210)
+- Fix cookie client session flow (#155, PLUM Sprint 230210)
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
