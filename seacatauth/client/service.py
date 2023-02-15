@@ -38,6 +38,11 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
+REDIRECT_URI_VALIDATION_METHODS = [
+	"none",
+	"full_match",
+	"prefix_match",
+]
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
@@ -125,6 +130,12 @@ CLIENT_METADATA_SCHEMA = {
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
+	"redirect_uri_validation_method": {  # NON-CANONICAL
+		"type": "string",
+		"description":
+			"Method of redirect URI validation. By default, there must be a 'full' match "
+			"between the requested URI and one of the registered URIs.",
+		"enum": REDIRECT_URI_VALIDATION_METHODS},
 	"template": {  # NON-CANONICAL
 		"type": "string",
 		"description": "Client template.",
@@ -339,7 +350,9 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "template"]):
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "template",
+			"redirect_uri_validation_method",
+		]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
 				upsertor.set(k, v)
@@ -445,9 +458,23 @@ class ClientService(asab.Service):
 		if client_secret != client.get("__client_secret", ""):
 			raise exceptions.InvalidClientSecret(client["_id"])
 
-		# TODO: Implement redirect_uri_validation option ("full_match", "startswith", "none")
-		# if redirect_uri not in client["redirect_uris"]:
-		# 	raise exceptions.InvalidRedirectURI(client_id=client_id, redirect_uri=redirect_uri)
+		redirect_uri_validation_method = client.get("redirect_uri_validation_method", "full_match")
+		if redirect_uri_validation_method == "full_match":
+			# Redirect URI must exactly match one of the registered URIs
+			if redirect_uri not in client["redirect_uris"]:
+				raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
+		elif redirect_uri_validation_method == "prefix_match":
+			# Redirect URI must start with one of the registered URIs
+			for registered_uri in client["redirect_uris"]:
+				if redirect_uri.startswith(registered_uri):
+					break
+			else:
+				raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
+		elif redirect_uri_validation_method == "none":
+			# No validation
+			pass
+		else:
+			raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(redirect_uri_validation_method))
 
 		if grant_type is not None and grant_type not in client["grant_types"]:
 			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
