@@ -39,9 +39,9 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	# "private_key_jwt"
 ]
 REDIRECT_URI_VALIDATION_METHODS = [
-	"none",
 	"full_match",
 	"prefix_match",
+	"none",
 ]
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
@@ -133,8 +133,9 @@ CLIENT_METADATA_SCHEMA = {
 	"redirect_uri_validation_method": {  # NON-CANONICAL
 		"type": "string",
 		"description":
-			"Method of redirect URI validation. By default, there must be a 'full' match "
-			"between the requested URI and one of the registered URIs.",
+			"Specifies the method how the redirect URI used in authorization requests is validated. "
+			"The default value is 'full_match', in which the requested redirect URI must fully match "
+			"one of the registered URIs.",
 		"enum": REDIRECT_URI_VALIDATION_METHODS},
 	"template": {  # NON-CANONICAL
 		"type": "string",
@@ -348,10 +349,13 @@ class ClientService(asab.Service):
 			self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
 			upsertor.set("code_challenge_methods", code_challenge_methods)
 
+		redirect_uri_validation_method = kwargs.get("redirect_uri_validation_method", "full_match")
+		assert redirect_uri_validation_method in REDIRECT_URI_VALIDATION_METHODS
+		upsertor.set("redirect_uri_validation_method", redirect_uri_validation_method)
+
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "template",
-			"redirect_uri_validation_method",
 		]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
@@ -508,7 +512,7 @@ class ClientService(asab.Service):
 
 	def _check_redirect_uris(self, redirect_uris: list, application_type: str, client_uri: str = None):
 		"""
-		Validate client redirect URIs
+		Check if the redirect URIs can be registered for the given application type
 
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 		"""
