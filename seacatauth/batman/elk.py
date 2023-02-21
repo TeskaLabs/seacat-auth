@@ -173,12 +173,6 @@ class ELKIntegration(asab.config.Configurable):
 				for resource in user_resources.intersection(elk_resources)
 			)
 
-		# ELK roles from tenants
-		for tenant in authz:
-			if tenant == "*":
-				continue
-			elk_roles.add("tenant_{}".format(tenant))
-
 		json["roles"] = list(elk_roles)
 
 		try:
