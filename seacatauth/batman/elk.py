@@ -152,9 +152,7 @@ class ELKIntegration(asab.config.Configurable):
 		if v is not None:
 			json['full_name'] = v
 
-		elk_roles = set(
-			self.ELKSeacatFlagRole,  # Add a role that marks users managed by Seacat Auth
-		)
+		elk_roles = {self.ELKSeacatFlagRole}  # Add a role that marks users managed by Seacat Auth
 
 		# Get authz dict
 		authz = await build_credentials_authz(self.TenantService, self.RoleService, cred["_id"])
