@@ -34,8 +34,6 @@ class ELKIntegration(asab.config.Configurable):
 		# to avoid interfering with kibana system users
 		'local_users': 'elastic kibana logstash_system beats_system remote_monitoring_user',
 
-		'mapped_roles_prefixes': '*/elk:',  # Prefix of roles that will be transfered to Kibana
-
 		# Resources with this prefix will be mapped to Kibana users as roles
 		# E.g.: Resource "elk:kibana-analyst" will be mapped to role "kibana-analyst"
 		"resource_prefix": "elk:",
@@ -63,10 +61,6 @@ class ELKIntegration(asab.config.Configurable):
 			re.escape(self.Config.get("resource_prefix"))
 		))
 		self.ELKSeacatFlagRole = self.Config.get("managed_role")
-
-		# TODO: Obsolete, back compat only. Use resources instead of roles.
-		#
-		self.RolePrefixes = re.split(r"\s+", self.Config.get("mapped_roles_prefixes"))
 
 		lu = re.split(r'\s+', self.Config.get('local_users'), flags=re.MULTILINE)
 		lu.append(username)
