@@ -29,6 +29,9 @@ class ELKIntegration(asab.config.Configurable):
 		'username': 'elastic',
 		'password': 'elastic',
 
+		# List of elasticsearch system users
+		# If Seacat Auth has users with one of these usernames, it will not sync them
+		# to avoid interfering with kibana system users
 		'local_users': 'elastic kibana logstash_system beats_system remote_monitoring_user',
 
 		'mapped_roles_prefixes': '*/elk:',  # Prefix of roles that will be transfered to Kibana
