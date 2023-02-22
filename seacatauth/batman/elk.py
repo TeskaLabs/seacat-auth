@@ -136,7 +136,7 @@ class ELKIntegration(asab.config.Configurable):
 			"enabled": cred.get("suspended", False) is not True,
 
 			# Generate technical password
-			"password": self.BatmanService.generate_password(cred['_id']),
+			"password": self.BatmanService.generate_password(cred["_id"]),
 
 			"metadata": {
 				# We are managed by SeaCat Auth
