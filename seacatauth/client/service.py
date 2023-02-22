@@ -15,9 +15,8 @@ L = logging.getLogger(__name__)
 
 #
 
-# TODO: Implement support for remaining metadata
-# TODO: Implement support for other response and grant types and stuff
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+# TODO: Supported OAuth/OIDC param values should be managed by the OpenIdConnect module, not Client.
 GRANT_TYPES = [
 	"authorization_code",
 	# "implicit",
@@ -53,7 +52,7 @@ CLIENT_METADATA_SCHEMA = {
 		"description": "URL of the home page of the Client."},
 	"cookie_domain": {
 		"type": "string",
-		"pattern": "^[a-z0-9\\.-]{1,61}\\.[a-z]{2,}$",
+		"pattern": "^[a-z0-9\\.-]{1,61}\\.[a-z]{2,}$|^$",
 		"description":
 			"Domain of the client cookie. Defaults to the application's global cookie domain."},
 	"redirect_uris": {
@@ -114,6 +113,22 @@ CLIENT_METADATA_SCHEMA = {
 	# "default_acr_values": {},
 	# "initiate_login_uri": {},
 	# "request_uris": {},
+	"code_challenge_methods": {
+		"type": "array",
+		"description":
+			"JSON array containing a list of the PKCE Code Challenge Methods "
+			"that the Client is declaring that it will restrict itself to using. "
+			"If omitted, the client is not expected to use PKCE.",
+		"items": {
+			"type": "string",
+			"enum": ["plain", "S256"]}},
+	"login_uri": {  # NON-CANONICAL
+		"type": "string",
+		"description": "URL of preferred login page."},
+	"template": {  # NON-CANONICAL
+		"type": "string",
+		"description": "Client template.",
+	}
 }
 
 REGISTER_CLIENT_SCHEMA = {
@@ -167,6 +182,7 @@ class ClientService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.ClientService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.OIDCService = None
 		self.ClientSecretExpiration = asab.Config.getseconds(
 			"seacatauth:client", "client_secret_expiration", fallback=None)
 		if self.ClientSecretExpiration <= 0:
@@ -187,6 +203,10 @@ class ClientService(asab.Service):
 
 		if not self._AllowCustomClientID:
 			CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
+
+
+	async def initialize(self, app):
+		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
 
 
 	def build_filter(self, match_string):
@@ -235,14 +255,6 @@ class ClientService(asab.Service):
 	async def register(
 		self, *,
 		redirect_uris: list,
-		response_types: list = frozenset(["code"]),
-		grant_types: list = frozenset(["authorization_code"]),
-		application_type: str = "web",
-		client_name: str = None,
-		client_uri: str = None,
-		token_endpoint_auth_method: str = "client_secret_basic",
-		logout_uri: str = None,
-		custom_data: dict = None,
 		_custom_client_id: str = None,
 		**kwargs
 	):
@@ -252,33 +264,22 @@ class ClientService(asab.Service):
 
 		:param redirect_uris: Array of Redirection URI values used by the Client.
 		:type redirect_uris: list
-		:param response_types: Array containing the OAuth 2.0 response_type values that the Client is declaring
-			that it will restrict itself to using.
-		:type response_types: list
-		:param grant_types: Array containing the OAuth 2.0 Grant Types that the Client is declaring that it will
-			restrict itself to using.
-		:type grant_types: list
-		:param application_type: Kind of the application. The defined values are "native" or "web".
-		:type application_type: str
-		:param client_name: Name of the Client to be presented to the End-User.
-		:type client_name: str
-		:param client_uri: URL of the home page of the Client.
-		:type client_uri: str
-		:param token_endpoint_auth_method: Requested Client Authentication method for the Token Endpoint.
-		:type token_endpoint_auth_method: str
-		:param logout_uri: NON-CANONICAL. URI that will be called on session logout.
-		:type logout_uri: str
-		:param custom_data: NON-CANONICAL. Additional client data.
-		:type custom_data: str
 		:param _custom_client_id: NON-CANONICAL. Request a specific ID for the client.
 		:type _custom_client_id: str
-		:return: Response containing the issued client_id and client_secret.
+		:return: Dict containing the issued client_id and client_secret.
 		"""
+		response_types = kwargs.get("response_types", frozenset(["code"]))
 		for v in response_types:
 			assert v in RESPONSE_TYPES
+
+		grant_types = kwargs.get("grant_types", frozenset(["authorization_code"]))
 		for v in grant_types:
 			assert v in GRANT_TYPES
+
+		application_type = kwargs.get("application_type", "web")
 		assert application_type in APPLICATION_TYPES
+
+		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
 		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 
 		if _custom_client_id is not None:
@@ -321,7 +322,7 @@ class ClientService(asab.Service):
 
 		upsertor.set("token_endpoint_auth_method", token_endpoint_auth_method)
 
-		self._check_redirect_uris(redirect_uris, application_type, client_uri)
+		self._check_redirect_uris(redirect_uris, application_type)
 		upsertor.set("redirect_uris", list(redirect_uris))
 
 		self._check_grant_types(grant_types, response_types)
@@ -330,19 +331,18 @@ class ClientService(asab.Service):
 
 		upsertor.set("application_type", application_type)
 
+		# Register allowed PKCE Code Challenge Methods
+		code_challenge_methods = kwargs.get("code_challenge_methods")
+		if code_challenge_methods is not None:
+			self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
+			upsertor.set("code_challenge_methods", code_challenge_methods)
+
 		# Optional client metadata
-
-		if client_name is not None:
-			upsertor.set("client_name", client_name)
-
-		if client_uri is not None:
-			upsertor.set("client_uri", client_uri)
-
-		if logout_uri is not None:
-			upsertor.set("logout_uri", logout_uri)
-
-		if custom_data is not None:
-			upsertor.set("custom_data", custom_data)
+		for k in frozenset([
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "template"]):
+			v = kwargs.get(k)
+			if v is not None and len(v) > 0:
+				upsertor.set(k, v)
 
 		try:
 			await upsertor.execute()
@@ -404,8 +404,15 @@ class ClientService(asab.Service):
 
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
+		# Register allowed PKCE Code Challenge Methods
+		if "code_challenge_methods" in kwargs:
+			self.OIDCService.PKCE.validate_code_challenge_methods_registration(kwargs["code_challenge_methods"])
+
 		for k, v in client_update.items():
-			upsertor.set(k, v)
+			if v is None or len(v) == 0:
+				upsertor.unset(k)
+			else:
+				upsertor.set(k, v)
 
 		await upsertor.execute()
 		L.log(asab.LOG_NOTICE, "Client updated", struct_data={
@@ -420,36 +427,33 @@ class ClientService(asab.Service):
 
 	async def authorize_client(
 		self,
-		client_id: str,
+		client: dict,
 		scope: list,
 		redirect_uri: str,
 		client_secret: str = None,
 		grant_type: str = None,
 		response_type: str = None,
 	):
-		try:
-			registered_client = await self.get(client_id)
-		except KeyError:
-			raise exceptions.ClientNotFoundError(client_id=client_id)
-
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
 			client_secret = ""
-		# TODO: Find a way to allow dynamic redirect URIs for some clients
-		#   (possibly only for cookie clients)
-		# if redirect_uri not in registered_client["redirect_uris"]:
+		if "client_secret_expires_at" in client \
+			and client["client_secret_expires_at"] != 0 \
+			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.InvalidClientSecret(client["_id"])
+		if client_secret != client.get("__client_secret", ""):
+			raise exceptions.InvalidClientSecret(client["_id"])
+
+		# TODO: Implement redirect_uri_validation option ("full_match", "startswith", "none")
+		# if redirect_uri not in client["redirect_uris"]:
 		# 	raise exceptions.InvalidRedirectURI(client_id=client_id, redirect_uri=redirect_uri)
-		if grant_type is not None and grant_type not in registered_client["grant_types"]:
-			raise exceptions.ClientError(client_id=client_id, grant_type=grant_type)
-		if response_type not in registered_client["response_types"]:
-			raise exceptions.ClientError(client_id=client_id, response_type=response_type)
-		if "client_secret_expires_at" in registered_client \
-			and registered_client["client_secret_expires_at"] != 0 \
-			and registered_client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.InvalidClientSecret(client_id)
-		if client_secret != registered_client.get("__client_secret", ""):
-			raise exceptions.InvalidClientSecret(client_id)
+
+		if grant_type is not None and grant_type not in client["grant_types"]:
+			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
+
+		if response_type not in client["response_types"]:
+			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
 
 		return True
 
