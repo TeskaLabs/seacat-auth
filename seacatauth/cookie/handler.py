@@ -157,7 +157,7 @@ class CookieHandler(object):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 			),
-			login_descriptor_session_builder(root_session.LoginDescriptor),
+			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
 			cookie_session_builder(),
 		]
 
@@ -175,6 +175,7 @@ class CookieHandler(object):
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
+			track_id=root_session.TrackId,
 			parent_session=root_session,
 			expiration=requested_expiration,
 			session_builders=session_builders,

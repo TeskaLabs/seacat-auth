@@ -226,6 +226,7 @@ class CookieService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="cookie",
 			parent_session=root_session,
+			track_id=root_session.TrackId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)

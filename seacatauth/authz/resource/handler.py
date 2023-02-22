@@ -3,7 +3,6 @@ import re
 
 import asab
 import asab.web.rest
-import asab.exceptions
 
 from seacatauth.decorators import access_control
 

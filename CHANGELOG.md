@@ -2,8 +2,17 @@
 
 ## Release candidate
 
-# Fix
+### Fix
 - Removed required fields from client update (#144, PLUM Sprint 230113)
+- Store client cookie domain (#147, PLUM Sprint 230113)
+- Efficient count in MongoDB credential provider (#150, PLUM Sprint 230127)
+- Fix sync method in Batman module (3c68cb8, PLUM Sprint 230210)
+- Fix cookie client session flow (#155, PLUM Sprint 230210)
+
+### Features
+- Allow unsetting some client features (#148, PLUM Sprint 230113)
+- OAuth 2.0 PKCE challenge (RFC7636) (#152, PLUM Sprint 230127)
+- Session tracking ID introduced (#135, PLUM Sprint 230210)
 
 ### Features
 - Assign roles and tenants to multiple credentials at once (#146, PLUM Sprint 230113)
@@ -14,7 +23,7 @@
 ---
 
 
-## v23.3
+## v23.03
 
 ### Breaking changes
 - Authorize endpoint no longer authorizes unregistered clients (#137, PLUM Sprint 230113)

@@ -2,7 +2,7 @@ import logging
 import re
 
 import asab.storage.exceptions
-import asab.exceptions
+import asab
 
 #
 
