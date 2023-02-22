@@ -25,14 +25,14 @@ class ELKIntegration(asab.config.Configurable):
 	"""
 
 	ConfigDefaults = {
-		'url': 'http://localhost:9200/',
-		'username': 'elastic',
-		'password': 'elastic',
+		"url": "http://localhost:9200/",
+		"username": "elastic",
+		"password": "elastic",
 
 		# List of elasticsearch system users
 		# If Seacat Auth has users with one of these usernames, it will not sync them
 		# to avoid interfering with kibana system users
-		'local_users': 'elastic kibana logstash_system beats_system remote_monitoring_user',
+		"local_users": "elastic kibana logstash_system beats_system remote_monitoring_user",
 
 		# Resources with this prefix will be mapped to Kibana users as roles
 		# E.g.: Resource "elk:kibana-analyst" will be mapped to role "kibana-analyst"
@@ -52,18 +52,18 @@ class ELKIntegration(asab.config.Configurable):
 		self.RoleService = self.BatmanService.App.get_service("seacatauth.RoleService")
 		self.ResourceService = self.BatmanService.App.get_service("seacatauth.ResourceService")
 
-		username = self.Config.get('username')
-		password = self.Config.get('password')
+		username = self.Config.get("username")
+		password = self.Config.get("password")
 		self.BasicAuth = aiohttp.BasicAuth(username, password)
 
-		self.URL = self.Config.get('url').rstrip('/')
+		self.URL = self.Config.get("url").rstrip("/")
 		self.ResourcePrefix = self.Config.get("resource_prefix")
 		self.ELKResourceRegex = re.compile("^{}".format(
 			re.escape(self.Config.get("resource_prefix"))
 		))
 		self.ELKSeacatFlagRole = self.Config.get("seacat_user_flag")
 
-		lu = re.split(r'\s+', self.Config.get('local_users'), flags=re.MULTILINE)
+		lu = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
 		lu.append(username)
 
 		self.LocalUsers = frozenset(lu)
@@ -108,7 +108,7 @@ class ELKIntegration(asab.config.Configurable):
 			if resource_id not in existing_elk_resources:
 				await self.ResourceService.create(
 					resource_id,
-					description="Grants access to ELK role '{}.".format(role)
+					description="Grants access to ELK role {!r}.".format(role)
 				)
 
 	async def sync_all(self):
@@ -122,7 +122,7 @@ class ELKIntegration(asab.config.Configurable):
 
 
 	async def sync(self, cred: dict, elk_resources: typing.Iterable):
-		username = cred.get('username')
+		username = cred.get("username")
 		if username is None:
 			# Be defensive
 			L.info("Cannot create user: No username", struct_data={"cid": cred["_id"]})
@@ -133,25 +133,25 @@ class ELKIntegration(asab.config.Configurable):
 			return
 
 		json = {
-			'enabled': cred.get('suspended', False) is not True,
+			"enabled": cred.get("suspended", False) is not True,
 
 			# Generate technical password
-			'password': self.BatmanService.generate_password(cred['_id']),
+			"password": self.BatmanService.generate_password(cred['_id']),
 
-			'metadata': {
+			"metadata": {
 				# We are managed by SeaCat Auth
-				'seacatauth': True
+				"seacatauth": True
 			},
 
 		}
 
-		v = cred.get('email')
+		v = cred.get("email")
 		if v is not None:
-			json['email'] = v
+			json["email"] = v
 
-		v = cred.get('full_name')
+		v = cred.get("full_name")
 		if v is not None:
-			json['full_name'] = v
+			json["full_name"] = v
 
 		elk_roles = {self.ELKSeacatFlagRole}  # Add a role that marks users managed by Seacat Auth
 
@@ -176,7 +176,7 @@ class ELKIntegration(asab.config.Configurable):
 
 		try:
 			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
-				async with session.post('{}/_xpack/security/user/{}'.format(self.URL, username), json=json) as resp:
+				async with session.post("{}/_xpack/security/user/{}".format(self.URL, username), json=json) as resp:
 					if resp.status == 200:
 						# Everything is alright here
 						pass
