@@ -38,8 +38,9 @@ class ELKIntegration(asab.config.Configurable):
 		# E.g.: Resource "elk:kibana-analyst" will be mapped to role "kibana-analyst"
 		"resource_prefix": "elk:",
 
-		'managed_role': 'seacat_managed',  # 'flags' users in ElasticSearch/Kibana that is managed by us,
+		# This role 'flags' users in ElasticSearch/Kibana that is managed by Seacat Auth
 		# There should be a role created in the ElasticSearch that grants no rights
+		"seacat_user_flag": "seacat_managed",
 	}
 
 
@@ -60,7 +61,7 @@ class ELKIntegration(asab.config.Configurable):
 		self.ELKResourceRegex = re.compile("^{}".format(
 			re.escape(self.Config.get("resource_prefix"))
 		))
-		self.ELKSeacatFlagRole = self.Config.get("managed_role")
+		self.ELKSeacatFlagRole = self.Config.get("seacat_user_flag")
 
 		lu = re.split(r'\s+', self.Config.get('local_users'), flags=re.MULTILINE)
 		lu.append(username)
