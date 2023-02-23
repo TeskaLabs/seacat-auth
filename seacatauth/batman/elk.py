@@ -79,6 +79,7 @@ class ELKIntegration(asab.config.Configurable):
 		await self.sync_all()
 
 	async def _initialize_resources(self):
+		# TODO: Remove resource if its respective kibana role has been removed
 		"""
 		Fetches roles from ELK and creates a Seacat Auth resource for each one of them.
 		"""
