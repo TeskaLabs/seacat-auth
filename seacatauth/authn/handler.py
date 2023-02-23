@@ -59,6 +59,7 @@ class AuthenticationHandler(object):
 		# Get arguments specified in login URL query
 		expiration = None
 		login_preferences = None
+		login_key = None
 		query_string = key.get("qs")
 		if query_string is not None:
 			query_dict = urllib.parse.parse_qs(query_string)
@@ -71,12 +72,22 @@ class AuthenticationHandler(object):
 				except Exception as e:
 					L.warning("Error when parsing expiration: {}".format(e))
 
+			# Get requested session expiration
+			client_id = query_dict.get("client_id")
+			if client_id is not None:
+				client_service = self.AuthenticationService.App.get_service("seacatauth.ClientService")
+				try:
+					client = await client_service.get(client_id)
+					login_key = client.get("login_key")
+				except KeyError:
+					login_key = None
+
 			# Get preferred login descriptor IDs
 			login_preferences = query_dict.get("ldid")
 
 		# Locate credentials
 		# TODO: Consider getting the `key` from dedicated request header
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=key)
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=login_key)
 		if credentials_id is None or credentials_id == []:
 			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session
