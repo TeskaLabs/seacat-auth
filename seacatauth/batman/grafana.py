@@ -99,7 +99,7 @@ class GrafanaIntegration(asab.config.Configurable):
 			return
 
 		# Get authz dict
-		authz = await build_credentials_authz(cred["_id"], self.TenantService, self.RoleService)
+		authz = await build_credentials_authz(self.TenantService, self.RoleService, cred["_id"])
 
 		# Grafana roles from SCA resources
 		# Use only global "*" roles for now

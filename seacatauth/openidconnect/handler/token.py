@@ -13,7 +13,9 @@ import jwcrypto.jws
 import jwcrypto.jwt
 import json
 
-from seacatauth.session import SessionAdapter
+from ...session import SessionAdapter
+from ..utils import TokenRequestErrorResponseCode
+from ..pkce import CodeChallengeFailedError
 
 #
 
@@ -73,10 +75,11 @@ class TokenHandler(object):
 		"""
 
 		# Ensure the Authorization Code was issued to the authenticated Client
-		authorization_code = qs_data.get('code', '')
+		authorization_code = qs_data.get("code", "")
 		if len(authorization_code) == 0:
 			L.warning("Authorization Code not provided")
-			return aiohttp.web.HTTPBadRequest()
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
 		# Translate authorization code into session id
 		# Verify that the Authorization Code has not been previously used (using `pop` operation)
@@ -84,22 +87,35 @@ class TokenHandler(object):
 			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
 		except KeyError:
 			L.warning("Authorization code not found", struct_data={"code": authorization_code})
-			return aiohttp.web.HTTPBadRequest()
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
 		# Locate the session using session id
 		try:
 			session = await self.SessionService.get(session_id)
 		except KeyError:
 			L.error("Session not found", struct_data={"sid": session_id})
-			return aiohttp.web.HTTPBadRequest()
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
-		if session is None:
-			L.warning("Authorization Code not valid")
-			return aiohttp.web.HTTPBadRequest()
+		if session.OAuth2.PKCE is not None:
+			try:
+				self.OpenIdConnectService.PKCE.evaluate_code_challenge(
+					session.OAuth2.PKCE["method"],
+					session.OAuth2.PKCE["challenge"],
+					qs_data.get("code_verifier"))
+			except CodeChallengeFailedError as e:
+				L.log(asab.LOG_NOTICE, "Code challenge failed.", struct_data={"reason": str(e)})
+				return asab.web.rest.json_response(
+					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+			except Exception as e:
+				L.error("Code challenge error: {}".format(e), exc_info=True)
+				return asab.web.rest.json_response(
+					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
-		# Check if the redirect URL is the same as the one in the authorization request
-		# if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
-		# 	return await self.token_error_response(request, "The redirect URL is not associated with the client.")
+		# TODO: Check if the redirect URL is the same as the one in the authorization request:
+		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
+		# 	  return await self.token_error_response(request, "The redirect URL is not associated with the client.")
 
 		headers = {
 			'Cache-Control': 'no-store',
