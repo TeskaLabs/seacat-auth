@@ -9,6 +9,7 @@
 - Fix sync method in Batman module (3c68cb8, PLUM Sprint 230210)
 - Fix cookie client session flow (#155, PLUM Sprint 230210)
 - Renaming resources without description (#158, PLUM Sprint 230210)
+- Batman does not add nonexistent roles to Kibana users (#159, PLUM Sprint 230210)
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
