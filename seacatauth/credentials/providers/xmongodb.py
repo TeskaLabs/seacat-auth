@@ -86,7 +86,10 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 
 
 	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> Optional[str]:
-		query = self._prepare_query(self.LocateQuery, dict(key))
+		kwargs = {"ident": ident}
+		if key is not None:
+			kwargs.update(key)
+		query = self._prepare_query(self.LocateQuery, kwargs)
 		cursor = self.Collection.aggregate(query)
 		result = None
 		async for obj in cursor:

@@ -80,7 +80,7 @@ class AuthenticationHandler(object):
 			# Get login key by client ID
 			client_id = query_dict.get("client_id")
 			if client_id is not None:
-				login_key = await self._get_client_login_key(client_id)
+				login_key = await self._get_client_login_key(client_id[0])
 
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=login_key)
