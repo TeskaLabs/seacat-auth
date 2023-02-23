@@ -1,6 +1,6 @@
 import random
 import logging
-
+import urllib.parse
 import aiohttp.web
 import asab
 
@@ -135,6 +135,34 @@ async def nginx_introspection(
 
 	response = aiohttp.web.HTTPOk(headers=headers)
 	return response
+
+
+def parse_url(url: str):
+	"""
+	Parses the URL into a dictionary
+	"""
+	return urllib.parse.urlparse(url)._asdict()
+
+
+def unparse_url(
+	scheme: str = "",
+	netloc: str = "",
+	path: str = "",
+	params: str = "",
+	query: str = "",
+	fragment: str = ""
+):
+	"""
+	Builds URL from individual components
+
+	Example usage:
+	```python
+	parsed = parse_url("http://local.test?option=true")
+	parsed["path"] = "/some/subpath"
+	url = unparse_url(**parsed)
+	```
+	"""
+	return urllib.parse.urlunparse((scheme, netloc, path, params, query, fragment))
 
 
 def generate_ergonomic_token(length: int):
