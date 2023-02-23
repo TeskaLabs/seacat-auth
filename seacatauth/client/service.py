@@ -125,6 +125,9 @@ CLIENT_METADATA_SCHEMA = {
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
+	"login_data": {  # NON-CANONICAL
+		"type": "object",
+		"description": "Additional data used for locating the credentials for login."},
 	"template": {  # NON-CANONICAL
 		"type": "string",
 		"description": "Client template.",
@@ -339,7 +342,8 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "template"]):
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_data",
+			"template"]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
 				upsertor.set(k, v)
