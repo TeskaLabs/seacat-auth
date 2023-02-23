@@ -25,6 +25,7 @@ from ..session import (
 from .session import oauth2_session_builder
 from ..audit import AuditCode
 from .. import exceptions
+from . import pkce
 
 #
 
@@ -52,6 +53,7 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
 		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
@@ -237,7 +239,13 @@ class OpenIdConnectService(asab.Service):
 		raise aiohttp.web.HTTPNotImplemented()
 
 
-	async def create_oidc_session(self, root_session, client_id, scope, tenants=None, requested_expiration=None):
+	async def create_oidc_session(
+		self, root_session, client_id, scope,
+		tenants=None,
+		requested_expiration=None,
+		code_challenge: str = None,
+		code_challenge_method: str = None
+	):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
@@ -249,6 +257,11 @@ class OpenIdConnectService(asab.Service):
 				tenants=tenants,
 			)
 		]
+
+		if code_challenge is not None:
+			session_builders.append((
+				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
+			))
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			authn_service = self.App.get_service("seacatauth.AuthenticationService")
@@ -266,6 +279,7 @@ class OpenIdConnectService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session=root_session,
+			track_id=root_session.TrackId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
@@ -319,6 +333,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Authentication.IsAnonymous:
 			userinfo["anonymous"] = True
+
+		if session.TrackId is not None:
+			userinfo["track_id"] = session.TrackId
 
 		if session.Authentication.TOTPSet is not None:
 			userinfo["totp_set"] = session.Authentication.TOTPSet

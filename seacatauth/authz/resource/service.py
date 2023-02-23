@@ -2,7 +2,7 @@ import logging
 import re
 
 import asab.storage.exceptions
-import asab.exceptions
+import asab
 
 #
 
@@ -207,7 +207,7 @@ class ResourceService(asab.Service):
 		role_svc = self.App.get_service("seacatauth.RoleService")
 
 		resource = await self.get(resource_id)
-		await self.create(new_resource_id, resource["description"])
+		await self.create(new_resource_id, resource.get("description"))
 
 		roles = await role_svc.list(resource=resource_id)
 		if roles["count"] > 0:

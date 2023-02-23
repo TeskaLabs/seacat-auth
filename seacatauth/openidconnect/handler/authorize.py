@@ -8,9 +8,10 @@ import asab
 
 from ...audit import AuditCode
 from ...cookie.utils import delete_cookie, set_cookie
-from ...client import exceptions as client_exceptions
+from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
+from ..pkce import InvalidCodeChallengeMethodError
 
 #
 
@@ -121,19 +122,22 @@ class AuthorizeHandler(object):
 				client_secret=request_parameters.get("client_secret"),
 				state=request_parameters.get("state"),
 				prompt=request_parameters.get("prompt"),
+				code_challenge=request_parameters.get("code_challenge"),
+				code_challenge_method=request_parameters.get("code_challenge_method"),
 				login_parameters=login_parameters
 			)
 
-		L.warning("Unknown response type: {}".format(response_type))
+		message = "Unsupported response type: {}".format(response_type)
+		L.warning(message)
 		await self.audit_authorize_error(
 			request_parameters["client_id"],
-			"invalid_response_type",
+			AuthErrorResponseCode.UnsupportedResponseType,
 			response_type=response_type
 		)
 		return self.reply_with_authentication_error(
 			request_parameters,
-			AuthErrorResponseCode.InvalidRequest,
-			"Invalid response_type: {}".format(response_type),
+			AuthErrorResponseCode.UnsupportedResponseType,
+			message,
 		)
 
 
@@ -146,6 +150,8 @@ class AuthorizeHandler(object):
 		client_secret: str = None,
 		state: str = None,
 		prompt: str = None,
+		code_challenge: str = None,
+		code_challenge_method: str = None,
 		login_parameters: dict = None,
 	):
 		"""
@@ -153,17 +159,10 @@ class AuthorizeHandler(object):
 
 		Authentication Code Flow
 		"""
-
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			await self.OpenIdConnectService.ClientService.authorize_client(
-				client_id=client_id,
-				client_secret=client_secret,
-				redirect_uri=redirect_uri,
-				scope=scope,
-				response_type="code"
-			)
-		except client_exceptions.ClientNotFoundError:
+			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+		except KeyError:
 			L.error("Client ID not found", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.InvalidRequest,
@@ -171,7 +170,15 @@ class AuthorizeHandler(object):
 				error_description="Invalid client_id",
 				state=state
 			)
-		except client_exceptions.InvalidClientSecret:
+		try:
+			await self.OpenIdConnectService.ClientService.authorize_client(
+				client=client_dict,
+				client_secret=client_secret,
+				redirect_uri=redirect_uri,
+				scope=scope,
+				response_type="code",
+			)
+		except client.exceptions.InvalidClientSecret:
 			L.error("Invalid client secret", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.UnauthorizedClient,
@@ -180,7 +187,7 @@ class AuthorizeHandler(object):
 				state=state
 			)
 		# TODO: Check for invalid redirect URI
-		except client_exceptions.ClientError as e:
+		except client.exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			await self.audit_authorize_error(
 				client_id, "client_error",
@@ -192,6 +199,25 @@ class AuthorizeHandler(object):
 				error_description="Client error.",
 				state=state
 			)
+
+		if code_challenge is not None:
+			if code_challenge_method is None:
+				code_challenge_method = self.OpenIdConnectService.PKCE.DefaultCodeChallengeMethod
+			try:
+				self.OpenIdConnectService.PKCE.validate_code_challenge_method(client_dict, code_challenge_method)
+			except InvalidCodeChallengeMethodError:
+				L.error("Invalid code challenge method.", struct_data={
+					"client_id": client_id, "method": code_challenge_method})
+				await self.audit_authorize_error(
+					client_id, "client_error",
+					redirect_uri=redirect_uri,
+				)
+				return self.reply_with_authentication_error(
+					AuthErrorResponseCode.InvalidRequest,
+					redirect_uri=redirect_uri,
+					error_description="Client error.",
+					state=state
+				)
 
 		# OpenID Connect requests MUST contain the openid scope value.
 		# Otherwise, the request is not considered OpenID and its behavior is unspecified
@@ -215,7 +241,7 @@ class AuthorizeHandler(object):
 			if root_session.Session.Type != "root":
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
-			if root_session.Authentication.IsAnonymous:
+			elif root_session.Authentication.IsAnonymous:
 				L.warning("Cannot authorize with anonymous session", struct_data={"sid": root_session.Id})
 				root_session = None
 
@@ -282,6 +308,8 @@ class AuthorizeHandler(object):
 				client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
+				code_challenge=code_challenge,
+				code_challenge_method=code_challenge_method,
 				login_parameters=login_parameters)
 
 		# We are authenticated!
@@ -295,9 +323,6 @@ class AuthorizeHandler(object):
 				redirect_uri,
 				state=state,
 			)
-
-
-		# TODO: Authorize the access to a given resource (specified by redirect_uri and scope )
 
 		# TODO: replace with ABAC
 		#  (the policies can use oidc client-id and scope)
@@ -331,7 +356,9 @@ class AuthorizeHandler(object):
 				root_session, client_id, scope, tenants, requested_expiration)
 		else:
 			session = await self.OpenIdConnectService.create_oidc_session(
-				root_session, client_id, scope, tenants, requested_expiration)
+				root_session, client_id, scope, tenants, requested_expiration,
+				code_challenge=code_challenge,
+				code_challenge_method=code_challenge_method)
 
 		await self.audit_authorize_success(session)
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
@@ -416,6 +443,8 @@ class AuthorizeHandler(object):
 	async def reply_with_redirect_to_login(
 		self, response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
+		code_challenge: str = None,
+		code_challenge_method: str = None,
 		login_parameters: dict = None
 	):
 		"""
@@ -437,6 +466,10 @@ class AuthorizeHandler(object):
 		]
 		if state is not None:
 			authorize_query_params.append(("state", state))
+		if code_challenge is not None:
+			authorize_query_params.append(("code_challenge", code_challenge))
+		if code_challenge_method is not None:
+			authorize_query_params.append(("code_challenge_method", code_challenge_method))
 
 		# Build the redirect URI back to this endpoint and add it to login params
 		authorize_redirect_uri = "{}{}?{}".format(

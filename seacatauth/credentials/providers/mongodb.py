@@ -263,9 +263,12 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			return {'$expr': {'$gt': [{'$indexOfCP': [{'$toLower': '$username'}, filtr.lower()]}, -1]}}
 
 
-	async def count(self, filtr=None) -> int:
+	async def count(self, filtr: str = None) -> int:
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
-		return await coll.count_documents(filter=self.build_filter(filtr))
+		if (filtr is None):
+			return await coll.estimated_document_count()
+		else:
+			return await coll.count_documents(filter=self.build_filter(filtr))
 
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
