@@ -127,7 +127,13 @@ CLIENT_METADATA_SCHEMA = {
 		"description": "URL of preferred login page."},
 	"login_key": {  # NON-CANONICAL
 		"type": "object",
-		"description": "Additional data used for locating the credentials at login."},
+		"description": "Additional data used for locating the credentials at login.",
+		"patternProperties": {
+			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
+				{"type": "string"},
+				{"type": "number"},
+				{"type": "boolean"},
+				{"type": "null"}]}}},
 	"template": {  # NON-CANONICAL
 		"type": "string",
 		"description": "Client template.",
