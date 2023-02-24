@@ -480,6 +480,7 @@ class AuthorizeHandler(object):
 		)
 
 		login_query_params.append(("redirect_uri", authorize_redirect_uri))
+		login_query_params.append(("client_id", client_id))
 
 		login_url = await self._build_login_uri(client_id, login_query_params)
 		response = aiohttp.web.HTTPNotFound(
