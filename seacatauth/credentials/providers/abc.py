@@ -41,7 +41,7 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		}
 
 
-	async def locate(self, ident: str, ident_fields: dict = None) -> str:
+	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> str:
 		'''
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
 		Return credentials_id or return None if not found.

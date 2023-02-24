@@ -15,6 +15,8 @@
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
 - OAuth 2.0 PKCE challenge (RFC7636) (#152, PLUM Sprint 230127)
 - Session tracking ID introduced (#135, PLUM Sprint 230210)
+- Clients can register a custom login_uri and login_key (#151, PLUM Sprint 230210)
+- Authorize request adds client_id to login URL query (#151, PLUM Sprint 230210)
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)

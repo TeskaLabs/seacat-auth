@@ -57,7 +57,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install bson
         pip install pymongo
-        pip install git+https://github.com/TeskaLabs/asab#egg=asab[storage_encryption]
+        pip install git+https://github.com/TeskaLabs/asab#egg=asab[encryption]
     
     - name: Test with unittest
       run: |
