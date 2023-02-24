@@ -145,6 +145,7 @@ def parse_url(url: str):
 
 
 def unparse_url(
+	*,
 	scheme: str = "",
 	netloc: str = "",
 	path: str = "",
