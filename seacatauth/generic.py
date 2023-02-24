@@ -137,14 +137,16 @@ async def nginx_introspection(
 	return response
 
 
-def parse_url(url: str):
+def urlparse(url: str):
 	"""
-	Parse the URL into a dictionary
+	Parse the URL into a dictionary.
+
+	Convenience wrapper around urllib.parse.urlparse().
 	"""
 	return urllib.parse.urlparse(url)._asdict()
 
 
-def unparse_url(
+def urlunparse(
 	*,
 	scheme: str = "",
 	netloc: str = "",
@@ -154,7 +156,9 @@ def unparse_url(
 	fragment: str = ""
 ):
 	"""
-	Build URL from individual components
+	Build URL from individual components.
+
+	Convenience wrapper around urllib.parse.urlunparse().
 
 	Example usage:
 	```python
