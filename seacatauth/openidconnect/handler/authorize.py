@@ -677,7 +677,7 @@ class AuthorizeHandler(object):
 			# as those used by Seacat Auth, they will be overwritten
 			query.update(login_query_params)
 			parsed["query"] = urllib.parse.urlencode(query)
-			login_url = unparse_url(parsed)
+			login_url = unparse_url(**parsed)
 		else:
 			# Seacat Auth login expects the parameters to be at the end of the URL (in the fragment (hash) part)
 			# TODO: Consider using regular query parameters instead (UI refactoring needed)
