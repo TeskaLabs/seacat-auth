@@ -12,7 +12,7 @@ from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
 from ..pkce import InvalidCodeChallengeMethodError
-from ...generic import parse_url, unparse_url
+from ...generic import urlparse, urlunparse
 
 #
 
@@ -672,13 +672,13 @@ class AuthorizeHandler(object):
 		except KeyError:
 			client_login_uri = None
 		if client_login_uri is not None:
-			parsed = parse_url(client_login_uri)
+			parsed = urlparse(client_login_uri)
 			query = urllib.parse.parse_qs(parsed["query"])
 			# WARNING: If the client's login URI includes query parameters with the same names
 			# as those used by Seacat Auth, they will be overwritten
 			query.update(login_query_params)
 			parsed["query"] = urllib.parse.urlencode(query)
-			login_url = unparse_url(**parsed)
+			login_url = urlunparse(**parsed)
 		else:
 			# Seacat Auth login expects the parameters to be at the end of the URL (in the fragment (hash) part)
 			# TODO: Consider using regular query parameters instead (UI refactoring needed)
