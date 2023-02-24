@@ -139,7 +139,7 @@ async def nginx_introspection(
 
 def parse_url(url: str):
 	"""
-	Parses the URL into a dictionary
+	Parse the URL into a dictionary
 	"""
 	return urllib.parse.urlparse(url)._asdict()
 
@@ -153,7 +153,7 @@ def unparse_url(
 	fragment: str = ""
 ):
 	"""
-	Builds URL from individual components
+	Build URL from individual components
 
 	Example usage:
 	```python
