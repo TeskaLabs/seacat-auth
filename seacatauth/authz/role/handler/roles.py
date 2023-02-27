@@ -7,7 +7,6 @@ import asab.web.authz
 import asab.web.tenant
 import asab.exceptions
 
-from ....credentials.utils import list_assigned_credential_ids
 from ....decorators import access_control
 from .... import exceptions
 
