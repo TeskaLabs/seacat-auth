@@ -59,11 +59,13 @@ class AuthenticationHandler(object):
 		# Get arguments specified in login URL query
 		expiration = None
 		login_preferences = None
+		login_key = None
 		query_string = key.get("qs")
 		if query_string is not None:
 			query_dict = urllib.parse.parse_qs(query_string)
 
 			# Get requested session expiration
+			# TODO: This option should be moved to client config or removed completely
 			expiration = query_dict.get("expiration")
 			if expiration is not None:
 				try:
@@ -72,10 +74,16 @@ class AuthenticationHandler(object):
 					L.warning("Error when parsing expiration: {}".format(e))
 
 			# Get preferred login descriptor IDs
+			# TODO: This option should be moved to client config or removed completely
 			login_preferences = query_dict.get("ldid")
 
+			# Get login key by client ID
+			client_id = query_dict.get("client_id")
+			if client_id is not None:
+				login_key = await self._get_client_login_key(client_id[0])
+
 		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True)
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=login_key)
 		if credentials_id is None or credentials_id == []:
 			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session
@@ -127,7 +135,6 @@ class AuthenticationHandler(object):
 			'key': key.export_public(as_dict=True),
 		}
 		return asab.web.rest.json_response(request, response)
-
 
 	async def login(self, request):
 		lsid = request.match_info["lsid"]
@@ -271,7 +278,6 @@ class AuthenticationHandler(object):
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
 
-
 	async def webauthn_login(self, request):
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
@@ -303,3 +309,13 @@ class AuthenticationHandler(object):
 		await self.AuthenticationService.update_login_session(lsid, data=login_data)
 
 		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))
+
+
+	async def _get_client_login_key(self, client_id):
+		client_service = self.AuthenticationService.App.get_service("seacatauth.ClientService")
+		try:
+			client = await client_service.get(client_id)
+			login_key = client.get("login_key")
+		except KeyError:
+			login_key = None
+		return login_key
