@@ -8,11 +8,15 @@
 - Efficient count in MongoDB credential provider (#150, PLUM Sprint 230127)
 - Fix sync method in Batman module (3c68cb8, PLUM Sprint 230210)
 - Fix cookie client session flow (#155, PLUM Sprint 230210)
+- Renaming resources without description (#158, PLUM Sprint 230210)
+- Batman does not add nonexistent roles to Kibana users (#159, PLUM Sprint 230210)
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
 - OAuth 2.0 PKCE challenge (RFC7636) (#152, PLUM Sprint 230127)
 - Session tracking ID introduced (#135, PLUM Sprint 230210)
+- Clients can register a custom login_uri and login_key (#151, PLUM Sprint 230210)
+- Authorize request adds client_id to login URL query (#151, PLUM Sprint 230210)
 
 ### Features
 - Assign roles and tenants to multiple credentials at once (#146, PLUM Sprint 230113)

@@ -108,7 +108,7 @@ class ElasticSearchCredentialsProvider(CredentialsProviderABC):
 		return obj
 
 
-	async def locate(self, ident: str, ident_fields: dict = None) -> str:
+	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> str:
 		query = {"query": {"bool": {
 			"filter": [
 				{"match_phrase": {"type": "user"}},
