@@ -188,7 +188,18 @@ class AuthorizeHandler(object):
 				error_description="Unauthorized client",
 				state=state
 			)
-		# TODO: Check for invalid redirect URI
+		except client.exceptions.InvalidRedirectURI:
+			# TODO: Strict error response instead of warning
+			L.warning(
+				"Invalid redirect URI. NOTICE: In future releases, authorize requests with invalid "
+				"redirect URI will result in error response!",
+				struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			# return self.reply_with_authentication_error(
+			# 	AuthErrorResponseCode.InvalidRequest,
+			# 	redirect_uri=None,
+			# 	error_description="Invalid redirect_uri.",
+			# 	state=state
+			# )
 		except client.exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			await self.audit_authorize_error(
