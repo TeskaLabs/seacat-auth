@@ -176,33 +176,16 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"minProperties": 1,
-		"maxProperties": 1,
-		"additionalProperties": False,
-		"properties": {
-			"has_tenant": {"type": "string"},
-			"has_role": {"type": "string"}}})
+		"type": "array",
+		"items": {"type": "string"}})
 	@access_control("authz:superuser")
 	async def bulk_assign_role(self, request, *, json_data, tenant):
-		# Query credentials by filter
-		# Only a single-condition filter is supported
-		credential_ids = await list_assigned_credential_ids(
-			self.RoleService.TenantService, self.RoleService, json_data)
-		if len(credential_ids) == 0:
-			data = {
-				"credentials_matched": [],
-				"successful_count": 0,
-				"error_count": 0,
-				"result": "OK"}
-			return asab.web.rest.json_response(request, data=data)
-
 		role = "{}/{}".format(tenant, request.match_info["role_name"])
 		await self.RoleService.get(role)
 
 		error_details = []
 		successful_count = 0
-		for credential_id in credential_ids:
+		for credential_id in json_data:
 			try:
 				await self.RoleService.assign_role(
 					credential_id, role,
@@ -221,7 +204,6 @@ class RolesHandler(object):
 				error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
 
 		data = {
-			"credentials_matched": list(credential_ids),
 			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
@@ -230,44 +212,25 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"minProperties": 1,
-		"maxProperties": 1,
-		"additionalProperties": False,
-		"properties": {
-			"has_tenant": {"type": "string"},
-			"has_role": {"type": "string"}}})
+		"type": "array",
+		"items": {"type": "string"}})
 	@access_control("authz:superuser")
 	async def bulk_unassign_role(self, request, *, json_data, tenant):
-		# List credentials that both fit the user filter and have the requested role assigned
 		role = "{}/{}".format(tenant, request.match_info["role_name"])
-		credential_ids = set.intersection(
-			await list_assigned_credential_ids(
-				self.RoleService.TenantService, self.RoleService, json_data),
-			await list_assigned_credential_ids(
-				self.RoleService.TenantService, self.RoleService, {"has_role": role}),
-		)
-		if len(credential_ids) == 0:
-			data = {
-				"credentials_matched": [],
-				"successful_count": 0,
-				"error_count": 0,
-				"result": "OK"}
-			return asab.web.rest.json_response(request, data=data)
-
 		error_details = []
 		successful_count = 0
-		for credential_id in credential_ids:
+		for credential_id in json_data:
 			try:
 				await self.RoleService.unassign_role(credential_id, role)
 				successful_count += 1
+			except KeyError:
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Role not assigned."})
 			except Exception as e:
 				L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
 					"cid": credential_id, "role": role})
 				error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
 
 		data = {
-			"credentials_matched": list(credential_ids),
 			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
