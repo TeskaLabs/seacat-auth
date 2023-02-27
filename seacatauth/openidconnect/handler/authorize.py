@@ -137,7 +137,9 @@ class AuthorizeHandler(object):
 		return self.reply_with_authentication_error(
 			request_parameters,
 			AuthErrorResponseCode.UnsupportedResponseType,
-			message,
+			request_parameters.get("redirect_uri") or None,
+			error_description="Unsupported response type: {}".format(response_type),
+			state=request_parameters.get("state")
 		)
 
 
@@ -163,7 +165,7 @@ class AuthorizeHandler(object):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError:
-			L.error("Client ID not found", struct_data={"client_id": client_id})
+			L.error("Client ID not found.", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.InvalidRequest,
 				redirect_uri,
@@ -179,10 +181,10 @@ class AuthorizeHandler(object):
 				response_type="code",
 			)
 		except client.exceptions.InvalidClientSecret:
-			L.error("Invalid client secret", struct_data={"client_id": client_id})
+			L.error("Invalid client secret.", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.UnauthorizedClient,
-				redirect_uri,
+				redirect_uri=redirect_uri,
 				error_description="Unauthorized client",
 				state=state
 			)
