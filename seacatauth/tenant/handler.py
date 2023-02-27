@@ -219,34 +219,13 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"minProperties": 1,
-		"maxProperties": 1,
-		"additionalProperties": False,
-		"properties": {
-			"has_tenant": {"type": "string"},
-			"has_role": {"type": "string"}}})
+		"type": "array",
+		"items": {"type": "string"}})
 	@access_control("authz:superuser")
 	async def bulk_assign_tenant(self, request, *, json_data, tenant):
-		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
-
-		# Query credentials by filter
-		# Only a single-condition filter is supported
-		credential_ids = await list_assigned_credential_ids(
-			self.TenantService, role_service, json_data)
-		if len(credential_ids) == 0:
-			data = {
-				"credentials_matched": [],
-				"successful_count": 0,
-				"error_count": 0,
-				"result": "OK"}
-			return asab.web.rest.json_response(request, data=data)
-
-		# Tenant has already been validated by @access_control
-
 		error_details = []
 		successful_count = 0
-		for credential_id in credential_ids:
+		for credential_id in json_data:
 			try:
 				await self.TenantService.assign_tenant(credential_id, tenant)
 				successful_count += 1
@@ -258,7 +237,6 @@ class TenantHandler(object):
 				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
 
 		data = {
-			"credentials_matched": list(credential_ids),
 			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
@@ -267,45 +245,24 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"minProperties": 1,
-		"maxProperties": 1,
-		"additionalProperties": False,
-		"properties": {
-			"has_tenant": {"type": "string"},
-			"has_role": {"type": "string"}}})
+		"type": "array",
+		"items": {"type": "string"}})
 	@access_control("authz:superuser")
 	async def bulk_unassign_tenant(self, request, *, json_data, tenant):
-		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
-
-		# List credentials that both fit the user filter and have the requested role assigned
-		credential_ids = set.intersection(
-			await list_assigned_credential_ids(
-				self.TenantService, role_service, json_data),
-			await list_assigned_credential_ids(
-				self.TenantService, role_service, {"has_tenant": tenant}),
-		)
-		if len(credential_ids) == 0:
-			data = {
-				"credentials_matched": [],
-				"successful_count": 0,
-				"error_count": 0,
-				"result": "OK"}
-			return asab.web.rest.json_response(request, data=data)
-
 		error_details = []
 		successful_count = 0
-		for credential_id in credential_ids:
+		for credential_id in json_data:
 			try:
 				await self.TenantService.unassign_tenant(credential_id, tenant)
 				successful_count += 1
+			except KeyError:
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
 			except Exception as e:
 				L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
 					"cid": credential_id, "tenant": tenant})
 				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
 
 		data = {
-			"credentials_matched": list(credential_ids),
 			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
