@@ -12,6 +12,7 @@ from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
 from ..pkce import InvalidCodeChallengeMethodError
+from ...generic import urlparse, urlunparse
 
 #
 
@@ -492,12 +493,9 @@ class AuthorizeHandler(object):
 		)
 
 		login_query_params.append(("redirect_uri", authorize_redirect_uri))
+		login_query_params.append(("client_id", client_id))
 
-		login_url = "{}{}?{}".format(
-			self.AuthWebuiBaseUrl,
-			self.LoginPath,
-			urllib.parse.urlencode(login_query_params)
-		)
+		login_url = await self._build_login_uri(client_id, login_query_params)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
 				"Location": login_url,
@@ -508,7 +506,6 @@ class AuthorizeHandler(object):
 		)
 		delete_cookie(self.App, response)
 		return response
-
 
 	async def reply_with_factor_setup_redirect(
 		self, session, missing_factors: list,
@@ -572,7 +569,6 @@ class AuthorizeHandler(object):
 		)
 
 		return response
-
 
 	def reply_with_authentication_error(
 		self, error: str, redirect_uri: str,
@@ -676,3 +672,33 @@ class AuthorizeHandler(object):
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 
 		return tenants
+
+
+	async def _build_login_uri(self, client_id, login_query_params):
+		"""
+		Check if the client has a registered login URI. If not, use the default.
+		Extend the URI with query parameters.
+		"""
+		try:
+			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+			client_login_uri = client_dict.get("login_uri")
+		except KeyError:
+			client_login_uri = None
+		if client_login_uri is not None:
+			parsed = urlparse(client_login_uri)
+			query = urllib.parse.parse_qs(parsed["query"])
+			# WARNING: If the client's login URI includes query parameters with the same names
+			# as those used by Seacat Auth, they will be overwritten
+			query.update(login_query_params)
+			parsed["query"] = urllib.parse.urlencode(query)
+			login_url = urlunparse(**parsed)
+		else:
+			# Seacat Auth login expects the parameters to be at the end of the URL (in the fragment (hash) part)
+			# TODO: Consider using regular query parameters instead (UI refactoring needed)
+			#   so that Seacat Auth UI does not need a special approach here
+			login_url = "{}{}?{}".format(
+				self.AuthWebuiBaseUrl,
+				self.LoginPath,
+				urllib.parse.urlencode(login_query_params)
+			)
+		return login_url

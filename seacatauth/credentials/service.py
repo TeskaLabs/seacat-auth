@@ -133,13 +133,13 @@ class CredentialsService(asab.Service):
 		self.CredentialProviders[credentials_provider.ProviderID] = credentials_provider
 
 
-	async def locate(self, ident: str, stop_at_first: bool = False):
+	async def locate(self, ident: str, stop_at_first: bool = False, key: dict = None):
 		'''
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
 		'''
 		ident = ident.strip()
 		credentials_ids = []
-		pending = [provider.locate(ident, self.IdentFields) for provider in self.CredentialProviders.values()]
+		pending = [provider.locate(ident, self.IdentFields, key) for provider in self.CredentialProviders.values()]
 		while len(pending) > 0:
 			done, pending = await asyncio.wait(pending)
 			for task in done:
