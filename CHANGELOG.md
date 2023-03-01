@@ -20,6 +20,7 @@
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
+- Swagger doc page uses the same auth rules as ASAB API (#164, PLUM Sprint 230224)
 
 ---
 
