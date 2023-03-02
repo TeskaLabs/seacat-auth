@@ -244,7 +244,7 @@ class AuthorizeHandler(object):
 			if root_session.Session.Type != "root":
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
-			elif root_session.Authentication.IsAnonymous and client_dict.get("authorize_anonymous_users", False):
+			elif root_session.Authentication.IsAnonymous and not client_dict.get("authorize_anonymous_users", False):
 				L.warning("Not allowed to authorize with anonymous session.", struct_data={
 					"sid": root_session.Id, "client_id": client_id})
 				root_session = None
