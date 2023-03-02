@@ -354,7 +354,7 @@ class ClientService(asab.Service):
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_key",
 			"authorize_anonymous_users", "template"]):
 			v = kwargs.get(k)
-			if v is not None and len(v) > 0:
+			if v is not None and not (isinstance(v, str) and len(v) > 0):
 				upsertor.set(k, v)
 
 		try:
@@ -422,7 +422,7 @@ class ClientService(asab.Service):
 			self.OIDCService.PKCE.validate_code_challenge_methods_registration(kwargs["code_challenge_methods"])
 
 		for k, v in client_update.items():
-			if v is None or len(v) == 0:
+			if v is None or (isinstance(v, str) and len(v) == 0):
 				upsertor.unset(k)
 			else:
 				upsertor.set(k, v)
