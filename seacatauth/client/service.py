@@ -134,6 +134,9 @@ CLIENT_METADATA_SCHEMA = {
 				{"type": "number"},
 				{"type": "boolean"},
 				{"type": "null"}]}}},
+	"authorize_anonymous_users": {  # NON-CANONICAL
+		"type": "boolean",
+		"description": "Allow authorize requests with anonymous users."},
 	"template": {  # NON-CANONICAL
 		"type": "string",
 		"description": "Client template.",
@@ -349,7 +352,7 @@ class ClientService(asab.Service):
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_key",
-			"template"]):
+			"authorize_anonymous_users", "template"]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
 				upsertor.set(k, v)
