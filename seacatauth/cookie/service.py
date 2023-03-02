@@ -232,3 +232,16 @@ class CookieService(asab.Service):
 		)
 
 		return session
+
+	def get_domain_id_by_host(self, request):
+		host = None
+		host = request.headers.get("X-Forwarded-Server")
+
+		if host is None:
+			host = request.host
+
+		if (host != self.RootCookieDomain):
+			for k, v in self.ApplicationCookies.items():
+				if host.endswith(v["domain"]):
+					return k
+		return None

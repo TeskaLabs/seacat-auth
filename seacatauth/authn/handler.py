@@ -227,7 +227,10 @@ class AuthenticationHandler(object):
 			body=login_session.encrypt(body)
 		)
 
-		set_cookie(self.App, response, session)
+		# cookie domain by host
+		domain_id = self.CookieService.get_domain_id_by_host(request)
+
+		set_cookie(self.App, response, session, domain_id)
 
 		self.AuthenticationService.LoginCounter.add('successful', 1)
 

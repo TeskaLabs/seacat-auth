@@ -119,12 +119,15 @@ class CookieHandler(object):
 				L.warning("Request authorization failed: {}".format(e), exc_info=True)
 				response = aiohttp.web.HTTPUnauthorized()
 
+		# cookie domain by host
+		domain_id = self.CookieService.get_domain_id_by_host(request)
+
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
 			return response
 
 		if anonymous_session_created:
-			set_cookie(self.App, response, session)
+			set_cookie(self.App, response, session, domain_id)
 
 		return response
 
