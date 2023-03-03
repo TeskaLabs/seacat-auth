@@ -3,6 +3,7 @@ import logging
 import asab.web.rest
 import asab.exceptions
 
+from .. import exceptions
 from ..decorators import access_control
 
 ###
@@ -33,8 +34,8 @@ class TenantHandler(object):
 		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
 		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
 
-		web_app.router.add_put("/tenant_assign_many/{tenant}", self.bulk_assign_tenant)
-		web_app.router.add_put("/tenant_unassign_many/{tenant}", self.bulk_unassign_tenant)
+		web_app.router.add_put("/tenant_assign_many", self.bulk_assign_tenant)
+		web_app.router.add_put("/tenant_unassign_many", self.bulk_unassign_tenant)
 
 		web_app.router.add_get('/tenant_propose', self.propose_tenant)
 
@@ -218,22 +219,34 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {"type": "string"}})
+		"type": "object",
+		"properties": {
+			"credential_ids": {
+				"type": "array",
+				"items": {"type": "string"}},
+			"tenants": {
+				"type": "array",
+				"items": {"type": "string"}},
+		}})
 	@access_control("authz:superuser")
-	async def bulk_assign_tenant(self, request, *, json_data, tenant):
+	async def bulk_assign_tenant(self, request, *, json_data):
 		error_details = []
 		successful_count = 0
-		for credential_id in json_data:
-			try:
-				await self.TenantService.assign_tenant(credential_id, tenant)
-				successful_count += 1
-			except asab.exceptions.Conflict:
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant already assigned."})
-			except Exception as e:
-				L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
-					"cid": credential_id, "tenant": tenant})
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+		for tenant in json_data["tenants"]:
+			for credential_id in json_data["credential_ids"]:
+				try:
+					await self.TenantService.assign_tenant(credential_id, tenant)
+					successful_count += 1
+				except asab.exceptions.Conflict:
+					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant already assigned."})
+				except exceptions.TenantNotFoundError:
+					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not found."})
+				except exceptions.CredentialsNotFoundError:
+					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Credentials not found."})
+				except Exception as e:
+					L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
+						"cid": credential_id, "tenant": tenant})
+					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
 
 		data = {
 			"successful_count": successful_count,
