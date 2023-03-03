@@ -257,23 +257,31 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {"type": "string"}})
+		"type": "object",
+		"properties": {
+			"credential_ids": {
+				"type": "array",
+				"items": {"type": "string"}},
+			"tenants": {
+				"type": "array",
+				"items": {"type": "string"}},
+		}})
 	@access_control("authz:superuser")
-	async def bulk_unassign_tenant(self, request, *, json_data, tenant):
+	async def bulk_unassign_tenant(self, request, *, json_data):
 		error_details = []
 		successful_count = 0
-		for credential_id in json_data:
-			if not await self.TenantService.has_tenant_assigned(credential_id, tenant):
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
-				continue
-			try:
-				await self.TenantService.unassign_tenant(credential_id, tenant)
-				successful_count += 1
-			except Exception as e:
-				L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
-					"cid": credential_id, "tenant": tenant})
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+		for tenant in json_data["tenants"]:
+			for credential_id in json_data["credential_ids"]:
+				if not await self.TenantService.has_tenant_assigned(credential_id, tenant):
+					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
+					continue
+				try:
+					await self.TenantService.unassign_tenant(credential_id, tenant)
+					successful_count += 1
+				except Exception as e:
+					L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
+						"cid": credential_id, "tenant": tenant})
+					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
 
 		data = {
 			"successful_count": successful_count,
