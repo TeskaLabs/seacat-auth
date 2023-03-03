@@ -251,11 +251,12 @@ class TenantHandler(object):
 		error_details = []
 		successful_count = 0
 		for credential_id in json_data:
+			if not await self.TenantService.has_tenant_assigned(credential_id, tenant):
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
+				continue
 			try:
 				await self.TenantService.unassign_tenant(credential_id, tenant)
 				successful_count += 1
-			except KeyError:
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
 			except Exception as e:
 				L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
 					"cid": credential_id, "tenant": tenant})
