@@ -18,6 +18,9 @@
 - Clients can register a custom login_uri and login_key (#151, PLUM Sprint 230210)
 - Authorize request adds client_id to login URL query (#151, PLUM Sprint 230210)
 
+### Features
+- Assign roles and tenants to multiple credentials at once (#146, PLUM Sprint 230113)
+
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
 - Swagger doc page uses the same auth rules as ASAB API (#164, PLUM Sprint 230224)
