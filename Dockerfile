@@ -45,7 +45,7 @@ RUN apk add --no-cache  \
     webauthn \
     pyyaml \
     bson \
-    git+https://github.com/TeskaLabs/asab.git
+    git+https://github.com/TeskaLabs/asab.git@bf1918b9a1f2e2ba89875a6ee5fec7127e3fa169
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
