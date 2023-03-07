@@ -105,7 +105,7 @@ CLIENT_METADATA_SCHEMA = {
 		"type": "string",
 		"description":
 			"Requested Client Authentication method for the Token Endpoint. "
-			"If omitted, the default is `client_secret_basic`.",
+			"If omitted, the default is `none`.",
 		"enum": TOKEN_ENDPOINT_AUTH_METHODS},
 	# "token_endpoint_auth_signing_alg": {},
 	# "default_max_age": {},
@@ -289,6 +289,7 @@ class ClientService(asab.Service):
 		assert application_type in APPLICATION_TYPES
 
 		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
+		# TODO: The default should be "client_secret_basic". Change this once implemented.
 		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 
 		if _custom_client_id is not None:
@@ -312,6 +313,8 @@ class ClientService(asab.Service):
 			client_secret = None
 			client_secret_expires_at = None
 		elif token_endpoint_auth_method == "client_secret_basic":
+			raise NotImplementedError("Token endpoint auth method 'client_secret_basic' is not supported.")
+			# TODO: Finish implementing authorization with client secret
 			# The client is CONFIDENTIAL
 			# Clients capable of maintaining the confidentiality of their
 			# credentials (e.g., client implemented on a secure server with
