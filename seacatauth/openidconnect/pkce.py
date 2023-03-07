@@ -50,10 +50,9 @@ class PKCE:
 			# permitted to use "plain" only if they cannot support "S256" for some
 			# technical reason and know via out-of-band configuration that the
 			# server supports "plain".
-			raise asab.exceptions.ValidationError(
-				"Cannot register the 'plain' Code Challenge Method alongside other more secure methods. "
-				"Clients are permitted to use 'plain' only if they do not support 'S256'."
-			)
+			L.warning(
+				"Registering 'plain' Code Challenge Method alongside more secure methods. "
+				"This is not recommended.")
 
 	@classmethod
 	def validate_code_challenge_method(cls, client: dict, code_challenge_method: str):
