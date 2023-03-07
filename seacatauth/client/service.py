@@ -118,7 +118,7 @@ CLIENT_METADATA_SCHEMA = {
 		"description":
 			"JSON array containing a list of the PKCE Code Challenge Methods "
 			"that the Client is declaring that it will restrict itself to using. "
-			"If omitted, the client is not expected to use PKCE.",
+			"If omitted, the default is that the Client will use only the `S256` method",
 		"items": {
 			"type": "string",
 			"enum": ["plain", "S256"]}},
@@ -344,10 +344,9 @@ class ClientService(asab.Service):
 		upsertor.set("application_type", application_type)
 
 		# Register allowed PKCE Code Challenge Methods
-		code_challenge_methods = kwargs.get("code_challenge_methods")
-		if code_challenge_methods is not None:
-			self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
-			upsertor.set("code_challenge_methods", code_challenge_methods)
+		code_challenge_methods = kwargs.get("code_challenge_methods", ["S256"])
+		self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
+		upsertor.set("code_challenge_methods", code_challenge_methods)
 
 		# Optional client metadata
 		for k in frozenset([
