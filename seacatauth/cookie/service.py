@@ -86,6 +86,7 @@ class CookieService(asab.Service):
 		if not domain.isascii():
 			L.warning("Cookie domain can contain only ASCII characters.", struct_data={"domain": domain})
 			return None
+		domain = domain.lstrip(".")
 		return domain
 
 
