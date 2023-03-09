@@ -119,6 +119,10 @@ CLIENT_METADATA_SCHEMA = {
 			"Code Challenge Method (PKCE) that the Client will be required to use at the Authorize Endpoint. "
 			"The default, if omitted, is `none`.",
 		"enum": ["none", "plain", "S256"]},
+	"authorize_uri": {  # NON-CANONICAL
+		"type": "string",
+		"description":
+			"URL of OAuth authorize endpoint. Useful when logging in from different than the default domain."},
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
@@ -131,7 +135,7 @@ CLIENT_METADATA_SCHEMA = {
 				{"type": "number"},
 				{"type": "boolean"},
 				{"type": "null"}]}}},
-	"template": {  # NON-CANONICAL
+	"template": {  # TODO: Remove this option
 		"type": "string",
 		"description": "Client template.",
 	}
@@ -348,7 +352,7 @@ class ClientService(asab.Service):
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_key",
-			"template"]):
+			"authorize_uri", "template"]):
 			v = kwargs.get(k)
 			if v is not None and len(v) > 0:
 				upsertor.set(k, v)
