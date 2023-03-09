@@ -113,15 +113,12 @@ CLIENT_METADATA_SCHEMA = {
 	# "default_acr_values": {},
 	# "initiate_login_uri": {},
 	# "request_uris": {},
-	"code_challenge_methods": {
-		"type": "array",
+	"code_challenge_method": {
+		"type": "string",
 		"description":
-			"JSON array containing a list of the PKCE Code Challenge Methods "
-			"that the Client is declaring that it will restrict itself to using. "
-			"If omitted, the default is that the Client will use only the `S256` method",
-		"items": {
-			"type": "string",
-			"enum": ["plain", "S256"]}},
+			"Code Challenge Method (PKCE) that the Client will be required to use at the Authorize Endpoint. "
+			"The default, if omitted, is `none`.",
+		"enum": ["none", "plain", "S256"]},
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
@@ -344,9 +341,9 @@ class ClientService(asab.Service):
 		upsertor.set("application_type", application_type)
 
 		# Register allowed PKCE Code Challenge Methods
-		code_challenge_methods = kwargs.get("code_challenge_methods", ["S256"])
-		self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
-		upsertor.set("code_challenge_methods", code_challenge_methods)
+		code_challenge_method = kwargs.get("code_challenge_method", "none")
+		self.OIDCService.PKCE.validate_code_challenge_method_registration(code_challenge_method)
+		upsertor.set("code_challenge_method", code_challenge_method)
 
 		# Optional client metadata
 		for k in frozenset([
@@ -417,8 +414,8 @@ class ClientService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
 		# Register allowed PKCE Code Challenge Methods
-		if "code_challenge_methods" in kwargs:
-			self.OIDCService.PKCE.validate_code_challenge_methods_registration(kwargs["code_challenge_methods"])
+		if "code_challenge_method" in kwargs:
+			self.OIDCService.PKCE.validate_code_challenge_method_registration(kwargs["code_challenge_method"])
 
 		for k, v in client_update.items():
 			if v is None or len(v) == 0:
