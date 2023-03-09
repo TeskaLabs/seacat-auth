@@ -2,6 +2,10 @@
 
 ## Release candidate
 
+### Breaking changes
+- Renamed the Code Challenge Method client feature (#168, PLUM Sprint 230224)
+- Code Challenge Method is now enforced if set (#168, PLUM Sprint 230224)
+
 ### Fix
 - Removed required fields from client update (#144, PLUM Sprint 230113)
 - Store client cookie domain (#147, PLUM Sprint 230113)
@@ -18,13 +22,13 @@
 - Clients can register a custom login_uri and login_key (#151, PLUM Sprint 230210)
 - Authorize request adds client_id to login URL query (#151, PLUM Sprint 230210)
 - Upgrade Docker image OS to Alpine 3.17 (#166, PLUM Sprint 230224)
-
-### Features
-- Assign roles and tenants to multiple credentials at once (#146, PLUM Sprint 230113)
+- Assign roles and tenants to multiple credentials at once (#146, PLUM Sprint 230224)
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
 - Swagger doc page uses the same auth rules as ASAB API (#164, PLUM Sprint 230224)
+- Renamed the Code Challenge Method client feature (#168, PLUM Sprint 230224)
+- Code Challenge Method is now enforced if set (#168, PLUM Sprint 230224)
 
 ---
 
