@@ -201,38 +201,25 @@ class AuthorizeHandler(object):
 				state=state
 			)
 
-		if code_challenge is not None:
-			try:
-				self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(client_dict, code_challenge_method)
-			except InvalidCodeChallengeMethodError:
-				L.error("Invalid code challenge method.", struct_data={
-					"client_id": client_id, "method": code_challenge_method})
-				await self.audit_authorize_error(
-					client_id, "client_error",
-					redirect_uri=redirect_uri,
-				)
-				return self.reply_with_authentication_error(
-					AuthErrorResponseCode.InvalidRequest,
-					redirect_uri=redirect_uri,
-					error_description="Client error.",
-					state=state
-				)
-			except InvalidCodeChallengeError:
-				L.error("Invalid code challenge request.", struct_data={
-					"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
-				await self.audit_authorize_error(
-					client_id, "client_error",
-					redirect_uri=redirect_uri,
-				)
-				return self.reply_with_authentication_error(
-					AuthErrorResponseCode.InvalidRequest,
-					redirect_uri=redirect_uri,
-					error_description="Client error.",
-					state=state
-				)
-		elif code_challenge_method is not None:
-			L.warning("Requesting code_challenge_method without .", struct_data={
+		try:
+			code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
+				client_dict, code_challenge, code_challenge_method)
+		except InvalidCodeChallengeMethodError:
+			L.error("Invalid code challenge method.", struct_data={
 				"client_id": client_id, "method": code_challenge_method})
+			await self.audit_authorize_error(
+				client_id, "client_error",
+				redirect_uri=redirect_uri,
+			)
+			return self.reply_with_authentication_error(
+				AuthErrorResponseCode.InvalidRequest,
+				redirect_uri=redirect_uri,
+				error_description="Client error.",
+				state=state
+			)
+		except InvalidCodeChallengeError:
+			L.error("Invalid code challenge request.", struct_data={
+				"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
 			await self.audit_authorize_error(
 				client_id, "client_error",
 				redirect_uri=redirect_uri,
