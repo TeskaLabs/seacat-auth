@@ -335,7 +335,7 @@ class ClientService(asab.Service):
 
 		upsertor.set("token_endpoint_auth_method", token_endpoint_auth_method)
 
-		self._check_redirect_uris(redirect_uris, application_type)
+		self._check_redirect_uris(redirect_uris, application_type, grant_types)
 		upsertor.set("redirect_uris", list(redirect_uris))
 
 		self._check_grant_types(grant_types, response_types)
@@ -409,6 +409,7 @@ class ClientService(asab.Service):
 		self._check_redirect_uris(
 			redirect_uris=client_update.get("redirect_uris", client["redirect_uris"]),
 			application_type=client_update.get("application_type", client["application_type"]),
+			grant_types=client_update.get("grant_types", client["grant_types"]),
 			client_uri=client_update.get("client_uri", client.get("client_uri")))
 
 		self._check_grant_types(
@@ -492,7 +493,8 @@ class ClientService(asab.Service):
 				"Response type 'token' requires 'implicit' to be included in grant types")
 
 
-	def _check_redirect_uris(self, redirect_uris: list, application_type: str, client_uri: str = None):
+	def _check_redirect_uris(
+		self, redirect_uris: list, application_type: str, grant_types: list, client_uri: str = None):
 		"""
 		Validate client redirect URIs
 
@@ -505,13 +507,14 @@ class ClientService(asab.Service):
 					"Redirect URI must be an absolute URI without a fragment component.")
 
 			if application_type == "web":
-				if parsed.scheme != "https" and not self._AllowInsecureWebClientURIs:
-					raise asab.exceptions.ValidationError(
-						"Web Clients using the OAuth Implicit Grant Type MUST only register URLs "
-						"using the https scheme as redirect_uris.")
-				if parsed.hostname == "localhost":
-					raise asab.exceptions.ValidationError(
-						"Web Clients using the OAuth Implicit Grant Type MUST NOT use localhost as the hostname.")
+				if "implicit" in grant_types:
+					if parsed.scheme != "https" and not self._AllowInsecureWebClientURIs:
+						raise asab.exceptions.ValidationError(
+							"Web Clients using the OAuth Implicit Grant Type MUST only register URLs "
+							"using the https scheme as redirect_uris.")
+					if parsed.hostname == "localhost":
+						raise asab.exceptions.ValidationError(
+							"Web Clients using the OAuth Implicit Grant Type MUST NOT use localhost as the hostname.")
 			elif application_type == "native":
 				# TODO: Authorization Servers MAY place additional constraints on Native Clients.
 				if parsed.scheme == "http":
