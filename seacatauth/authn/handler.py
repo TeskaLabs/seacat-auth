@@ -59,9 +59,10 @@ class AuthenticationHandler(object):
 		# Get arguments specified in login URL query
 		expiration = None
 		login_preferences = None
-		login_key = None
 		query_string = key.get("qs")
-		if query_string is not None:
+		if query_string is None:
+			query_dict = None
+		else:
 			query_dict = urllib.parse.parse_qs(query_string)
 
 			# Get requested session expiration
@@ -77,13 +78,8 @@ class AuthenticationHandler(object):
 			# TODO: This option should be moved to client config or removed completely
 			login_preferences = query_dict.get("ldid")
 
-			# Get login key by client ID
-			client_id = query_dict.get("client_id")
-			if client_id is not None:
-				login_key = await self._get_client_login_key(client_id[0])
-
 		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=login_key)
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=query_dict)
 		if credentials_id is None or credentials_id == []:
 			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session

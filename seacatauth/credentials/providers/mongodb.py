@@ -208,7 +208,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return "OK"
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> Optional[str]:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> Optional[str]:
 		"""
 		Locate credentials by matching ident string against configured ident fields.
 		"""
