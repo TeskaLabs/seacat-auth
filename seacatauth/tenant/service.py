@@ -4,6 +4,7 @@ import uuid
 
 import asab
 import asab.storage.exceptions
+import asab.exceptions
 
 from .. import exceptions
 
@@ -204,12 +205,19 @@ class TenantService(asab.Service):
 
 		failed_count = 0
 		for tenant in tenants_to_assign:
-			data = await self.assign_tenant(credentials_id, tenant)
-			if data["result"] != "OK":
+			try:
+				await self.assign_tenant(credentials_id, tenant)
+			except Exception as e:
+				L.error("Failed to assign tenant: {}".format(e), struct_data={
+					"cid": credentials_id, "tenant": tenant})
 				failed_count += 1
+
 		for tenant in tenants_to_unassign:
-			data = await self.unassign_tenant(credentials_id, tenant)
-			if data["result"] != "OK":
+			try:
+				await self.unassign_tenant(credentials_id, tenant)
+			except Exception as e:
+				L.error("Failed to unassign tenant: {}".format(e), struct_data={
+					"cid": credentials_id, "tenant": tenant})
 				failed_count += 1
 
 		L.log(asab.LOG_NOTICE, "Tenants successfully assigned to credentials", struct_data={
@@ -222,10 +230,39 @@ class TenantService(asab.Service):
 		return {"result": "OK"}
 
 
-	async def assign_tenant(self, credentials_id: str, tenant: str):
+	async def assign_tenant(
+		self, credentials_id: str, tenant: str,
+		verify_tenant: bool = True,
+		verify_credentials: bool = True
+	):
 		assert (self.is_enabled())
-		# TODO: Possibly validate tenant and credentials here
-		return await self.TenantsProvider.assign_tenant(credentials_id, tenant)
+
+		if verify_tenant:
+			try:
+				await self.get_tenant(tenant)
+			except KeyError:
+				raise exceptions.TenantNotFoundError(tenant)
+
+		if verify_credentials:
+			credential_service = self.App.get_service("seacatauth.CredentialsService")
+			try:
+				await credential_service.detail(credentials_id)
+			except KeyError:
+				raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		try:
+			await self.TenantsProvider.assign_tenant(credentials_id, tenant)
+		except asab.storage.exceptions.DuplicateError as e:
+			if e.KeyValue is not None:
+				key, value = e.KeyValue.popitem()
+				raise asab.exceptions.Conflict("Tenant already assigned.", key=key, value=value)
+			else:
+				raise asab.exceptions.Conflict("Tenant already assigned.")
+
+		L.log(asab.LOG_NOTICE, "Tenant assigned to credentials", struct_data={
+			"cid": credentials_id,
+			"tenant": tenant,
+		})
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
@@ -239,7 +276,7 @@ class TenantService(asab.Service):
 			roles=[]
 		)
 
-		return await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
+		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 
 
 	def is_enabled(self):
@@ -293,3 +330,11 @@ class TenantService(asab.Service):
 				raise exceptions.NoTenantsError(credential_id)
 
 		return tenants
+
+
+	async def has_tenant_assigned(self, credatials_id: str, tenant: str):
+		try:
+			await self.TenantsProvider.get_assignment(credatials_id, tenant)
+		except KeyError:
+			return False
+		return True
