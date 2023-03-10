@@ -2,15 +2,9 @@ async def build_credentials_authz(tenant_service, role_service, credentials_id, 
 	"""
 	Creates a nested 'authz' dict with tenant:resource structure:
 	{
-		'*': {
-			['resourceA', 'resourceB'],
-		},
-		'tenantA': {
-			['resourceA', 'resourceB', 'resourceC'],
-		},
-		'tenantB': {
-			['resourceA', 'resourceB', 'resourceE', 'resourceD'],
-		},
+		'*': ['resourceA', 'resourceB'],
+		'tenantA': ['resourceA', 'resourceB', 'resourceC'],
+		'tenantB': ['resourceA', 'resourceB', 'resourceE', 'resourceD'],
 	}
 	"""
 
