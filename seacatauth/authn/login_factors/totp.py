@@ -14,8 +14,11 @@ class TOTPFactor(LoginFactorABC):
 	Type = "totp"
 
 	async def is_eligible(self, login_data: dict) -> bool:
-		# Check if OTP is set up in credentials
-		cred_svc = self.AuthenticationService.CredentialsService
+		"""
+		Check if OTP is set up in credentials.
+		"""
+		cred_svc = self.AuthenticationService.App.get_service("seacatauth.OTPService")
+
 		cred_id = login_data["credentials_id"]
 		if cred_id == "":
 			# Not eligible for "fake" login session
