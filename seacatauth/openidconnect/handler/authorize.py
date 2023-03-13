@@ -12,7 +12,7 @@ from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
 from ..pkce import InvalidCodeChallengeMethodError
-from ...generic import urlparse, urlunparse
+from ...generic import urlparse, urlparse_without_fragment, urlunparse
 
 #
 
@@ -678,7 +678,7 @@ class AuthorizeHandler(object):
 		except KeyError:
 			client_login_uri = None
 		if client_login_uri is not None:
-			parsed = urlparse(client_login_uri)
+			parsed = urlparse_without_fragment(client_login_uri)
 			query = urllib.parse.parse_qs(parsed["query"])
 			# WARNING: If the client's login URI includes query parameters with the same names
 			# as those used by Seacat Auth, they will be overwritten
