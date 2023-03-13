@@ -479,17 +479,17 @@ class AuthorizeHandler(object):
 		if code_challenge_method is not None:
 			authorize_query_params.append(("code_challenge_method", code_challenge_method))
 
-		# Build the redirect URI back to this endpoint and add it to login params
-		authorize_redirect_uri = "{}{}?{}".format(
-			self.PublicApiBaseUrl,
-			self.AuthorizePath,
-			urllib.parse.urlencode(authorize_query_params)
-		)
+		# Get client collection
+		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+
+		# Build redirect uri
+		authorize_redirect_uri = self._build_redirect_uri(client_dict, authorize_query_params)
 
 		login_query_params.append(("redirect_uri", authorize_redirect_uri))
 		login_query_params.append(("client_id", client_id))
 
-		login_url = await self._build_login_uri(client_id, login_query_params)
+		# Build login uri
+		login_url = self._build_login_uri(client_dict, login_query_params)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
 				"Location": login_url,
@@ -668,13 +668,12 @@ class AuthorizeHandler(object):
 		return tenants
 
 
-	async def _build_login_uri(self, client_id, login_query_params):
+	def _build_login_uri(self, client_dict, login_query_params):
 		"""
 		Check if the client has a registered login URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
 		try:
-			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 			client_login_uri = client_dict.get("login_uri")
 		except KeyError:
 			client_login_uri = None
@@ -696,3 +695,29 @@ class AuthorizeHandler(object):
 				urllib.parse.urlencode(login_query_params)
 			)
 		return login_url
+
+	def _build_redirect_uri(self, client_dict, authorize_query_params):
+		"""
+		Check if the client has a registered oauth URI. If not, use the default.
+		Extend the URI with query parameters.
+		"""
+		try:
+			client_oauth_uri = client_dict.get("oauth_uri")
+		except KeyError:
+			client_oauth_uri = None
+		if client_oauth_uri is not None:
+			parsed = urlparse(client_oauth_uri)
+			query = urllib.parse.parse_qs(parsed["query"])
+			# WARNING: If the client's login URI includes query parameters with the same names
+			# as those used by Seacat Auth, they will be overwritten
+			query.update(authorize_query_params)
+			parsed["query"] = urllib.parse.urlencode(query)
+			authorize_redirect_uri = urlunparse(**parsed)
+		else:
+			# Build the redirect URI back to this endpoint and add it to login params
+			authorize_redirect_uri = "{}{}?{}".format(
+				self.PublicApiBaseUrl,
+				self.AuthorizePath,
+				urllib.parse.urlencode(authorize_query_params)
+			)
+		return authorize_redirect_uri
