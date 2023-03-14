@@ -125,15 +125,6 @@ CLIENT_METADATA_SCHEMA = {
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
-	"login_key": {  # NON-CANONICAL
-		"type": "object",
-		"description": "Additional data used for locating the credentials at login.",
-		"patternProperties": {
-			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-				{"type": "string"},
-				{"type": "number"},
-				{"type": "boolean"},
-				{"type": "null"}]}}},
 	"authorize_anonymous_users": {  # NON-CANONICAL
 		"type": "boolean",
 		"description": "Allow authorize requests with anonymous users."},
@@ -351,7 +342,7 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_key",
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
 			"authorize_anonymous_users", "template"]):
 			v = kwargs.get(k)
 			if v is not None and not (isinstance(v, str) and len(v) > 0):
