@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import re
 
 import asab
 
@@ -69,6 +70,12 @@ class AuthenticationService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
+
+		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
+		if self.CustomLoginParameters != "":
+			self.CustomLoginParameters = frozenset(re.split(r"\s+", self.CustomLoginParameters))
+		else:
+			self.CustomLoginParameters = frozenset()
 
 		self.LoginAttempts = asab.Config.getint("seacatauth:authentication", "login_attempts")
 		self.LoginSessionExpiration = asab.Config.getseconds("seacatauth:authentication", "login_session_expiration")
