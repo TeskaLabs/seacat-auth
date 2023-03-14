@@ -344,7 +344,7 @@ class ClientService(asab.Service):
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
 			"authorize_anonymous_users", "authorize_uri"]):
 			v = kwargs.get(k)
-			if v is not None and not (isinstance(v, str) and len(v) > 0):
+			if v is not None and not (isinstance(v, str) and len(v) == 0):
 				upsertor.set(k, v)
 
 		try:
