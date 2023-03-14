@@ -8,6 +8,8 @@ import pymongo
 from passlib.hash import bcrypt
 from .mongodb import MongoDBCredentialsProvider
 
+from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -79,7 +81,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		u.set("username", credentials["username"])
 		u.set("__password", bcrypt.hash(credentials["password"].encode("utf-8")))
 
-		credentials_id = await u.execute()
+		credentials_id = await u.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.M2M_MONGO_CREDENTIALS_CREATED})
 
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
