@@ -87,7 +87,8 @@ def private_auth_middleware_factory(app):
 				return await handler(request)
 
 		# TODO authorization should be demanded on the handler level based on @accesscontrol
-		if (request.path.startswith("/asab/v1") or request.path == "/doc") and request.method == "GET":
+		if (request.path.startswith("/asab/v1") or request.path in ("/doc", "/oauth2-redirect.html")) \
+			and request.method == "GET":
 			if "asab:api:auth" in asab.Config.sections():
 				if request.headers.get("Authorization") == "Bearer " + asab.Config.get("asab:api:auth", "bearer"):
 					return await handler(request)
