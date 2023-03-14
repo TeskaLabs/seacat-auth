@@ -14,6 +14,7 @@
 - Fix cookie client session flow (#155, PLUM Sprint 230210)
 - Renaming resources without description (#158, PLUM Sprint 230210)
 - Batman does not add nonexistent roles to Kibana users (#159, PLUM Sprint 230210)
+- Fixed empty string check in client registration (#168, PLUM Sprint 230224)
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
