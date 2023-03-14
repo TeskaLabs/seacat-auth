@@ -7,7 +7,6 @@ import urllib.parse
 import asab
 import asab.storage
 
-from enum import Enum
 from typing import Optional
 
 #
@@ -17,7 +16,7 @@ L = logging.getLogger(__name__)
 #
 
 
-class EventType(Enum):
+class EventType():
 	TOTP_CREATED = "totp_created"
 
 
@@ -53,7 +52,7 @@ class OTPService(asab.Service):
 		If not activated, it also generates and returns a new TOTP secret.
 		"""
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		if self.has_activated_totp(credentials_id):
+		if await self.has_activated_totp(credentials_id):
 			return {
 				"result": "OK",
 				"active": True
@@ -83,7 +82,7 @@ class OTPService(asab.Service):
 		Activates TOTP for the current user, provided that a TOTP secret is already set.
 		Requires entering the generated OTP to succeed.
 		"""
-		if self.has_activated_totp(credentials_id):
+		if not await self.has_activated_totp(credentials_id):
 			return {"result": "FAILED"}
 
 		try:
@@ -97,7 +96,7 @@ class OTPService(asab.Service):
 			# TOTP secret does not match
 			return {"result": "FAILED"}
 
-		# Store secret in credentials object
+		# Store secret in its own dedicated collection
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
 		upsertor.set("__totp", secret)
 
@@ -114,10 +113,7 @@ class OTPService(asab.Service):
 		"""
 		Deactivates TOTP for the current user and erases the secret.
 		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is None or len(secret) == 0:
-			# TOTP is not active
+		if not await self.has_activated_totp(credentials_id):
 			return {"result": "FAILED"}
 
 		provider = self.CredentialsService.get_provider(credentials_id)
@@ -155,7 +151,7 @@ class OTPService(asab.Service):
 
 
 	async def _get_totp_secret(self, session_id: str) -> str:
-		data = await self.StorageService.get(collection=self.TOTPUnregisteredSecretCollection, obj_id=session_id, decrypt={"__s", "exp"})
+		data = await self.StorageService.get(collection=self.TOTPUnregisteredSecretCollection, obj_id=session_id, decrypt={"__s"})
 		secret: str = data["__s"]
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
@@ -181,12 +177,12 @@ class OTPService(asab.Service):
 
 	async def has_activated_totp(self, credentials_id: str) -> bool:
 		"""
-		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check it from credentials (the old way))
+		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also TOTPUnregisteredSecretCollection.)
 		"""
-		collection = self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id)
-		secret = collection.get("__totp")
-
+		credentials = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id)
+		secret = credentials.get("__totp")
 		if secret is None:
+			# look for secret in TOTPUnregisteredSecretCollection
 			credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
 			secret = credentials.get("__totp")
 		if secret is not None and len(secret) > 0:
