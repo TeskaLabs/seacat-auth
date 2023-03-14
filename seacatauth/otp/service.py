@@ -18,6 +18,7 @@ L = logging.getLogger(__name__)
 
 class EventType():
 	TOTP_CREATED = "totp_created"
+	TOTP_MOVED_TO_TOTP_COLLECTION = "totp_moved_to_its_collection"
 
 
 class OTPService(asab.Service):
@@ -87,10 +88,12 @@ class OTPService(asab.Service):
 		Requires entering the generated OTP to succeed.
 		"""
 		if not await self.has_activated_totp(credentials_id):
+			L.warning("self.has_activated_totp = False")
+			L.warning("result: FAILED")
 			return {"result": "FAILED"}
 
 		try:
-			secret = await self._get_totp_secret(session.SessionId)
+			secret = await self._get_totp_secret_from_session_id(session.SessionId)
 		except KeyError:
 			# TOTP secret has not been initialized or has expired
 			return {"result": "FAILED"}
@@ -103,7 +106,7 @@ class OTPService(asab.Service):
 		# Store secret in its own dedicated collection
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
 		upsertor.set("__totp", secret)
-
+		await upsertor.execute(custom_data={"event_type": EventType.TOTP_MOVED_TO_TOTP_COLLECTION})
 		# provider = self.CredentialsService.get_provider(credentials_id)
 		# await provider.update(credentials_id, {"__totp": secret})
 		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
@@ -132,6 +135,7 @@ class OTPService(asab.Service):
 		"""
 		Create TOTP secret.
 		"""
+		L.warning("ENTERED 133 FUNCTION _create_totp_secret(session_id={})".format(session_id))
 		# Delete secret if exists.
 		try:
 			await self._delete_totp_secret(session_id)
@@ -154,15 +158,33 @@ class OTPService(asab.Service):
 		return secret
 
 
-	async def _get_totp_secret(self, session_id: str) -> str:
-		data = await self.StorageService.get(collection=self.TOTPUnregisteredSecretCollection, obj_id=session_id, decrypt={"__s"})
+	async def _get_totp_secret_from_session_id(self, session_id: str) -> str:
+		"""
+		Get TOTP secret from TOTPUnregisteredSecretCollection["__s"]. If it has already expired, raise KeyError.
+		"""
+		L.warning("ENTERING 161 _get_totp_secret_from_session_id({})".format(session_id))
+		data = await self.StorageService.get(collection=self.TOTPUnregisteredSecretCollection, obj_id=session_id)
 		secret: str = data["__s"]
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
-
+		L.warning("secret: {}".format(secret))
 		return secret
 
+	async def _get_totp_secret_from_credentials_id(self, credentials_id: str) -> str:
+		"""
+		Get TOTP secret from TOTPCollection["__totp"].
+		"""
+		L.warning("ENTERING 174 _get_totp_secret_from_credentials_id({})".format(credentials_id))
+		try:
+			credentials = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id)
+			L.warning("credentials: {}".format(credentials))
+			secret: str = credentials.get("__totp")
+			L.warning("secret = {}".format(secret))
+		except KeyError:
+			L.warning("key error in obtaining credentials -> secret = None")
+			secret = None
+		return secret
 
 	async def _delete_totp_secret(self, session_id: str):
 		await self.StorageService.delete(collection=self.TOTPUnregisteredSecretCollection, obj_id=session_id)
@@ -183,20 +205,33 @@ class OTPService(asab.Service):
 		"""
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also TOTPUnregisteredSecretCollection.)
 		"""
-		credentials = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id)
-		secret = credentials.get("__totp")
+		L.warning("ENTERING 192: has_activated_totp")
+		secret: Optional[str] = await self._get_totp_secret_from_credentials_id(credentials_id)
+		L.warning("secret = {}".format(secret))
 		if secret is None:
 			# look for secret in TOTPUnregisteredSecretCollection
+			L.warning("looking for it in TOTPUnregisteredSecretCollection['__totp']")
 			credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
 			secret = credentials.get("__totp")
+			L.warning("secret = {}".format(secret))
+
 		if secret is not None and len(secret) > 0:
 			return True
 		return False
 
 
-	async def authn_totp(credentials: dict, request_data: dict) -> bool:
+	async def compare_totp_with_request_data(self, credentials_id, request_data: dict) -> bool:
+		L.warning("ENTERING 208 compare_totp_with_request_data({}, {})".format(credentials_id, request_data))
+		totp_secret: Optional[str] = await self._get_totp_secret_from_credentials_id(credentials_id)
+		L.warning("totp_secret = {}".format(totp_secret))
+		if totp_secret is None:
+			# look for secret in TOTPUnregisteredSecretCollection
+			credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
+			totp_secret = credentials.get("__totp")
+			L.warning("totp_secret from CredentialService = {}".format(totp_secret))
+
 		try:
-			totp = pyotp.TOTP(credentials['__totp'])
-			return totp.verify(request_data['totp'])
+			totp_object = pyotp.TOTP(totp_secret)
+			return totp_object.verify(request_data['totp'])
 		except KeyError:
 			return False
