@@ -51,7 +51,7 @@ class OTPHandler(object):
 		Activates TOTP for the current user, provided that a TOTP secret is already set.
 		"""
 		otp = json_data.get("otp")
-		response = await self.OTPService.set_totp(request.Session, credentials_id, otp)
+		response = await self.OTPService.complete_totp_registration(request.Session, credentials_id, otp)
 		return asab.web.rest.json_response(request, response)
 
 

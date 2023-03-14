@@ -51,8 +51,12 @@ class OTPService(asab.Service):
 		Returns the status of TOTP setting.
 		If not activated, it also generates and returns a new TOTP secret.
 		"""
+		L.warning("ENTERED get_totp_secret({}, {})".format(session, credentials_id))
 		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		if await self.has_activated_totp(credentials_id):
+		secret = credentials.get("__totp")
+		L.warning("credentials: {}".format(credentials))
+		L.warning("secret = {}".format(secret))
+		if secret is not None and len(secret) > 0:
 			return {
 				"result": "OK",
 				"active": True
@@ -77,7 +81,7 @@ class OTPService(asab.Service):
 		return response
 
 
-	async def set_totp(self, session, credentials_id, otp):
+	async def complete_totp_registration(self, session, credentials_id, otp):
 		"""
 		Activates TOTP for the current user, provided that a TOTP secret is already set.
 		Requires entering the generated OTP to succeed.
@@ -142,7 +146,7 @@ class OTPService(asab.Service):
 
 		# TODO: Encryption
 		secret = pyotp.random_base32()
-		upsertor.set("__s", secret, encrypt=True)
+		upsertor.set("__s", secret)
 
 		await upsertor.execute(custom_data={"event_type": EventType.TOTP_CREATED})
 		L.log(asab.LOG_NOTICE, "TOTP secret created", struct_data={"sid": session_id})
@@ -190,9 +194,9 @@ class OTPService(asab.Service):
 		return False
 
 
-def authn_totp(credentials: dict, request_data: dict) -> bool:
-	try:
-		totp = pyotp.TOTP(credentials['__totp'])
-		return totp.verify(request_data['totp'])
-	except KeyError:
-		return False
+	async def authn_totp(credentials: dict, request_data: dict) -> bool:
+		try:
+			totp = pyotp.TOTP(credentials['__totp'])
+			return totp.verify(request_data['totp'])
+		except KeyError:
+			return False
