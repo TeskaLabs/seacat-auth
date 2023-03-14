@@ -135,7 +135,7 @@ class OTPService(asab.Service):
 		"""
 		Create TOTP secret.
 		"""
-		L.warning("ENTERED 133 FUNCTION _create_totp_secret(session_id={})".format(session_id))
+		L.warning("ENTERED 134 FUNCTION _create_totp_secret(session_id={})".format(session_id))
 		# Delete secret if exists.
 		try:
 			await self._delete_totp_secret(session_id)
@@ -205,7 +205,7 @@ class OTPService(asab.Service):
 		"""
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also TOTPUnregisteredSecretCollection.)
 		"""
-		L.warning("ENTERING 192: has_activated_totp")
+		L.warning("ENTERING 208: has_activated_totp")
 		secret: Optional[str] = await self._get_totp_secret_from_credentials_id(credentials_id)
 		L.warning("secret = {}".format(secret))
 		if secret is None:
@@ -221,7 +221,7 @@ class OTPService(asab.Service):
 
 
 	async def compare_totp_with_request_data(self, credentials_id, request_data: dict) -> bool:
-		L.warning("ENTERING 208 compare_totp_with_request_data({}, {})".format(credentials_id, request_data))
+		L.warning("ENTERING 224 compare_totp_with_request_data({}, {})".format(credentials_id, request_data))
 		totp_secret: Optional[str] = await self._get_totp_secret_from_credentials_id(credentials_id)
 		L.warning("totp_secret = {}".format(totp_secret))
 		if totp_secret is None:
