@@ -126,15 +126,9 @@ CLIENT_METADATA_SCHEMA = {
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
-	"login_key": {  # NON-CANONICAL
-		"type": "object",
-		"description": "Additional data used for locating the credentials at login.",
-		"patternProperties": {
-			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-				{"type": "string"},
-				{"type": "number"},
-				{"type": "boolean"},
-				{"type": "null"}]}}},
+	"authorize_anonymous_users": {  # NON-CANONICAL
+		"type": "boolean",
+		"description": "Allow authorize requests with anonymous users."},
 	"template": {  # TODO: Remove this option
 		"type": "string",
 		"description": "Client template.",
@@ -351,10 +345,10 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_key",
-			"authorize_uri", "template"]):
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
+			"authorize_anonymous_users", "authorize_uri", "template"]):
 			v = kwargs.get(k)
-			if v is not None and len(v) > 0:
+			if v is not None and not (isinstance(v, str) and len(v) > 0):
 				upsertor.set(k, v)
 
 		try:
@@ -423,7 +417,7 @@ class ClientService(asab.Service):
 			self.OIDCService.PKCE.validate_code_challenge_method_registration(kwargs["code_challenge_method"])
 
 		for k, v in client_update.items():
-			if v is None or len(v) == 0:
+			if v is None or (isinstance(v, str) and len(v) == 0):
 				upsertor.unset(k)
 			else:
 				upsertor.set(k, v)

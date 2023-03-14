@@ -93,6 +93,7 @@ class AuthorizeHandler(object):
 
 		# Check the presence of required parameters
 		for parameter in frozenset(["scope", "client_id", "response_type", "redirect_uri"]):
+			# TODO: "redirect_uri" is required only by OIDC, not generic OAuth
 			if parameter not in request_parameters or len(request_parameters[parameter]) == 0:
 				L.warning("Missing required parameter: {}".format(parameter), struct_data=request_parameters)
 				return self.reply_with_authentication_error(
@@ -233,6 +234,7 @@ class AuthorizeHandler(object):
 
 		# OpenID Connect requests MUST contain the openid scope value.
 		# Otherwise, the request is not considered OpenID and its behavior is unspecified
+		# TODO: This is required only by OIDC, not generic OAuth
 		if "openid" not in scope:
 			L.warning("Scope does not contain 'openid'", struct_data={"scope": " ".join(scope)})
 			await self.audit_authorize_error(
@@ -253,8 +255,9 @@ class AuthorizeHandler(object):
 			if root_session.Session.Type != "root":
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
-			elif root_session.Authentication.IsAnonymous:
-				L.warning("Cannot authorize with anonymous session", struct_data={"sid": root_session.Id})
+			elif root_session.Authentication.IsAnonymous and not client_dict.get("authorize_anonymous_users", False):
+				L.warning("Not allowed to authorize with anonymous session.", struct_data={
+					"sid": root_session.Id, "client_id": client_id})
 				root_session = None
 
 		if prompt not in frozenset([None, "none", "login", "select_account"]):

@@ -301,7 +301,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return None
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> str:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> str:
 		# TODO: Implement ident_fields support
 		'''
 		Locate search for the exact match of provided ident and the username in the htpasswd file
