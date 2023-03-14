@@ -1,7 +1,7 @@
 import logging
 
 from .abc import LoginFactorABC
-from ...otp import authn_totp
+
 
 #
 
@@ -17,20 +17,20 @@ class TOTPFactor(LoginFactorABC):
 		"""
 		Check if OTP is set up in credentials.
 		"""
-		cred_svc = self.AuthenticationService.App.get_service("seacatauth.OTPService")
+		otp_service = self.AuthenticationService.App.get_service("seacatauth.OTPService")
 
 		cred_id = login_data["credentials_id"]
 		if cred_id == "":
 			# Not eligible for "fake" login session
 			return False
-		credentials = await cred_svc.get(cred_id, include=frozenset(["__totp"]))
+		credentials = await otp_service.get(cred_id, include=frozenset(["__totp"]))
 		totp = credentials.get("__totp", "")
 		if len(totp) > 0:
 			return True
 		return False
 
 	async def authenticate(self, login_session, request_data) -> bool:
-		cred_svc = self.AuthenticationService.CredentialsService
-		cred_id = login_session.CredentialsId
-		credentials = await cred_svc.get(cred_id, include=frozenset(["__totp"]))
-		return authn_totp(credentials, request_data)
+		L.warning("ENTERED authenticate")
+		otp_service = self.AuthenticationService.App.get_service("seacatauth.OTPService")
+		credentials_id = login_session.CredentialsId
+		return otp_service.compare_totp_with_request_data(credentials_id, request_data)
