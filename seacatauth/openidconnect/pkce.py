@@ -19,7 +19,14 @@ class InvalidCodeChallengeMethodError(Exception):
 	def __init__(self, client_id, code_challenge_method, *args, **kwargs):
 		self.ClientID = client_id
 		self.CodeChallengeMethod = code_challenge_method
-		super().__init__("Invalid code_challenge_method for client", *args)
+		super().__init__("Invalid code_challenge_method for client.", *args)
+
+
+class InvalidCodeChallengeError(Exception):
+	def __init__(self, message=None, *, client_id, **kwargs):
+		self.ClientID = client_id
+		message = message or "Code challenge request is not valid."
+		super().__init__(message)
 
 
 class PKCE:
@@ -32,47 +39,40 @@ class PKCE:
 	"""
 
 	CodeVerifierPattern = re.compile("^[A-Za-z0-9._~-]{43,128}$")
-	SupportedCodeChallengeMethods = frozenset(["plain", "S256"])  # TODO: Configurable
+	SupportedCodeChallengeMethods = frozenset(["none", "plain", "S256"])  # TODO: Configurable
 	DefaultCodeChallengeMethod = "plain"
 
 	@classmethod
-	def validate_code_challenge_methods_registration(cls, code_challenge_methods: list):
+	def validate_code_challenge_method_registration(cls, code_challenge_method: str):
 		"""
 		Validate whether (any) client can register the requested methods
 		"""
-		for method in code_challenge_methods:
-			if method not in cls.SupportedCodeChallengeMethods:
-				raise asab.exceptions.ValidationError(
-					"Unsupported Code Challenge Method: {!r}.".format(method))
-		if "plain" in code_challenge_methods and len(code_challenge_methods) > 1:
-			# If the client is capable of using "S256", it MUST use "S256", as
-			# "S256" is Mandatory To Implement (MTI) on the server.  Clients are
-			# permitted to use "plain" only if they cannot support "S256" for some
-			# technical reason and know via out-of-band configuration that the
-			# server supports "plain".
+		if code_challenge_method not in cls.SupportedCodeChallengeMethods:
 			raise asab.exceptions.ValidationError(
-				"Cannot register the 'plain' Code Challenge Method alongside other more secure methods. "
-				"Clients are permitted to use 'plain' only if they do not support 'S256'."
-			)
+				"Unsupported Code Challenge Method: {!r}.".format(code_challenge_method))
 
 	@classmethod
-	def validate_code_challenge_method(cls, client: dict, code_challenge_method: str):
+	def validate_code_challenge_initialization(
+		cls, client: dict, code_challenge: str = None, requested_code_challenge_method: str = None):
 		"""
 		Validate whether the client can use the requested method in authorization
 		"""
-		if code_challenge_method is None:
-			code_challenge_method = "plain"
+		if requested_code_challenge_method is None:
+			if code_challenge is None:
+				requested_code_challenge_method = "none"
+			else:
+				requested_code_challenge_method = "plain"
 
-		allowed_methods = client.get("code_challenge_methods")
-		if allowed_methods is None or len(allowed_methods) == 0:
-			# TODO: If the client has no code_challenge_methods registered, raise an error
-			L.warning("Client has no 'code_challenge_methods' registered.", struct_data={"client_id": client["_id"]})
-		elif code_challenge_method not in allowed_methods:
+		if requested_code_challenge_method == "none" and code_challenge is not None:
+			raise InvalidCodeChallengeError(
+				"Cannot request code_challenge_method without providing code_challenge.", client_id=client["_id"])
+
+		expected_method = client.get("code_challenge_method", "none")
+		if requested_code_challenge_method != expected_method:
 			raise InvalidCodeChallengeMethodError(
-				client_id=client["_id"], code_challenge_method=code_challenge_method)
-		else:
-			# Method is valid for this client
-			pass
+				client_id=client["_id"], code_challenge_method=requested_code_challenge_method)
+
+		return requested_code_challenge_method
 
 	@classmethod
 	def evaluate_code_challenge(cls, code_challenge_method, code_challenge, code_verifier):
