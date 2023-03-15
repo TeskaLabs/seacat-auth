@@ -2,6 +2,10 @@
 
 ## Release candidate
 
+### Breaking changes
+- Renamed the Code Challenge Method client feature (#168, PLUM Sprint 230224)
+- Code Challenge Method is now enforced if set (#168, PLUM Sprint 230224)
+
 ### Fix
 - Removed required fields from client update (#144, PLUM Sprint 230113)
 - Store client cookie domain (#147, PLUM Sprint 230113)
@@ -10,6 +14,7 @@
 - Fix cookie client session flow (#155, PLUM Sprint 230210)
 - Renaming resources without description (#158, PLUM Sprint 230210)
 - Batman does not add nonexistent roles to Kibana users (#159, PLUM Sprint 230210)
+- Fixed empty string check in client registration (#168, PLUM Sprint 230224)
 
 ### Features
 - Allow unsetting some client features (#148, PLUM Sprint 230113)
@@ -25,6 +30,8 @@
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
 - Swagger doc page uses the same auth rules as ASAB API (#164, PLUM Sprint 230224)
+- Renamed the Code Challenge Method client feature (#168, PLUM Sprint 230224)
+- Code Challenge Method is now enforced if set (#168, PLUM Sprint 230224)
 
 ---
 
