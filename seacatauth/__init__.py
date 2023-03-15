@@ -103,6 +103,10 @@ asab.Config.add_defaults({
 		"descriptor_file": "",
 		# "descriptor_file": "/conf/login-descriptors.json",
 
+		# Whitespace-separated list of field names that will be passed to the credential provider
+		# locate() method if supplied in login prologue request body `qs` parameter
+		"custom_login_parameters": "",
+
 		# Login attempts before login session is invalidated
 		"login_attempts": 10,
 
