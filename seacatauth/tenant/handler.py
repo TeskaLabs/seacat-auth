@@ -220,36 +220,82 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
+		"required": ["credential_ids", "tenants"],
 		"properties": {
 			"credential_ids": {
 				"type": "array",
 				"items": {"type": "string"}},
 			"tenants": {
-				"type": "array",
-				"items": {"type": "string"}},
-		}})
+				"type": "object",
+				"patternProperties": {
+					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
+						"type": "array",
+						"items": {"type": "string"}}}}}
+	})
 	@access_control("authz:superuser")
 	async def bulk_assign_tenant(self, request, *, json_data):
-		error_details = []
-		successful_count = 0
-		for tenant in json_data["tenants"]:
-			for credential_id in json_data["credential_ids"]:
+		credential_service = self.TenantService.App.get_service("seacatauth.CredentialsService")
+		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
+
+		# Validate that all the credentials exist
+		for credential_id in json_data["credential_ids"]:
+			try:
+				await credential_service.detail(credential_id)
+			except KeyError:
+				raise asab.exceptions.ValidationError("Credentials not found: {}".format(credential_id))
+
+		# Validate that tenants and their roles exists
+		for tenant, roles in json_data["tenants"].items():
+			if tenant != "*":
 				try:
-					await self.TenantService.assign_tenant(credential_id, tenant)
-					successful_count += 1
+					await self.TenantService.get(tenant)
+				except KeyError:
+					raise asab.exceptions.ValidationError("Tenant not found: {}".format(tenant))
+			for role in roles:
+				t, _ = role.split("/", 1)
+				if t != tenant:
+					# Role is not listed under its proper tenant
+					raise asab.exceptions.ValidationError("Role {!r} not found in tenant {!r}".format(role, tenant))
+				try:
+					await role_service.get(role)
+				except KeyError:
+					raise asab.exceptions.ValidationError("Role not found: {}".format(role))
+
+		error_details = []
+		for tenant, roles in json_data["tenants"].items():
+			for credential_id in json_data["credential_ids"]:
+				success = False
+				try:
+					await self.TenantService.assign_tenant(
+						credential_id, tenant, verify_tenant=False, verify_credentials=False)
+					success = True
 				except asab.exceptions.Conflict:
-					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant already assigned."})
-				except exceptions.TenantNotFoundError:
-					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not found."})
-				except exceptions.CredentialsNotFoundError:
-					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Credentials not found."})
+					L.info("Skipping: Tenant already assigned.", struct_data={
+						"cid": credential_id, "tenant": tenant})
+					success = True
 				except Exception as e:
 					L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
 						"cid": credential_id, "tenant": tenant})
-					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+					error_details.append({"cid": credential_id, "tenant": tenant})
+				if not success:
+					continue
+
+				if len(roles) == 0:
+					continue
+
+				for role in roles:
+					try:
+						await role_service.assign_role(
+							credential_id, role, verify_role=False, verify_credentials=False, verify_tenant=False)
+					except asab.exceptions.Conflict:
+						L.info("Skipping: Role already assigned.", struct_data={
+							"cid": credential_id, "role": role})
+					except Exception as e:
+						L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
+							"cid": credential_id, "role": role})
+						error_details.append({"cid": credential_id, "role": role})
 
 		data = {
-			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
 			"result": "OK"}
