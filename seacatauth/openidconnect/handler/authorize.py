@@ -12,7 +12,7 @@ from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
-from ...generic import urlparse, urlparse_without_fragment, urlunparse
+from ...generic import urlparse, urlunparse
 
 #
 
@@ -494,9 +494,9 @@ class AuthorizeHandler(object):
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
 		# Build redirect uri
-		authorize_redirect_uri = self._build_redirect_uri(client_dict, authorize_query_params)
+		callback_uri = self._build_login_callback_uri(client_dict, authorize_query_params)
 
-		login_query_params.append(("redirect_uri", authorize_redirect_uri))
+		login_query_params.append(("redirect_uri", callback_uri))
 		login_query_params.append(("client_id", client_id))
 
 		# Build login uri
@@ -684,51 +684,39 @@ class AuthorizeHandler(object):
 		Check if the client has a registered login URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
-		try:
-			client_login_uri = client_dict.get("login_uri")
-		except KeyError:
-			client_login_uri = None
-		if client_login_uri is not None:
-			parsed = urlparse_without_fragment(client_login_uri)
+		login_uri = client_dict.get("login_uri")
+		if login_uri is None:
+			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
+
+		parsed = urlparse(login_uri)
+		if parsed["fragment"] != "":
+			# If the Login URI contains fragment, add the login params into the fragment query
+			fragment_parsed = urlparse(parsed["fragment"])
+			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query.update(login_query_params)
+			fragment_parsed["query"] = urllib.parse.urlencode(query)
+			parsed["fragment"] = urlunparse(**fragment_parsed)
+		else:
+			# If the Login URI contains no fragment, add the login params into the regular URL query
 			query = urllib.parse.parse_qs(parsed["query"])
-			# WARNING: If the client's login URI includes query parameters with the same names
-			# as those used by Seacat Auth, they will be overwritten
 			query.update(login_query_params)
 			parsed["query"] = urllib.parse.urlencode(query)
-			login_url = urlunparse(**parsed)
-		else:
-			# Seacat Auth login expects the parameters to be at the end of the URL (in the fragment (hash) part)
-			# TODO: Consider using regular query parameters instead (UI refactoring needed)
-			#   so that Seacat Auth UI does not need a special approach here
-			login_url = "{}{}?{}".format(
-				self.AuthWebuiBaseUrl,
-				self.LoginPath,
-				urllib.parse.urlencode(login_query_params)
-			)
-		return login_url
 
-	def _build_redirect_uri(self, client_dict, authorize_query_params):
+		return urlunparse(**parsed)
+
+
+	def _build_login_callback_uri(self, client_dict, authorize_query_params):
 		"""
-		Check if the client has a registered oauth URI. If not, use the default.
+		Check if the client has a registered OAuth Authorize URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
-		try:
-			client_oauth_uri = client_dict.get("oauth_uri")
-		except KeyError:
-			client_oauth_uri = None
-		if client_oauth_uri is not None:
-			parsed = urlparse(client_oauth_uri)
-			query = urllib.parse.parse_qs(parsed["query"])
-			# WARNING: If the client's login URI includes query parameters with the same names
-			# as those used by Seacat Auth, they will be overwritten
-			query.update(authorize_query_params)
-			parsed["query"] = urllib.parse.urlencode(query)
-			authorize_redirect_uri = urlunparse(**parsed)
-		else:
-			# Build the redirect URI back to this endpoint and add it to login params
-			authorize_redirect_uri = "{}{}?{}".format(
-				self.PublicApiBaseUrl,
-				self.AuthorizePath,
-				urllib.parse.urlencode(authorize_query_params)
-			)
-		return authorize_redirect_uri
+		authorize_uri = client_dict.get("authorize_uri")
+		if authorize_uri is None:
+			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+
+		parsed = urlparse(authorize_uri)
+		query = urllib.parse.parse_qs(parsed["query"])
+		query.update(authorize_query_params)
+		parsed["query"] = urllib.parse.urlencode(query)
+
+		return urlunparse(**parsed)
