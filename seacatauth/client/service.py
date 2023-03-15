@@ -110,7 +110,7 @@ CLIENT_METADATA_SCHEMA = {
 		"type": "string",
 		"description":
 			"Requested Client Authentication method for the Token Endpoint. "
-			"If omitted, the default is `client_secret_basic`.",
+			"If omitted, the default is `none`.",
 		"enum": TOKEN_ENDPOINT_AUTH_METHODS},
 	# "token_endpoint_auth_signing_alg": {},
 	# "default_max_age": {},
@@ -118,27 +118,22 @@ CLIENT_METADATA_SCHEMA = {
 	# "default_acr_values": {},
 	# "initiate_login_uri": {},
 	# "request_uris": {},
-	"code_challenge_methods": {
-		"type": "array",
+	"code_challenge_method": {
+		"type": "string",
 		"description":
-			"JSON array containing a list of the PKCE Code Challenge Methods "
-			"that the Client is declaring that it will restrict itself to using. "
-			"If omitted, the client is not expected to use PKCE.",
-		"items": {
-			"type": "string",
-			"enum": ["plain", "S256"]}},
+			"Code Challenge Method (PKCE) that the Client will be required to use at the Authorize Endpoint. "
+			"The default, if omitted, is `none`.",
+		"enum": ["none", "plain", "S256"]},
+	"authorize_uri": {  # NON-CANONICAL
+		"type": "string",
+		"description":
+			"URL of OAuth authorize endpoint. Useful when logging in from different than the default domain."},
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description": "URL of preferred login page."},
-	"login_key": {  # NON-CANONICAL
-		"type": "object",
-		"description": "Additional data used for locating the credentials at login.",
-		"patternProperties": {
-			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-				{"type": "string"},
-				{"type": "number"},
-				{"type": "boolean"},
-				{"type": "null"}]}}},
+	"authorize_anonymous_users": {  # NON-CANONICAL
+		"type": "boolean",
+		"description": "Allow authorize requests with anonymous users."},
 	"redirect_uri_validation_method": {  # NON-CANONICAL
 		"type": "string",
 		"description":
@@ -146,10 +141,6 @@ CLIENT_METADATA_SCHEMA = {
 			"The default value is 'full_match', in which the requested redirect URI must fully match "
 			"one of the registered URIs.",
 		"enum": REDIRECT_URI_VALIDATION_METHODS},
-	"template": {  # NON-CANONICAL
-		"type": "string",
-		"description": "Client template.",
-	}
 }
 
 REGISTER_CLIENT_SCHEMA = {
@@ -301,6 +292,7 @@ class ClientService(asab.Service):
 		assert application_type in APPLICATION_TYPES
 
 		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
+		# TODO: The default should be "client_secret_basic". Change this once implemented.
 		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 
 		if _custom_client_id is not None:
@@ -324,6 +316,8 @@ class ClientService(asab.Service):
 			client_secret = None
 			client_secret_expires_at = None
 		elif token_endpoint_auth_method == "client_secret_basic":
+			raise NotImplementedError("Token endpoint auth method 'client_secret_basic' is not supported.")
+			# TODO: Finish implementing authorization with client secret
 			# The client is CONFIDENTIAL
 			# Clients capable of maintaining the confidentiality of their
 			# credentials (e.g., client implemented on a secure server with
@@ -343,7 +337,7 @@ class ClientService(asab.Service):
 
 		upsertor.set("token_endpoint_auth_method", token_endpoint_auth_method)
 
-		self._check_redirect_uris(redirect_uris, application_type)
+		self._check_redirect_uris(redirect_uris, application_type, grant_types)
 		upsertor.set("redirect_uris", list(redirect_uris))
 
 		self._check_grant_types(grant_types, response_types)
@@ -353,10 +347,9 @@ class ClientService(asab.Service):
 		upsertor.set("application_type", application_type)
 
 		# Register allowed PKCE Code Challenge Methods
-		code_challenge_methods = kwargs.get("code_challenge_methods")
-		if code_challenge_methods is not None:
-			self.OIDCService.PKCE.validate_code_challenge_methods_registration(code_challenge_methods)
-			upsertor.set("code_challenge_methods", code_challenge_methods)
+		code_challenge_method = kwargs.get("code_challenge_method", "none")
+		self.OIDCService.PKCE.validate_code_challenge_method_registration(code_challenge_method)
+		upsertor.set("code_challenge_method", code_challenge_method)
 
 		redirect_uri_validation_method = kwargs.get("redirect_uri_validation_method", "full_match")
 		assert redirect_uri_validation_method in REDIRECT_URI_VALIDATION_METHODS
@@ -364,10 +357,10 @@ class ClientService(asab.Service):
 
 		# Optional client metadata
 		for k in frozenset([
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri", "login_key",
-			"template"]):
+			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
+			"authorize_anonymous_users", "authorize_uri"]):
 			v = kwargs.get(k)
-			if v is not None and len(v) > 0:
+			if v is not None and not (isinstance(v, str) and len(v) == 0):
 				upsertor.set(k, v)
 
 		try:
@@ -422,6 +415,7 @@ class ClientService(asab.Service):
 		self._check_redirect_uris(
 			redirect_uris=client_update.get("redirect_uris", client["redirect_uris"]),
 			application_type=client_update.get("application_type", client["application_type"]),
+			grant_types=client_update.get("grant_types", client["grant_types"]),
 			client_uri=client_update.get("client_uri", client.get("client_uri")))
 
 		self._check_grant_types(
@@ -431,11 +425,11 @@ class ClientService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
 		# Register allowed PKCE Code Challenge Methods
-		if "code_challenge_methods" in kwargs:
-			self.OIDCService.PKCE.validate_code_challenge_methods_registration(kwargs["code_challenge_methods"])
+		if "code_challenge_method" in kwargs:
+			self.OIDCService.PKCE.validate_code_challenge_method_registration(kwargs["code_challenge_method"])
 
 		for k, v in client_update.items():
-			if v is None or len(v) == 0:
+			if v is None or (isinstance(v, str) and len(v) == 0):
 				upsertor.unset(k)
 			else:
 				upsertor.set(k, v)
@@ -519,7 +513,8 @@ class ClientService(asab.Service):
 				"Response type 'token' requires 'implicit' to be included in grant types")
 
 
-	def _check_redirect_uris(self, redirect_uris: list, application_type: str, client_uri: str = None):
+	def _check_redirect_uris(
+		self, redirect_uris: list, application_type: str, grant_types: list, client_uri: str = None):
 		"""
 		Check if the redirect URIs can be registered for the given application type
 
@@ -532,13 +527,14 @@ class ClientService(asab.Service):
 					"Redirect URI must be an absolute URI without a fragment component.")
 
 			if application_type == "web":
-				if parsed.scheme != "https" and not self._AllowInsecureWebClientURIs:
-					raise asab.exceptions.ValidationError(
-						"Web Clients using the OAuth Implicit Grant Type MUST only register URLs "
-						"using the https scheme as redirect_uris.")
-				if parsed.hostname == "localhost":
-					raise asab.exceptions.ValidationError(
-						"Web Clients using the OAuth Implicit Grant Type MUST NOT use localhost as the hostname.")
+				if "implicit" in grant_types:
+					if parsed.scheme != "https" and not self._AllowInsecureWebClientURIs:
+						raise asab.exceptions.ValidationError(
+							"Web Clients using the OAuth Implicit Grant Type MUST only register URLs "
+							"using the https scheme as redirect_uris.")
+					if parsed.hostname == "localhost":
+						raise asab.exceptions.ValidationError(
+							"Web Clients using the OAuth Implicit Grant Type MUST NOT use localhost as the hostname.")
 			elif application_type == "native":
 				# TODO: Authorization Servers MAY place additional constraints on Native Clients.
 				if parsed.scheme == "http":

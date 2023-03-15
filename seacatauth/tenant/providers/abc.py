@@ -27,6 +27,11 @@ class TenantsProviderABC(asab.ConfigObject, abc.ABC):
 		pass
 
 
+	@abc.abstractmethod
+	async def get_assignment(self, credatials_id: str, tenant: str):
+		pass
+
+
 class EditableTenantsProviderABC(TenantsProviderABC):
 
 	@abc.abstractmethod

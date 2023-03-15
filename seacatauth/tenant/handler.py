@@ -1,6 +1,7 @@
 import logging
 
 import asab.web.rest
+import asab.exceptions
 
 from ..decorators import access_control
 
@@ -31,6 +32,9 @@ class TenantHandler(object):
 		web_app.router.add_put('/tenant_assign/{credentials_id}', self.set_tenants)
 		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
 		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
+
+		web_app.router.add_put("/tenant_assign_many/{tenant}", self.bulk_assign_tenant)
+		web_app.router.add_put("/tenant_unassign_many/{tenant}", self.bulk_unassign_tenant)
 
 		web_app.router.add_get('/tenant_propose', self.propose_tenant)
 
@@ -172,30 +176,20 @@ class TenantHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def assign_tenant(self, request, *, tenant):
-		data = await self.TenantService.assign_tenant(
+		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
 		)
-
-		return asab.web.rest.json_response(
-			request,
-			data=data,
-			status=200 if data["result"] == "OK" else 400
-		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
 	@access_control("authz:tenant:admin")
 	async def unassign_tenant(self, request, *, tenant):
-		data = await self.TenantService.unassign_tenant(
+		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
 		)
-
-		return asab.web.rest.json_response(
-			request,
-			data=data,
-			status=200 if data["result"] == "OK" else 400
-		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
 	async def get_tenants_by_credentials(self, request):
@@ -221,3 +215,56 @@ class TenantHandler(object):
 		proposed_tenant = self.NameProposerService.propose_name()
 		# TODO: Check is the proposed tenant name is not already taken
 		return asab.web.rest.json_response(request, {'tenant_id': proposed_tenant})
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "array",
+		"items": {"type": "string"}})
+	@access_control("authz:superuser")
+	async def bulk_assign_tenant(self, request, *, json_data, tenant):
+		error_details = []
+		successful_count = 0
+		for credential_id in json_data:
+			try:
+				await self.TenantService.assign_tenant(credential_id, tenant)
+				successful_count += 1
+			except asab.exceptions.Conflict:
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant already assigned."})
+			except Exception as e:
+				L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
+					"cid": credential_id, "tenant": tenant})
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+
+		data = {
+			"successful_count": successful_count,
+			"error_count": len(error_details),
+			"error_details": error_details,
+			"result": "OK"}
+		return asab.web.rest.json_response(request, data=data)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "array",
+		"items": {"type": "string"}})
+	@access_control("authz:superuser")
+	async def bulk_unassign_tenant(self, request, *, json_data, tenant):
+		error_details = []
+		successful_count = 0
+		for credential_id in json_data:
+			if not await self.TenantService.has_tenant_assigned(credential_id, tenant):
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
+				continue
+			try:
+				await self.TenantService.unassign_tenant(credential_id, tenant)
+				successful_count += 1
+			except Exception as e:
+				L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
+					"cid": credential_id, "tenant": tenant})
+				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+
+		data = {
+			"successful_count": successful_count,
+			"error_count": len(error_details),
+			"error_details": error_details,
+			"result": "OK"}
+		return asab.web.rest.json_response(request, data=data)
