@@ -2,6 +2,7 @@ import datetime
 import logging
 
 import asab.storage.exceptions
+import pymongo
 
 from .codes import AuditCode
 
@@ -22,6 +23,16 @@ class AuditService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
+	async def initialize(self, app):
+		coll = await self.StorageService.collection(self.AuditCollection)
+
+		await coll.create_index(
+			[
+				("cid", pymongo.ASCENDING),
+				("_c", pymongo.DESCENDING),	 # Most of calls are for latest entries
+				("c", pymongo.ASCENDING)
+			],
+		)
 
 	async def append(self, code: AuditCode, attributes: dict = None):
 		assert (isinstance(code, AuditCode))
