@@ -145,14 +145,6 @@ def urlparse(url: str):
 	"""
 	return urllib.parse.urlparse(url)._asdict()
 
-def urlparse_without_fragment(url: str):
-	"""
-	Parse the URL into a dictionary and ignore fragment.
-	see https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlparse
-
-	Convenience wrapper around urllib.parse.urlparse().
-	"""
-	return urllib.parse.urlparse(url, allow_fragments=False)._asdict()
 
 def urlunparse(
 	*,
