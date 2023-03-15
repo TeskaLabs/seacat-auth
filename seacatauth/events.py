@@ -3,8 +3,8 @@ class EventTypes:
 	LOGIN_SESSION_CREATED = "login_session_created"
 	LOGIN_SESSION_UPDATED = "login_session_updated"
 
-	WEBAUTHN_CREDENTIAL_CREATED = "webauthn_credential_created"
-	WEBAUTHN_CREDENTIAL_UPDATED = "webauthn_credential_updated"
+	WEBAUTHN_CREDENTIALS_CREATED = "webauthn_credentials_created"
+	WEBAUTHN_CREDENTIALS_UPDATED = "webauthn_credentials_updated"
 	REGISTRATION_CHALLENGE_CREATED = "registration_challenge_created"
 
 	RESOURCE_CREATED = "resource_created"
