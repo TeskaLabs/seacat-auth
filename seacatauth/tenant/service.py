@@ -279,8 +279,8 @@ class TenantService(asab.Service):
 		role_svc = self.App.get_service("seacatauth.RoleService")
 		await role_svc.set_roles(
 			credentials_id,
-			tenant_scope={tenant},
-			roles=[]
+			roles=[],
+			tenant=tenant
 		)
 
 		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
