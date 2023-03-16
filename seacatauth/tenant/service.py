@@ -236,7 +236,7 @@ class TenantService(asab.Service):
 		verify_credentials: bool = True
 	):
 		"""
-		Grant access to a tenant to specified credentials.
+		Grant tenant access to specified credentials.
 		Optionally, verify first that the tenant and the credentials exist.
 		"""
 		assert (self.is_enabled())
