@@ -87,7 +87,7 @@ class WebAuthnService(asab.Service):
 		upsertor.set("rpid", self.RelyingPartyId)
 		upsertor.set("name", name)
 
-		wacid = await upsertor.execute(event_type=EventTypes.WEBAUTHN_REG_CHALLENGE_CREATED)
+		wacid = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid})
 
 
@@ -157,7 +157,7 @@ class WebAuthnService(asab.Service):
 		if last_login is not None:
 			upsertor.set("ll", last_login)
 
-		await upsertor.execute(event_type=EventTypes.WEBAUTHN_REG_CHALLENGE_UPDATED)
+		await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_UPDATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
 			"wacid": webauthn_credential_id,
 		})
@@ -215,7 +215,7 @@ class WebAuthnService(asab.Service):
 		challenge = secrets.token_bytes(32)
 		upsertor.set("ch", challenge)
 
-		await upsertor.execute(event_type=EventTypes.WEBAUTHN_REG_CHALLENGE_CREATED)
+		await upsertor.execute(event_type=EventTypes.REGISTRATION_CHALLENGE_CREATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn challenge created", struct_data={"sid": session_id})
 
 		return challenge
