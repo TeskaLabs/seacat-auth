@@ -15,6 +15,13 @@ L = logging.getLogger(__name__)
 
 
 class ClientHandler(object):
+	"""
+	Client management
+
+	---
+	tags:
+	- Client management
+	"""
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
 
@@ -30,6 +37,18 @@ class ClientHandler(object):
 
 	@access_control("authz:superuser")
 	async def list(self, request):
+		"""
+		List registered clients
+
+		---
+		query:
+		- p:
+			description: Page number
+		- i:
+			description: Items per page
+		- f:
+			description: Filter
+		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
 		if limit is not None:
@@ -52,6 +71,9 @@ class ClientHandler(object):
 
 	@access_control("authz:superuser")
 	async def get(self, request):
+		"""
+		Get client by client_id
+		"""
 		client_id = request.match_info["client_id"]
 		result = self._rest_normalize(
 			await self.ClientService.get(client_id),
@@ -63,6 +85,11 @@ class ClientHandler(object):
 
 	@access_control("authz:superuser")
 	async def features(self, request):
+		"""
+		Get schema of supported client metadata
+
+		https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+		"""
 		result = {
 			"metadata_schema": REGISTER_CLIENT_SCHEMA,
 			"templates": CLIENT_TEMPLATES,
@@ -75,6 +102,11 @@ class ClientHandler(object):
 	@asab.web.rest.json_schema_handler(REGISTER_CLIENT_SCHEMA)
 	@access_control("authz:superuser")
 	async def register(self, request, *, json_data):
+		"""
+		Register a new client
+
+		https://openid.net/specs/openid-connect-registration-1_0.html
+		"""
 		if "preferred_client_id" in json_data:
 			if not self.ClientService._AllowCustomClientID:
 				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
@@ -86,6 +118,11 @@ class ClientHandler(object):
 	@asab.web.rest.json_schema_handler(UPDATE_CLIENT_SCHEMA)
 	@access_control("authz:superuser")
 	async def update(self, request, *, json_data):
+		"""
+		Edit an existing client
+
+		https://openid.net/specs/openid-connect-registration-1_0.html
+		"""
 		client_id = request.match_info["client_id"]
 		if "preferred_client_id" in json_data:
 			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
@@ -98,6 +135,9 @@ class ClientHandler(object):
 
 	@access_control("authz:superuser")
 	async def reset_secret(self, request):
+		"""
+		Reset client secret
+		"""
 		client_id = request.match_info["client_id"]
 		response = await self.ClientService.reset_secret(client_id)
 		return asab.web.rest.json_response(
@@ -108,6 +148,9 @@ class ClientHandler(object):
 
 	@access_control("authz:superuser")
 	async def delete(self, request):
+		"""
+		Delete a client
+		"""
 		client_id = request.match_info["client_id"]
 		await self.ClientService.delete(client_id)
 		return asab.web.rest.json_response(
