@@ -90,7 +90,7 @@ class AuthenticationHandler(object):
 			query_dict = urllib.parse.parse_qs(query_string)
 
 			login_dict = {
-				k: v
+				k: v[0]
 				for k, v in query_dict.items()
 				if k in self.AuthenticationService.CustomLoginParameters}
 
