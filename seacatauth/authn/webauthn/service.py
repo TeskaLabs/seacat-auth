@@ -215,7 +215,7 @@ class WebAuthnService(asab.Service):
 		challenge = secrets.token_bytes(32)
 		upsertor.set("ch", challenge)
 
-		await upsertor.execute(event_type=EventTypes.REGISTRATION_CHALLENGE_CREATED)
+		await upsertor.execute(event_type=EventTypes.WEBAUTHN_REG_CHALLENGE_CREATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn challenge created", struct_data={"sid": session_id})
 
 		return challenge
