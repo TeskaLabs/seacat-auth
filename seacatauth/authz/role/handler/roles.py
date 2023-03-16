@@ -8,7 +8,6 @@ import asab.web.tenant
 import asab.exceptions
 
 from ....decorators import access_control
-from .... import exceptions
 
 #
 
