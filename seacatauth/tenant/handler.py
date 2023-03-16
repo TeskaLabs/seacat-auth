@@ -115,6 +115,8 @@ class TenantHandler(object):
 			"id": {
 				"type": "string",
 				"description": "Unique tenant ID. Can't be changed once the tenant has been created."}},
+		"example": {
+			"id": "acme-corp"}
 	})
 	@access_control("authz:superuser")
 	async def create(self, request, *, credentials_id, json_data):
@@ -142,15 +144,25 @@ class TenantHandler(object):
 		"additionalProperties": False,
 		"properties": {
 			"description": {
-				"type": "string"},
+				"type": "string",
+				"description": "Human readable description."},
 			"data": {
 				"type": "object",
+				"description":
+					"Custom tenant data. Shallow JSON object that maps string keys "
+					"to non-structured values.",
 				"patternProperties": {
 					"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
 						{"type": "string"},
 						{"type": "number"},
 						{"type": "boolean"},
-						{"type": "null"}]}}}}
+						{"type": "null"}]}}}},
+		"example": {
+			"description": "ACME Corp Inc.",
+			"data": {
+				"email": "support@acmecorp.test",
+				"very_corporate": True,
+				"schema": "ECS"}}
 	})
 	@access_control("authz:tenant:admin")
 	async def update_tenant(self, request, *, json_data, tenant):
@@ -184,7 +196,10 @@ class TenantHandler(object):
 		"properties": {
 			"tenants": {
 				"type": "array",
-				"items": {"type": "string"}}}
+				"description": "List of the IDs of tenants to be set",
+				"items": {"type": "string"}}},
+		"example": {
+			"tenants": ["acme-corp", "my-eshop"]}
 	})
 	@access_control()
 	async def set_tenants(self, request, *, json_data):
@@ -285,13 +300,29 @@ class TenantHandler(object):
 		"properties": {
 			"credential_ids": {
 				"type": "array",
+				"description": "List of the IDs of credentials to manage",
 				"items": {"type": "string"}},
 			"tenants": {
 				"type": "object",
+				"description":
+					"Tenants and roles to be assigned. \n\n"
+					"The keys are the IDs of tenants to be granted access to. The values are arrays of the respective "
+					"tenant's roles to be assigned. \n\n"
+					"To grant tenant access without assigning any roles, "
+					"leave the role array empty. \n\n"
+					"To assign global roles, list them under the `'*'` key.",
 				"patternProperties": {
 					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
 						"type": "array",
-						"items": {"type": "string"}}}}}
+						"description": "List of the tenant's roles to be assigned",
+						"items": {"type": "string"}}}}},
+		"example": {
+			"credential_ids": [
+				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
+			"tenants": {
+				"*": ["*/global-editor"],
+				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
+				"my-eshop": []}},
 	})
 	@access_control("authz:superuser")
 	async def bulk_assign_tenants(self, request, *, json_data):
@@ -375,14 +406,28 @@ class TenantHandler(object):
 		"properties": {
 			"credential_ids": {
 				"type": "array",
+				"description": "List of the IDs of credentials to manage",
 				"items": {"type": "string"}},
 			"tenants": {
 				"type": "object",
+				"description":
+					"Tenants and roles to be unassigned. \n\n"
+					"The keys are the IDs of tenants to be revoked access to. The values are arrays of the respective "
+					"tenant's roles to be unassigned. \n\n"
+					"To completely revoke credentials' access to the tenant, leave the role array empty. \n\n"
+					"To unassign global roles, list them under the `'*'` key.",
 				"patternProperties": {
 					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
 						"type": "array",
-						"items": {"type": "string"}}}}}
-	})
+						"items": {"type": "string"}}}}},
+		"example": {
+			"credential_ids": [
+				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
+			"tenants": {
+				"*": ["*/global-editor"],
+				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
+				"my-eshop": []}},
+		})
 	@access_control("authz:superuser")
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
