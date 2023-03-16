@@ -272,7 +272,8 @@ class TenantHandler(object):
 	@asab.web.rest.json_schema_handler({
 		"type": "array",
 		"description": "List of credential IDs",
-		"items": {"type": "string"}
+		"items": {"type": "string"},
+		"example": ["mongodb:default:abc123def456", "htpasswd:local:zdenek"],
 	})
 	async def get_tenants_batch(self, request, *, json_data):
 		"""
@@ -347,7 +348,7 @@ class TenantHandler(object):
 		for tenant, roles in json_data["tenants"].items():
 			if tenant != "*":
 				try:
-					await self.TenantService.get(tenant)
+					await self.TenantService.get_tenant(tenant)
 				except KeyError:
 					raise asab.exceptions.ValidationError("Tenant not found: {}".format(tenant))
 			for role in roles:
@@ -465,6 +466,9 @@ class TenantHandler(object):
 					for role in roles:
 						try:
 							await role_service.unassign_role(credential_id, role)
+						except KeyError:
+							L.info("Skipping: Role not assigned.", struct_data={
+								"cid": credential_id, "role": role})
 						except Exception as e:
 							L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
 								"cid": credential_id, "role": role})
