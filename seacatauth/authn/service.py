@@ -151,7 +151,7 @@ class AuthenticationService(asab.Service):
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
 
-		await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.LOGIN_SESSION_CREATED})
+		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_CREATED)
 
 		return login_session
 
@@ -179,7 +179,7 @@ class AuthenticationService(asab.Service):
 		if remaining_login_attempts is not None:
 			upsertor.set("la", remaining_login_attempts)
 
-		await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.LOGIN_SESSION_UPDATED})
+		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_UPDATED)
 		L.info("Login session updated", struct_data={
 			"lsid": login_session_id,
 		})

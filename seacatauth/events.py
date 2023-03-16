@@ -1,5 +1,4 @@
 class EventTypes:
-	EVENT_TYPE = "event_type"
 	LOGIN_SESSION_CREATED = "login_session_created"
 	LOGIN_SESSION_UPDATED = "login_session_updated"
 

@@ -144,7 +144,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		for field, value in credentials.items():
 			u.set(field, value)
 
-		credentials_id = await u.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.MONGO_CREDENTIALS_CREATED})
+		credentials_id = await u.execute(event_type=EventTypes.MONGO_CREDENTIALS_CREATED)
 
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
@@ -188,7 +188,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				u.unset(key)
 
 		try:
-			await u.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.MONGO_CREDENTIALS_UPDATED})
+			await u.execute(event_type=EventTypes.MONGO_CREDENTIALS_UPDATED)
 			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
 				"cid": credentials_id,
 				"fields": ", ".join(updated_fields or []),

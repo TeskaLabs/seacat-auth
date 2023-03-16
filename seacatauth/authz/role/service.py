@@ -111,7 +111,7 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
 		try:
-			await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.ROLE_CREATED})
+			await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
@@ -205,7 +205,7 @@ class RoleService(asab.Service):
 			upsertor.set("description", description)
 			log_data["description"] = description
 
-		await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.ROLE_UPDATED})
+		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
 		return "OK"
 
@@ -318,7 +318,7 @@ class RoleService(asab.Service):
 			tenant = await self.get_role_tenant(role)
 			if tenant != "*":
 				upsertor.set("t", tenant)
-			await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.ROLES_ASSIGNED})
+			await upsertor.execute(event_type=EventTypes.ROLES_ASSIGNED)
 
 		L.log(asab.LOG_NOTICE, "Roles assigned", struct_data={
 			"cid": credentials_id,
@@ -396,7 +396,7 @@ class RoleService(asab.Service):
 			upsertor.set("t", tenant)
 
 		try:
-			await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.ROLE_ASSIGNED})
+			await upsertor.execute(event_type=EventTypes.ROLE_ASSIGNED)
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
 				key, value = e.KeyValue.popitem()
