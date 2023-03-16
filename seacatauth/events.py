@@ -4,7 +4,7 @@ class EventTypes:
 
 	WEBAUTHN_CREDENTIALS_CREATED = "webauthn_credentials_created"
 	WEBAUTHN_CREDENTIALS_UPDATED = "webauthn_credentials_updated"
-	REGISTRATION_CHALLENGE_CREATED = "registration_challenge_created"
+	WEBAUTHN_REG_CHALLENGE_CREATED = "webauthn_registration_challenge_created"
 
 	RESOURCE_CREATED = "resource_created"
 	RESOURCE_UPDATED = "resource_updated"
