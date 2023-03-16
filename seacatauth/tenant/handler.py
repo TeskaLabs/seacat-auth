@@ -46,6 +46,9 @@ class TenantHandler(object):
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
 	async def list(self, request):
+		"""
+		List all registered tenant IDs
+		"""
 		# TODO: This has to be cached agressivelly
 		provider = self.TenantService.get_provider()
 		result = []
@@ -55,6 +58,20 @@ class TenantHandler(object):
 
 
 	async def search(self, request):
+		"""
+		Search registered tenants
+		---
+		query:
+		- p:
+			name: Page number
+			type: integer
+		- i:
+			name: Items per page
+			type: integer
+		- f:
+			name: Tenant ID filter
+			type: string
+		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i")
 		if limit is not None:
@@ -82,6 +99,9 @@ class TenantHandler(object):
 
 
 	async def get(self, request):
+		"""
+		Get tenant detail
+		"""
 		tenant_id = request.match_info.get("tenant")
 		data = await self.TenantService.get_tenant(tenant_id)
 		return asab.web.rest.json_response(request, data)
@@ -89,14 +109,23 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"properties": {
-			"id": {"type": "string"},
-		},
 		"required": ["id"],
 		"additionalProperties": False,
+		"properties": {
+			"id": {
+				"type": "string",
+				"description": "Unique tenant ID. Can't be changed once the tenant has been created."}},
 	})
 	@access_control("authz:superuser")
 	async def create(self, request, *, credentials_id, json_data):
+		"""
+		Create a tenant
+
+		---
+		security:
+		- oAuth:
+			- authz:superuser
+		"""
 		tenant_id = json_data["id"]
 
 		# Create tenant
@@ -121,14 +150,17 @@ class TenantHandler(object):
 						{"type": "string"},
 						{"type": "number"},
 						{"type": "boolean"},
-						{"type": "null"},
-					]}
-				}
-			}
-		}
+						{"type": "null"}]}}}}
 	})
 	@access_control("authz:tenant:admin")
 	async def update_tenant(self, request, *, json_data, tenant):
+		"""
+		Update tenant description and/or its structured data
+		---
+		security:
+		- oAuth:
+			- authz:tenant:admin
+		"""
 		result = await self.TenantService.update_tenant(tenant, **json_data)
 		return asab.web.rest.json_response(request, data=result)
 
@@ -137,6 +169,10 @@ class TenantHandler(object):
 	async def delete(self, request, *, tenant):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
+		---
+		security:
+		- oAuth:
+			- authz:superuser
 		"""
 		result = await self.TenantService.delete_tenant(tenant)
 		return asab.web.rest.json_response(request, data=result)
@@ -144,22 +180,21 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": [
-			"tenants",
-		],
+		"required": ["tenants"],
 		"properties": {
 			"tenants": {
 				"type": "array",
-				"items": {
-					"type": "string",
-				},
-			},
-		}
+				"items": {"type": "string"}}}
 	})
 	@access_control()
 	async def set_tenants(self, request, *, json_data):
 		"""
-		Helper method for bulk tenant un/assignment
+		Specify a set of accessible tenants for requested credentials ID
+
+		The credentials entity will be granted access to the listed tenants
+		and revoked access to the tenants that are not listed.
+		The caller needs to have access to `authz:tenant:admin` resource for each tenant whose access
+		is being granted or revoked.
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		data = await self.TenantService.set_tenants(
@@ -177,6 +212,13 @@ class TenantHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def assign_tenant(self, request, *, tenant):
+		"""
+		Grant specified tenant access to requested credentials
+		---
+		security:
+		- oAuth:
+			- authz:tenant:admin
+		"""
 		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
@@ -186,6 +228,15 @@ class TenantHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def unassign_tenant(self, request, *, tenant):
+		"""
+		Revoke specified tenant access to requested credentials
+
+		The tenant's roles are unassigned in the process.
+		---
+		security:
+		- oAuth:
+			- authz:tenant:admin
+		"""
 		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
@@ -194,6 +245,9 @@ class TenantHandler(object):
 
 
 	async def get_tenants_by_credentials(self, request):
+		"""
+		Get list of authorized tenants for requested credentials
+		"""
 		result = await self.TenantService.get_tenants(request.match_info["credentials_id"])
 		return asab.web.rest.json_response(
 			request, result
@@ -202,9 +256,13 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "array",
+		"description": "List of credential IDs",
 		"items": {"type": "string"}
 	})
 	async def get_tenants_batch(self, request, *, json_data):
+		"""
+		Get list of authorized tenants for each listed credential ID
+		"""
 		response = {
 			cid: await self.TenantService.get_tenants(cid)
 			for cid in json_data
@@ -213,6 +271,9 @@ class TenantHandler(object):
 
 
 	async def propose_tenant(self, request):
+		"""
+		Propose name for a new tenant.
+		"""
 		proposed_tenant = self.NameProposerService.propose_name()
 		# TODO: Check is the proposed tenant name is not already taken
 		return asab.web.rest.json_response(request, {'tenant_id': proposed_tenant})
@@ -235,7 +296,7 @@ class TenantHandler(object):
 	@access_control("authz:superuser")
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
-		Grant tenant access and/or assign roles to a list of credentials.
+		Grant tenant access and/or assign roles to a list of credentials
 		---
 		security:
 		- oAuth:
@@ -325,7 +386,7 @@ class TenantHandler(object):
 	@access_control("authz:superuser")
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
-		Revoke tenant access and/or unassign roles from a list of credentials.
+		Revoke tenant access and/or unassign roles from a list of credentials
 		---
 		security:
 		- oAuth:
@@ -365,7 +426,6 @@ class TenantHandler(object):
 							error_details.append({"cid": credential_id, "role": role})
 
 		data = {
-			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
 			"result": "OK"}
