@@ -34,8 +34,8 @@ class TenantHandler(object):
 		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
 		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
 
-		web_app.router.add_put("/tenant_assign_many", self.bulk_assign_tenant)
-		web_app.router.add_put("/tenant_unassign_many", self.bulk_unassign_tenant)
+		web_app.router.add_put("/tenant_assign_many", self.bulk_assign_tenants)
+		web_app.router.add_put("/tenant_unassign_many", self.bulk_unassign_tenants)
 
 		web_app.router.add_get('/tenant_propose', self.propose_tenant)
 
@@ -233,7 +233,14 @@ class TenantHandler(object):
 						"items": {"type": "string"}}}}}
 	})
 	@access_control("authz:superuser")
-	async def bulk_assign_tenant(self, request, *, json_data):
+	async def bulk_assign_tenants(self, request, *, json_data):
+		"""
+		Grant tenant access and/or assign roles to a list of credentials.
+		---
+		security:
+		- oAuth:
+			- authz:superuser
+		"""
 		credential_service = self.TenantService.App.get_service("seacatauth.CredentialsService")
 		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
 
@@ -301,33 +308,61 @@ class TenantHandler(object):
 			"result": "OK"}
 		return asab.web.rest.json_response(request, data=data)
 
-
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
+		"required": ["credential_ids", "tenants"],
 		"properties": {
 			"credential_ids": {
 				"type": "array",
 				"items": {"type": "string"}},
 			"tenants": {
-				"type": "array",
-				"items": {"type": "string"}},
-		}})
+				"type": "object",
+				"patternProperties": {
+					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
+						"type": "array",
+						"items": {"type": "string"}}}}}
+	})
 	@access_control("authz:superuser")
-	async def bulk_unassign_tenant(self, request, *, json_data):
+	async def bulk_unassign_tenants(self, request, *, json_data):
+		"""
+		Revoke tenant access and/or unassign roles from a list of credentials.
+		---
+		security:
+		- oAuth:
+			- authz:superuser
+		"""
+		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
+
+		# Verify that roles are listed under their proper tenant
+		for tenant, roles in json_data["tenants"].items():
+			for role in roles:
+				t, _ = role.split("/", 1)
+				if t != tenant:
+					raise asab.exceptions.ValidationError("Role {!r} not found in tenant {!r}".format(role, tenant))
+
 		error_details = []
-		successful_count = 0
-		for tenant in json_data["tenants"]:
+		for tenant, roles in json_data["tenants"].items():
 			for credential_id in json_data["credential_ids"]:
-				if not await self.TenantService.has_tenant_assigned(credential_id, tenant):
-					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
-					continue
-				try:
-					await self.TenantService.unassign_tenant(credential_id, tenant)
-					successful_count += 1
-				except Exception as e:
-					L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
-						"cid": credential_id, "tenant": tenant})
-					error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+				if len(roles) == 0:
+					# If no roles are listed under the tenant (e.g. `"my-tenant": []`),
+					# revoke access to the tenant completely.
+					# This also automatically unassigns all the tenant's roles
+					try:
+						await self.TenantService.unassign_tenant(credential_id, tenant)
+					except Exception as e:
+						L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
+							"cid": credential_id, "tenant": tenant})
+						error_details.append({"cid": credential_id, "tenant": tenant})
+				else:
+					# If any roles are listed under the tenant (e.g. `"my-tenant": ["my-tenant/user"]`),
+					# unassign only those and keep the tenant access.
+					for role in roles:
+						try:
+							await role_service.unassign_role(credential_id, role)
+						except Exception as e:
+							L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
+								"cid": credential_id, "role": role})
+							error_details.append({"cid": credential_id, "role": role})
 
 		data = {
 			"successful_count": successful_count,
