@@ -3,7 +3,6 @@ import logging
 import asab.web.rest
 import asab.exceptions
 
-from .. import exceptions
 from ..decorators import access_control
 
 ###
@@ -428,7 +427,7 @@ class TenantHandler(object):
 				"*": ["*/global-editor"],
 				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
 				"my-eshop": []}},
-		})
+	})
 	@access_control("authz:superuser")
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
