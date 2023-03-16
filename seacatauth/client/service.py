@@ -387,7 +387,7 @@ class ClientService(asab.Service):
 		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
-		await upsertor.execute(event_type=EventTypes.CLIENT_RESET)
+		await upsertor.execute(event_type=EventTypes.CLIENT_SECRET_RESET)
 		L.log(asab.LOG_NOTICE, "Client secret updated", struct_data={"client_id": client_id})
 
 		response = {"client_secret": client_secret}
