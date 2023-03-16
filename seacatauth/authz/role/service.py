@@ -318,7 +318,7 @@ class RoleService(asab.Service):
 			tenant = await self.get_role_tenant(role)
 			if tenant != "*":
 				upsertor.set("t", tenant)
-			await upsertor.execute(event_type=EventTypes.ROLES_ASSIGNED)
+			await upsertor.execute(event_type=EventTypes.ROLE_ASSIGNED)  # TODO: Make use of the _do_assign_role method here
 
 		L.log(asab.LOG_NOTICE, "Roles assigned", struct_data={
 			"cid": credentials_id,
