@@ -357,7 +357,7 @@ class ClientService(asab.Service):
 				upsertor.set(k, v)
 
 		try:
-			await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.CLIENT_REGISTERED})
+			await upsertor.execute(event_type=EventTypes.CLIENT_REGISTERED)
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="client_id", value=client_id)
 
@@ -387,7 +387,7 @@ class ClientService(asab.Service):
 		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
-		await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.CLIENT_RESET})
+		await upsertor.execute(event_type=EventTypes.CLIENT_RESET)
 		L.log(asab.LOG_NOTICE, "Client secret updated", struct_data={"client_id": client_id})
 
 		response = {"client_secret": client_secret}
@@ -426,7 +426,7 @@ class ClientService(asab.Service):
 			else:
 				upsertor.set(k, v)
 
-		await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.CLIENT_UPDATED})
+		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
 		L.log(asab.LOG_NOTICE, "Client updated", struct_data={
 			"client_id": client_id,
 			"fields": " ".join(client_update.keys())})

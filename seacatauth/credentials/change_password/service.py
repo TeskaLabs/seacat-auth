@@ -81,7 +81,7 @@ class ChangePasswordService(asab.Service):
 		for request_builder in request_builders:
 			for key, value in request_builder.items():
 				upsertor.set(key, value)
-		request_id = await upsertor.execute(custom_data={EventTypes.EVENT_TYPE: EventTypes.PWD_RESET_TOKEN_CREATED})
+		request_id = await upsertor.execute(event_type=EventTypes.PWD_RESET_TOKEN_CREATED)
 		assert pwd_change_id == request_id
 		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"pwd_token": request_id})
 		return request_id
