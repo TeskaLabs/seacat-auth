@@ -40,6 +40,11 @@ TOKEN_ENDPOINT_AUTH_METHODS = [
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
+REDIRECT_URI_VALIDATION_METHODS = [
+	"full_match",
+	"prefix_match",
+	"none",
+]
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
@@ -131,6 +136,13 @@ CLIENT_METADATA_SCHEMA = {
 	"authorize_anonymous_users": {  # NON-CANONICAL
 		"type": "boolean",
 		"description": "Allow authorize requests with anonymous users."},
+	"redirect_uri_validation_method": {  # NON-CANONICAL
+		"type": "string",
+		"description":
+			"Specifies the method how the redirect URI used in authorization requests is validated. "
+			"The default value is 'full_match', in which the requested redirect URI must fully match "
+			"one of the registered URIs.",
+		"enum": REDIRECT_URI_VALIDATION_METHODS},
 }
 
 REGISTER_CLIENT_SCHEMA = {
@@ -341,6 +353,10 @@ class ClientService(asab.Service):
 		self.OIDCService.PKCE.validate_code_challenge_method_registration(code_challenge_method)
 		upsertor.set("code_challenge_method", code_challenge_method)
 
+		redirect_uri_validation_method = kwargs.get("redirect_uri_validation_method", "full_match")
+		assert redirect_uri_validation_method in REDIRECT_URI_VALIDATION_METHODS
+		upsertor.set("redirect_uri_validation_method", redirect_uri_validation_method)
+
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
@@ -451,9 +467,9 @@ class ClientService(asab.Service):
 		if client_secret != client.get("__client_secret", ""):
 			raise exceptions.InvalidClientSecret(client["_id"])
 
-		# TODO: Implement redirect_uri_validation option ("full_match", "startswith", "none")
-		# if redirect_uri not in client["redirect_uris"]:
-		# 	raise exceptions.InvalidRedirectURI(client_id=client_id, redirect_uri=redirect_uri)
+		if not validate_redirect_uri(
+			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
+			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
 
 		if grant_type is not None and grant_type not in client["grant_types"]:
 			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
@@ -462,7 +478,6 @@ class ClientService(asab.Service):
 			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
 
 		return True
-
 
 	def _check_grant_types(self, grant_types, response_types):
 		# https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
@@ -488,7 +503,7 @@ class ClientService(asab.Service):
 	def _check_redirect_uris(
 		self, redirect_uris: list, application_type: str, grant_types: list, client_uri: str = None):
 		"""
-		Validate client redirect URIs
+		Check if the redirect URIs can be registered for the given application type
 
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 		"""
@@ -537,3 +552,27 @@ class ClientService(asab.Service):
 		else:
 			client_secret_expires_at = None
 		return client_secret, client_secret_expires_at
+
+
+def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
+	if validation_method == "full_match":
+		# Redirect URI must exactly match one of the registered URIs
+		if redirect_uri in registered_uris:
+			return True
+	elif validation_method == "prefix_match":
+		# Redirect URI must start with one of the registered URIs and their netloc must match
+		for registered_uri in registered_uris:
+			if redirect_uri == registered_uri:
+				return True
+			if redirect_uri.startswith(registered_uri):
+				redirect_uri_parsed = urllib.parse.urlparse(redirect_uri)
+				registered_uri_parsed = urllib.parse.urlparse(registered_uri)
+				if redirect_uri_parsed.netloc == registered_uri_parsed.netloc:
+					return True
+	elif validation_method == "none":
+		# No validation
+		return True
+	else:
+		raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(validation_method))
+
+	return False
