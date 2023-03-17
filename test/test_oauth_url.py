@@ -106,5 +106,6 @@ class OAuthUriTestCase(unittest.TestCase):
 		registered_uris = ["https://abc.test/path"]
 		requested_uri = "https://abc.test/pathetic"
 		self.assertFalse(validate_redirect_uri(requested_uri, registered_uris))
+		# This should probably be False:
 		self.assertTrue(validate_redirect_uri(requested_uri, registered_uris, "prefix_match"))
 		self.assertTrue(validate_redirect_uri(requested_uri, registered_uris, "none"))
