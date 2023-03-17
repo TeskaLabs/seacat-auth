@@ -7,6 +7,8 @@ import pymongo
 
 from .providers import create_provider, GenericOAuth2Login
 
+from ..events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -70,7 +72,7 @@ class ExternalLoginService(asab.Service):
 		upsertor.set("s", sub)
 		upsertor.set("cid", credentials_id)
 
-		elcid = await upsertor.execute()
+		elcid = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_CREATED)
 		L.log(asab.LOG_NOTICE, "External login credential created", struct_data={
 			"id": elcid,
 			"cid": credentials_id,
