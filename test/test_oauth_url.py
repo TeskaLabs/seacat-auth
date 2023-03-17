@@ -57,7 +57,7 @@ class OAuthUriTestCase(unittest.TestCase):
 		registered_uris = ["https://abc.test"]
 		requested_uri = "http://abc.test"
 		self.assertFalse(validate_redirect_uri(requested_uri, registered_uris))
-		self.assertTrue(validate_redirect_uri(requested_uri, registered_uris, "prefix_match"))
+		self.assertFalse(validate_redirect_uri(requested_uri, registered_uris, "prefix_match"))
 		self.assertTrue(validate_redirect_uri(requested_uri, registered_uris, "none"))
 
 	def test_extra_trailing_slash(self):
@@ -85,7 +85,7 @@ class OAuthUriTestCase(unittest.TestCase):
 		registered_uris = ["https://abc.test"]
 		requested_uri = "https://abc.test:8080"
 		self.assertFalse(validate_redirect_uri(requested_uri, registered_uris))
-		self.assertTrue(validate_redirect_uri(requested_uri, registered_uris, "prefix_match"))
+		self.assertFalse(validate_redirect_uri(requested_uri, registered_uris, "prefix_match"))
 		self.assertTrue(validate_redirect_uri(requested_uri, registered_uris, "none"))
 
 	def test_different_port(self):
