@@ -4,6 +4,8 @@ import re
 import asab.storage.exceptions
 import asab
 
+from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -114,7 +116,7 @@ class ResourceService(asab.Service):
 			upsertor.set("description", description)
 
 		try:
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.RESOURCE_CREATED)
 		except asab.storage.exceptions.DuplicateError as e:
 			if e.KeyValue is not None:
 				key, value = e.KeyValue
@@ -140,7 +142,7 @@ class ResourceService(asab.Service):
 		else:
 			upsertor.set("description", description)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.RESOURCE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={"resource": resource_id})
 
 
@@ -173,7 +175,7 @@ class ResourceService(asab.Service):
 				version=resource["_v"]
 			)
 			upsertor.set("deleted", True)
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.RESOURCE_DELETED)
 			L.log(asab.LOG_NOTICE, "Resource soft-deleted", struct_data={
 				"resource": resource_id,
 			})
@@ -190,7 +192,7 @@ class ResourceService(asab.Service):
 			version=resource["_v"]
 		)
 		upsertor.unset("deleted")
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.RESOURCE_UNDELETED)
 		L.log(asab.LOG_NOTICE, "Resource undeleted", struct_data={
 			"resource": resource_id,
 		})

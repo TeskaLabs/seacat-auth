@@ -7,6 +7,8 @@ import urllib.parse
 import asab
 import asab.storage
 
+from ..events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -136,7 +138,7 @@ class OTPService(asab.Service):
 		secret = pyotp.random_base32()
 		upsertor.set("__s", secret)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.TOTP_SECRET_CREATED)
 		L.log(asab.LOG_NOTICE, "TOTP secret created", struct_data={"sid": session_id})
 
 		return secret

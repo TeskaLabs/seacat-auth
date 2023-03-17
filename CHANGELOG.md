@@ -27,6 +27,7 @@
 - Allow OAuth authorize requests with anonymous sessions (#165, PLUM Sprint 230224)
 - Allow extra login parameters to be supplied in login prologue body (#169, PLUM Sprint 230310)
 - Assign roles and tenants to multiple credentials at once (#167, PLUM Sprint 230310)
+- Introduce event type descriptors (#132, PLUM Sprint 230310)
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)

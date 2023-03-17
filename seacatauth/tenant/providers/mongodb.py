@@ -7,6 +7,8 @@ import asab.storage.exceptions
 
 from .abc import EditableTenantsProviderABC
 
+from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -198,7 +200,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		upsertor = self.MongoDBStorageService.upsertor(self.AssignCollection, obj_id=assignment_id)
 		upsertor.set("c", credentials_id)
 		upsertor.set("t", tenant)
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.TENANT_ASSIGNED)
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
