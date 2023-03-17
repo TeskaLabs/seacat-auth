@@ -20,6 +20,12 @@ L = logging.getLogger(__name__)
 
 
 class AuthenticationHandler(object):
+	"""
+	Login and authentication
+
+	---
+	tags: ["Login and authentication"]
+	"""
 
 	def __init__(self, app, authn_svc):
 		self.App = app
@@ -46,23 +52,47 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put(r'/public/login/{lsid}/webauthn', self.webauthn_login)
 		web_app_public.router.add_put(r'/public/logout', self.logout)
 
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": ["ident"],
+		"properties": {
+			"ident": {
+				"type": "string",
+				"description": "Value (usually email or username) used for locating credentials to be used for login."},
+			"qs": {
+				"type": "string",
+				"description":
+					"Optional extra parameters used for locating credentials. "
+					"Allowed parameter names must be listed in `[seacatauth:authentication] custom_login_parameters` "
+					"in the app configuration."}}
+	})
+	async def login_prologue(self, request, *, json_data):
+		"""
+		Locate credentials by `ident` and establish an encrypted login session
 
-	async def login_prologue(self, request):
+		Flow:
+		- Locate credentials by ident
+		- Get app's available login descriptors
+		- Remove login descriptors that the credentials cannot use
+		- Store the login data in a new LoginSession object
+		- Respond with login session ID, encryption key and available login descriptors
+		"""
 		key = jwcrypto.jwk.JWK.from_json(await request.read())
-		ident = key.get('ident')
-		if ident is None:
-			L.error("Missing 'ident' attribute.", struct_data={
-				"attributes": list(key.keys())
-			})
-			raise aiohttp.web.HTTPBadRequest()
+		ident = json_data.get('ident')
 
 		# Get arguments specified in login URL query
 		expiration = None
 		login_preferences = None
-		login_key = None
-		query_string = key.get("qs")
-		if query_string is not None:
+		query_string = json_data.get("qs")
+		if query_string is None:
+			login_dict = None
+		else:
 			query_dict = urllib.parse.parse_qs(query_string)
+
+			login_dict = {
+				k: v
+				for k, v in query_dict.items()
+				if k in self.AuthenticationService.CustomLoginParameters}
 
 			# Get requested session expiration
 			# TODO: This option should be moved to client config or removed completely
@@ -77,13 +107,8 @@ class AuthenticationHandler(object):
 			# TODO: This option should be moved to client config or removed completely
 			login_preferences = query_dict.get("ldid")
 
-			# Get login key by client ID
-			client_id = query_dict.get("client_id")
-			if client_id is not None:
-				login_key = await self._get_client_login_key(client_id[0])
-
 		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, key=login_key)
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
 		if credentials_id is None or credentials_id == []:
 			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session
@@ -137,6 +162,16 @@ class AuthenticationHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 	async def login(self, request):
+		"""
+		Perform an encrypted login request
+
+		Flow:
+		- Locate login session by it ID
+		- Check if there are any login attempts remaining
+		- Record login attempt
+		- Validate login request data
+		- If valid, log the user in
+		"""
 		lsid = request.match_info["lsid"]
 
 		try:
@@ -234,6 +269,9 @@ class AuthenticationHandler(object):
 		return response
 
 	async def logout(self, request):
+		"""
+		Log out of the current session and all its subsessions
+		"""
 		session = await self.CookieService.get_session_by_sci(request)
 		if session is None:
 			raise aiohttp.web.HTTPBadRequest()
@@ -254,6 +292,9 @@ class AuthenticationHandler(object):
 		return response
 
 	async def smslogin(self, request):
+		"""
+		Generate a one-time passcode and send it via SMS
+		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
 		login_session = await self.AuthenticationService.get_login_session(lsid)
@@ -279,6 +320,9 @@ class AuthenticationHandler(object):
 		return aiohttp.web.Response(body=login_session.encrypt(body))
 
 	async def webauthn_login(self, request):
+		"""
+		Initialize WebAuthn challenge and return WebAuthn authentication options object
+		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
 		login_session = await self.AuthenticationService.get_login_session(lsid)
