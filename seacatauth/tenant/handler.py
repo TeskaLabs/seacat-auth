@@ -33,8 +33,8 @@ class TenantHandler(object):
 		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
 		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
 
-		web_app.router.add_put("/tenant_assign_many/{tenant}", self.bulk_assign_tenant)
-		web_app.router.add_put("/tenant_unassign_many/{tenant}", self.bulk_unassign_tenant)
+		web_app.router.add_put("/tenant_assign_many", self.bulk_assign_tenants)
+		web_app.router.add_put("/tenant_unassign_many", self.bulk_unassign_tenants)
 
 		web_app.router.add_get('/tenant_propose', self.propose_tenant)
 
@@ -45,6 +45,9 @@ class TenantHandler(object):
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
 	async def list(self, request):
+		"""
+		List all registered tenant IDs
+		"""
 		# TODO: This has to be cached agressivelly
 		provider = self.TenantService.get_provider()
 		result = []
@@ -54,6 +57,20 @@ class TenantHandler(object):
 
 
 	async def search(self, request):
+		"""
+		Search registered tenants
+		---
+		query:
+		- p:
+			name: Page number
+			type: integer
+		- i:
+			name: Items per page
+			type: integer
+		- f:
+			name: Tenant ID filter
+			type: string
+		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i")
 		if limit is not None:
@@ -81,6 +98,9 @@ class TenantHandler(object):
 
 
 	async def get(self, request):
+		"""
+		Get tenant detail
+		"""
 		tenant_id = request.match_info.get("tenant")
 		data = await self.TenantService.get_tenant(tenant_id)
 		return asab.web.rest.json_response(request, data)
@@ -88,14 +108,25 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"properties": {
-			"id": {"type": "string"},
-		},
 		"required": ["id"],
 		"additionalProperties": False,
+		"properties": {
+			"id": {
+				"type": "string",
+				"description": "Unique tenant ID. Can't be changed once the tenant has been created."}},
+		"example": {
+			"id": "acme-corp"}
 	})
 	@access_control("authz:superuser")
 	async def create(self, request, *, credentials_id, json_data):
+		"""
+		Create a tenant
+
+		---
+		security:
+		- oAuth:
+			- authz:superuser
+		"""
 		tenant_id = json_data["id"]
 
 		# Create tenant
@@ -112,22 +143,35 @@ class TenantHandler(object):
 		"additionalProperties": False,
 		"properties": {
 			"description": {
-				"type": "string"},
+				"type": "string",
+				"description": "Human readable description."},
 			"data": {
 				"type": "object",
+				"description":
+					"Custom tenant data. Shallow JSON object that maps string keys "
+					"to non-structured values.",
 				"patternProperties": {
 					"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
 						{"type": "string"},
 						{"type": "number"},
 						{"type": "boolean"},
-						{"type": "null"},
-					]}
-				}
-			}
-		}
+						{"type": "null"}]}}}},
+		"example": {
+			"description": "ACME Corp Inc.",
+			"data": {
+				"email": "support@acmecorp.test",
+				"very_corporate": True,
+				"schema": "ECS"}}
 	})
 	@access_control("authz:tenant:admin")
 	async def update_tenant(self, request, *, json_data, tenant):
+		"""
+		Update tenant description and/or its structured data
+		---
+		security:
+		- oAuth:
+			- authz:tenant:admin
+		"""
 		result = await self.TenantService.update_tenant(tenant, **json_data)
 		return asab.web.rest.json_response(request, data=result)
 
@@ -136,6 +180,10 @@ class TenantHandler(object):
 	async def delete(self, request, *, tenant):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
+		---
+		security:
+		- oAuth:
+			- authz:superuser
 		"""
 		result = await self.TenantService.delete_tenant(tenant)
 		return asab.web.rest.json_response(request, data=result)
@@ -143,22 +191,24 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": [
-			"tenants",
-		],
+		"required": ["tenants"],
 		"properties": {
 			"tenants": {
 				"type": "array",
-				"items": {
-					"type": "string",
-				},
-			},
-		}
+				"description": "List of the IDs of tenants to be set",
+				"items": {"type": "string"}}},
+		"example": {
+			"tenants": ["acme-corp", "my-eshop"]}
 	})
 	@access_control()
 	async def set_tenants(self, request, *, json_data):
 		"""
-		Helper method for bulk tenant un/assignment
+		Specify a set of accessible tenants for requested credentials ID
+
+		The credentials entity will be granted access to the listed tenants
+		and revoked access to the tenants that are not listed.
+		The caller needs to have access to `authz:tenant:admin` resource for each tenant whose access
+		is being granted or revoked.
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		data = await self.TenantService.set_tenants(
@@ -176,6 +226,13 @@ class TenantHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def assign_tenant(self, request, *, tenant):
+		"""
+		Grant specified tenant access to requested credentials
+		---
+		security:
+		- oAuth:
+			- authz:tenant:admin
+		"""
 		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
@@ -185,6 +242,15 @@ class TenantHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def unassign_tenant(self, request, *, tenant):
+		"""
+		Revoke specified tenant access to requested credentials
+
+		The tenant's roles are unassigned in the process.
+		---
+		security:
+		- oAuth:
+			- authz:tenant:admin
+		"""
 		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],
 			tenant,
@@ -193,6 +259,9 @@ class TenantHandler(object):
 
 
 	async def get_tenants_by_credentials(self, request):
+		"""
+		Get list of authorized tenants for requested credentials
+		"""
 		result = await self.TenantService.get_tenants(request.match_info["credentials_id"])
 		return asab.web.rest.json_response(
 			request, result
@@ -201,9 +270,14 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "array",
-		"items": {"type": "string"}
+		"description": "List of credential IDs",
+		"items": {"type": "string"},
+		"example": ["mongodb:default:abc123def456", "htpasswd:local:zdenek"],
 	})
 	async def get_tenants_batch(self, request, *, json_data):
+		"""
+		Get list of authorized tenants for each listed credential ID
+		"""
 		response = {
 			cid: await self.TenantService.get_tenants(cid)
 			for cid in json_data
@@ -212,58 +286,194 @@ class TenantHandler(object):
 
 
 	async def propose_tenant(self, request):
+		"""
+		Propose name for a new tenant.
+		"""
 		proposed_tenant = self.NameProposerService.propose_name()
 		# TODO: Check is the proposed tenant name is not already taken
 		return asab.web.rest.json_response(request, {'tenant_id': proposed_tenant})
 
 
 	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {"type": "string"}})
+		"type": "object",
+		"required": ["credential_ids", "tenants"],
+		"properties": {
+			"credential_ids": {
+				"type": "array",
+				"description": "List of the IDs of credentials to manage",
+				"items": {"type": "string"}},
+			"tenants": {
+				"type": "object",
+				"description":
+					"Tenants and roles to be assigned. \n\n"
+					"The keys are the IDs of tenants to be granted access to. The values are arrays of the respective "
+					"tenant's roles to be assigned. \n\n"
+					"To grant tenant access without assigning any roles, "
+					"leave the role array empty. \n\n"
+					"To assign global roles, list them under the `'*'` key.",
+				"patternProperties": {
+					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
+						"type": "array",
+						"description": "List of the tenant's roles to be assigned",
+						"items": {"type": "string"}}}}},
+		"example": {
+			"credential_ids": [
+				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
+			"tenants": {
+				"*": ["*/global-editor"],
+				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
+				"my-eshop": []}},
+	})
 	@access_control("authz:superuser")
-	async def bulk_assign_tenant(self, request, *, json_data, tenant):
-		error_details = []
-		successful_count = 0
-		for credential_id in json_data:
+	async def bulk_assign_tenants(self, request, *, json_data):
+		"""
+		Grant tenant access and/or assign roles to a list of credentials
+		---
+		security:
+		- oAuth:
+			- authz:superuser
+		"""
+		credential_service = self.TenantService.App.get_service("seacatauth.CredentialsService")
+		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
+
+		# Validate that all the credentials exist
+		for credential_id in json_data["credential_ids"]:
 			try:
-				await self.TenantService.assign_tenant(credential_id, tenant)
-				successful_count += 1
-			except asab.exceptions.Conflict:
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant already assigned."})
-			except Exception as e:
-				L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
-					"cid": credential_id, "tenant": tenant})
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+				await credential_service.detail(credential_id)
+			except KeyError:
+				raise asab.exceptions.ValidationError("Credentials not found: {}".format(credential_id))
+
+		# Validate that tenants and their roles exists
+		for tenant, roles in json_data["tenants"].items():
+			if tenant != "*":
+				try:
+					await self.TenantService.get_tenant(tenant)
+				except KeyError:
+					raise asab.exceptions.ValidationError("Tenant not found: {}".format(tenant))
+			for role in roles:
+				t, _ = role.split("/", 1)
+				if t != tenant:
+					# Role is not listed under its proper tenant
+					raise asab.exceptions.ValidationError("Role {!r} not found in tenant {!r}".format(role, tenant))
+				try:
+					await role_service.get(role)
+				except KeyError:
+					raise asab.exceptions.ValidationError("Role not found: {}".format(role))
+
+		error_details = []
+		for tenant, roles in json_data["tenants"].items():
+			for credential_id in json_data["credential_ids"]:
+				success = False
+				try:
+					await self.TenantService.assign_tenant(
+						credential_id, tenant, verify_tenant=False, verify_credentials=False)
+					success = True
+				except asab.exceptions.Conflict:
+					L.info("Skipping: Tenant already assigned.", struct_data={
+						"cid": credential_id, "tenant": tenant})
+					success = True
+				except Exception as e:
+					L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
+						"cid": credential_id, "tenant": tenant})
+					error_details.append({"cid": credential_id, "tenant": tenant})
+				if not success:
+					continue
+
+				if len(roles) == 0:
+					continue
+
+				for role in roles:
+					try:
+						await role_service.assign_role(
+							credential_id, role, verify_role=False, verify_credentials=False, verify_tenant=False)
+					except asab.exceptions.Conflict:
+						L.info("Skipping: Role already assigned.", struct_data={
+							"cid": credential_id, "role": role})
+					except Exception as e:
+						L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
+							"cid": credential_id, "role": role})
+						error_details.append({"cid": credential_id, "role": role})
 
 		data = {
-			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
 			"result": "OK"}
 		return asab.web.rest.json_response(request, data=data)
 
-
 	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {"type": "string"}})
+		"type": "object",
+		"required": ["credential_ids", "tenants"],
+		"properties": {
+			"credential_ids": {
+				"type": "array",
+				"description": "List of the IDs of credentials to manage",
+				"items": {"type": "string"}},
+			"tenants": {
+				"type": "object",
+				"description":
+					"Tenants and roles to be unassigned. \n\n"
+					"The keys are the IDs of tenants to be revoked access to. The values are arrays of the respective "
+					"tenant's roles to be unassigned. \n\n"
+					"To completely revoke credentials' access to the tenant, leave the role array empty. \n\n"
+					"To unassign global roles, list them under the `'*'` key.",
+				"patternProperties": {
+					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
+						"type": "array",
+						"items": {"type": "string"}}}}},
+		"example": {
+			"credential_ids": [
+				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
+			"tenants": {
+				"*": ["*/global-editor"],
+				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
+				"my-eshop": []}},
+	})
 	@access_control("authz:superuser")
-	async def bulk_unassign_tenant(self, request, *, json_data, tenant):
+	async def bulk_unassign_tenants(self, request, *, json_data):
+		"""
+		Revoke tenant access and/or unassign roles from a list of credentials
+		---
+		security:
+		- oAuth:
+			- authz:superuser
+		"""
+		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
+
+		# Verify that roles are listed under their proper tenant
+		for tenant, roles in json_data["tenants"].items():
+			for role in roles:
+				t, _ = role.split("/", 1)
+				if t != tenant:
+					raise asab.exceptions.ValidationError("Role {!r} not found in tenant {!r}".format(role, tenant))
+
 		error_details = []
-		successful_count = 0
-		for credential_id in json_data:
-			if not await self.TenantService.has_tenant_assigned(credential_id, tenant):
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Tenant not assigned."})
-				continue
-			try:
-				await self.TenantService.unassign_tenant(credential_id, tenant)
-				successful_count += 1
-			except Exception as e:
-				L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
-					"cid": credential_id, "tenant": tenant})
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Server error."})
+		for tenant, roles in json_data["tenants"].items():
+			for credential_id in json_data["credential_ids"]:
+				if len(roles) == 0:
+					# If no roles are listed under the tenant (e.g. `"my-tenant": []`),
+					# revoke access to the tenant completely.
+					# This also automatically unassigns all the tenant's roles
+					try:
+						await self.TenantService.unassign_tenant(credential_id, tenant)
+					except Exception as e:
+						L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
+							"cid": credential_id, "tenant": tenant})
+						error_details.append({"cid": credential_id, "tenant": tenant})
+				else:
+					# If any roles are listed under the tenant (e.g. `"my-tenant": ["my-tenant/user"]`),
+					# unassign only those and keep the tenant access.
+					for role in roles:
+						try:
+							await role_service.unassign_role(credential_id, role)
+						except KeyError:
+							L.info("Skipping: Role not assigned.", struct_data={
+								"cid": credential_id, "role": role})
+						except Exception as e:
+							L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
+								"cid": credential_id, "role": role})
+							error_details.append({"cid": credential_id, "role": role})
 
 		data = {
-			"successful_count": successful_count,
 			"error_count": len(error_details),
 			"error_details": error_details,
 			"result": "OK"}
