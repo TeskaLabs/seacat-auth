@@ -6,6 +6,8 @@ import asab.storage.exceptions
 import asab.exceptions
 from ... import exceptions
 
+from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -114,7 +116,7 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
 		try:
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
@@ -210,7 +212,7 @@ class RoleService(asab.Service):
 			upsertor.set("description", description)
 			log_data["description"] = description
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
 		return "OK"
 
@@ -354,7 +356,7 @@ class RoleService(asab.Service):
 			upsertor.set("t", tenant)
 
 		try:
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.ROLE_ASSIGNED)
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
 				key, value = e.KeyValue.popitem()
