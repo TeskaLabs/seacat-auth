@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os.path
 import re
 import secrets
 import urllib.parse
@@ -465,23 +466,9 @@ class ClientService(asab.Service):
 		if client_secret != client.get("__client_secret", ""):
 			raise exceptions.InvalidClientSecret(client["_id"])
 
-		redirect_uri_validation_method = client.get("redirect_uri_validation_method", "full_match")
-		if redirect_uri_validation_method == "full_match":
-			# Redirect URI must exactly match one of the registered URIs
-			if redirect_uri not in client["redirect_uris"]:
-				raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
-		elif redirect_uri_validation_method == "prefix_match":
-			# Redirect URI must start with one of the registered URIs
-			for registered_uri in client["redirect_uris"]:
-				if redirect_uri.startswith(registered_uri):
-					break
-			else:
-				raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
-		elif redirect_uri_validation_method == "none":
-			# No validation
-			pass
-		else:
-			raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(redirect_uri_validation_method))
+		if not validate_redirect_uri(
+			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
+			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
 
 		if grant_type is not None and grant_type not in client["grant_types"]:
 			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
@@ -490,7 +477,6 @@ class ClientService(asab.Service):
 			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
 
 		return True
-
 
 	def _check_grant_types(self, grant_types, response_types):
 		# https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
@@ -565,3 +551,26 @@ class ClientService(asab.Service):
 		else:
 			client_secret_expires_at = None
 		return client_secret, client_secret_expires_at
+
+
+def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
+	if validation_method == "full_match":
+		# Redirect URI must exactly match one of the registered URIs
+		if redirect_uri not in registered_uris:
+			return False
+	elif validation_method == "prefix_match":
+		# Redirect URI must start with one of the registered URIs
+		for registered_uri in registered_uris:
+			if redirect_uri.startswith(registered_uri):
+				redirect_uri_parsed = urllib.parse.urlparse(redirect_uri)
+				registered_uri_parsed = urllib.parse.urlparse(registered_uri)
+				if redirect_uri_parsed.netloc == registered_uri_parsed.netloc and \
+					os.path.commonpath((redirect_uri_parsed.path, registered_uri_parsed.path)):
+					return True
+		else:
+			return False
+	elif validation_method == "none":
+		# No validation
+		return True
+	else:
+		raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(validation_method))
