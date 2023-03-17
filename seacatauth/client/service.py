@@ -558,21 +558,24 @@ class ClientService(asab.Service):
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
 	if validation_method == "full_match":
 		# Redirect URI must exactly match one of the registered URIs
-		if redirect_uri not in registered_uris:
-			return False
+		if redirect_uri in registered_uris:
+			return True
 	elif validation_method == "prefix_match":
 		# Redirect URI must start with one of the registered URIs
 		for registered_uri in registered_uris:
+			if redirect_uri == registered_uri:
+				return True
 			if redirect_uri.startswith(registered_uri):
 				redirect_uri_parsed = urllib.parse.urlparse(redirect_uri)
 				registered_uri_parsed = urllib.parse.urlparse(registered_uri)
 				if redirect_uri_parsed.netloc == registered_uri_parsed.netloc and \
-					os.path.commonpath((redirect_uri_parsed.path, registered_uri_parsed.path)):
+					os.path.commonpath((redirect_uri_parsed.path or "/", registered_uri_parsed.path or "/")) == \
+						(registered_uri_parsed.path or "/"):
 					return True
-		else:
-			return False
 	elif validation_method == "none":
 		# No validation
 		return True
 	else:
 		raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(validation_method))
+
+	return False
