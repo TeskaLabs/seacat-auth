@@ -27,6 +27,8 @@ from ..audit import AuditCode
 from .. import exceptions
 from . import pkce
 
+from ..events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -150,7 +152,7 @@ class OpenIdConnectService(asab.Service):
 		upsertor.set("sid", session_id)
 		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.OPENID_AUTH_CODE_GENERATED)
 
 		return code
 
