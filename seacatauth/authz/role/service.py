@@ -309,16 +309,11 @@ class RoleService(asab.Service):
 
 		# Assign new roles
 		for role in roles_to_assign:
-			crid = "{} {}".format(credentials_id, role)
-			upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=crid)
-			upsertor.set("c", credentials_id)
-			upsertor.set("r", role)
+			await self.assign_role(credentials_id, role, verify_tenant=False, verify_credentials=False)
 
-			# TODO: Optimize; this database lookup is being called twice for each role
-			tenant = await self.get_role_tenant(role)
-			if tenant != "*":
-				upsertor.set("t", tenant)
-			await upsertor.execute(event_type=EventTypes.ROLE_ASSIGNED)  # TODO: Make use of the _do_assign_role method here
+		# Unassign roles
+		for role in roles_to_unassign:
+			await self.unassign_role(credentials_id, role)
 
 		L.log(asab.LOG_NOTICE, "Roles assigned", struct_data={
 			"cid": credentials_id,
