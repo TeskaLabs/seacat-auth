@@ -30,12 +30,8 @@ asab.Config.add_defaults({
 
 		"secure": "yes",
 
-		# Cookie domain specifies the domain scope where the cookie is valid
-		# MUST NOT BE EMPTY!
-		# NOTE:
-		#   To fully work in all major browsers, cookie domain must contain at least two dots (requirement by Firefox).
-		#   For example, "localhost" or ".com" may not work properly,
-		#   but ".app.localhost" or ".example.com" should work fine.
+		# Specifies the domain scope where the cookie is valid
+		# Leave empty unless necessary
 		"domain": ""
 	},
 

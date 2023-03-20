@@ -40,15 +40,8 @@ class CookieService(asab.Service):
 		)
 		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
 		self.RootCookieDomain = self._validate_cookie_domain(
-			asab.Config.get("seacatauth:cookie", "domain", fallback=None)
+			asab.Config.get("seacatauth:cookie", "domain")
 		)
-		if self.RootCookieDomain is None:
-			parsed = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
-			self.RootCookieDomain = str(parsed.hostname)
-			L.warning(
-				"Cookie domain is not specified. Assuming your cookie domain is {!r} "
-				"(inferred from Auth WebUI base URL). It is recommended to specify cookie domain explicitly "
-				"in your Seacat Auth configuration file.".format(self.RootCookieDomain))
 
 		# Configure cookies for application domains
 		# TODO: Allow different cookie name for each domain
