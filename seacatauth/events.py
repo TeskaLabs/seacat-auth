@@ -30,6 +30,7 @@ class EventTypes:
 	OPENID_AUTH_CODE_GENERATED = "openid_auth_code_generated"
 
 	TOTP_CREATED = "totp_secret_created"
+	TOTP_REGISTERED = "totp_registered"
 
 	SESSION_CREATED = "session_created"
 	SESSION_UPDATED = "session_updated"

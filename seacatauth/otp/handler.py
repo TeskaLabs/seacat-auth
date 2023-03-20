@@ -60,7 +60,7 @@ class OTPHandler(object):
 	@access_control()
 	async def set_totp(self, request, *, credentials_id, json_data):
 		"""
-		Activates TOTP for the current user, provided that a TOTP secret is already set.
+		Activate TOTP for the current user, provided that a TOTP secret is already set.
 		"""
 		otp = json_data.get("otp")
 		response = await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
@@ -70,7 +70,7 @@ class OTPHandler(object):
 	@access_control()
 	async def unset_totp(self, request, *, credentials_id):
 		"""
-		Deactivates TOTP for the current user and erases the secret.
+		Deactivate TOTP for the current user and erase the secret.
 		"""
 		try:
 			await self.OTPService.deactivate_totp(credentials_id)
