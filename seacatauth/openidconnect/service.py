@@ -291,6 +291,9 @@ class OpenIdConnectService(asab.Service):
 		# TODO: Session object should only serve as a cache
 		#   After the cache has expired, update session object with fresh credential, authn and authz data
 		#   and rebuild the userinfo
+
+		otp_service = self.App.get_service("seacatauth.OTPService")
+
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
@@ -337,8 +340,8 @@ class OpenIdConnectService(asab.Service):
 		if session.TrackId is not None:
 			userinfo["track_id"] = session.TrackId
 
-		if session.Authentication.TOTPSet is not None:
-			userinfo["totp_set"] = session.Authentication.TOTPSet
+		if await otp_service.has_activated_totp(session.Credentials.Id):
+			userinfo["totp_set"] = True
 
 		if session.Authentication.AvailableFactors is not None:
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
