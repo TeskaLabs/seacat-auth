@@ -65,7 +65,9 @@ def login_descriptor_session_builder(login_descriptor):
 async def available_factors_session_builder(authentication_service, credentials_id):
 	factors = []
 	for factor in authentication_service.LoginFactors.values():
+		L.warning("factor: {}".format(factor))
 		if await factor.is_eligible({"credentials_id": credentials_id}):
+			L.warning("eligible")
 			factors.append(factor.Type)
 	return ((SessionAdapter.FN.Authentication.AvailableFactors, factors),)
 

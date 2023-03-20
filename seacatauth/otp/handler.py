@@ -4,6 +4,7 @@ import asab.web
 import asab.web.rest
 
 from ..decorators import access_control
+from ..exceptions import TOTPNotActiveError
 
 #
 
@@ -20,22 +21,33 @@ class OTPHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get('/public/totp', self.get_totp_secret)
+		web_app.router.add_get('/public/totp', self.prepare_totp_if_not_active)
 		web_app.router.add_put('/public/set-totp', self.set_totp)
 		web_app.router.add_put('/public/unset-totp', self.unset_totp)
 
 		# Public endpoints
-		web_app_public.router.add_get('/public/totp', self.get_totp_secret)
+		web_app_public.router.add_get('/public/totp', self.prepare_totp_if_not_active)
 		web_app_public.router.add_put('/public/set-totp', self.set_totp)
 		web_app_public.router.add_put('/public/unset-totp', self.unset_totp)
 
 	@access_control()
-	async def get_totp_secret(self, request, *, credentials_id):
+	async def prepare_totp_if_not_active(self, request, *, credentials_id):
 		"""
-		Returns the status of TOTP setting.
-		If not activated, it also generates and returns a new TOTP secret.
+		Return the status of TOTP setting.
+		If not activated, generate and return a new TOTP secret.
 		"""
-		response = await self.OTPService.get_totp_secret(request.Session, credentials_id)
+		if await self.OTPService.has_activated_totp(credentials_id):
+			response: dict = {
+				"result": "OK",
+				"active": True
+			}
+		else:
+			response: dict = await self.OTPService.prepare_totp(request.Session, credentials_id)
+			response.update({
+				"result": "OK",
+				"active": False
+			})
+
 		return asab.web.rest.json_response(request, response)
 
 	@asab.web.rest.json_schema_handler({
@@ -51,7 +63,7 @@ class OTPHandler(object):
 		Activates TOTP for the current user, provided that a TOTP secret is already set.
 		"""
 		otp = json_data.get("otp")
-		response = await self.OTPService.complete_totp_registration(request.Session, credentials_id, otp)
+		response = await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
 		return asab.web.rest.json_response(request, response)
 
 
@@ -60,5 +72,9 @@ class OTPHandler(object):
 		"""
 		Deactivates TOTP for the current user and erases the secret.
 		"""
-		response = await self.OTPService.unset_totp(credentials_id)
-		return asab.web.rest.json_response(request, response)
+		try:
+			await self.OTPService.deactivate_totp(credentials_id)
+		except TOTPNotActiveError:
+			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
