@@ -6,6 +6,8 @@ import asab.storage.exceptions
 import asab.exceptions
 from ... import exceptions
 
+from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ class RoleService(asab.Service):
 	CredentialsRolesCollection = "cr"
 	RoleNamePattern = r"[a-zA-Z_][a-zA-Z0-9_-]{0,31}"
 
+
 	def __init__(self, app, service_name="seacatauth.RoleService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
@@ -39,6 +42,7 @@ class RoleService(asab.Service):
 		self.RoleIdRegex = re.compile(r"^([^/]+)/({role})$".format(
 			role=self.RoleNamePattern
 		))
+
 
 	async def list(
 		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *,
@@ -72,6 +76,7 @@ class RoleService(asab.Service):
 			"data": roles,
 		}
 
+
 	async def get(self, role_id: str):
 		try:
 			result = await self.StorageService.get(self.RoleCollection, role_id)
@@ -79,9 +84,11 @@ class RoleService(asab.Service):
 			raise exceptions.RoleNotFoundError(role_id)
 		return result
 
+
 	async def get_role_resources(self, role_id: str):
 		role_obj = await self.get(role_id)
 		return role_obj["resources"]
+
 
 	async def create(self, role_id: str):
 		# TODO: No return dicts! This should return role_id or raise (custom) error.
@@ -109,7 +116,7 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
 		try:
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
@@ -118,6 +125,7 @@ class RoleService(asab.Service):
 				"message": "Role '{}' already exists.".format(role_id)
 			}
 		return "OK"
+
 
 	async def delete(self, role_id: str):
 		"""
@@ -130,6 +138,7 @@ class RoleService(asab.Service):
 		await self.StorageService.delete(self.RoleCollection, role_id)
 		L.log(asab.LOG_NOTICE, "Role deleted", struct_data={'role_id': role_id})
 		return "OK"
+
 
 	async def update(
 		self, role_id: str, *,
@@ -203,9 +212,10 @@ class RoleService(asab.Service):
 			upsertor.set("description", description)
 			log_data["description"] = description
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
 		return "OK"
+
 
 	async def get_roles_by_credentials(self, credentials_id: str, tenants: list = None):
 		"""
@@ -221,109 +231,61 @@ class RoleService(asab.Service):
 			result.append(obj["r"])
 		return result
 
-	async def set_roles(self, credentials_id: str, tenant_scope: set, roles: list):
+
+	async def set_roles(self, credentials_id: str, roles: list, tenant: str = "*", include_global: bool = False):
 		"""
-		Assign `roles` list to a given `credentials_id` and unassign all current roles that are not listed in `roles`.
-		Only roles within the `tenant_scope` can be un/assigned.
+		Assign a list of roles to given credentials and unassign all their current roles that are not listed
 		"""
-		# Validate that requested credentials exist
-		try:
-			await self.CredentialService.get(credentials_id=credentials_id)
-		except KeyError:
-			message = "Credentials not found"
-			L.error(message, struct_data={"cid": credentials_id})
-			raise KeyError(message)
+		# Determine whether tenant roles can be assigned
+		has_tenant_assigned = await self.TenantService.has_tenant_assigned(credentials_id, tenant)
 
-		# Validate that requested credentials have access to roles' tenants
-		# Remove invalid tenants from the tenant scope
-		if self.TenantService.is_enabled():
-			cred_tenants = await self.TenantService.get_tenants(credentials_id)
-			unavailable_tenants = set()
-			for tenant in tenant_scope:
-				if tenant == "*":
-					continue
-				if tenant not in cred_tenants:
-					unavailable_tenants.add(tenant)
-			tenant_scope.difference_update(unavailable_tenants)
-		else:
-			# Tenant service is not enabled: Only global roles can be assigned
-			if tenant_scope != set("*"):
-				message = "Assigning tenant roles in tenantless mode"
-				L.error(message)
-				raise ValueError(message)
-
-		if len(tenant_scope) == 0:
-			message = "No valid tenants"
-			L.error(message)
-			raise ValueError(message)
-
-		# Validate all requested roles
-		roles_to_assign = set()
+		# Sort the requested roles
+		requested_tenant_roles = set()
+		requested_global_roles = set()
 		for role in roles:
-			# Validate that role exists
-			await self.get(role_id=role)
-
-			# Check that role has valid tenant
-			try:
-				role_tenant = await self.get_role_tenant(role)
-			except KeyError as e:
-				raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role)) from e
-
-			# Validate by current tenant scope
-			if role_tenant not in tenant_scope:
-				# Role is outside current tenant scope
-				if role_tenant == "*":
-					# "*" is not in scope, so global roles are simply ignored without raising an error
-					continue
-				# Roles from unexpected tenant raise error
-				message = "Role doesn't match requested tenants"
-				L.warning(message, struct_data={
-					"role": role,
-					"tenants": list(tenant_scope)
-				})
-				raise ValueError(message)
-
-			roles_to_assign.add(role)
-
-		# Get current roles
-		tenant_query = [None if tenant == "*" else tenant for tenant in tenant_scope]
-		coll = await self.StorageService.collection(self.CredentialsRolesCollection)
-
-		# {"t": {"$in": [None]}} matches entries with the "t" field missing, i.e. global roles
-		# {"t": {"$in": ["tenant-1", None]}} matches both global roles and "tenant-1" roles
-		query = {"c": credentials_id, "t": {"$in": tenant_query}}
-
-		# Unassign roles that are not among the requested roles
-		assignments_to_remove = []
-		async for obj in coll.find(query):
-			if obj['r'] not in roles_to_assign:
-				assignments_to_remove.append(obj['_id'])
+			t, _ = role.split("/", 1)
+			if t == "*":
+				requested_global_roles.add(role)
+			elif t == tenant:
+				if not has_tenant_assigned:
+					raise asab.exceptions.ValidationError(
+						"Cannot assign role {!r}: Credentials {!r} does not have access to tenant {!r}.".format(
+							role, credentials_id, tenant))
+				requested_tenant_roles.add(role)
 			else:
-				# The role is already assigned
-				roles_to_assign.remove(obj['r'])
+				raise KeyError("Role {} not found in tenant {}.".format(role, tenant))
 
-		if len(assignments_to_remove) > 0:
-			await coll.delete_many({'_id': {'$in': assignments_to_remove}})
+		# Sort the credentials' currently assigned roles
+		current_tenant_roles = set()
+		current_global_roles = set()
+		for role in await self.get_roles_by_credentials(credentials_id, [tenant]):
+			t, _ = role.split("/", 1)
+			if t == "*":
+				current_global_roles.add(role)
+			else:
+				current_tenant_roles.add(role)
 
-		# Assign new roles
+		# Compute the difference between the current and the desired state
+		# Determine which roles need to be un/assigned
+		roles_to_assign = requested_tenant_roles - current_tenant_roles
+		roles_to_unassign = current_tenant_roles - requested_tenant_roles
+		if include_global:
+			roles_to_assign.update(requested_global_roles - current_global_roles)
+			roles_to_unassign.update(current_global_roles - requested_global_roles)
+
+		# Check that credentials exist
+		# (Nonexistent credentials can be only unassigned)
+		if len(roles_to_assign) > 0:
+			await self.CredentialService.detail(credentials_id)
+
+		# Assign roles
 		for role in roles_to_assign:
-			crid = "{} {}".format(credentials_id, role)
-			upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=crid)
-			upsertor.set("c", credentials_id)
-			upsertor.set("r", role)
+			await self.assign_role(credentials_id, role, verify_tenant=False, verify_credentials=False)
 
-			# TODO: Optimize; this database lookup is being called twice for each role
-			tenant = await self.get_role_tenant(role)
-			if tenant != "*":
-				upsertor.set("t", tenant)
-			await upsertor.execute()
+		# Unassign roles
+		for role in roles_to_unassign:
+			await self.unassign_role(credentials_id, role)
 
-		L.log(asab.LOG_NOTICE, "Roles assigned", struct_data={
-			"cid": credentials_id,
-			"tenants": list(tenant_scope),
-			"assigned": list(roles_to_assign),
-			"unassigned": [assignment.split(" ")[-1] for assignment in assignments_to_remove]
-		})
 
 	async def list_role_assignments(self, role_id, page: int = 0, limit: int = None):
 		"""
@@ -394,7 +356,7 @@ class RoleService(asab.Service):
 			upsertor.set("t", tenant)
 
 		try:
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.ROLE_ASSIGNED)
 		except asab.storage.exceptions.DuplicateError as e:
 			if hasattr(e, "KeyValue") and e.KeyValue is not None:
 				key, value = e.KeyValue.popitem()
