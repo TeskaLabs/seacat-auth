@@ -469,7 +469,12 @@ class ClientService(asab.Service):
 
 		if not validate_redirect_uri(
 			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
-			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
+			# TODO: Raise error instead of warning
+			# raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
+			L.warning(
+				"Invalid redirect URI. NOTICE: In future releases, authorize requests with invalid "
+				"redirect URI will result in error response!",
+				struct_data={"client_id": client["_id"], "redirect_uri": redirect_uri})
 
 		if grant_type is not None and grant_type not in client["grant_types"]:
 			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
