@@ -555,6 +555,9 @@ class ClientService(asab.Service):
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
+	if validation_method is None:
+		validation_method = "full_match"
+
 	if validation_method == "full_match":
 		# Redirect URI must exactly match one of the registered URIs
 		if redirect_uri in registered_uris:
