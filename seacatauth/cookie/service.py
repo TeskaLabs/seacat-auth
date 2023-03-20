@@ -94,27 +94,13 @@ class CookieService(asab.Service):
 		"""
 		Get Seacat cookie value from request header
 		"""
-		raw_cookies = request.headers.get(aiohttp.hdrs.COOKIE)
-		if raw_cookies is None:
+		cookie = request.cookies.get(self.CookieName)
+		try:
+			session_cookie_id = base64.urlsafe_b64decode(cookie)
+		except ValueError:
+			L.info("Cookie value is not base64", struct_data={"sci": cookie})
 			return None
-
-		# Custom cookie parsing to prevent overwriting cookies that share the same name
-		for cookie_string in raw_cookies.split(";"):
-			# Check if cookie name matches
-			split_cookie = http.cookies.SimpleCookie(cookie_string)
-			cookie = split_cookie.get(self.CookieName)
-			if cookie is None:
-				continue
-
-			try:
-				session_cookie_id = base64.urlsafe_b64decode(cookie.value)
-			except ValueError:
-				L.info("Cookie value is not base64", struct_data={"sci": cookie.value})
-				return None
-
-			return session_cookie_id
-
-		return None
+		return session_cookie_id
 
 
 	async def get_session_by_sci(self, request, client_id=None):
