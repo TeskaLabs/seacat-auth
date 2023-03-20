@@ -9,6 +9,7 @@ import asab.storage
 
 from typing import Optional
 from ..exceptions import TOTPNotActiveError
+from ..events import EventTypes
 
 #
 
@@ -131,7 +132,8 @@ class OTPService(asab.Service):
 		secret = pyotp.random_base32()
 		upsertor.set("__s", secret)
 
-		await upsertor.execute(custom_data={"event_type": EventType.TOTP_CREATED})
+
+		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)
 		L.log(asab.LOG_NOTICE, "TOTP secret created", struct_data={"sid": session_id})
 
 		return secret

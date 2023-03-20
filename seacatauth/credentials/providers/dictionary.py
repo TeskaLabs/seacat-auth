@@ -108,7 +108,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		self.Dictionary.pop(credentials_id[len(prefix):])
 		return "OK"
 
-	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> str:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> str:
 		# TODO: Implement ident_fields support
 		# Fast match based on the username
 		credentials_id = hashlib.sha224(ident.encode('utf-8')).hexdigest()

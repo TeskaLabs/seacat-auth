@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import re
 
 import asab
 
@@ -17,6 +18,8 @@ from ..session import (
 	available_factors_session_builder,
 	external_login_session_builder, SessionAdapter,
 )
+
+from ..events import EventTypes
 
 #
 
@@ -69,6 +72,12 @@ class AuthenticationService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
+
+		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
+		if self.CustomLoginParameters != "":
+			self.CustomLoginParameters = frozenset(re.split(r"\s+", self.CustomLoginParameters))
+		else:
+			self.CustomLoginParameters = frozenset()
 
 		self.LoginAttempts = asab.Config.getint("seacatauth:authentication", "login_attempts")
 		self.LoginSessionExpiration = asab.Config.getseconds("seacatauth:authentication", "login_session_expiration")
@@ -149,7 +158,7 @@ class AuthenticationService(asab.Service):
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_CREATED)
 
 		return login_session
 
@@ -177,7 +186,7 @@ class AuthenticationService(asab.Service):
 		if remaining_login_attempts is not None:
 			upsertor.set("la", remaining_login_attempts)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_UPDATED)
 		L.info("Login session updated", struct_data={
 			"lsid": login_session_id,
 		})
