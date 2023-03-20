@@ -26,19 +26,11 @@ def set_cookie(app, response, session, cookie_domain=None, secure=None):
 	if secure is None:
 		secure = cookie_svc.CookieSecure
 
-	# Set cookie max age equal to session max age
-	# TODO: Set cookie expiration to current session expiration and extend it dynamically
-	max_age = int((
-		session.Session.MaxExpiration
-		- datetime.datetime.now(datetime.timezone.utc)
-	).total_seconds())
-
 	response.set_cookie(
 		cookie_svc.CookieName,
 		session.Cookie.Id,
 		httponly=True,  # Not accessible from Javascript
 		domain=cookie_domain,
-		max_age=max_age,
 		secure=secure,
 	)
 
