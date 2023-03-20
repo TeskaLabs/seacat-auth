@@ -26,7 +26,6 @@ class TOTPFactor(LoginFactorABC):
 		return await otp_service.has_activated_totp(cred_id)
 
 	async def authenticate(self, login_session, request_data) -> bool:
-		L.warning("ENTERED authenticate")
 		otp_service = self.AuthenticationService.App.get_service("seacatauth.OTPService")
 		credentials_id = login_session.CredentialsId
 		return otp_service.verify_request_totp(credentials_id, request_data)
