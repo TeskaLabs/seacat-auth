@@ -139,7 +139,9 @@ class AuthorizeHandler(object):
 		return self.reply_with_authentication_error(
 			request_parameters,
 			AuthErrorResponseCode.UnsupportedResponseType,
-			message,
+			request_parameters.get("redirect_uri") or None,
+			error_description="Unsupported response type: {}".format(response_type),
+			state=request_parameters.get("state")
 		)
 
 
@@ -165,7 +167,7 @@ class AuthorizeHandler(object):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError:
-			L.error("Client ID not found", struct_data={"client_id": client_id})
+			L.error("Client ID not found.", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.InvalidRequest,
 				redirect_uri,
@@ -181,14 +183,25 @@ class AuthorizeHandler(object):
 				response_type="code",
 			)
 		except client.exceptions.InvalidClientSecret:
-			L.error("Invalid client secret", struct_data={"client_id": client_id})
+			L.error("Invalid client secret.", struct_data={"client_id": client_id})
 			return self.reply_with_authentication_error(
 				AuthErrorResponseCode.UnauthorizedClient,
-				redirect_uri,
+				redirect_uri=redirect_uri,
 				error_description="Unauthorized client",
 				state=state
 			)
-		# TODO: Check for invalid redirect URI
+		except client.exceptions.InvalidRedirectURI:
+			# TODO: Strict error response instead of warning
+			L.warning(
+				"Invalid redirect URI. NOTICE: In future releases, authorize requests with invalid "
+				"redirect URI will result in error response!",
+				struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			# return self.reply_with_authentication_error(
+			# 	AuthErrorResponseCode.InvalidRequest,
+			# 	redirect_uri=None,
+			# 	error_description="Invalid redirect_uri.",
+			# 	state=state
+			# )
 		except client.exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			await self.audit_authorize_error(
