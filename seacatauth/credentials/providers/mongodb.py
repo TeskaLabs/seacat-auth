@@ -18,6 +18,8 @@ import pymongo.errors
 
 from .abc import EditableCredentialsProviderABC
 
+from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -142,7 +144,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		for field, value in credentials.items():
 			u.set(field, value)
 
-		credentials_id = await u.execute()
+		credentials_id = await u.execute(event_type=EventTypes.CREDENTIALS_CREATED)
 
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
@@ -186,7 +188,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				u.unset(key)
 
 		try:
-			await u.execute()
+			await u.execute(event_type=EventTypes.CREDENTIALS_UPDATED)
 			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
 				"cid": credentials_id,
 				"fields": ", ".join(updated_fields or []),
@@ -208,7 +210,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return "OK"
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, key: dict = None) -> Optional[str]:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> Optional[str]:
 		"""
 		Locate credentials by matching ident string against configured ident fields.
 		"""

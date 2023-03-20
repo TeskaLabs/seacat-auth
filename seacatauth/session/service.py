@@ -17,6 +17,8 @@ import pymongo
 
 from .adapter import SessionAdapter, rest_get
 
+from ..events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -197,7 +199,7 @@ class SessionService(asab.Service):
 					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 				upsertor.set(key, value)
 
-		session_id = await upsertor.execute()
+		session_id = await upsertor.execute(event_type=EventTypes.SESSION_CREATED)
 
 		struct_data = {
 			"sid": session_id,
@@ -224,7 +226,7 @@ class SessionService(asab.Service):
 			for key, value in session_builder:
 				upsertor.set(key, value)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
 		return await self.get(session_id)
 
@@ -399,7 +401,7 @@ class SessionService(asab.Service):
 		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
 
 		try:
-			await upsertor.execute()
+			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
 			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.Id, "exp": expires})
 		except KeyError:
 			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.Id})
