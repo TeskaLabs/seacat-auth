@@ -19,11 +19,9 @@ def set_cookie(app, response, session, cookie_domain=None, secure=None):
 		Response to set cookie to
 	:param session:
 		Seacat Auth session to get cookie value from
-	:param cookie_domain_id:
-		Identifier of cookie domain where the cookie should be valid. Defaults to root cookie domain.
 	"""
 	cookie_svc = app.get_service("seacatauth.CookieService")
-	if cookie_domain is None:
+	if cookie_domain in (None, ""):
 		cookie_domain = cookie_svc.RootCookieDomain
 	if secure is None:
 		secure = cookie_svc.CookieSecure
