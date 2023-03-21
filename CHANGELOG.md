@@ -29,8 +29,9 @@
 - Allow extra login parameters to be supplied in login prologue body (#169, PLUM Sprint 230310)
 - Assign roles and tenants to multiple credentials at once (#167, PLUM Sprint 230310)
 - Introduce event type descriptors (#172, PLUM Sprint 230310)
-- OAuth redirect URI validation options (#157, PLUM Sprint 230310)
+- OAuth redirect URI validation options (#157, #175, PLUM Sprint 230310)
 - TOTP secrets moved to dedicated collection (#176, PLUM Sprint 230310)
+
 
 ### Refactoring
 - Regex validation of cookie_domain client attribute (#144, PLUM Sprint 230113)
