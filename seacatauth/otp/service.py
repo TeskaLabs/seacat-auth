@@ -97,7 +97,7 @@ class OTPService(asab.Service):
 
 		# Store secret in its own dedicated collection
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
-		upsertor.set("__totp", secret, encrypt=True)
+		upsertor.set("__totp", secret.encode("ascii"), encrypt=True)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
 		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
 
@@ -122,7 +122,7 @@ class OTPService(asab.Service):
 		expires: datetime.datetime = datetime.datetime.now(datetime.timezone.utc) + self.RegistrationTimeout
 		upsertor.set("exp", expires)
 
-		secret: str = pyotp.random_base32()
+		secret: str = pyotp.random_base32().encode("ascii")
 		upsertor.set("__s", secret, encrypt=True)
 
 		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)
@@ -140,17 +140,28 @@ class OTPService(asab.Service):
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
+
+		secret = secret.decode("ascii")
+
 		return secret
 
 	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> Optional[str]:
 		"""
 		Get TOTP secret from `TOTPCollection` by `credentials_id`.
+		Backwards compatibility: if not found, get TOTP from `CredentialsService`.
 		"""
 		try:
 			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
 			secret: str = totp_object.get("__totp")
 		except KeyError:
 			secret = None
+
+		if secret is not None:
+			return secret.decode("ascii")
+		
+		credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
+		secret = credentials.get("__totp")
+
 		return secret
 
 	async def _delete_prepared_totp_secret(self, session_id: str):
@@ -178,9 +189,7 @@ class OTPService(asab.Service):
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also PreparedTOTPCollection.)
 		"""
 		secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
-		if secret is None:
-			credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-			secret = credentials.get("__totp")
+		
 
 		if secret is not None and len(secret) > 0:
 			return True
@@ -189,9 +198,6 @@ class OTPService(asab.Service):
 
 	async def verify_request_totp(self, credentials_id, request_data: dict) -> bool:
 		totp_secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
-		if totp_secret is None:
-			credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-			totp_secret = credentials.get("__totp")
 
 		try:
 			totp_object: pyotp.TOTP = pyotp.TOTP(totp_secret)
