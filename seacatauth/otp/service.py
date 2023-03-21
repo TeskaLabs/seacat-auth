@@ -96,8 +96,8 @@ class OTPService(asab.Service):
 			return {"result": "FAILED"}
 
 		# Store secret in its own dedicated collection
-		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id, encrypt=True)
-		upsertor.set("__totp", secret)
+		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
+		upsertor.set("__totp", secret, encrypt=True)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
 		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
 
