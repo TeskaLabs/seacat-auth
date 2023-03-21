@@ -70,10 +70,19 @@ class CookieHandler(object):
 		}
 		```
 		"""
+		client_id = request.query.get("client_id")
+		if client_id is None:
+			raise ValueError("No 'client_id' parameter specified in anonymous introspection query.")
 
-		session = await self.authenticate_request(request, client_id=request.query.get("client_id"))
+		# TODO: Also check query for scope and validate it
+
+		session = await self.authenticate_request(request, client_id)
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
+		elif session.Authentication.IsAnonymous:
+			L.warning("Regular cookie introspection does not allow anonymous user access.", struct_data={
+				"client_id": client_id, "cid": session.Credentials.Id})
+			response = aiohttp.web.HTTPForbidden()
 		else:
 			try:
 				response = await nginx_introspection(request, session, self.App)
