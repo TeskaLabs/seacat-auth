@@ -98,25 +98,39 @@ class CookieHandler(object):
 
 
 	async def nginx_anonymous(self, request):
+		client_svc = self.App.get_service("seacatauth.ClientService")
+
 		anonymous_cid = request.query.get("cid")
 		if anonymous_cid is None:
-			raise ValueError("No 'cid' parameter specified in anonymous introspection query.")
+			L.error("No 'cid' parameter specified in anonymous introspection query.")
+			return aiohttp.web.HTTPBadRequest()
 		anonymous_session_created = False
 
-		# TODO: Consider client-specific anonymous sessions
-		if "client_id" in request.query:
-			raise ValueError("Anonymous introspection does not support 'client_id' parameter.")
+		client_id = request.query.get("client_id")
+		if client_id is None:
+			L.error("No 'client_id' parameter specified in anonymous introspection query.")
+			return aiohttp.web.HTTPBadRequest()
+		try:
+			client = await client_svc.get(client_id)
+		except KeyError:
+			L.error("Client not found.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPBadRequest()
 
-		session = await self.authenticate_request(request, client_id=None)
+		scope = request.query.get("scope", "")
+		if len(scope) > 0:
+			scope = scope.split(" ")
+		else:
+			scope = ["cookie"]
+
+		session = await self.authenticate_request(request, client_id)
 		if session is None:
 			# Create a new root session with anonymous_cid and a cookie
-			# Set the cookie
 			from_info = [request.remote]
 			forwarded_for = request.headers.get("X-Forwarded-For")
 			if forwarded_for is not None:
 				from_info.extend(forwarded_for.split(", "))
 			session = await self.CookieService.AuthenticationService.create_anonymous_session(
-				anonymous_cid, from_info=from_info)
+				anonymous_cid, client_id, scope, from_info=from_info)
 			anonymous_session_created = True
 
 		if session is None:
@@ -128,15 +142,14 @@ class CookieHandler(object):
 				L.warning("Request authorization failed: {}".format(e), exc_info=True)
 				response = aiohttp.web.HTTPUnauthorized()
 
-		# cookie domain by host
-		domain_id = self.CookieService.get_domain_id_by_host(request)
+		cookie_domain = client.get("cookie_domain") or None
 
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
 			return response
 
 		if anonymous_session_created:
-			set_cookie(self.App, response, session, domain_id)
+			set_cookie(self.App, response, session, cookie_domain)
 
 		return response
 
