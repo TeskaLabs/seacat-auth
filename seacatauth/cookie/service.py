@@ -1,9 +1,5 @@
 import base64
-import http.cookies
 import re
-import urllib.parse
-
-import aiohttp
 import logging
 
 import asab
@@ -39,32 +35,9 @@ class CookieService(asab.Service):
 			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieName)
 		)
 		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
-		self.RootCookieDomain = self._validate_cookie_domain(
-			asab.Config.get("seacatauth:cookie", "domain")
-		)
-
-		# Configure cookies for application domains
-		# TODO: Allow different cookie name for each domain
-		self.ApplicationCookies = {}
-		self.ApplicationCookieDomains = set()
-		section_pattern = re.compile(r"^seacatauth:cookie:([-_.0-9A-Za-z]+)$")
-		for section_name in asab.Config.sections():
-			match = section_pattern.match(section_name)
-			if match is None:
-				continue
-			domain_id = match.group(1)
-			section = asab.Config[section_name]
-
-			redirect_uri = section.get("redirect_uri", asab.Config.get("general", "auth_webui_base_url"))
-			domain = self._validate_cookie_domain(section.get("domain"))
-			if domain is None:
-				raise ValueError("Application cookie domain must be specified.")
-
-			self.ApplicationCookies[domain_id] = {
-				"redirect_uri": redirect_uri,
-				"domain": domain
-			}
-			self.ApplicationCookieDomains.add(domain)
+		self.RootCookieDomain = asab.Config.get("seacatauth:cookie", "domain") or None
+		if self.RootCookieDomain is not None:
+			self.RootCookieDomain = self._validate_cookie_domain(self.RootCookieDomain)
 
 
 	async def initialize(self, app):
@@ -73,14 +46,10 @@ class CookieService(asab.Service):
 
 	@staticmethod
 	def _validate_cookie_domain(domain):
-		if domain in ("", None):
-			L.warning("Cookie domain not specified or empty")
-			return None
 		if not domain.isascii():
-			L.warning("Cookie domain can contain only ASCII characters.", struct_data={"domain": domain})
-			return None
+			raise ValueError("Cookie domain can contain only ASCII characters.")
 		domain = domain.lstrip(".")
-		return domain
+		return domain or None
 
 
 	def _get_session_cookie_id(self, request):
@@ -88,10 +57,12 @@ class CookieService(asab.Service):
 		Get Seacat cookie value from request header
 		"""
 		cookie = request.cookies.get(self.CookieName)
+		if cookie is None:
+			return None
 		try:
-			session_cookie_id = base64.urlsafe_b64decode(cookie)
+			session_cookie_id = base64.urlsafe_b64decode(cookie.encode("ascii"))
 		except ValueError:
-			L.info("Cookie value is not base64", struct_data={"sci": cookie})
+			L.warning("Cookie value is not base64", struct_data={"sci": cookie})
 			return None
 		return session_cookie_id
 
@@ -166,7 +137,7 @@ class CookieService(asab.Service):
 		except KeyError:
 			raise KeyError("Client '{}' not found".format(client_id))
 
-		if "cookie_domain" in client:
+		if client.get("cookie_domain") not in (None, ""):
 			cookie_domain = client["cookie_domain"]
 		else:
 			cookie_domain = self.RootCookieDomain
@@ -197,17 +168,3 @@ class CookieService(asab.Service):
 		)
 
 		return session
-
-	def get_domain_id_by_host(self, request):
-		host = request.headers.get("X-Forwarded-Server")
-		if host is None:
-			host = request.host
-
-		if host == self.RootCookieDomain:
-			return None
-
-		for k, v in self.ApplicationCookies.items():
-			if host == v["domain"] or host.endswith("." + v["domain"]):
-				return k
-
-		return None
