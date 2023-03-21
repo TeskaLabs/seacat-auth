@@ -158,9 +158,28 @@ class CookieHandler(object):
 		"""
 		Exchange authorization code for cookie and redirect afterwards.
 		"""
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		tenant_svc = self.App.get_service("seacatauth.TenantService")
+
+		client_id = request.query.get("client_id")
+		if client_id is None:
+			L.error("No 'client_id' specified in cookie entrypoint query.")
+			return aiohttp.web.HTTPBadRequest()
+		try:
+			client = await client_svc.get(client_id)
+		except KeyError:
+			L.error("Client not found.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPBadRequest()
+
+		scope = request.query.get("scope", "")
+		if len(scope) > 0:
+			scope = scope.split(" ")
+		else:
+			scope = ["cookie"]
+
 		grant_type = request.query.get("grant_type")
 		if grant_type != "authorization_code":
-			L.error("Grant type not supported", struct_data={"grant_type": grant_type})
+			L.error("Grant type not supported.", struct_data={"grant_type": grant_type})
 			return aiohttp.web.HTTPBadRequest()
 
 		# Use the code to get session ID
@@ -169,9 +188,7 @@ class CookieHandler(object):
 		if root_session is None:
 			return aiohttp.web.HTTPBadRequest()
 
-		# TODO: Where to get the tenants from?
-		tenants = None
-		scope = frozenset(["profile", "email", "phone"])
+		tenants = await tenant_svc.get_tenants_by_scope(scope, root_session.Credentials.Id, has_access_to_all_tenants=False)
 
 		# TODO: Choose builders based on scope
 		session_builders = [
@@ -186,11 +203,9 @@ class CookieHandler(object):
 			cookie_session_builder(),
 		]
 
-		# TODO: Temporary solution. Root session should have no OAuth2 data.
-		#   Remove once ID token support is fully implemented.
 		oauth2_data = {
-			"scope": None,
-			"client_id": None,
+			"scope": scope,
+			"client_id": client_id,
 		}
 		session_builders.append(oauth2_session_builder(oauth2_data))
 
@@ -207,12 +222,13 @@ class CookieHandler(object):
 		)
 
 		# Construct the response
-		# TODO: Dynamic redirect (instead of static URL from config)
-		domain_id = request.match_info["domain_id"]
-		if domain_id not in self.CookieService.ApplicationCookies:
-			L.error("Invalid domain ID", struct_data={"domain_id": domain_id})
+		if client.get("cookie_domain") not in (None, ""):
+			cookie_domain = client["cookie_domain"]
+		else:
+			cookie_domain = self.CookieService.RootCookieDomain
 
-		redirect_uri = self.CookieService.ApplicationCookies[domain_id]["redirect_uri"]
+		# TODO: Dynamic redirect (instead of static URL from config)
+		redirect_uri = client.get("client_uri", "https://auth.local.loc")  # TODO: WIP!!!
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
@@ -225,10 +241,9 @@ class CookieHandler(object):
 		)
 
 		# TODO: Verify that the request came from the correct domain
-		try:
-			set_cookie(self.App, response, session, domain_id)
-		except KeyError:
-			L.error("Failed to set cookie", struct_data={"sid": session.Session.Id, "domain_id": domain_id})
-			return
+
+		set_cookie(self.App, response, session, cookie_domain)
+
+		# TODO: Set additional client cookies (obtained via HTTP request to client application)
 
 		return response
