@@ -158,7 +158,7 @@ class OTPService(asab.Service):
 
 		if secret is not None:
 			return secret.decode("ascii")
-		
+
 		credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
 		secret = credentials.get("__totp")
 
@@ -189,7 +189,7 @@ class OTPService(asab.Service):
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also PreparedTOTPCollection.)
 		"""
 		secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
-		
+
 
 		if secret is not None and len(secret) > 0:
 			return True
