@@ -36,6 +36,9 @@ class ExternalLoginHandler(object):
 
 
 	async def login(self, request):
+		cookie_svc = self.App.get_service("seacatauth.CookieService")
+		client_svc = self.App.get_service("seacatauth.ClientService")
+
 		state = request.query.get("state")
 		if state is None:
 			L.warning("State parameter not provided in external login response")
@@ -113,10 +116,16 @@ class ExternalLoginHandler(object):
 		})
 		response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-SUCCESSFUL")
 
-		# cookie domain by host
-		domain_id = self.CookieService.get_domain_id_by_host(request)
+		# Get cookie domain
+		cookie_domain = cookie_svc.RootCookieDomain
+		if hasattr(login_session, "ClientId"):
+			try:
+				client = await client_svc.get(login_session.ClientId)
+				cookie_domain = client.get("cookie_domain")
+			except KeyError:
+				L.error("Client not found.", struct_data={"client_id": login_session.ClientId})
 
-		set_cookie(self.App, response, session, domain_id)
+		set_cookie(self.App, response, session, cookie_domain)
 
 		return response
 
