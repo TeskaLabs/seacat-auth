@@ -385,10 +385,7 @@ class AuthorizeHandler(object):
 
 		await self.audit_authorize_success(session)
 
-		# cookie domain by host
-		domain_id = self.CookieService.get_domain_id_by_host(request)
-
-		return await self.reply_with_successful_response(session, scope, redirect_uri, state, domain_id)
+		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
 
 
 	async def _get_factors_to_setup(self, session):
@@ -413,7 +410,7 @@ class AuthorizeHandler(object):
 
 	async def reply_with_successful_response(
 		self, session, scope: list, redirect_uri: str,
-		state: str = None, domain_id: str = None
+		state: str = None,
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -458,11 +455,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-
-		if "cookie" in scope:
-			# TODO: Check that the cookie domain matches
-			#   Setting cookies for mismatching domains is a security flaw
-			set_cookie(self.App, response, session, domain_id)
 
 		return response
 
