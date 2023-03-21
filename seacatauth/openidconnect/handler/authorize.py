@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 
 from ...audit import AuditCode
-from ...cookie.utils import delete_cookie, set_cookie
+from ...cookie.utils import delete_cookie
 from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
