@@ -9,6 +9,7 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
+from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
@@ -416,8 +417,7 @@ class AuthenticationService(asab.Service):
 
 
 	async def create_anonymous_session(
-		self,
-		credentials_id: str,
+		self, credentials_id: str, client_id: str, scope: list,
 		session_expiration: float = None,
 		from_info: list = None
 	):
@@ -436,6 +436,12 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id),
 			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
 		]
+
+		oauth2_data = {
+			"scope": scope,
+			"client_id": client_id,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="root",
