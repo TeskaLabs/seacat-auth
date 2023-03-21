@@ -43,7 +43,7 @@ class OTPService(asab.Service):
 
 	async def deactivate_totp(self, credential_id: str):
 		"""
-		Delete TOTPCollection. If TOTP is not active, raise `TOTPNotActiveError`.
+		Delete active TOTP secret for requested credentials.
 		"""
 		if not await self.has_activated_totp(credential_id):
 			raise TOTPNotActiveError(credential_id)
@@ -96,7 +96,7 @@ class OTPService(asab.Service):
 			return {"result": "FAILED"}
 
 		# Store secret in its own dedicated collection
-		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
+		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id, encrypt=True)
 		upsertor.set("__totp", secret)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
 		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
@@ -122,9 +122,8 @@ class OTPService(asab.Service):
 		expires: datetime.datetime = datetime.datetime.now(datetime.timezone.utc) + self.RegistrationTimeout
 		upsertor.set("exp", expires)
 
-		# TODO: Encryption
 		secret: str = pyotp.random_base32()
-		upsertor.set("__s", secret)
+		upsertor.set("__s", secret, encrypt=True)
 
 		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)
 		L.log(asab.LOG_NOTICE, "TOTP secret created", struct_data={"sid": session_id})
@@ -136,7 +135,7 @@ class OTPService(asab.Service):
 		"""
 		Get TOTP secret from `PreparedTOTPCollection`. If it has already expired, raise `KeyError`.
 		"""
-		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id)
+		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id, decrypt=["__s"])
 		secret: str = data["__s"]
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
@@ -148,7 +147,7 @@ class OTPService(asab.Service):
 		Get TOTP secret from `TOTPCollection` by `credentials_id`.
 		"""
 		try:
-			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id)
+			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
 			secret: str = totp_object.get("__totp")
 		except KeyError:
 			secret = None
