@@ -262,10 +262,18 @@ class AuthenticationHandler(object):
 			body=login_session.encrypt(body)
 		)
 
-		# cookie domain by host
-		domain_id = self.CookieService.get_domain_id_by_host(request)
+		cookie_domain = None
+		if hasattr(login_session, "ClientId"):
+			client_svc = self.App.get_service("seacatauth.ClientService")
+			try:
+				client = await client_svc.get(login_session.ClientId)
+				cookie_domain = client.get("cookie_domain")
+			except KeyError:
+				L.error("Client not found.", struct_data={"client_id": login_session.ClientId})
+		if cookie_domain is None:
+			cookie_domain = self.CookieService.RootCookieDomain
 
-		set_cookie(self.App, response, session, domain_id)
+		set_cookie(self.App, response, session, cookie_domain)
 
 		self.AuthenticationService.LoginCounter.add('successful', 1)
 
