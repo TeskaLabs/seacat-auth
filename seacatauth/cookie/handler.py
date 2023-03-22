@@ -168,6 +168,8 @@ class CookieHandler(object):
 	async def cookie_authorize_callback(self, request):
 		"""
 		Exchange authorization code for cookie and redirect afterwards.
+
+		Together with cookie introspection, this endpoint replaces the obsolete `seacatauth.bouncer` module.
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
