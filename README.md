@@ -69,7 +69,7 @@ SeaCat Auth provides a rich REST API [documented in a Postman collection](./doc/
  * OpenIDConnect Service
  * Provisioning Service
  * Batman Service
- * Bouncer Service
+ * Cookie Service
 
 
 ### Components
