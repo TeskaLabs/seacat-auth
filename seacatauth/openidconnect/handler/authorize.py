@@ -487,8 +487,8 @@ class AuthorizeHandler(object):
 			authorize_query_params.append(("state", state))
 		if code_challenge is not None:
 			authorize_query_params.append(("code_challenge", code_challenge))
-		if code_challenge_method is not None:
-			authorize_query_params.append(("code_challenge_method", code_challenge_method))
+			if code_challenge_method not in (None, "none"):
+				authorize_query_params.append(("code_challenge_method", code_challenge_method))
 
 		# Get client collection
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
