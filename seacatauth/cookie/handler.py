@@ -1,16 +1,11 @@
 import logging
+import secrets
+
 import aiohttp
 import aiohttp.web
 
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
-from ..openidconnect.session import oauth2_session_builder
-from ..session import (
-	credentials_session_builder,
-	authz_session_builder,
-	cookie_session_builder,
-	login_descriptor_session_builder,
-)
 
 #
 
@@ -32,13 +27,13 @@ class CookieHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
 		web_app.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
-		web_app.router.add_get('/cookie/entry/{domain_id}', self.cookie_request)
+		web_app.router.add_get('/cookie/entry', self.cookie_request)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post('/cookie/nginx', self.nginx)
 		web_app_public.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
-		web_app_public.router.add_get('/cookie/entry/{domain_id}', self.cookie_request)
+		web_app_public.router.add_get('/cookie/entry', self.cookie_request)
 
 
 	async def authenticate_request(self, request, client_id=None):
@@ -76,6 +71,8 @@ class CookieHandler(object):
 
 		# TODO: Also check query for scope and validate it
 
+		L.warning(f"\n{request.headers=}")
+
 		session = await self.authenticate_request(request, client_id)
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
@@ -92,6 +89,14 @@ class CookieHandler(object):
 
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
+			state = secrets.token_urlsafe(16)
+			redirect_uri = request.headers.get("X-Request-Uri")
+			self.CookieService.TrampolineStorage[state] = redirect_uri
+			# TODO:
+			#   Get "X-Request-URI",
+			#   generate "X-State",
+			#   save it in the storage for later
+			response.headers.add("X-State", state)
 			return response
 
 		return response
@@ -159,7 +164,6 @@ class CookieHandler(object):
 		Exchange authorization code for cookie and redirect afterwards.
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
-		tenant_svc = self.App.get_service("seacatauth.TenantService")
 
 		client_id = request.query.get("client_id")
 		if client_id is None:
@@ -171,64 +175,33 @@ class CookieHandler(object):
 			L.error("Client not found.", struct_data={"client_id": client_id})
 			return aiohttp.web.HTTPBadRequest()
 
-		scope = request.query.get("scope", "")
-		if len(scope) > 0:
-			scope = scope.split(" ")
-		else:
-			scope = ["cookie"]
-
 		grant_type = request.query.get("grant_type")
 		if grant_type != "authorization_code":
 			L.error("Grant type not supported.", struct_data={"grant_type": grant_type})
 			return aiohttp.web.HTTPBadRequest()
 
-		# Use the code to get session ID
-		code = request.query.get("code")
-		root_session = await self.CookieService.get_session_by_authorization_code(code)
-		if root_session is None:
+		state = request.query.get("state")
+		# TODO: Validate the redirect URI
+		redirect_uri = self.CookieService.TrampolineStorage.pop(state, None)
+		if redirect_uri is None:
+			L.error("Empty or missing redirect URI.", struct_data={"client_id": client_id, "state": state})
 			return aiohttp.web.HTTPBadRequest()
 
-		tenants = await tenant_svc.get_tenants_by_scope(scope, root_session.Credentials.Id, has_access_to_all_tenants=False)
-
-		# TODO: Choose builders based on scope
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
-			await authz_session_builder(
-				tenant_service=self.CookieService.TenantService,
-				role_service=self.CookieService.RoleService,
-				credentials_id=root_session.Credentials.Id,
-				tenants=tenants,
-			),
-			login_descriptor_session_builder(root_session.Authentication.LoginDescriptor),
-			cookie_session_builder(),
-		]
-
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
-
-		requested_expiration = request.query.get("expiration")
-		if requested_expiration is not None:
-			requested_expiration = int(requested_expiration)
-
-		session = await self.SessionService.create_session(
-			session_type="cookie",
-			track_id=root_session.TrackId,
-			parent_session=root_session,
-			expiration=requested_expiration,
-			session_builders=session_builders,
-		)
+		# Use the code to get session ID
+		code = request.query.get("code")
+		if code in (None, ""):
+			L.warning("Empty or missing 'code' parameter in query.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPBadRequest()
+		session = await self.CookieService.get_session_by_authorization_code(code)
+		if session is None:
+			L.warning("Session not found: Authorization code invalid or expired.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPBadRequest()
 
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):
 			cookie_domain = client["cookie_domain"]
 		else:
 			cookie_domain = self.CookieService.RootCookieDomain
-
-		# TODO: Dynamic redirect (instead of static URL from config)
-		redirect_uri = client.get("client_uri", "https://auth.local.loc")  # TODO: WIP!!!
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
@@ -244,6 +217,6 @@ class CookieHandler(object):
 
 		set_cookie(self.App, response, session, cookie_domain)
 
-		# TODO: Set additional client cookies (obtained via HTTP request to client application)
+		# TODO: Set additional client cookies (obtained via synchronous HTTP request to a preconfigured endpoint)
 
 		return response

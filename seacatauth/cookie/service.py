@@ -39,6 +39,9 @@ class CookieService(asab.Service):
 		if self.RootCookieDomain is not None:
 			self.RootCookieDomain = self._validate_cookie_domain(self.RootCookieDomain)
 
+		# TODO: Temporary solution. Either move this storage to DB, or use the encryption approach.
+		self.TrampolineStorage = {}
+
 
 	async def initialize(self, app):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")

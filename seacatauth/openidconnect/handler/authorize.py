@@ -431,9 +431,8 @@ class AuthorizeHandler(object):
 			# then use the exact value received from the client.
 			url_qs["state"] = state
 
-		# Add the Authorization Code into the session ...
-		if "cookie" not in scope:
-			url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
+		# Add the Authorization Code into the response
+		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
 
 		# Success
 		url = urllib.parse.urlunparse((
