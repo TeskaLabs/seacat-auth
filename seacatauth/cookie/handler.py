@@ -6,6 +6,7 @@ import aiohttp.web
 
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
+from ..client import validate_redirect_uri
 
 #
 
@@ -27,13 +28,13 @@ class CookieHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
 		web_app.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
-		web_app.router.add_post('/cookie/entry', self.cookie_request)
+		web_app.router.add_post('/cookie/entry', self.cookie_authorize_callback)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post('/cookie/nginx', self.nginx)
 		web_app_public.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
-		web_app_public.router.add_post('/cookie/entry', self.cookie_request)
+		web_app_public.router.add_post('/cookie/entry', self.cookie_authorize_callback)
 
 
 	async def authenticate_request(self, request, client_id=None):
@@ -65,6 +66,8 @@ class CookieHandler(object):
 		}
 		```
 		"""
+		client_svc = self.App.get_service("seacatauth.ClientService")
+
 		client_id = request.query.get("client_id")
 		if client_id is None:
 			raise ValueError("No 'client_id' parameter specified in anonymous introspection query.")
@@ -77,7 +80,7 @@ class CookieHandler(object):
 		elif session.Authentication.IsAnonymous:
 			L.warning("Regular cookie introspection does not allow anonymous user access.", struct_data={
 				"client_id": client_id, "cid": session.Credentials.Id})
-			response = aiohttp.web.HTTPForbidden()
+			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
 				response = await nginx_introspection(request, session, self.App)
@@ -86,15 +89,20 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
-			delete_cookie(self.App, response)
 			state = secrets.token_urlsafe(16)
 			redirect_uri = request.headers.get("X-Request-Uri")
-			self.CookieService.TrampolineStorage[state] = redirect_uri
-			# TODO:
-			#   Get "X-Request-URI",
-			#   generate "X-State",
-			#   save it in the storage for later
-			response.headers.add("X-State", state)
+			# Validate redirect URI
+			client = await client_svc.get(client_id)
+			if validate_redirect_uri(
+				redirect_uri, client["redirect_uris"], client.get("validation_method")
+			):
+				self.CookieService.TrampolineStorage[state] = redirect_uri
+				response.headers.add("X-State", state)
+			else:
+				L.warning("Redirect URI not valid for client.", struct_data={
+					"client_id": client_id, "redirect_uri": redirect_uri})
+				response = aiohttp.web.HTTPForbidden()
+			delete_cookie(self.App, response)
 			return response
 
 		return response
@@ -157,13 +165,13 @@ class CookieHandler(object):
 		return response
 
 
-	async def cookie_request(self, request):
+	async def cookie_authorize_callback(self, request):
 		"""
 		Exchange authorization code for cookie and redirect afterwards.
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		query = await request.json()
+		query = await request.post()
 
 		client_id = query.get("client_id")
 		if client_id is None:
@@ -181,7 +189,6 @@ class CookieHandler(object):
 			return aiohttp.web.HTTPBadRequest()
 
 		state = query.get("state")
-		# TODO: Validate the redirect URI
 		redirect_uri = self.CookieService.TrampolineStorage.pop(state, None)
 		if redirect_uri is None:
 			L.error("Empty or missing redirect URI.", struct_data={"client_id": client_id, "state": state})
