@@ -1,6 +1,5 @@
 import logging
 import secrets
-import urllib.parse
 
 import aiohttp
 import aiohttp.web
@@ -71,8 +70,6 @@ class CookieHandler(object):
 			raise ValueError("No 'client_id' parameter specified in anonymous introspection query.")
 
 		# TODO: Also check query for scope and validate it
-
-		L.warning(f"\n{request.headers=}")
 
 		session = await self.authenticate_request(request, client_id)
 		if session is None:
