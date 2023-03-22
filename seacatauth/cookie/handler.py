@@ -1,5 +1,6 @@
 import logging
 import secrets
+import urllib.parse
 
 import aiohttp
 import aiohttp.web
@@ -27,13 +28,13 @@ class CookieHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post('/cookie/nginx', self.nginx)
 		web_app.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
-		web_app.router.add_get('/cookie/entry', self.cookie_request)
+		web_app.router.add_post('/cookie/entry', self.cookie_request)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post('/cookie/nginx', self.nginx)
 		web_app_public.router.add_post('/cookie/nginx/anonymous', self.nginx_anonymous)
-		web_app_public.router.add_get('/cookie/entry', self.cookie_request)
+		web_app_public.router.add_post('/cookie/entry', self.cookie_request)
 
 
 	async def authenticate_request(self, request, client_id=None):
@@ -165,7 +166,9 @@ class CookieHandler(object):
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		client_id = request.query.get("client_id")
+		query = await request.json()
+
+		client_id = query.get("client_id")
 		if client_id is None:
 			L.error("No 'client_id' specified in cookie entrypoint query.")
 			return aiohttp.web.HTTPBadRequest()
@@ -175,12 +178,12 @@ class CookieHandler(object):
 			L.error("Client not found.", struct_data={"client_id": client_id})
 			return aiohttp.web.HTTPBadRequest()
 
-		grant_type = request.query.get("grant_type")
+		grant_type = query.get("grant_type")
 		if grant_type != "authorization_code":
 			L.error("Grant type not supported.", struct_data={"grant_type": grant_type})
 			return aiohttp.web.HTTPBadRequest()
 
-		state = request.query.get("state")
+		state = query.get("state")
 		# TODO: Validate the redirect URI
 		redirect_uri = self.CookieService.TrampolineStorage.pop(state, None)
 		if redirect_uri is None:
@@ -188,7 +191,7 @@ class CookieHandler(object):
 			return aiohttp.web.HTTPBadRequest()
 
 		# Use the code to get session ID
-		code = request.query.get("code")
+		code = query.get("code")
 		if code in (None, ""):
 			L.warning("Empty or missing 'code' parameter in query.", struct_data={"client_id": client_id})
 			return aiohttp.web.HTTPBadRequest()
