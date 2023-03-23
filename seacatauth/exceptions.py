@@ -67,3 +67,9 @@ class TenantNotAuthorizedError(AccessDeniedError):
 		self.CredentialsId = credentials_id
 		self.Tenant = tenant
 		super().__init__("Credentials not authorized under tenant.", *args)
+
+
+class TOTPNotActiveError(Exception):
+	def __init__(self, credential_id: str):
+		self.CredentialID: str = credential_id
+		super().__init__("TOTP not active for credentials.")
