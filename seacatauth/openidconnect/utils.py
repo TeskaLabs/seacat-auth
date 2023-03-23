@@ -29,7 +29,7 @@ class TokenRequestErrorResponseCode:
 	InvalidClient = "invalid_client"
 	InvalidGrant = "invalid_grant"
 	UnauthorizedClient = "unauthorized_client"
-	UnauthorizedGranttype = "unauthorized_grant_type"
+	UnsupportedGrantType = "unsupported_grant_type"
 	InvalidScope = "invalid_scope"
 
 
