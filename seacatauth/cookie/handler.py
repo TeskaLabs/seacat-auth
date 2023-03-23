@@ -46,7 +46,7 @@ class CookieHandler(object):
 
 			# Extract the "X-State" header from auth request response and insert it in the error page Authorize URI
 			auth_request_set      $x_state $upstream_http_x_state;
-			error_page 401        /auth/api/openidconnect/authorize?response_type=code&scope=openid%20cookie%20profile&client_id=my-protected-app&state=$x_state&redirect_uri=https://example.app.loc:8443/my_app_callback;
+			error_page 401        /auth/api/openidconnect/authorize?response_type=code&scope=openid%20cookie%20profile&client_id=my-protected-app&state=$x_state&redirect_uri=https://my.app.test/my_app_callback;
 
 			rewrite ^/my_app(/(.*))? /$2 break;
 			proxy_pass http://my_app_api;
@@ -57,7 +57,7 @@ class CookieHandler(object):
 			internal;
 			proxy_method          POST;
 			proxy_set_body        "$http_authorization";
-			proxy_set_header      X-Request-Uri "$scheme://$host:$server_port$request_uri";
+			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
 			proxy_pass            http://auth_api/cookie/nginx?client_id=my-protected-app;
 			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 
@@ -187,6 +187,13 @@ class CookieHandler(object):
 			schema:
 				type: string
 				default: mongodb:default:abc123def456
+		-	name: client_id
+			in: query
+			description: ID of the Client who requested the introspection
+			required: true
+			schema:
+				type: string
+				default: my-application
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
