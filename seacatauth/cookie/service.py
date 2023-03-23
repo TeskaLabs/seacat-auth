@@ -1,6 +1,8 @@
 import base64
+import datetime
 import re
 import logging
+import secrets
 
 import asab
 import asab.storage
@@ -11,6 +13,7 @@ from ..session import (
 	authz_session_builder,
 )
 from ..openidconnect.session import oauth2_session_builder
+from ..events import EventTypes
 
 
 #
@@ -21,7 +24,21 @@ L = logging.getLogger(__name__)
 
 
 class CookieService(asab.Service):
-	CookieBouncerCollection = "cb"
+	"""
+	Manage cookie sessions
+
+	CookieRedirectUriCollection object example:
+	```json
+	{
+		"_id": "my-application abcd1234efgh5678",
+		"_v": 1,
+		"_c": ISODate("2023-03-16T13:15:42.003Z"),
+		"_m": ISODate("2023-03-16T13:15:42.003Z"),
+		"redirect_uri": "https://my-app.example.test/home/",
+	}
+	```
+	"""
+	CookieRedirectUriCollection = "cru"
 
 	def __init__(self, app, service_name="seacatauth.CookieService"):
 		super().__init__(app, service_name)
@@ -42,12 +59,54 @@ class CookieService(asab.Service):
 		if self.RootCookieDomain is not None:
 			self.RootCookieDomain = self._validate_cookie_domain(self.RootCookieDomain)
 
-		# TODO: Temporary solution. Either move this storage to DB, or use the encryption approach.
-		self.TrampolineStorage = {}
+		self.StateLength = asab.Config.getint("seacatauth:cookie", "redirect_state_length")
+		self.RedirectTimeout = datetime.timedelta(
+			seconds=asab.Config.getseconds("seacatauth:cookie", "redirect_timeout"))
+
+		self.App.PubSub.subscribe("Application.tick/60!", self._every_minute)
 
 
-	async def initialize(self, app):
-		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
+	async def _every_minute(self, event_name):
+		await self._delete_expired_redirect_uris()
+
+
+	async def store_redirect_uri(self, redirect_uri: str, client_id: str):
+		"""
+		Store redirect URI and return its randomly generated `state` string
+		"""
+		state = secrets.token_urlsafe(self.StateLength)
+		_id = "{} {}".format(client_id, state)
+		upsertor = self.StorageService.upsertor(self.CookieRedirectUriCollection, obj_id=_id)
+		upsertor.set("redirect_uri", redirect_uri)
+		await upsertor.execute(event_type=EventTypes.BOUNCER_URI_STORED)
+		return state
+
+
+	async def get_redirect_uri(self, client_id: str, state: str):
+		"""
+		Pop and return redirect URI from the storage
+		"""
+		_id = "{} {}".format(client_id, state)
+		collection = self.StorageService.Database[self.CookieRedirectUriCollection]
+		data = await collection.find_one_and_delete(filter={"_id": _id})
+		if data is None:
+			raise KeyError("Redirect URI not found.")
+		if data["_c"] < datetime.datetime.now(datetime.timezone.utc) - self.RedirectTimeout:
+			raise KeyError("Redirect URI expired.")
+		return data["redirect_uri"]
+
+
+	async def _delete_expired_redirect_uris(self):
+		"""
+		Delete redirect URIs created too long ago from now
+		"""
+		collection = self.StorageService.Database[self.CookieRedirectUriCollection]
+		result = await collection.delete_many(
+			{"_c": {"$lt": datetime.datetime.now(datetime.timezone.utc) - self.RedirectTimeout}})
+		if result.deleted_count > 0:
+			L.info("Expired WebAuthn challenges deleted", struct_data={
+				"count": result.deleted_count
+			})
 
 
 	@staticmethod
@@ -90,7 +149,10 @@ class CookieService(asab.Service):
 				SessionAdapter.FN.OAuth2.ClientId: client_id,
 			})
 		except KeyError:
-			L.info("Session not found", struct_data={"sci": session_cookie_id})
+			L.info("Session not found.", struct_data={"sci": session_cookie_id})
+			return None
+		except ValueError:
+			L.warning("Error retrieving session.", exc_info=True, struct_data={"sci": session_cookie_id})
 			return None
 
 		return session
