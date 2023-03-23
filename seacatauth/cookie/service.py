@@ -66,6 +66,10 @@ class CookieService(asab.Service):
 		self.App.PubSub.subscribe("Application.tick/60!", self._every_minute)
 
 
+	async def initialize(self, app):
+		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
+
+
 	async def _every_minute(self, event_name):
 		await self._delete_expired_redirect_uris()
 
