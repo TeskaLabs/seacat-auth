@@ -1,5 +1,4 @@
 import logging
-import secrets
 
 import aiohttp
 import aiohttp.web
@@ -353,7 +352,7 @@ class CookieHandler(object):
 			# Validate redirect URI
 			client = await client_svc.get(client_id)
 			if validate_redirect_uri(
-					redirect_uri, client["redirect_uris"], client.get("validation_method")
+				redirect_uri, client["redirect_uris"], client.get("validation_method")
 			):
 				state = await self.CookieService.store_redirect_uri(redirect_uri, client_id)
 				response.headers.add("X-State", state)
