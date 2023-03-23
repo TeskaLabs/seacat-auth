@@ -7,6 +7,8 @@ import urllib.parse
 import asab
 import asab.storage
 
+from typing import Optional
+from ..exceptions import TOTPNotActiveError
 from ..events import EventTypes
 
 #
@@ -17,7 +19,8 @@ L = logging.getLogger(__name__)
 
 
 class OTPService(asab.Service):
-	TOTPSecretCollection = "tos"
+	PreparedTOTPCollection = "tos"
+	TOTPCollection = "totp"
 
 	def __init__(self, app, service_name="seacatauth.OTPService"):
 		super().__init__(app, service_name)
@@ -38,141 +41,168 @@ class OTPService(asab.Service):
 		await self._delete_expired_totp_secrets()
 
 
-	async def get_totp_secret(self, session, credentials_id):
+	async def deactivate_totp(self, credential_id: str):
 		"""
-		Returns the status of TOTP setting.
-		If not activated, it also generates and returns a new TOTP secret.
+		Delete active TOTP secret for requested credentials.
 		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is not None and len(secret) > 0:
-			return {
-				"result": "OK",
-				"active": True
-			}
+		if not await self.has_activated_totp(credential_id):
+			raise TOTPNotActiveError(credential_id)
+		try:
+			await self.StorageService.delete(collection=self.TOTPCollection, obj_id=credential_id)
+		except KeyError:
+			# TOTP are stored in the old self.PreparedTOTPCollection -> only for backward compatibility
+			pass
 
-		# Generate secret and store in database
-		secret = await self._create_totp_secret(session.SessionId)
 
-		username = credentials["username"]
+		provider = self.CredentialsService.get_provider(credential_id)
+		await provider.update(credential_id, {
+			"__totp": None
+		})
 
-		url = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name=self.Issuer)
 
-		response = {
-			"result": "OK",
-			"active": False,
+	async def prepare_totp(self, session, credentials_id: str) -> dict:
+		"""
+		Prepare TOTP specifications from credentials and session.
+		"""
+
+		credentials: dict = await self.CredentialsService.get(credentials_id)
+		secret: str = await self._create_totp_secret(session.SessionId)
+		username: str = credentials.get("username")
+		url: str = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name=self.Issuer)
+
+		totp_setup: dict = {
 			"url": url,
 			"username": username,
 			"issuer": self.Issuer,
 			"secret": secret,
 			"timeout": self.RegistrationTimeout.total_seconds(),
 		}
-		return response
 
+		return totp_setup
 
-	async def set_totp(self, session, credentials_id, otp):
+	async def activate_prepared_totp(self, session, credentials_id: str, request_otp: str):
 		"""
-		Activates TOTP for the current user, provided that a TOTP secret is already set.
+		Activate TOTP for the current user, provided that a TOTP secret is already set.
 		Requires entering the generated OTP to succeed.
 		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is not None and len(secret) > 0:
-			# TOTP is already enabled
+		if await self.has_activated_totp(credentials_id):
 			return {"result": "FAILED"}
 
 		try:
-			secret = await self._get_totp_secret(session.SessionId)
+			secret = await self._get_prepared_totp_secret_by_session_id(session.SessionId)
 		except KeyError:
 			# TOTP secret has not been initialized or has expired
 			return {"result": "FAILED"}
 
 		totp = pyotp.TOTP(secret)
-		if totp.verify(otp) is False:
+		if totp.verify(request_otp) is False:
 			# TOTP secret does not match
 			return {"result": "FAILED"}
 
-		# Store secret in credentials object
-		provider = self.CredentialsService.get_provider(credentials_id)
-		await provider.update(credentials_id, {"__totp": secret})
+		# Store secret in its own dedicated collection
+		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
+		upsertor.set("__totp", secret.encode("ascii"), encrypt=True)
+		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
 		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
 
-		await self._delete_totp_secret(session.SessionId)
-
-		return {"result": "OK"}
-
-
-	async def unset_totp(self, credentials_id):
-		"""
-		Deactivates TOTP for the current user and erases the secret.
-		"""
-		credentials = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		secret = credentials.get("__totp")
-		if secret is None or len(secret) == 0:
-			# TOTP is not active
-			return {"result": "FAILED"}
-
-		provider = self.CredentialsService.get_provider(credentials_id)
-		await provider.update(credentials_id, {
-			"__totp": ""
-		})
+		await self._delete_prepared_totp_secret(session.SessionId)
 
 		return {"result": "OK"}
 
 
 	async def _create_totp_secret(self, session_id: str) -> str:
-		# Delete existing secret
+		"""
+		Create TOTP secret and save it into `PreparedTOTPCollection`. Delete it if already exists.
+		"""
+		# Delete secret if exists.
 		try:
-			await self._get_totp_secret(session_id)
-			await self._delete_totp_secret(session_id)
+			await self._delete_prepared_totp_secret(session_id)
 		except KeyError:
 			# There is no secret associated with this user session
 			pass
 
-		upsertor = self.StorageService.upsertor(self.TOTPSecretCollection, obj_id=session_id)
-
-		expires = datetime.datetime.now(datetime.timezone.utc) + self.RegistrationTimeout
+		# Store expiration date and secret to PreparedTOTPCollection
+		upsertor = self.StorageService.upsertor(collection=self.PreparedTOTPCollection, obj_id=session_id)
+		expires: datetime.datetime = datetime.datetime.now(datetime.timezone.utc) + self.RegistrationTimeout
 		upsertor.set("exp", expires)
 
-		# TODO: Encryption
-		secret = pyotp.random_base32()
-		upsertor.set("__s", secret)
+		secret: str = pyotp.random_base32().encode("ascii")
+		upsertor.set("__s", secret, encrypt=True)
 
-		await upsertor.execute(event_type=EventTypes.TOTP_SECRET_CREATED)
+		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)
 		L.log(asab.LOG_NOTICE, "TOTP secret created", struct_data={"sid": session_id})
 
 		return secret
 
 
-	async def _get_totp_secret(self, session_id: str) -> str:
-		data = await self.StorageService.get(self.TOTPSecretCollection, session_id)
-		secret = data["__s"]
-		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
+	async def _get_prepared_totp_secret_by_session_id(self, session_id: str) -> str:
+		"""
+		Get TOTP secret from `PreparedTOTPCollection`. If it has already expired, raise `KeyError`.
+		"""
+		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id, decrypt=["__s"])
+		secret: str = data["__s"]
+		expiration_time: Optional[datetime.datetime] = data["exp"]
+		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
+
+		secret = secret.decode("ascii")
 
 		return secret
 
+	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> Optional[str]:
+		"""
+		Get TOTP secret from `TOTPCollection` by `credentials_id`.
+		Backwards compatibility: if not found, get TOTP from `CredentialsService`.
+		"""
+		try:
+			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
+			secret: str = totp_object.get("__totp")
+		except KeyError:
+			secret = None
 
-	async def _delete_totp_secret(self, session_id: str):
-		await self.StorageService.delete(self.TOTPSecretCollection, session_id)
+		if secret is not None:
+			return secret.decode("ascii")
+
+		credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
+		secret = credentials.get("__totp")
+
+		return secret
+
+	async def _delete_prepared_totp_secret(self, session_id: str):
+		"""
+		Delete TOTP secret from `PreparedTOTPCollection`.
+		"""
+		await self.StorageService.delete(collection=self.PreparedTOTPCollection, obj_id=session_id)
 		L.info("TOTP secret deleted", struct_data={"sid": session_id})
 
 
 	async def _delete_expired_totp_secrets(self):
-		collection = self.StorageService.Database[self.TOTPSecretCollection]
-
-		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+		"""
+		Delete expired TOTP secrets
+		"""
+		collection: dict = self.StorageService.Database[self.PreparedTOTPCollection]
+		query_filter: dict = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.info("Expired TOTP secrets deleted", struct_data={
 				"count": result.deleted_count
 			})
 
-
-def authn_totp(dbcred, credentials):
-	try:
-		totp = pyotp.TOTP(dbcred['__totp'])
-		return totp.verify(credentials['totp'])
-	except KeyError:
+	async def has_activated_totp(self, credentials_id: str) -> bool:
+		"""
+		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also PreparedTOTPCollection.)
+		"""
+		secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
+		if secret is not None and len(secret) > 0:
+			return True
 		return False
+
+
+	async def verify_request_totp(self, credentials_id, request_data: dict) -> bool:
+		totp_secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
+
+		try:
+			totp_object: pyotp.TOTP = pyotp.TOTP(totp_secret)
+			return totp_object.verify(request_data['totp'])
+		except KeyError:
+			return False
