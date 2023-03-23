@@ -37,3 +37,5 @@ class EventTypes:
 	SESSION_EXTENDED = "session_extended"
 
 	TENANT_ASSIGNED = "tenant_assigned"
+
+	BOUNCER_URI_STORED = "bouncer_uri_stored"

@@ -311,9 +311,9 @@ class CookieHandler(object):
 		# Retrieve the original request URI by the state
 		state = query.get("state")
 		try:
-			redirect_uri = self.CookieService.TrampolineStorage.pop(state)
+			redirect_uri = await self.CookieService.get_redirect_uri(client_id, state)
 		except KeyError:
-			L.error("State not found.", struct_data={"client_id": client_id, "state": state})
+			L.warning("State matched no redirect URI.", struct_data={"client_id": client_id, "state": state})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
@@ -355,8 +355,7 @@ class CookieHandler(object):
 			if validate_redirect_uri(
 					redirect_uri, client["redirect_uris"], client.get("validation_method")
 			):
-				state = secrets.token_urlsafe(16)
-				self.CookieService.TrampolineStorage[state] = redirect_uri
+				state = await self.CookieService.store_redirect_uri(redirect_uri, client_id)
 				response.headers.add("X-State", state)
 			else:
 				L.warning("Redirect URI not valid for client.", struct_data={
