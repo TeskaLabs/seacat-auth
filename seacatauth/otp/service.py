@@ -45,13 +45,12 @@ class OTPService(asab.Service):
 		"""
 		Delete active TOTP secret for requested credentials.
 		"""
-
+		if not await self.has_activated_totp(credential_id):
+			raise TOTPNotActiveError(credential_id)
 		try:
-			if not await self.has_activated_totp(credential_id):
-				raise TOTPNotActiveError(credential_id)
 			await self.StorageService.delete(collection=self.TOTPCollection, obj_id=credential_id)
 		except KeyError:
-			# the user wants to deactivate TOTP stored in the old collection
+			# TOTP are stored in the old self.PreparedTOTPCollection -> only for backward compatibility
 			pass
 
 
@@ -194,8 +193,6 @@ class OTPService(asab.Service):
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also PreparedTOTPCollection.)
 		"""
 		secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
-
-
 		if secret is not None and len(secret) > 0:
 			return True
 		return False
