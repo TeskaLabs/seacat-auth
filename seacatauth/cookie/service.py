@@ -21,8 +21,11 @@ L = logging.getLogger(__name__)
 
 
 class CookieService(asab.Service):
+	CookieBouncerCollection = "cb"
+
 	def __init__(self, app, service_name="seacatauth.CookieService"):
 		super().__init__(app, service_name)
+		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
@@ -123,6 +126,31 @@ class CookieService(asab.Service):
 
 
 	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
+		"""
+		Create a new cookie-based session
+
+		Cookie-based sessions are uniquely identified by the combination of Cookie ID (SCI) and Client ID
+		and do not have any Access Token.
+		"""
+		# Check if the Client exists
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		try:
+			client = await client_svc.get(client_id)
+		except KeyError:
+			raise KeyError("Client '{}' not found".format(client_id))
+
+		# Check if session with the same cookie+client_id exists
+		# If so, delete it
+		try:
+			session = await self.SessionService.get_by({
+				SessionAdapter.FN.Cookie.Id: base64.urlsafe_b64decode(root_session.Cookie.Id.encode("ascii")),
+				SessionAdapter.FN.OAuth2.ClientId: client_id,
+			})
+			await self.SessionService.delete(session.SessionId)
+		except KeyError:
+			pass
+
+		# Build the session
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
@@ -134,12 +162,6 @@ class CookieService(asab.Service):
 		]
 
 		# Get cookie value and domain
-		client_svc = self.App.get_service("seacatauth.ClientService")
-		try:
-			client = await client_svc.get(client_id)
-		except KeyError:
-			raise KeyError("Client '{}' not found".format(client_id))
-
 		if client.get("cookie_domain") not in (None, ""):
 			cookie_domain = client["cookie_domain"]
 		else:
