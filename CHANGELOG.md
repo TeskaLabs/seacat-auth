@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.13-beta
 
 ### Breaking changes
 - Renamed the Code Challenge Method client feature (#168, PLUM Sprint 230224)
