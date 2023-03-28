@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 
 from ...audit import AuditCode
-from ...cookie.utils import delete_cookie, set_cookie
+from ...cookie.utils import delete_cookie
 from ... import client
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
@@ -384,6 +384,7 @@ class AuthorizeHandler(object):
 				code_challenge_method=code_challenge_method)
 
 		await self.audit_authorize_success(session)
+
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
 
 
@@ -409,7 +410,7 @@ class AuthorizeHandler(object):
 
 	async def reply_with_successful_response(
 		self, session, scope: list, redirect_uri: str,
-		state: str = None
+		state: str = None,
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -430,9 +431,8 @@ class AuthorizeHandler(object):
 			# then use the exact value received from the client.
 			url_qs["state"] = state
 
-		# Add the Authorization Code into the session ...
-		if "cookie" not in scope:
-			url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
+		# Add the Authorization Code into the response
+		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
 
 		# Success
 		url = urllib.parse.urlunparse((
@@ -454,11 +454,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-
-		if "cookie" in scope:
-			# TODO: Check that the cookie domain matches
-			#   Setting cookies for mismatching domains is a security flaw
-			set_cookie(self.App, response, session)
 
 		return response
 
@@ -491,20 +486,20 @@ class AuthorizeHandler(object):
 			authorize_query_params.append(("state", state))
 		if code_challenge is not None:
 			authorize_query_params.append(("code_challenge", code_challenge))
-		if code_challenge_method is not None:
-			authorize_query_params.append(("code_challenge_method", code_challenge_method))
+			if code_challenge_method not in (None, "none"):
+				authorize_query_params.append(("code_challenge_method", code_challenge_method))
 
-		# Build the redirect URI back to this endpoint and add it to login params
-		authorize_redirect_uri = "{}{}?{}".format(
-			self.PublicApiBaseUrl,
-			self.AuthorizePath,
-			urllib.parse.urlencode(authorize_query_params)
-		)
+		# Get client collection
+		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
-		login_query_params.append(("redirect_uri", authorize_redirect_uri))
+		# Build redirect uri
+		callback_uri = self._build_login_callback_uri(client_dict, authorize_query_params)
+
+		login_query_params.append(("redirect_uri", callback_uri))
 		login_query_params.append(("client_id", client_id))
 
-		login_url = await self._build_login_uri(client_id, login_query_params)
+		# Build login uri
+		login_url = self._build_login_uri(client_dict, login_query_params)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
 				"Location": login_url,
@@ -683,31 +678,44 @@ class AuthorizeHandler(object):
 		return tenants
 
 
-	async def _build_login_uri(self, client_id, login_query_params):
+	def _build_login_uri(self, client_dict, login_query_params):
 		"""
 		Check if the client has a registered login URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
-		try:
-			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-			client_login_uri = client_dict.get("login_uri")
-		except KeyError:
-			client_login_uri = None
-		if client_login_uri is not None:
-			parsed = urlparse(client_login_uri)
+		login_uri = client_dict.get("login_uri")
+		if login_uri is None:
+			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
+
+		parsed = urlparse(login_uri)
+		if parsed["fragment"] != "":
+			# If the Login URI contains fragment, add the login params into the fragment query
+			fragment_parsed = urlparse(parsed["fragment"])
+			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query.update(login_query_params)
+			fragment_parsed["query"] = urllib.parse.urlencode(query)
+			parsed["fragment"] = urlunparse(**fragment_parsed)
+		else:
+			# If the Login URI contains no fragment, add the login params into the regular URL query
 			query = urllib.parse.parse_qs(parsed["query"])
-			# WARNING: If the client's login URI includes query parameters with the same names
-			# as those used by Seacat Auth, they will be overwritten
 			query.update(login_query_params)
 			parsed["query"] = urllib.parse.urlencode(query)
-			login_url = urlunparse(**parsed)
-		else:
-			# Seacat Auth login expects the parameters to be at the end of the URL (in the fragment (hash) part)
-			# TODO: Consider using regular query parameters instead (UI refactoring needed)
-			#   so that Seacat Auth UI does not need a special approach here
-			login_url = "{}{}?{}".format(
-				self.AuthWebuiBaseUrl,
-				self.LoginPath,
-				urllib.parse.urlencode(login_query_params)
-			)
-		return login_url
+
+		return urlunparse(**parsed)
+
+
+	def _build_login_callback_uri(self, client_dict, authorize_query_params):
+		"""
+		Check if the client has a registered OAuth Authorize URI. If not, use the default.
+		Extend the URI with query parameters.
+		"""
+		authorize_uri = client_dict.get("authorize_uri")
+		if authorize_uri is None:
+			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+
+		parsed = urlparse(authorize_uri)
+		query = urllib.parse.parse_qs(parsed["query"])
+		query.update(authorize_query_params)
+		parsed["query"] = urllib.parse.urlencode(query)
+
+		return urlunparse(**parsed)
