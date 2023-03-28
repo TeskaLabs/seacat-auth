@@ -86,6 +86,9 @@ async def nginx_introspection(
 	Optionally checks for resources. Missing resource access results in 403 response.
 	Optionally adds session attributes (username, tenants etc.) to X-headers.
 	"""
+
+	# TODO: Optionally, validate the request URI (in request.headers["X-Request-Uri"])
+
 	session_service = app.get_service("seacatauth.SessionService")
 	rbac_service = app.get_service("seacatauth.RBACService")
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
@@ -111,7 +114,6 @@ async def nginx_introspection(
 	# Extend session expiration
 	session = await session_service.touch(session)
 
-	# TODO: Tenant-specific token (session)
 	id_token = await oidc_service.build_id_token(session)
 
 	# Set the authorization header

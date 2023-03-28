@@ -33,6 +33,7 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"admin_ui_url": "",
 	"admin_ui_client_id": "asab-webui-auth",
 	"admin_ui_client_name": "ASAB WebUI",
+	"redirect_uri_validation_method": "prefix_match",
 }
 
 
@@ -129,6 +130,10 @@ class ProvisioningService(asab.Service):
 			k: v
 			for k, v in CLIENT_TEMPLATES["Public web application"].items()
 			if client is None or client.get(k) != v}
+
+		redirect_uri_validation_method = self.Config["redirect_uri_validation_method"]
+		if client.get("redirect_uri_validation_method") != redirect_uri_validation_method:
+			update["redirect_uri_validation_method"] = redirect_uri_validation_method
 
 		# Check if the client has the correct redirect URI
 		# Use default URI if none is specified and the client doesn't exist yet
