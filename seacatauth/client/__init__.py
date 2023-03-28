@@ -1,9 +1,10 @@
 from .handler import ClientHandler
-from .service import ClientService
+from .service import ClientService, validate_redirect_uri
 from . import exceptions
 
 __all__ = [
 	"ClientHandler",
 	"ClientService",
-	"exceptions"
+	"exceptions",
+	"validate_redirect_uri"
 ]

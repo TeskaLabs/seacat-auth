@@ -18,8 +18,7 @@ services:
     volumes:
       - ./nginx-conf:/etc/nginx/conf.d
       - ./log/nginx:/log
-      - ./seacat-auth-webui:/seacat-auth-webui
-      - ./seacat-webui:/seacat-webui
+      - ./webroot:/webroot
 
   # SeaCat Auth
   seacat-auth:
