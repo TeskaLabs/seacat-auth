@@ -9,6 +9,7 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
+from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
@@ -18,6 +19,8 @@ from ..session import (
 	available_factors_session_builder,
 	external_login_session_builder, SessionAdapter,
 )
+
+from ..events import EventTypes
 
 #
 
@@ -156,7 +159,7 @@ class AuthenticationService(asab.Service):
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_CREATED)
 
 		return login_session
 
@@ -184,7 +187,7 @@ class AuthenticationService(asab.Service):
 		if remaining_login_attempts is not None:
 			upsertor.set("la", remaining_login_attempts)
 
-		await upsertor.execute()
+		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_UPDATED)
 		L.info("Login session updated", struct_data={
 			"lsid": login_session_id,
 		})
@@ -414,8 +417,7 @@ class AuthenticationService(asab.Service):
 
 
 	async def create_anonymous_session(
-		self,
-		credentials_id: str,
+		self, credentials_id: str, client_id: str, scope: list,
 		session_expiration: float = None,
 		from_info: list = None
 	):
@@ -434,6 +436,12 @@ class AuthenticationService(asab.Service):
 			await available_factors_session_builder(self, credentials_id),
 			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
 		]
+
+		oauth2_data = {
+			"scope": scope,
+			"client_id": client_id,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
 			session_type="root",
