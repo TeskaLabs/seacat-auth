@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## Release candidate
+
+### Breaking changes
+- Introspection requests require client_id in the query (#156, PLUM Sprint 230324)
+- Every cookie introspection should be paired with a cookie entrypoint (#156, PLUM Sprint 230324)
+- Bouncer module replaced by cookie entrypoint (#156, PLUM Sprint 230324)
+- Dropped support for custom cookie domains in the configuration (#156, PLUM Sprint 230324)
+
+### Features
+- Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
+
+---
+
+
 ## v23.13-beta
 
 ### Breaking changes
