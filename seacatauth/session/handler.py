@@ -19,7 +19,7 @@ class SessionHandler(object):
 	Sessions
 
 	---
-	- tags: ["Sessions"]
+	tags: ["Sessions"]
 	"""
 
 	def __init__(self, app, session_svc):

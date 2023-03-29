@@ -30,7 +30,7 @@ class AuthorizeHandler(object):
 	https://openid.net/specs/openid-connect-core-1_0.html
 
 	---
-	- tags: ["OAuth 2.0 / OpenID Connect"]
+	tags: ["OAuth 2.0 / OpenID Connect"]
 	"""
 
 	AuthorizePath = "/openidconnect/authorize"
