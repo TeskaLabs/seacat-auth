@@ -11,6 +11,9 @@
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
 
+### Refactoring
+- OpenAPI docs updated (#181, PLUM Sprint 230324)
+
 ---
 
 

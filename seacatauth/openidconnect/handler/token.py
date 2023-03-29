@@ -25,45 +25,88 @@ L = logging.getLogger(__name__)
 
 
 class TokenHandler(object):
+	"""
+	OAuth 2.0 Token request
+
+	---
+	- tags: ["OAuth 2.0 / OpenID Connect"]
+	"""
 
 	def __init__(self, app, oidc_svc):
 		self.OpenIdConnectService = oidc_svc
-		self.SessionService = app.get_service('seacatauth.SessionService')
-		self.CredentialsService = app.get_service('seacatauth.CredentialsService')
+		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post('/openidconnect/token', self.token_request)
-		web_app.router.add_post('/openidconnect/token/revoke', self.token_revoke)
-		web_app.router.add_post('/openidconnect/token/refresh', self.token_refresh)
-		web_app.router.add_put('/openidconnect/token/validate', self.validate_id_token)
+		web_app.router.add_post("/openidconnect/token", self.token_request)
+		web_app.router.add_post("/openidconnect/token/revoke", self.token_revoke)
+		web_app.router.add_post("/openidconnect/token/refresh", self.token_refresh)
+		web_app.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post('/openidconnect/token', self.token_request)
-		web_app_public.router.add_post('/openidconnect/token/revoke', self.token_revoke)
-		web_app_public.router.add_post('/openidconnect/token/refresh', self.token_refresh)
-		web_app_public.router.add_put('/openidconnect/token/validate', self.validate_id_token)
+		web_app_public.router.add_post("/openidconnect/token", self.token_request)
+		web_app_public.router.add_post("/openidconnect/token/revoke", self.token_revoke)
+		web_app_public.router.add_post("/openidconnect/token/refresh", self.token_refresh)
+		web_app_public.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 
 	async def token_request(self, request):
+		"""
+		OAuth 2.0 Token Request
+
+		---
+		requestBody:
+			content:
+				application/x-www-form-urlencoded:
+					schema:
+						type: object
+						properties:
+							grant_type:
+								type: string
+								enum: ["authorization_code", "refresh_token"]
+								description: The type of grant being requested
+							code:
+								type: string
+								description: The authorization code returned by the authorization server
+							refresh_token:
+								type: string
+								description: The refresh token returned by the authorization server
+							redirect_uri:
+								type: string
+								description: The redirect URI that was used in the initial authorization request
+							client_id:
+								type: string
+								description: The client ID issued by the authorization server
+							client_secret:
+								type: string
+								description: The client secret issued by the authorization server
+							code_verifier:
+								type: string
+								description:
+									A cryptographically random string that is used to correlate the authorization
+									request to the token request.
+						required:
+							- grant_type
+		"""
 		data = await request.text()
 		qs_data = dict(urllib.parse.parse_qsl(data))
 
 		# 3.1.3.2.  Token Request Validation
-		grant_type = qs_data.get('grant_type', '<missing>')
+		grant_type = qs_data.get("grant_type", "<missing>")
 
-		if grant_type == 'authorization_code':
-			return await self.token_request_authorization_code(request, qs_data)
+		if grant_type == "authorization_code":
+			return await self._token_request_authorization_code(request, qs_data)
 
-		if grant_type == 'batman':
+		if grant_type == "batman":
 			# TODO: Call the batman service (when implemented)
-			return await self.token_request_batman(request, qs_data)
+			return await self._token_request_batman(request, qs_data)
 
 		L.warning("Grant Type is not 'authorization_code' but '{}'".format(grant_type))
 		return aiohttp.web.HTTPBadRequest()
 
 
-	async def token_request_authorization_code(self, request, qs_data):
+	async def _token_request_authorization_code(self, request, qs_data):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 
@@ -118,8 +161,8 @@ class TokenHandler(object):
 		# 	  return await self.token_error_response(request, "The redirect URL is not associated with the client.")
 
 		headers = {
-			'Cache-Control': 'no-store',
-			'Pragma': 'no-cache',
+			"Cache-Control": "no-store",
+			"Pragma": "no-cache",
 		}
 
 		expires_in = int((session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
@@ -145,11 +188,10 @@ class TokenHandler(object):
 		return asab.web.rest.json_response(request, body, headers=headers)
 
 
-	async def token_request_batman(self, request, qs_data):
-
+	async def _token_request_batman(self, request, qs_data):
 		# Ensure the Authorization Code was issued to the authenticated Client
 		# If possible, verify that the Authorization Code has not been previously used
-		authorization_code = qs_data.get('code', '')
+		authorization_code = qs_data.get("code", "")
 		if len(authorization_code) == 0:
 			L.warning("Authorization Code not provided")
 			return aiohttp.web.HTTPBadRequest()
@@ -174,28 +216,31 @@ class TokenHandler(object):
 		credentials = await self.CredentialsService.get(session.Credentials.Id)
 
 		headers = {
-			'Cache-Control': 'no-store',
-			'Pragma': 'no-cache',
+			"Cache-Control": "no-store",
+			"Pragma": "no-cache",
 		}
 
 		body = {
 			"token_type": "Batman",
 			"cid": session.Credentials.Id,
-			"username": credentials['username'],
+			"username": credentials["username"],
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
 
 
 	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'required': ['token'],
-		'properties': {
-			'token': {'type': 'string'},
-			'token_type_hint': {'type': 'string'},
+		"type": "object",
+		"required": ["token"],
+		"properties": {
+			"token": {"type": "string"},
+			"token_type_hint": {"type": "string"},
 		}
 	})
 	async def token_revoke(self, request, *, json_data):
+		"""
+		OAuth 2.0 Access Token Revoke
+		"""
 		# TODO: this is not implemented
 
 		if not self.OpenIdConnectService.check_access_token(request.headers["Authorization"].split()[1]):
@@ -209,13 +254,13 @@ class TokenHandler(object):
 
 		token_type_hint = json_data.get("token_type_hint")  # Optional `access_token` or `refresh_token`
 		if token_type_hint:
-			if token_type_hint == 'access_token':
-				self.OpenIdConnectService.invalidate_access_token(json_data['token'])
-			elif token_type_hint == 'refresh_token':
-				self.OpenIdConnectService.invalidate_refresh_token(json_data['token'])
+			if token_type_hint == "access_token":
+				self.OpenIdConnectService.invalidate_access_token(json_data["token"])
+			elif token_type_hint == "refresh_token":
+				self.OpenIdConnectService.invalidate_refresh_token(json_data["token"])
 			else:
 				return await self.token_error_response(request, "Unknown token_type_hint {}".format(token_type_hint))
-		self.OpenIdConnectService.invalidate_token(json_data['token'])
+		self.OpenIdConnectService.invalidate_token(json_data["token"])
 		return aiohttp.web.HTTPOk()
 
 
@@ -232,7 +277,7 @@ class TokenHandler(object):
 	})
 	async def token_refresh(self, request, *, json_data):
 		"""
-		6.  Refreshing an Access token
+		OAuth 2.0 Access Token Refresh
 		"""
 		# TODO: this is not implemented
 

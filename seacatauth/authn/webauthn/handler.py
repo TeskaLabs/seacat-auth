@@ -15,10 +15,11 @@ L = logging.getLogger(__name__)
 
 
 class WebAuthnHandler(object):
-
 	"""
-	Example implementation:
-	https://github.com/pyauth/pywarp/blob/master/pywarp/rp.py
+	Manage FIDO2 Web Authentication
+
+	---
+	tags: ["Manage FIDO2 Web Authentication"]
 	"""
 
 	def __init__(self, app, webauthn_svc):
@@ -43,6 +44,9 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def get_registration_options(self, request):
+		"""
+		Get WebAuthn registration options
+		"""
 		options = await self.WebAuthnService.get_registration_options(request.Session)
 		return aiohttp.web.Response(body=options, content_type="application/json")
 		# return asab.web.rest.json_response(request, options)
@@ -84,6 +88,9 @@ class WebAuthnHandler(object):
 	})
 	@access_control()
 	async def register_credential(self, request, *, json_data):
+		"""
+		Register a new WebAuthn credential for the current user
+		"""
 		response = await self.WebAuthnService.register_credential(request.Session, public_key_credential=json_data)
 		return asab.web.rest.json_response(
 			request, response,
@@ -92,6 +99,9 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def list_credentials(self, request, *, credentials_id):
+		"""
+		List current user's registered WebAuthn credentials
+		"""
 		wa_credentials = []
 		for credential in await self.WebAuthnService.list_webauthn_credentials(credentials_id):
 			wa_credential = {
@@ -124,6 +134,9 @@ class WebAuthnHandler(object):
 	})
 	@access_control()
 	async def update_credential(self, request, *, json_data, credentials_id):
+		"""
+		Update current user's registered WebAuthn credential's metadata
+		"""
 		try:
 			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
 		except ValueError:
@@ -147,6 +160,9 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def remove_credential(self, request, *, credentials_id):
+		"""
+		Remove current user's registered WebAuthn credential
+		"""
 		try:
 			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
 		except ValueError:

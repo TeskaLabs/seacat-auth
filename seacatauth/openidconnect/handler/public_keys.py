@@ -10,7 +10,12 @@ L = logging.getLogger(__name__)
 
 
 class PublicKeysHandler(object):
+	"""
+	Public keys
 
+	---
+	- tags: ["OAuth 2.0 / OpenID Connect"]
+	"""
 
 	def __init__(self, app, oidc_svc):
 		self.App = app
@@ -27,9 +32,17 @@ class PublicKeysHandler(object):
 
 	async def public_keys(self, request):
 		"""
-		Return JWK public keys that the client can use for token verification.
+		JSON Web Key Sets
 
-		Specify ?format=pem in query to return the keys in PEM format.
+		---
+		parameters:
+		-	name: format
+			in: query
+			description: Server key format
+			required: false
+			schema:
+				type: boolean
+				enum: ["pem", "jwk"]
 		"""
 		# TODO: Multiple key support
 		public_key = self.OpenIdConnectService.PrivateKey.public()
