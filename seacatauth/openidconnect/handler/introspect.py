@@ -15,10 +15,14 @@ L = logging.getLogger(__name__)
 
 
 class TokenIntrospectionHandler(object):
-	'''
+	"""
 	OAuth 2.0 Token Introspection
+
 	https://tools.ietf.org/html/rfc7662
-	'''
+
+	---
+	- tags: ["OAuth 2.0 / OpenID Connect"]
+	"""
 
 	def __init__(self, app, oidc_svc, credentials_svc):
 		self.CredentialsService = credentials_svc
@@ -27,18 +31,20 @@ class TokenIntrospectionHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post('/openidconnect/introspect', self.introspect)
-		web_app.router.add_post('/openidconnect/introspect/nginx', self.introspect_nginx)
+		web_app.router.add_post("/openidconnect/introspect", self.introspect)
+		web_app.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post('/openidconnect/introspect', self.introspect)
-		web_app_public.router.add_post('/openidconnect/introspect/nginx', self.introspect_nginx)
+		web_app_public.router.add_post("/openidconnect/introspect", self.introspect)
+		web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
 
 
 	async def introspect(self, request):
 		"""
-		RFC7662 chapter 2.Introspection Endpoint
+		OAuth 2.0 Access Token Introspection Endpoint
+
+		RFC7662 chapter 2
 
 		POST /introspect HTTP/1.1
 		Accept: application/json
@@ -76,6 +82,8 @@ class TokenIntrospectionHandler(object):
 
 	async def introspect_nginx(self, request):
 		"""
+		Access token introspection for Nginx
+
 		Non-standard version of RFC7662 chapter 2.Introspection Endpoint that is usable with Nginx auth_request module.
 
 		Based on:
