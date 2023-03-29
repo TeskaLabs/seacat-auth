@@ -3,6 +3,7 @@ import re
 
 import asab.storage.exceptions
 import asab
+import asab.exceptions
 
 from ...events import EventTypes
 
@@ -20,20 +21,68 @@ class ResourceService(asab.Service):
 	ResourceNamePattern = r"[a-z][a-z0-9:._-]{0,128}[a-z0-9]"
 
 	# TODO: gather these system resources automatically
-	BuiltinResources = [
-		{
-			"id": "seacat:access",
-			"description": "Grants access to Seacat API and Seacat WebUI.",
+	_SeacatAuthResources = {
+		"seacat:access": {
+			"description": "Access to Seacat Admin API and UI.",
 		},
-		{
-			"id": "authz:superuser",
-			"description": "Grants superuser access, including the access to all tenants. Global-only.",
+		"authz:superuser": {
+			"description": "Grants superuser access, including the access to all tenants.",
 		},
-		{
-			"id": "authz:tenant:access",
-			"description": "Grants non-superuser access to all tenants. Global-only.",
+		"authz:tenant:access": {
+			"description": "Grants non-superuser access to all tenants.",
 		},
-	]
+		"seacat:credentials:access": {
+			"description": "List credentials and view credentials details.",
+		},
+		"seacat:credentials:edit": {
+			"description": "Edit and suspend credentials.",
+		},
+		"seacat:session:access": {
+			"description": "List sessions and view session details.",
+		},
+		"seacat:session:terminate": {
+			"description": "Terminate sessions.",
+		},
+		"seacat:resource:access": {
+			"description": "List resources and view resource details.",
+		},
+		"seacat:resource:edit": {
+			"description": "Edit and delete resources.",
+		},
+		"seacat:client:access": {
+			"description": "List clients and view client details.",
+		},
+		"seacat:client:edit": {
+			"description": "Edit and delete clients.",
+		},
+		"seacat:tenant:access": {
+			"description": "List tenants, view tenant detail and see tenant members.",
+		},
+		"seacat:tenant:edit": {
+			"description": "Edit tenant data.",
+		},
+		"seacat:tenant:delete": {
+			"description": "Delete tenant.",
+		},
+		"seacat:tenant:assign": {
+			"description": "Assign and unassign tenant members.",
+		},
+		"seacat:role:access": {
+			"description": "Search tenant roles, view role detail and list role bearers.",
+		},
+		"seacat:role:edit": {
+			"description":
+				"Create, edit and delete tenant roles. "
+				"This does not enable the bearer to assign Seacat system resources.",
+		},
+		"seacat:role:assign": {
+			"description": "Assign and unassign tenant roles.",
+		},
+	}
+	_GlobalOnlyResources = frozenset({
+		"authz:superuser", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
+		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
+		"seacat:client:access", "seacat:client:edit"})
 
 
 	def __init__(self, app, service_name="seacatauth.ResourceService"):
@@ -47,28 +96,32 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
+	def is_seacat_auth_resource(self, resource_id):
+		return resource_id in self._SeacatAuthResources
+
+
+	def is_global_only_resource(self, resource_id):
+		return resource_id in self._GlobalOnlyResources
+
+
 	async def _ensure_builtin_resources(self):
 		"""
 		Check if all builtin resources exist. Create them if they don't.
 		Update their descriptions if they are outdated.
 		"""
-		for resource_config in self.BuiltinResources:
-			resource_id = resource_config["id"]
-			resource_description = resource_config.get("description")
+		for resource_id, resource_config in self._SeacatAuthResources.items():
+			description = resource_config.get("description")
 
 			L.info("Checking for builtin resource '{}'".format(resource_id))
 			try:
 				db_resource = await self.get(resource_id)
 			except KeyError:
-				await self.create(resource_id, resource_description)
+				await self.create(resource_id, description)
 				continue
-			except Exception as e:
-				L.error("Cannot create builtin resource '{}'".format(resource_id))
-				raise e
 
 			# Update resource description
-			if resource_description is not None and db_resource.get("description") != resource_description:
-				await self.update(resource_id, resource_description)
+			if description is not None and db_resource.get("description") != description:
+				await self.update(resource_id, description)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -86,6 +139,10 @@ class ResourceService(asab.Service):
 		resources = []
 		count = await collection.count_documents(query_filter)
 		async for resource_dict in cursor:
+			if self.is_seacat_auth_resource(resource_dict["_id"]):
+				resource_dict["editable"] = False
+			if self.is_global_only_resource(resource_dict["_id"]):
+				resource_dict["global_only"] = True
 			resources.append(resource_dict)
 
 		return {
@@ -97,6 +154,10 @@ class ResourceService(asab.Service):
 
 	async def get(self, resource_id: str):
 		data = await self.StorageService.get(self.ResourceCollection, resource_id)
+		if self.is_seacat_auth_resource(data["_id"]):
+			data["editable"] = False
+		if self.is_global_only_resource(data["_id"]):
+			data["global_only"] = True
 		return data
 
 
@@ -124,6 +185,8 @@ class ResourceService(asab.Service):
 
 
 	async def update(self, resource_id: str, description: str):
+		if self.is_seacat_auth_resource(resource_id):
+			raise asab.exceptions.ValidationError("System resource cannot be modified")
 		resource = await self.get(resource_id)
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
@@ -143,8 +206,8 @@ class ResourceService(asab.Service):
 
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
-		if resource_id in map(lambda x: x["id"], self.BuiltinResources):
-			raise ValueError("System resource cannot be deleted")
+		if self.is_seacat_auth_resource(resource_id):
+			raise asab.exceptions.ValidationError("System resource cannot be deleted")
 
 		resource = await self.get(resource_id)
 
@@ -199,8 +262,8 @@ class ResourceService(asab.Service):
 		Shortcut for creating a new resource with the desired name,
 		assigning it to roles that have the original resource and deleting the original resource
 		"""
-		if resource_id in map(lambda x: x["id"], self.BuiltinResources):
-			raise ValueError("System resource cannot be renamed")
+		if self.is_seacat_auth_resource(resource_id):
+			raise asab.exceptions.ValidationError("System resource cannot be renamed")
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
 
