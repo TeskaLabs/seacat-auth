@@ -16,10 +16,10 @@ L = logging.getLogger(__name__)
 
 class ResourceHandler(object):
 	"""
-	Manage resources
+	Resource management
 
 	---
-	- tags: ["Manage resources"]
+	- tags: ["Resource management"]
 	"""
 
 	def __init__(self, app, rbac_svc):
@@ -55,6 +55,20 @@ class ResourceHandler(object):
 			description: Filter string
 			schema:
 				type: string
+		-	name: include_deleted
+			in: query
+			description: Whether to include soft-deleted resources
+			required: false
+			schema:
+				type: string
+				enum: ["true"]
+		-	name: exclude_global_only
+			in: query
+			description: Whether to exclude global-only resources
+			required: false
+			schema:
+				type: string
+				enum: ["true"]
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
@@ -64,12 +78,17 @@ class ResourceHandler(object):
 		# Filter by ID.startswith()
 		query_filter = {}
 		if "f" in request.query:
-			query_filter["_id"] = re.compile(
-				"^{}".format(re.escape(request.query["f"])))
+			query_filter["_id"] = {"$regex": "^{}".format(re.escape(request.query["f"]))}
 
 		# Do not include soft-deleted resources unless requested
 		if request.query.get("include_deleted") != "true":
 			query_filter["deleted"] = {"$in": [None, False]}
+
+		# Exclude global-only resources if requested
+		if request.query.get("exclude_global_only") == "true":
+			if "_id" not in query_filter:
+				query_filter["_id"] = {}
+			query_filter["_id"]["$nin"] = list(self.ResourceService._GlobalOnlyResources)
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
