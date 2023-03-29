@@ -19,7 +19,7 @@ class ChangePasswordHandler(object):
 	Manage password
 
 	---
-	- tags: ["Manage password"]
+	tags: ["Manage password"]
 	"""
 
 	def __init__(self, app, change_password_svc):

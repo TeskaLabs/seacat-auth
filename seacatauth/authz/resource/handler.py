@@ -19,7 +19,7 @@ class ResourceHandler(object):
 	Manage resources
 
 	---
-	- tags: ["Manage resources"]
+	tags: ["Manage resources"]
 	"""
 
 	def __init__(self, app, rbac_svc):

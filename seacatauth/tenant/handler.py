@@ -17,7 +17,7 @@ class TenantHandler(object):
 	Tenant management
 
 	---
-	- tags: ["Tenant management"]
+	tags: ["Tenant management"]
 	"""
 
 	def __init__(self, app, tenant_svc):
