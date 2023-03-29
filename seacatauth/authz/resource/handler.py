@@ -1,6 +1,7 @@
 import logging
 import re
 
+import aiohttp.web
 import asab
 import asab.web.rest
 
@@ -16,9 +17,11 @@ L = logging.getLogger(__name__)
 class ResourceHandler(object):
 	"""
 	Manage resources
+
 	---
-	- tags: ["Resource management"]
+	- tags: ["Manage resources"]
 	"""
+
 	def __init__(self, app, rbac_svc):
 		self.RBACService = rbac_svc
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
@@ -30,7 +33,29 @@ class ResourceHandler(object):
 		web_app.router.add_put("/resource/{resource_id}", self.update)
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
+
 	async def list(self, request):
+		"""
+		List resources
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: f
+			in: query
+			description: Filter string
+			schema:
+				type: string
+		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
 		if limit is not None:
@@ -49,7 +74,11 @@ class ResourceHandler(object):
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
 
+
 	async def get(self, request):
+		"""
+		Get resource detail
+		"""
 		resource_id = request.match_info["resource_id"]
 		result = await self.ResourceService.get(resource_id)
 		result["result"] = "OK"
@@ -57,14 +86,12 @@ class ResourceHandler(object):
 			request, result
 		)
 
+
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
-			"description": {
-				"type": "string",
-			},
-		}
+			"description": {"type": "string"}}
 	})
 	@access_control("authz:superuser")
 	async def create_or_undelete(self, request, *, json_data):
@@ -114,10 +141,26 @@ class ResourceHandler(object):
 	@access_control("authz:superuser")
 	async def delete(self, request):
 		"""
-		Delete a resource. The resource is soft-deleted (suspended) by default,
-		unless "hard_delete=true" is specified in query.
+		Delete resource
+
+		The resource is soft-deleted (suspended) by default.
+
+		---
+		parameters:
+		-	name: hard_delete
+			in: query
+			description:
+				By default, the resource is only soft-deleted, i.e. marked as deleted and retained in te database.
+				Enabling this switch causes the resource to be completely removed from the database.
+				Hard-deleting requires `authz:superuser`.
+			required: false
+			schema:
+				type: boolean
+				enum: ["true"]
 		"""
 		resource_id = request.match_info["resource_id"]
 		hard_delete = request.query.get("hard_delete") == "true"
+		if hard_delete and not request.is_superuser:
+			raise aiohttp.web.HTTPForbidden()
 		await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
 		return asab.web.rest.json_response(request, {"result": "OK"})

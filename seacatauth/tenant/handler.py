@@ -13,34 +13,40 @@ L = logging.getLogger(__name__)
 
 
 class TenantHandler(object):
+	"""
+	Tenant management
+
+	---
+	- tags: ["Tenant management"]
+	"""
 
 	def __init__(self, app, tenant_svc):
 		self.TenantService = tenant_svc
 		self.NameProposerService = app.get_service("seacatauth.NameProposerService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get('/tenant', self.list)
-		web_app.router.add_get('/tenants', self.search)
-		web_app.router.add_get('/tenant/{tenant}', self.get)
-		web_app.router.add_put('/tenant/{tenant}', self.update_tenant)
-		web_app.router.add_put('/tenants', self.get_tenants_batch)
+		web_app.router.add_get("/tenant", self.list)
+		web_app.router.add_get("/tenants", self.search)
+		web_app.router.add_get("/tenant/{tenant}", self.get)
+		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
+		web_app.router.add_put("/tenants", self.get_tenants_batch)
 
-		web_app.router.add_post('/tenant', self.create)
-		web_app.router.add_delete('/tenant/{tenant}', self.delete)
+		web_app.router.add_post("/tenant", self.create)
+		web_app.router.add_delete("/tenant/{tenant}", self.delete)
 
-		web_app.router.add_get('/tenant_assign/{credentials_id}', self.get_tenants_by_credentials)
-		web_app.router.add_put('/tenant_assign/{credentials_id}', self.set_tenants)
-		web_app.router.add_post('/tenant_assign/{credentials_id}/{tenant}', self.assign_tenant)
-		web_app.router.add_delete('/tenant_assign/{credentials_id}/{tenant}', self.unassign_tenant)
+		web_app.router.add_get("/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
+		web_app.router.add_put("/tenant_assign/{credentials_id}", self.set_tenants)
+		web_app.router.add_post("/tenant_assign/{credentials_id}/{tenant}", self.assign_tenant)
+		web_app.router.add_delete("/tenant_assign/{credentials_id}/{tenant}", self.unassign_tenant)
 
 		web_app.router.add_put("/tenant_assign_many", self.bulk_assign_tenants)
 		web_app.router.add_put("/tenant_unassign_many", self.bulk_unassign_tenants)
 
-		web_app.router.add_get('/tenant_propose', self.propose_tenant)
+		web_app.router.add_get("/tenant_propose", self.propose_tenant)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get('/tenant', self.list)
+		web_app_public.router.add_get("/tenant", self.list)
 
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
@@ -52,24 +58,31 @@ class TenantHandler(object):
 		provider = self.TenantService.get_provider()
 		result = []
 		async for tenant in provider.iterate():
-			result.append(tenant['_id'])
+			result.append(tenant["_id"])
 		return asab.web.rest.json_response(request, data=result)
 
 
 	async def search(self, request):
 		"""
 		Search registered tenants
+
 		---
-		query:
-		- p:
-			name: Page number
-			type: integer
-		- i:
-			name: Items per page
-			type: integer
-		- f:
-			name: Tenant ID filter
-			type: string
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: f
+			in: query
+			description: Filter string
+			schema:
+				type: string
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i")
@@ -180,6 +193,7 @@ class TenantHandler(object):
 	async def delete(self, request, *, tenant):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
+
 		---
 		security:
 		- oAuth:
@@ -228,6 +242,7 @@ class TenantHandler(object):
 	async def assign_tenant(self, request, *, tenant):
 		"""
 		Grant specified tenant access to requested credentials
+
 		---
 		security:
 		- oAuth:
@@ -246,6 +261,7 @@ class TenantHandler(object):
 		Revoke specified tenant access to requested credentials
 
 		The tenant's roles are unassigned in the process.
+
 		---
 		security:
 		- oAuth:
@@ -291,7 +307,7 @@ class TenantHandler(object):
 		"""
 		proposed_tenant = self.NameProposerService.propose_name()
 		# TODO: Check is the proposed tenant name is not already taken
-		return asab.web.rest.json_response(request, {'tenant_id': proposed_tenant})
+		return asab.web.rest.json_response(request, {"tenant_id": proposed_tenant})
 
 
 	@asab.web.rest.json_schema_handler({
@@ -328,6 +344,7 @@ class TenantHandler(object):
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
 		Grant tenant access and/or assign roles to a list of credentials
+
 		---
 		security:
 		- oAuth:
@@ -432,6 +449,7 @@ class TenantHandler(object):
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
 		Revoke tenant access and/or unassign roles from a list of credentials
+
 		---
 		security:
 		- oAuth:

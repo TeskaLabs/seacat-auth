@@ -22,7 +22,12 @@ L = logging.getLogger(__name__)
 
 
 class CredentialsHandler(object):
+	"""
+	Credential management
 
+	---
+	tags: ["Manage credentials"]
+	"""
 
 	def __init__(self, app, credentials_svc):
 		self.CredentialsService = credentials_svc
@@ -58,6 +63,9 @@ class CredentialsHandler(object):
 
 
 	async def list_providers(self, request):
+		"""
+		Get credential providers and their metadata
+		"""
 		providers = {}
 		for provider_id in self.CredentialsService.CredentialProviders:
 			providers[provider_id] = self.CredentialsService.get_provider_info(provider_id)
@@ -65,17 +73,23 @@ class CredentialsHandler(object):
 
 
 	async def get_provider_info(self, request):
+		"""
+		Get the metadata of the requested credential provider.
+		"""
 		provider_id = request.match_info["provider_id"]
 		data = self.CredentialsService.get_provider_info(provider_id)
 		response = {
-			"result": "OK",
-			**data,  # TODO: Move to response["data"], as in get_my_provider_info()
+			"result": "OK",  # TODO: Redundant field
+			**data,
 		}
 		return asab.web.rest.json_response(request, response)
 
 
 	@access_control()
 	async def get_my_provider_info(self, request, *, credentials_id):
+		"""
+		Get the metadata of the current user's credential provider.
+		"""
 		provider = self.CredentialsService.get_provider(credentials_id)
 		data = self.CredentialsService.get_provider_info(provider.ProviderID)
 		response = {
@@ -86,13 +100,73 @@ class CredentialsHandler(object):
 
 
 	async def locate_credentials(self, request):
-		ident = request.query.get('ident')
-		stop_at_first = request.query.get('stop_at_first', False)
+		"""
+		Return the IDs of credentials that match the specified ident.
+
+		---
+		parameters:
+		-	name: ident
+			in: query
+			required: true
+			description:
+				Credential identifier. It may be email address, username, phone number etc., the exact supported
+				attributes depend on the capabilities and the configuration of the credential providers.
+			schema:
+				type: string
+		-	name: stop_at_first
+			in: query
+			required: false
+			description: Whether to return only the first matched credentials' ID.
+			schema:
+				type: boolean
+		"""
+		ident = request.query.get("ident")
+		stop_at_first = request.query.get("stop_at_first", "no").lower() in frozenset(["yes", "true", "1", "y"])
 		credentials_ids = await self.CredentialsService.locate(ident, stop_at_first=stop_at_first)
 		return asab.web.rest.json_response(request, {"credentials_ids": credentials_ids})
 
 
 	async def list_credentials(self, request):
+		"""
+		List credentials
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: f
+			in: query
+			description: Filter string
+			schema:
+				type: string
+		-	name: m
+			in: query
+			required: false
+			description:
+				Filter mode.
+
+				- In the `default` mode, the request filters for credentials whose attributes contain
+				the *filter string*. The actual attributes searched depend on the capabilities of the respective
+				credential provider.
+
+				- In the `tenant` mode, the request filters for credentials assigned to the tenant that exactly
+				matches the *filter string*.
+
+				- In the `role` mode, the request filters for credentials with the role that exactly
+				matches the *filter string*.
+			schema:
+				type: string
+				enum: ["tenant", "role", "default"]
+				default: default
+		"""
 		page = int(request.query.get('p', 1)) - 1
 		limit = int(request.query.get('i', 10))
 
@@ -221,6 +295,9 @@ class CredentialsHandler(object):
 		}
 	})
 	async def get_idents_from_ids(self, request, *, json_data):
+		"""
+		Get human-intelligible identifiers for a list of credential IDs
+		"""
 		result_data = {}
 		failed_ids = []
 		for cred_id in json_data:
@@ -246,6 +323,9 @@ class CredentialsHandler(object):
 
 
 	async def get_credentials(self, request):
+		"""
+		Get requested credentials' metadata
+		"""
 		credentials_id = request.match_info["credentials_id"]
 		_, provider_id, _ = credentials_id.split(':', 2)
 		provider = self.CredentialsService.CredentialProviders[provider_id]
@@ -261,7 +341,7 @@ class CredentialsHandler(object):
 	@access_control("authz:tenant:admin")
 	async def create_credentials(self, request, *, json_data):
 		"""
-		Create new credentials.
+		Create new credentials
 		"""
 		password_link = json_data.pop("passwordlink", False)
 
@@ -293,7 +373,7 @@ class CredentialsHandler(object):
 	@access_control("authz:superuser")
 	async def update_credentials(self, request, *, json_data):
 		"""
-		Update credentials.
+		Update credentials
 		"""
 		credentials_id = request.match_info["credentials_id"]
 
@@ -312,7 +392,7 @@ class CredentialsHandler(object):
 	@access_control()
 	async def update_my_credentials(self, request, *, json_data, credentials_id):
 		"""
-		Update user's own credentials.
+		Update the current user's own credentials
 		"""
 		result = await self.CredentialsService.update_credentials(
 			credentials_id,
@@ -341,7 +421,7 @@ class CredentialsHandler(object):
 	})
 	async def enforce_factors(self, request, *, json_data):
 		"""
-		Specify authn factors to be enforced from the user
+		Specify authentication factors to be enforced from the user
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		provider = self.CredentialsService.get_provider(credentials_id)
@@ -363,15 +443,9 @@ class CredentialsHandler(object):
 	@access_control("authz:superuser")
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
-		Delete credentials.
+		Delete credentials
 		"""
 		agent_cid = credentials_id  # Who called the request
 		credentials_id = request.match_info["credentials_id"]  # Who will be deleted
 		result = await self.CredentialsService.delete_credentials(credentials_id, agent_cid)
 		return asab.web.rest.json_response(request, {"result": result})
-
-
-	def locate_provider(self, request):
-		return self.CredentialsService.CredentialProviders[
-			request.match_info["provider"]
-		]

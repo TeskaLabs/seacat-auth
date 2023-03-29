@@ -14,26 +14,33 @@ L = logging.getLogger(__name__)
 
 
 class OTPHandler(object):
+	"""
+	Manage TOTP
+
+	---
+	- tags: ["Manage TOTP"]
+	"""
 
 	def __init__(self, app, otp_svc):
-		self.CredentialsService = app.get_service('seacatauth.CredentialsService')
+		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.OTPService = otp_svc
 		web_app_public = app.PublicWebContainer.WebApp
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get('/public/totp', self.prepare_totp_if_not_active)
-		web_app.router.add_put('/public/set-totp', self.set_totp)
-		web_app.router.add_put('/public/unset-totp', self.unset_totp)
+		web_app.router.add_get("/public/totp", self.prepare_totp_if_not_active)
+		web_app.router.add_put("/public/set-totp", self.set_totp)
+		web_app.router.add_put("/public/unset-totp", self.unset_totp)
 
 		# Public endpoints
-		web_app_public.router.add_get('/public/totp', self.prepare_totp_if_not_active)
-		web_app_public.router.add_put('/public/set-totp', self.set_totp)
-		web_app_public.router.add_put('/public/unset-totp', self.unset_totp)
+		web_app_public.router.add_get("/public/totp", self.prepare_totp_if_not_active)
+		web_app_public.router.add_put("/public/set-totp", self.set_totp)
+		web_app_public.router.add_put("/public/unset-totp", self.unset_totp)
 
 	@access_control()
 	async def prepare_totp_if_not_active(self, request, *, credentials_id):
 		"""
-		Return the status of TOTP setting.
+		Return the status of TOTP setting
+
 		If not activated, generate and return a new TOTP secret.
 		"""
 		if await self.OTPService.has_activated_totp(credentials_id):
@@ -51,16 +58,18 @@ class OTPHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'required': ['otp'],
-		'properties': {
-			'otp': {'type': 'string'}
+		"type": "object",
+		"required": ["otp"],
+		"properties": {
+			"otp": {"type": "string"}
 		}
 	})
 	@access_control()
 	async def set_totp(self, request, *, credentials_id, json_data):
 		"""
-		Activate TOTP for the current user, provided that a TOTP secret is already set.
+		Activate TOTP for the current user
+
+		This requires that a TOTP secret is already prepared for the user.
 		"""
 		otp = json_data.get("otp")
 		response = await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
@@ -70,7 +79,9 @@ class OTPHandler(object):
 	@access_control()
 	async def unset_totp(self, request, *, credentials_id):
 		"""
-		Deactivate TOTP for the current user and erase the secret.
+		Deactivate TOTP for the current user
+
+		The user's TOTP secret is deleted.
 		"""
 		try:
 			await self.OTPService.deactivate_totp(credentials_id)

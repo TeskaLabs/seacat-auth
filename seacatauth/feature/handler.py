@@ -11,6 +11,12 @@ L = logging.getLogger(__name__)
 
 
 class FeatureHandler(object):
+	"""
+	Login and registration features
+
+	---
+	- tags: ["Login and registration features"]
+	"""
 
 	def __init__(self, app, feture_svc):
 		self.FeatureService = feture_svc
@@ -23,6 +29,9 @@ class FeatureHandler(object):
 		web_app_public.router.add_get("/public/features", self.get_features)
 
 	async def get_features(self, request):
+		"""
+		Get public login and registration features
+		"""
 		features = await self.FeatureService.get_features()
 		response = {
 			"data": features,
