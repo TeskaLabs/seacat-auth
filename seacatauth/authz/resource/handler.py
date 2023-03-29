@@ -32,6 +32,27 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 	async def list(self, request):
+		"""
+		List resources
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: f
+			in: query
+			description: Filter string
+			schema:
+				type: string
+		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
 		if limit is not None:
@@ -62,10 +83,7 @@ class ResourceHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
-			"description": {
-				"type": "string",
-			},
-		}
+			"description": {"type": "string"}}
 	})
 	@access_control("authz:superuser")
 	async def create_or_undelete(self, request, *, json_data):
@@ -115,8 +133,22 @@ class ResourceHandler(object):
 	@access_control("authz:superuser")
 	async def delete(self, request):
 		"""
-		Delete a resource. The resource is soft-deleted (suspended) by default,
-		unless "hard_delete=true" is specified in query.
+		Delete resource
+
+		The resource is soft-deleted (suspended) by default.
+
+		---
+		parameters:
+		-	name: hard_delete
+			in: query
+			description:
+				By default, the resource is only soft-deleted, i.e. marked as deleted and retained in te database.
+				Enabling this switch causes the resource to be completely removed from the database.
+				Hard-deleting requires `authz:superuser`.
+			required: false
+			schema:
+				type: boolean
+				enum: ["true"]
 		"""
 		resource_id = request.match_info["resource_id"]
 		hard_delete = request.query.get("hard_delete") == "true"

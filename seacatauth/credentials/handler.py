@@ -149,6 +149,7 @@ class CredentialsHandler(object):
 				type: string
 		-	name: m
 			in: query
+			required: false
 			description:
 				Filter mode.
 
