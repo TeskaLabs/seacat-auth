@@ -17,6 +17,12 @@ L = logging.getLogger(__name__)
 
 
 class RoleHandler(object):
+	"""
+	Manage roles
+
+	---
+	- tags: ["Manage roles"]
+	"""
 	def __init__(self, app, role_svc):
 		self.App = app
 		self.RoleService = role_svc
@@ -32,10 +38,52 @@ class RoleHandler(object):
 
 	@access_control("authz:superuser")
 	async def list_all(self, request):
+		"""
+		List roles from all tenants
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: resource
+			in: query
+			description: Show only roles that contain the specified resource
+			schema:
+				type: string
+		"""
 		return await self._list(request, tenant=None)
 
 	@access_control()
 	async def list(self, request, *, tenant):
+		"""
+		List tenant roles
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: resource
+			in: query
+			description: Show only roles that contain the specified resource
+			schema:
+				type: string
+		"""
 		return await self._list(request, tenant=tenant)
 
 	async def _list(self, request, *, tenant):
@@ -51,6 +99,9 @@ class RoleHandler(object):
 
 	@access_control()
 	async def get(self, request, *, tenant):
+		"""
+		Get role detail
+		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
 		try:
@@ -68,6 +119,9 @@ class RoleHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def create(self, request, *, tenant):
+		"""
+		Create a new role
+		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
 		result = await self.RoleService.create(role_id)
@@ -79,6 +133,9 @@ class RoleHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def delete(self, request, *, tenant):
+		"""
+		Delete role
+		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
 
@@ -118,8 +175,7 @@ class RoleHandler(object):
 	@access_control("authz:tenant:admin")
 	async def update(self, request, *, json_data, tenant, resources):
 		"""
-		Sets, adds or removes resources from a specified role.
-		Global roles can be edited by superuser only.
+		Edit role description and resources
 		"""
 		is_superuser = "authz:superuser" in resources
 		role_name = request.match_info["role_name"]
