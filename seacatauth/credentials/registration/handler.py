@@ -18,6 +18,12 @@ L = logging.getLogger(__name__)
 
 
 class RegistrationHandler(object):
+	"""
+	Credential registration
+
+	---
+	tags: ["Register or invite credentials"]
+	"""
 
 	def __init__(self, app, registration_svc, credentials_svc):
 		self.RegistrationService = registration_svc
@@ -66,7 +72,7 @@ class RegistrationHandler(object):
 	@access_control("authz:tenant:admin")  # TODO: Maybe create a dedicated resource for invitations
 	async def create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
-		Admin request to register a new user and invite them to specified tenant.
+		Admin request to register a new user and invite them to the specified tenant.
 		Generate a registration code and send a registration link to the user's email.
 		"""
 		# Get IPs of the invitation issuer
@@ -112,6 +118,9 @@ class RegistrationHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def resend_invitation(self, request):
+		"""
+		Resend invitation to an already invited user
+		"""
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
 
