@@ -182,14 +182,14 @@ class CredentialsHandler(object):
 				L.error("No filter string specified.", struct_data={"mode": mode})
 				raise aiohttp.web.HTTPBadRequest()
 
-			# These filters require access to authz:tenant:admin resource
+			# These filters require access dedicated resource
 			rbac_svc = self.CredentialsService.App.get_service("seacatauth.RBACService")
 
 			if mode == "role":
 				# Check if the user has admin access to the role's tenant
 				tenant = filtr.split("/")[0]
 				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]
+					request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
 				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
@@ -201,7 +201,7 @@ class CredentialsHandler(object):
 				# Check if the user has admin access to the requested tenant
 				tenant = filtr
 				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]
+					request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
 				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
@@ -209,6 +209,9 @@ class CredentialsHandler(object):
 				tenant_svc = self.CredentialsService.App.get_service("seacatauth.TenantService")
 				provider = tenant_svc.get_provider()
 				assignments = await provider.list_tenant_assignments(tenant, page, limit)
+
+			else:
+				raise ValueError("Unknown mode: {}".format(mode))
 
 			if assignments["count"] == 0:
 				return asab.web.rest.json_response(request, {
@@ -338,7 +341,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(CREATE_CREDENTIALS)
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials

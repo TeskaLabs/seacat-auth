@@ -117,7 +117,7 @@ class RoleHandler(object):
 		)
 
 
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def create(self, request, *, tenant):
 		"""
 		Create a new role
@@ -131,7 +131,7 @@ class RoleHandler(object):
 		)
 
 
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def delete(self, request, *, tenant):
 		"""
 		Delete role
@@ -172,7 +172,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def update(self, request, *, json_data, tenant):
 		"""
 		Edit role description and resources

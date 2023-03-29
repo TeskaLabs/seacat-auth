@@ -90,8 +90,9 @@ class TenantService(asab.Service):
 		try:
 			# Create admin role in tenant
 			await role_service.create(role_id)
-			# Assign "authz:tenant:admin" resource
-			await role_service.update(role_id, resources_to_set=["authz:tenant:admin"])
+			# Assign tenant management resources
+			await role_service.update(role_id, resources_to_set=[
+				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign"])
 			role_created = True
 		except Exception as e:
 			role_created = False
@@ -191,7 +192,7 @@ class TenantService(asab.Service):
 					"message": message,
 				}
 			# Check permission
-			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["authz:tenant:admin"]):
+			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["authz:tenant:assign"]):
 				message = "Not authorized for tenant un/assignment"
 				L.error(message, struct_data={
 					"agent_cid": session.Credentials.Id,
