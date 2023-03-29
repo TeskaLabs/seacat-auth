@@ -44,6 +44,9 @@ class WebAuthnHandler(object):
 
 	@access_control()
 	async def get_registration_options(self, request):
+		"""
+		Get WebAuthn registration options
+		"""
 		options = await self.WebAuthnService.get_registration_options(request.Session)
 		return aiohttp.web.Response(body=options, content_type="application/json")
 		# return asab.web.rest.json_response(request, options)
