@@ -26,10 +26,11 @@ class AuditService(asab.Service):
 	async def initialize(self, app):
 		coll = await self.StorageService.collection(self.AuditCollection)
 
+		# Create index to improve the performance of last login searches
 		await coll.create_index(
 			[
 				("cid", pymongo.ASCENDING),
-				("_c", pymongo.DESCENDING),	 # Most of calls are for latest entries
+				("_c", pymongo.DESCENDING),
 				("c", pymongo.ASCENDING)
 			],
 		)
