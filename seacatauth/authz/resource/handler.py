@@ -21,6 +21,7 @@ class ResourceHandler(object):
 	---
 	- tags: ["Manage resources"]
 	"""
+
 	def __init__(self, app, rbac_svc):
 		self.RBACService = rbac_svc
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
@@ -31,6 +32,7 @@ class ResourceHandler(object):
 		web_app.router.add_post("/resource/{resource_id}", self.create_or_undelete)
 		web_app.router.add_put("/resource/{resource_id}", self.update)
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
+
 
 	async def list(self, request):
 		"""
@@ -72,13 +74,18 @@ class ResourceHandler(object):
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
 
+
 	async def get(self, request):
+		"""
+		Get resource detail
+		"""
 		resource_id = request.match_info["resource_id"]
 		result = await self.ResourceService.get(resource_id)
 		result["result"] = "OK"
 		return asab.web.rest.json_response(
 			request, result
 		)
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
