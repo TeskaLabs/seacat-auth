@@ -173,11 +173,10 @@ class RoleHandler(object):
 		}
 	})
 	@access_control("authz:tenant:admin")
-	async def update(self, request, *, json_data, tenant, resources):
+	async def update(self, request, *, json_data, tenant):
 		"""
 		Edit role description and resources
 		"""
-		is_superuser = "authz:superuser" in resources
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
 		resources_to_set = json_data.get("set")
@@ -189,9 +188,17 @@ class RoleHandler(object):
 			resources_to_remove or []
 		)
 
+		# Only superuser can edit global roles
+		if tenant in (None, "*") and not request.is_superuser:
+			L.warning("Not authorized to edit global roles", struct_data={
+				"role_id": role_id,
+				"cid": request.CredentialsId
+			})
+			raise aiohttp.web.HTTPForbidden()
+
 		# Only superuser can un/assign "authz:superuser"
-		if "authz:superuser" in resources_to_assign and not is_superuser:
-			L.warning("Forbidden access: Assigning 'authz:superuser' resource", struct_data={
+		if "authz:superuser" in resources_to_assign and not request.is_superuser:
+			L.warning("Not authorized to assign 'authz:superuser' resource", struct_data={
 				"role_id": role_id,
 				"tenant": tenant,
 				"cid": request.CredentialsId
