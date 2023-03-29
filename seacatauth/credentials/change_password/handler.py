@@ -15,7 +15,12 @@ L = logging.getLogger(__name__)
 
 
 class ChangePasswordHandler(object):
+	"""
+	Manage password
 
+	---
+	- tags: ["Manage password"]
+	"""
 
 	def __init__(self, app, change_password_svc):
 		self.ChangePasswordService = change_password_svc
@@ -46,7 +51,7 @@ class ChangePasswordHandler(object):
 	@access_control()
 	async def change_password(self, request, *, json_data):
 		"""
-		Verify old password and change it to new password
+		Set a new password (with current password authentication)
 		"""
 		result = await self.ChangePasswordService.change_password(
 			request.Session,
@@ -74,7 +79,7 @@ class ChangePasswordHandler(object):
 	})
 	async def reset_password(self, request, *, json_data):
 		"""
-		Set a new password using pwd_token obtained in "Lost password" procedure
+		Set a new password (with password token authentication)
 		"""
 		# TODO: this call needs to be encrypted
 		result = await self.ChangePasswordService.change_password_by_pwdreset_id(
@@ -95,8 +100,7 @@ class ChangePasswordHandler(object):
 	@access_control("authz:tenant:admin")
 	async def init_password_change(self, request, *, json_data):
 		"""
-		Directly creates a password reset request. This should be called by admin only.
-		For user-initiated password reset use `lost_password` method.
+		Send a password reset link to specified user
 		"""
 		result = await self.ChangePasswordService.init_password_change(
 			json_data.get("credentials_id"),
@@ -112,6 +116,9 @@ class ChangePasswordHandler(object):
 		}
 	})
 	async def lost_password(self, request, *, json_data):
+		"""
+		Request a password reset link
+		"""
 		await asyncio.sleep(5)  # Safety time cooldown
 		ident = json_data["ident"]
 		await self.ChangePasswordService.lost_password(ident)
