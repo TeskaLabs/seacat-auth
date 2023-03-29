@@ -15,10 +15,11 @@ L = logging.getLogger(__name__)
 
 
 class WebAuthnHandler(object):
-
 	"""
-	Example implementation:
-	https://github.com/pyauth/pywarp/blob/master/pywarp/rp.py
+	Manage FIDO2 Web Authentication
+
+	---
+	tags: ["Manage FIDO2 Web Authentication"]
 	"""
 
 	def __init__(self, app, webauthn_svc):

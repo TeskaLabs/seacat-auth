@@ -14,7 +14,10 @@ L = logging.getLogger(__name__)
 
 class RBACHandler(object):
 	"""
-	Implements check whether the user is authorized to access the given resource or not.
+	Resource-based access control
+
+	---
+	tags: ["Resource access"]
 	"""
 
 	def __init__(self, app, rbac_svc):
