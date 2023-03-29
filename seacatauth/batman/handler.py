@@ -46,7 +46,9 @@ class BatmanHandler(object):
 
 	async def batman_nginx(self, request):
 		"""
-		Exchange Batman cookie for Basic Authorization header
+		Validate Batman cookie and respond with Basic Authorization header
+
+		**Internal endpoint for Nginx auth_request.**
 		"""
 		bid = request.cookies.get(self.BatmanService.CookieName, None)
 		if bid is not None:
