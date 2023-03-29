@@ -16,8 +16,9 @@ L = logging.getLogger(__name__)
 class ResourceHandler(object):
 	"""
 	Manage resources
+
 	---
-	- tags: ["Resource management"]
+	- tags: ["Manage resources"]
 	"""
 	def __init__(self, app, rbac_svc):
 		self.RBACService = rbac_svc

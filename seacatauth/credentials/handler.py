@@ -22,7 +22,12 @@ L = logging.getLogger(__name__)
 
 
 class CredentialsHandler(object):
+	"""
+	Credential management
 
+	---
+	tags: ["Manage credentials"]
+	"""
 
 	def __init__(self, app, credentials_svc):
 		self.CredentialsService = credentials_svc

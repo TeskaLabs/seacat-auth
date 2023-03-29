@@ -18,6 +18,12 @@ L = logging.getLogger(__name__)
 
 
 class RegistrationHandler(object):
+	"""
+	Credential registration
+
+	---
+	tags: ["Register or invite credentials"]
+	"""
 
 	def __init__(self, app, registration_svc, credentials_svc):
 		self.RegistrationService = registration_svc
