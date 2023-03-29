@@ -22,16 +22,22 @@ L = logging.getLogger(__name__)
 
 
 class AuthorizeHandler(object):
+	"""
+	OAuth 2.0 Authorize
 
-	'''
 	OpenID Connect Core 1.0
+
 	https://openid.net/specs/openid-connect-core-1_0.html
-	'''
+
+	---
+	- tags: ["OAuth 2.0 / OpenID Connect"]
+	"""
+
 	AuthorizePath = "/openidconnect/authorize"
 
 	def __init__(self, app, oidc_svc, credentials_svc, public_api_base_url, auth_webui_base_url):
 		self.App = app
-		self.SessionService = app.get_service('seacatauth.SessionService')
+		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CookieService = app.get_service('seacatauth.CookieService')
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
@@ -62,24 +68,96 @@ class AuthorizeHandler(object):
 
 
 	async def authorize_get(self, request):
-		'''
+		"""
+		OAuth 2.0 Authorize Endpoint
+
 		https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
 
 		3.1.2.1.  Authentication Request
 
 		If using the HTTP GET method, the request parameters are serialized using URI Query String Serialization
-		'''
+
+		---
+		parameters:
+		-	name: response_type
+			in: query
+			required: true
+			description:
+				The type of response desired from the Authorization Endpoint.
+				This must be set to "code" for the authorization code grant flow
+				or "id_token" for the implicit flow.
+			schema:
+				type: string
+				enum: ["code", "id_token"]
+		-	name: client_id
+			in: query
+			required: true
+			description:
+				The client identifier registered with the Authorization Server.
+			schema:
+				type: string
+		-	name: redirect_uri
+			in: query
+			required: true
+			description:
+				The redirection URI to which the response will be sent.
+				This URI must be registered with the Authorization Server.
+			schema:
+				type: string
+		-	name: scope
+			in: query
+			required: false
+			description:
+				The scope of the access request as described by the Authorization Server.
+			schema:
+				type: string
+		-	name: state
+			in: query
+			required: false
+			description:
+				An opaque value used by the client to maintain state between the request and callback.
+				The Authorization Server will include this value when redirecting the user back to the client.
+			schema:
+				type: string
+		-	name: prompt
+			in: query
+			required: false
+			description:
+				Space delimited, case-sensitive list of ASCII string values that specifies whether the
+				Authorization Server prompts the End-User for re-authentication and consent.
+			schema:
+				type: string
+				enum: ["login", "none", "select_account"]
+		-	name: code_challenge
+			in: query
+			required: false
+			description:
+				A challenge derived from the code verifier that is sent in the authorization request, to be
+				verified against later.
+			schema:
+				type: string
+		-	name: code_challenge_method
+			in: query
+			required: false
+			description:
+				A method that was used to derive code challenge.
+			schema:
+				type: string
+				enum: ["S256", "plain"]
+		"""
 		return await self.authorize(request, request.query)
 
 
 	async def authorize_post(self, request):
-		'''
+		"""
+		OAuth 2.0 Authorize Endpoint
+
 		https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
 
 		3.1.2.1.  Authentication Request
 
 		If using the HTTP POST method, the request parameters are serialized using Form Serialization
-		'''
+		"""
 		request_parameters = await request.post()
 		return await self.authorize(request, request_parameters)
 
