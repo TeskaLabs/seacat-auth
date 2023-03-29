@@ -121,7 +121,7 @@ class ResourceService(asab.Service):
 
 			# Update resource description
 			if description is not None and db_resource.get("description") != description:
-				await self.update(resource_id, description)
+				await self.update(resource_id, description, _internal=True)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -184,8 +184,8 @@ class ResourceService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource": resource_id})
 
 
-	async def update(self, resource_id: str, description: str):
-		if self.is_seacat_auth_resource(resource_id):
+	async def update(self, resource_id: str, description: str, *, _internal: bool = False):
+		if self.is_seacat_auth_resource(resource_id) and not _internal:
 			raise asab.exceptions.ValidationError("System resource cannot be modified")
 		resource = await self.get(resource_id)
 		upsertor = self.StorageService.upsertor(
