@@ -150,10 +150,6 @@ class SeaCatAuthApplication(asab.Application):
 		self.OTPService = OTPService(self)
 		self.OTPHandler = OTPHandler(self, self.OTPService)
 
-		from .bouncer import BouncerService, BouncerHandler
-		self.BouncerService = BouncerService(self)
-		self.BouncerHandler = BouncerHandler(self, self.BouncerService)
-
 		from .external_login import ExternalLoginService, ExternalLoginHandler
 		self.ExternalLoginService = ExternalLoginService(self)
 		self.ExternalLoginHandler = ExternalLoginHandler(self, self.ExternalLoginService)

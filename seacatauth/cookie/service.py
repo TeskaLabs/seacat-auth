@@ -1,10 +1,8 @@
 import base64
-import http.cookies
+import datetime
 import re
-import urllib.parse
-
-import aiohttp
 import logging
+import secrets
 
 import asab
 import asab.storage
@@ -15,6 +13,7 @@ from ..session import (
 	authz_session_builder,
 )
 from ..openidconnect.session import oauth2_session_builder
+from ..events import EventTypes
 
 
 #
@@ -25,8 +24,25 @@ L = logging.getLogger(__name__)
 
 
 class CookieService(asab.Service):
+	"""
+	Manage cookie sessions
+
+	CookieRedirectUriCollection object example:
+	```json
+	{
+		"_id": "my-application abcd1234efgh5678",
+		"_v": 1,
+		"_c": ISODate("2023-03-16T13:15:42.003Z"),
+		"_m": ISODate("2023-03-16T13:15:42.003Z"),
+		"redirect_uri": "https://my-app.example.test/home/",
+	}
+	```
+	"""
+	CookieRedirectUriCollection = "cru"
+
 	def __init__(self, app, service_name="seacatauth.CookieService"):
 		super().__init__(app, service_name)
+		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
@@ -39,96 +55,85 @@ class CookieService(asab.Service):
 			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieName)
 		)
 		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
-		self.RootCookieDomain = self._validate_cookie_domain(
-			asab.Config.get("seacatauth:cookie", "domain", fallback=None)
-		)
-		if self.RootCookieDomain is None:
-			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
-			if fragments.netloc == "localhost":
-				self.RootCookieDomain = fragments.netloc
-			else:
-				self.RootCookieDomain = ".{}".format(fragments.netloc)
-			L.warning("""Cookie domain is not specified.
-				Assuming your cookie domain is '{}' (inferred from Auth WebUI base URL).
-				It is recommended to specify cookie domain explicitly in your Seacat Auth configuration file.
-			""".replace("\t", "").format(self.RootCookieDomain))
+		self.RootCookieDomain = asab.Config.get("seacatauth:cookie", "domain") or None
+		if self.RootCookieDomain is not None:
+			self.RootCookieDomain = self._validate_cookie_domain(self.RootCookieDomain)
 
-		# Configure cookies for application domains
-		# TODO: Allow different cookie name for each domain
-		self.ApplicationCookies = {}
-		self.ApplicationCookieDomains = set()
-		section_pattern = re.compile(r"^seacatauth:cookie:([-_.0-9A-Za-z]+)$")
-		for section_name in asab.Config.sections():
-			match = section_pattern.match(section_name)
-			if match is None:
-				continue
-			domain_id = match.group(1)
-			section = asab.Config[section_name]
+		self.StateLength = asab.Config.getint("seacatauth:cookie", "redirect_state_length")
+		self.RedirectTimeout = datetime.timedelta(
+			seconds=asab.Config.getseconds("seacatauth:cookie", "redirect_timeout"))
 
-			redirect_uri = section.get("redirect_uri", asab.Config.get("general", "auth_webui_base_url"))
-			domain = self._validate_cookie_domain(section.get("domain"))
-			if domain is None:
-				raise ValueError("Application cookie domain must be specified.")
-
-			self.ApplicationCookies[domain_id] = {
-				"redirect_uri": redirect_uri,
-				"domain": domain
-			}
-			self.ApplicationCookieDomains.add(domain)
+		self.App.PubSub.subscribe("Application.tick/60!", self._every_minute)
 
 
 	async def initialize(self, app):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 
+	async def _every_minute(self, event_name):
+		await self._delete_expired_redirect_uris()
+
+
+	async def store_redirect_uri(self, redirect_uri: str, client_id: str):
+		"""
+		Store redirect URI and return its randomly generated `state` string
+		"""
+		state = secrets.token_urlsafe(self.StateLength)
+		_id = "{} {}".format(client_id, state)
+		upsertor = self.StorageService.upsertor(self.CookieRedirectUriCollection, obj_id=_id)
+		upsertor.set("redirect_uri", redirect_uri)
+		await upsertor.execute(event_type=EventTypes.BOUNCER_URI_STORED)
+		return state
+
+
+	async def get_redirect_uri(self, client_id: str, state: str):
+		"""
+		Pop and return redirect URI from the storage
+		"""
+		_id = "{} {}".format(client_id, state)
+		collection = self.StorageService.Database[self.CookieRedirectUriCollection]
+		data = await collection.find_one_and_delete(filter={"_id": _id})
+		if data is None:
+			raise KeyError("Redirect URI not found.")
+		if data["_c"] < datetime.datetime.now(datetime.timezone.utc) - self.RedirectTimeout:
+			raise KeyError("Redirect URI expired.")
+		return data["redirect_uri"]
+
+
+	async def _delete_expired_redirect_uris(self):
+		"""
+		Delete redirect URIs created too long ago from now
+		"""
+		collection = self.StorageService.Database[self.CookieRedirectUriCollection]
+		result = await collection.delete_many(
+			{"_c": {"$lt": datetime.datetime.now(datetime.timezone.utc) - self.RedirectTimeout}})
+		if result.deleted_count > 0:
+			L.info("Expired WebAuthn challenges deleted", struct_data={
+				"count": result.deleted_count
+			})
+
+
 	@staticmethod
 	def _validate_cookie_domain(domain):
-		if domain in ("", None):
-			L.warning("Cookie domain not specified or empty")
-			return None
 		if not domain.isascii():
-			L.warning("Cookie domain can contain only ASCII characters.", struct_data={"domain": domain})
-			return None
-		return domain
+			raise ValueError("Cookie domain can contain only ASCII characters.")
+		domain = domain.lstrip(".")
+		return domain or None
 
 
 	def _get_session_cookie_id(self, request):
 		"""
 		Get Seacat cookie value from request header
 		"""
-		raw_cookies = request.headers.get(aiohttp.hdrs.COOKIE)
-		if raw_cookies is None:
+		cookie = request.cookies.get(self.CookieName)
+		if cookie is None:
 			return None
-
-		# Custom cookie parsing to prevent overwriting cookies that share the same name
-		for cookie_string in raw_cookies.split(";"):
-			# Check if cookie name matches
-			split_cookie = http.cookies.SimpleCookie(cookie_string)
-			cookie = split_cookie.get(self.CookieName)
-			if cookie is None:
-				continue
-
-			# Split away prefix
-			try:
-				domain, session_cookie_id_encoded = cookie.value.split(":", 1)
-			except ValueError:
-				L.info("Cookie has no domain prefix", struct_data={"sci": cookie.value})
-				return None
-
-			# Check if domain matches
-			if domain != self.RootCookieDomain and domain not in self.ApplicationCookieDomains:
-				L.info("Cookie value doesn't match any of the allowed domains", struct_data={"sci": session_cookie_id_encoded})
-				return None
-
-			try:
-				session_cookie_id = base64.urlsafe_b64decode(session_cookie_id_encoded)
-			except ValueError:
-				L.info("Cookie value is not base64", struct_data={"sci": session_cookie_id_encoded})
-				return None
-
-			return session_cookie_id
-
-		return None
+		try:
+			session_cookie_id = base64.urlsafe_b64decode(cookie.encode("ascii"))
+		except ValueError:
+			L.warning("Cookie value is not base64", struct_data={"sci": cookie})
+			return None
+		return session_cookie_id
 
 
 	async def get_session_by_sci(self, request, client_id=None):
@@ -148,7 +153,10 @@ class CookieService(asab.Service):
 				SessionAdapter.FN.OAuth2.ClientId: client_id,
 			})
 		except KeyError:
-			L.info("Session not found", struct_data={"sci": session_cookie_id})
+			L.info("Session not found.", struct_data={"sci": session_cookie_id})
+			return None
+		except ValueError:
+			L.warning("Error retrieving session.", exc_info=True, struct_data={"sci": session_cookie_id})
 			return None
 
 		return session
@@ -184,6 +192,31 @@ class CookieService(asab.Service):
 
 
 	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
+		"""
+		Create a new cookie-based session
+
+		Cookie-based sessions are uniquely identified by the combination of Cookie ID (SCI) and Client ID
+		and do not have any Access Token.
+		"""
+		# Check if the Client exists
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		try:
+			client = await client_svc.get(client_id)
+		except KeyError:
+			raise KeyError("Client '{}' not found".format(client_id))
+
+		# Check if session with the same cookie+client_id exists
+		# If so, delete it
+		try:
+			session = await self.SessionService.get_by({
+				SessionAdapter.FN.Cookie.Id: base64.urlsafe_b64decode(root_session.Cookie.Id.encode("ascii")),
+				SessionAdapter.FN.OAuth2.ClientId: client_id,
+			})
+			await self.SessionService.delete(session.SessionId)
+		except KeyError:
+			pass
+
+		# Build the session
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
@@ -195,13 +228,7 @@ class CookieService(asab.Service):
 		]
 
 		# Get cookie value and domain
-		client_svc = self.App.get_service("seacatauth.ClientService")
-		try:
-			client = await client_svc.get(client_id)
-		except KeyError:
-			raise KeyError("Client '{}' not found".format(client_id))
-
-		if "cookie_domain" in client:
+		if client.get("cookie_domain") not in (None, ""):
 			cookie_domain = client["cookie_domain"]
 		else:
 			cookie_domain = self.RootCookieDomain

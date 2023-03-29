@@ -8,7 +8,6 @@ import asab.web.tenant
 import asab.exceptions
 
 from ....decorators import access_control
-from .... import exceptions
 
 #
 
@@ -18,6 +17,13 @@ L = logging.getLogger(__name__)
 
 
 class RolesHandler(object):
+	"""
+	Assign or unassign roles
+
+	---
+	- tags: ["Assign or unassign roles"]
+	"""
+
 	def __init__(self, app, role_svc):
 		self.App = app
 		self.RoleService = role_svc
@@ -30,11 +36,11 @@ class RolesHandler(object):
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
-		web_app.router.add_put("/role_assign_many/{tenant}/{role_name}", self.bulk_assign_role)
-		web_app.router.add_put("/role_unassign_many/{tenant}/{role_name}", self.bulk_unassign_role)
-
 	@access_control()
 	async def get_roles_by_credentials(self, request, *, tenant):
+		"""
+		Get credential's roles
+		"""
 		creds_id = request.match_info["credentials_id"]
 		try:
 			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
@@ -51,10 +57,14 @@ class RolesHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "array",
+		"description": "Credential IDs",
 		"items": {"type": "string"}
 	})
 	@access_control()
 	async def get_roles_batch(self, request, *, tenant, json_data):
+		"""
+		Get the assigned roles for several credentials
+		"""
 		response = {
 			cid: await self.RoleService.get_roles_by_credentials(cid, [tenant])
 			for cid in json_data
@@ -63,64 +73,50 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'properties': {
-			'roles': {
-				'type': 'array',
-				"items": {
-					"type": "string",
-				},
-			},
-		}
+		"type": "object",
+		"properties": {
+			"roles": {
+				"type": "array",
+				"items": {"type": "string"}}}
 	})
 	@access_control("authz:tenant:admin")
 	async def set_roles(self, request, *, json_data, tenant, resources):
-		# TODO: PATCH request to set/unset only known roles
 		"""
-		For given credentials: Assigns all listed roles, unassigns what's not in the list.
+		For given credentials, assign listed roles and unassign existing roles that are not in the list
+
 		Cases:
 		1) The requester is superuser AND requested `tenant` is "*":
-			Only global roles can be un/assigned.
+			Only global roles will be un/assigned.
 		2) The requester is superuser AND requested `tenant` is "tenant-name":
-			Roles from "tenant-name/..." + global roles can be un/assigned.
+			Roles from "tenant-name/..." + global roles will be un/assigned.
 		3) The requester is not superuser AND requested `tenant` is "tenant-name":
-			Only "tenant-name/..." roles can be un/assigned.
+			Only "tenant-name/..." roles will be un/assigned.
 		ELSE) In other cases the role assignment fails.
 		"""
 		credentials_id = request.match_info["credentials_id"]
-		roles = json_data["roles"]
+		requested_roles = json_data["roles"]
 
-		tenant_scope = set()
-
+		# Determine whether global roles will be un/assigned
 		if "authz:superuser" in resources:
-			tenant_scope.add("*")
+			include_global = True
+		elif tenant == "*":
+			L.warning("Not authorized to manage global roles.", struct_data={
+				"cid": request.CredentialsId
+			})
+			raise aiohttp.web.HTTPForbidden()
 		else:
-			if tenant == "*":
-				L.warning("Forbidden access: global roles un/assignment", struct_data={
-					"cid": request.CredentialsId
-				})
-				raise aiohttp.web.HTTPForbidden()
+			include_global = False
 
-		tenant_scope.add(tenant)
+		await self.RoleService.set_roles(credentials_id, requested_roles, tenant, include_global)
 
-		try:
-			await self.RoleService.set_roles(
-				credentials_id,
-				tenant_scope,
-				roles
-			)
-		except ValueError:
-			raise aiohttp.web.HTTPBadRequest()
-
-		resp_data = {"result": "OK"}
-		return asab.web.rest.json_response(
-			request,
-			data=resp_data,
-		)
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@access_control("authz:tenant:admin")
 	async def assign_role(self, request, *, tenant):
+		"""
+		Assign role to credentials
+		"""
 		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
 		if tenant == "*":
 			# Assigning global roles requires superuser
@@ -149,6 +145,9 @@ class RolesHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def unassign_role(self, request, *, tenant):
+		"""
+		Unassign role from credentials
+		"""
 		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
 		if tenant == "*":
 			# Unassigning global roles requires superuser
@@ -172,66 +171,3 @@ class RolesHandler(object):
 			role_id=role_id
 		)
 		return asab.web.rest.json_response(request, data={"result": "OK"})
-
-
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {"type": "string"}})
-	@access_control("authz:superuser")
-	async def bulk_assign_role(self, request, *, json_data, tenant):
-		role = "{}/{}".format(tenant, request.match_info["role_name"])
-		await self.RoleService.get(role)
-
-		error_details = []
-		successful_count = 0
-		for credential_id in json_data:
-			try:
-				await self.RoleService.assign_role(
-					credential_id, role,
-					verify_role=False,
-					verify_credentials=False,
-					verify_tenant=False)
-				successful_count += 1
-			except asab.exceptions.Conflict:
-				error_details.append({"cid": credential_id, "role": role, "error": "Role already assigned."})
-			except exceptions.TenantNotAuthorizedError:
-				error_details.append(
-					{"cid": credential_id, "role": role, "error": "Credentials not authorized under tenant."})
-			except Exception as e:
-				L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
-					"cid": credential_id, "role": role})
-				error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
-
-		data = {
-			"successful_count": successful_count,
-			"error_count": len(error_details),
-			"error_details": error_details,
-			"result": "OK"}
-		return asab.web.rest.json_response(request, data=data)
-
-
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {"type": "string"}})
-	@access_control("authz:superuser")
-	async def bulk_unassign_role(self, request, *, json_data, tenant):
-		role = "{}/{}".format(tenant, request.match_info["role_name"])
-		error_details = []
-		successful_count = 0
-		for credential_id in json_data:
-			try:
-				await self.RoleService.unassign_role(credential_id, role)
-				successful_count += 1
-			except KeyError:
-				error_details.append({"cid": credential_id, "tenant": tenant, "error": "Role not assigned."})
-			except Exception as e:
-				L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
-					"cid": credential_id, "role": role})
-				error_details.append({"cid": credential_id, "role": role, "error": "Server error."})
-
-		data = {
-			"successful_count": successful_count,
-			"error_count": len(error_details),
-			"error_details": error_details,
-			"result": "OK"}
-		return asab.web.rest.json_response(request, data=data)

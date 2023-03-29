@@ -41,13 +41,22 @@ class ClientHandler(object):
 		List registered clients
 
 		---
-		query:
-		- p:
+		parameters:
+		-	name: p
+			in: query
 			description: Page number
-		- i:
+			schema:
+				type: integer
+		-	name: i
+			in: query
 			description: Items per page
-		- f:
+			schema:
+				type: integer
+		-	name: p
+			in: query
 			description: Filter
+			schema:
+				type: string
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
