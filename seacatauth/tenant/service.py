@@ -235,6 +235,10 @@ class TenantService(asab.Service):
 		verify_tenant: bool = True,
 		verify_credentials: bool = True
 	):
+		"""
+		Grant tenant access to specified credentials.
+		Optionally, verify first that the tenant and the credentials exist.
+		"""
 		assert (self.is_enabled())
 
 		if verify_tenant:
@@ -266,23 +270,26 @@ class TenantService(asab.Service):
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
+		"""
+		Revoke credentials' access to specified tenant and unassign the tenant's roles.
+		"""
 		assert (self.is_enabled())
 
 		# Unassign tenant roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
 		await role_svc.set_roles(
 			credentials_id,
-			tenant_scope={tenant},
-			roles=[]
+			roles=[],
+			tenant=tenant
 		)
 
 		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 
 
 	def is_enabled(self):
-		'''
+		"""
 		Tenants are optional, SeaCat Auth can operate without tenant.
-		'''
+		"""
 		return self.TenantsProvider is not None
 
 
