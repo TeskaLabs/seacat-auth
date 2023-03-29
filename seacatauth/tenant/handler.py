@@ -176,14 +176,14 @@ class TenantHandler(object):
 				"very_corporate": True,
 				"schema": "ECS"}}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:tenant:edit")
 	async def update_tenant(self, request, *, json_data, tenant):
 		"""
 		Update tenant description and/or its structured data
 		---
 		security:
 		- oAuth:
-			- authz:tenant:admin
+			- seacat:tenant:edit
 		"""
 		result = await self.TenantService.update_tenant(tenant, **json_data)
 		return asab.web.rest.json_response(request, data=result)
@@ -221,7 +221,7 @@ class TenantHandler(object):
 
 		The credentials entity will be granted access to the listed tenants
 		and revoked access to the tenants that are not listed.
-		The caller needs to have access to `authz:tenant:admin` resource for each tenant whose access
+		The caller needs to have access to `authz:tenant:assign` resource for each tenant whose access
 		is being granted or revoked.
 		"""
 		credentials_id = request.match_info["credentials_id"]
@@ -238,7 +238,7 @@ class TenantHandler(object):
 		)
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("authz:tenant:assign")
 	async def assign_tenant(self, request, *, tenant):
 		"""
 		Grant specified tenant access to requested credentials
@@ -246,7 +246,7 @@ class TenantHandler(object):
 		---
 		security:
 		- oAuth:
-			- authz:tenant:admin
+			- authz:tenant:assign
 		"""
 		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
@@ -255,7 +255,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("authz:tenant:assign")
 	async def unassign_tenant(self, request, *, tenant):
 		"""
 		Revoke specified tenant access to requested credentials
@@ -265,7 +265,7 @@ class TenantHandler(object):
 		---
 		security:
 		- oAuth:
-			- authz:tenant:admin
+			- authz:tenant:assign
 		"""
 		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],

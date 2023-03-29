@@ -79,7 +79,7 @@ class RolesHandler(object):
 				"type": "array",
 				"items": {"type": "string"}}}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def set_roles(self, request, *, json_data, tenant, resources):
 		"""
 		For given credentials, assign listed roles and unassign existing roles that are not in the list
@@ -112,7 +112,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def assign_role(self, request, *, tenant):
 		"""
 		Assign role to credentials
@@ -143,7 +143,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("authz:tenant:admin")
+	@access_control()
 	async def unassign_role(self, request, *, tenant):
 		"""
 		Unassign role from credentials
