@@ -17,6 +17,12 @@ L = logging.getLogger(__name__)
 
 
 class RolesHandler(object):
+	"""
+	Assign or unassign roles
+
+	---
+	- tags: ["Assign or unassign roles"]
+	"""
 	def __init__(self, app, role_svc):
 		self.App = app
 		self.RoleService = role_svc
@@ -31,6 +37,9 @@ class RolesHandler(object):
 
 	@access_control()
 	async def get_roles_by_credentials(self, request, *, tenant):
+		"""
+		Get credential's roles
+		"""
 		creds_id = request.match_info["credentials_id"]
 		try:
 			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
@@ -47,10 +56,14 @@ class RolesHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "array",
+		"description": "Credential IDs",
 		"items": {"type": "string"}
 	})
 	@access_control()
 	async def get_roles_batch(self, request, *, tenant, json_data):
+		"""
+		Get the assigned roles for several credentials
+		"""
 		response = {
 			cid: await self.RoleService.get_roles_by_credentials(cid, [tenant])
 			for cid in json_data
@@ -100,6 +113,9 @@ class RolesHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def assign_role(self, request, *, tenant):
+		"""
+		Assign role to credentials
+		"""
 		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
 		if tenant == "*":
 			# Assigning global roles requires superuser
@@ -128,6 +144,9 @@ class RolesHandler(object):
 
 	@access_control("authz:tenant:admin")
 	async def unassign_role(self, request, *, tenant):
+		"""
+		Unassign role from credentials
+		"""
 		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
 		if tenant == "*":
 			# Unassigning global roles requires superuser
