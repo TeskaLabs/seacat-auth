@@ -16,7 +16,7 @@ class SessionHandler(object):
 	OAuth 2.0 Session management
 
 	---
-	- tags: ["OAuth 2.0 / OpenID Connect"]
+	tags: ["OAuth 2.0 / OpenID Connect"]
 	"""
 
 	def __init__(self, app, oidc_svc, session_svc):

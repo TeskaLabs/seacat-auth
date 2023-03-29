@@ -29,7 +29,7 @@ class TokenHandler(object):
 	OAuth 2.0 Token request
 
 	---
-	- tags: ["OAuth 2.0 / OpenID Connect"]
+	tags: ["OAuth 2.0 / OpenID Connect"]
 	"""
 
 	def __init__(self, app, oidc_svc):

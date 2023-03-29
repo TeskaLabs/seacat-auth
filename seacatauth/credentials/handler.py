@@ -26,7 +26,7 @@ class CredentialsHandler(object):
 	Credential management
 
 	---
-	tags: ["Manage credentials"]
+	tags: ["Credential management"]
 	"""
 
 	def __init__(self, app, credentials_svc):
