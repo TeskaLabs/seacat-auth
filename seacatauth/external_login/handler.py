@@ -21,7 +21,7 @@ class ExternalLoginHandler(object):
 	External login
 
 	---
-	- tags: ["External login"]
+	tags: ["External login"]
 	"""
 
 	def __init__(self, app, external_login_svc: ExternalLoginService):

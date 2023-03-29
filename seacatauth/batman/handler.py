@@ -30,7 +30,7 @@ class BatmanHandler(object):
 	Translates Seacat Auth cookies into Basic auth headers for applications that only support Basic auth (Kibana, Grafana).
 
 	---
-	- tags: ["Batman (Basic auth)"]
+	tags: ["Batman (Basic auth)"]
 	"""
 
 	def __init__(self, app, batman_svc):
