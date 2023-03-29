@@ -8,6 +8,9 @@
 - Bouncer module replaced by cookie entrypoint (#156, PLUM Sprint 230324)
 - Dropped support for custom cookie domains in the configuration (#156, PLUM Sprint 230324)
 
+### Fix
+- Improve last login search performance (#173, PLUM Sprint 230324)
+
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
 
