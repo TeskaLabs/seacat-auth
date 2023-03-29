@@ -54,7 +54,7 @@ class TokenHandler(object):
 	async def token_request(self, request):
 		"""
 		OAuth 2.0 Token Request
-		
+
 		---
 		requestBody:
 			content:
