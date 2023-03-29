@@ -23,6 +23,7 @@ class RolesHandler(object):
 	---
 	- tags: ["Assign or unassign roles"]
 	"""
+
 	def __init__(self, app, role_svc):
 		self.App = app
 		self.RoleService = role_svc
