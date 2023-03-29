@@ -94,7 +94,8 @@ class AuthenticationHandler(object):
 			for k, v in query_dict.items():
 				if k in self.AuthenticationService.CustomLoginParameters:
 					if len(v) > 1:
-						raise asab.exceptions.ValidationError("Repeated query parameters are not supported")
+						L.error("Repeated query parameters are not supported", struct_data={"qs": query_string})
+						raise asab.exceptions.ValidationError("Invalid request")
 					login_dict[k] = v[0]
 
 			# Get requested session expiration
