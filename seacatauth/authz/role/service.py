@@ -154,7 +154,7 @@ class RoleService(asab.Service):
 		try:
 			tenant = await self.get_role_tenant(role_id)
 		except KeyError as e:
-			raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role_id)) from e
+			raise KeyError("Tenant of role {!r} not found. Please delete this role.".format(role_id)) from e
 
 		# Validate resources
 		resources_to_assign = set().union(
@@ -164,12 +164,12 @@ class RoleService(asab.Service):
 		)
 		if tenant != "*":
 			# TENANT role
-			# Resource "authz:superuser" cannot be assigned to a tenant role
-			for global_only_resource in frozenset(["authz:superuser", "authz:tenant:access"]):
-				if global_only_resource in resources_to_assign:
-					message = "Cannot assign a global-only resource '{}' to a tenant role ({}).".format(global_only_resource, role_id)
-					L.warning(message)
-					raise ValueError(message)
+			# Global-only resources cannot be assigned to a tenant role
+			for resource in resources_to_assign:
+				if self.ResourceService.is_global_only_resource(resource):
+					message = "Cannot assign global-only resources to tenant roles"
+					L.warning(message, struct_data={"resource": resource, "role": role_id})
+					raise asab.exceptions.ValidationError(message)
 
 		if resources_to_set is None:
 			resources_to_set = set(role_current["resources"])
