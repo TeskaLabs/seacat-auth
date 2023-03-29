@@ -17,6 +17,12 @@ L = logging.getLogger(__name__)
 
 
 class ExternalLoginHandler(object):
+	"""
+	External login
+
+	---
+	- tags: ["External login"]
+	"""
 
 	def __init__(self, app, external_login_svc: ExternalLoginService):
 		self.App = app
@@ -25,17 +31,20 @@ class ExternalLoginHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
-		web_app.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.add_external_login)
-		web_app.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.delete_external_login)
+		web_app.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
-		web_app_public.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.add_external_login)
-		web_app_public.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.delete_external_login)
+		web_app_public.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app_public.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 
 	async def login(self, request):
+		"""
+		Log in with a registered external provider account
+		"""
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
@@ -131,7 +140,10 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def add_external_login(self, request, *, credentials_id):
+	async def register_external_login(self, request, *, credentials_id):
+		"""
+		Register a new external login provider account
+		"""
 		state = request.query.get("state")
 		# if state is None:
 		# 	L.warning("State parameter not provided in external login response")
@@ -213,7 +225,10 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def delete_external_login(self, request, *, credentials_id):
+	async def unregister_external_login(self, request, *, credentials_id):
+		"""
+		Unregister an external login provider account
+		"""
 		provider_type = request.match_info["ext_login_provider"]
 
 		try:
