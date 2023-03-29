@@ -100,11 +100,12 @@ class CookieHandler(object):
 
 	async def nginx(self, request):
 		"""
-		**Internal endpoint for Nginx auth_request.**
 		Authenticate (and optionally authorize) the incoming request by its Cookie + Client ID and respond with
 		corresponding ID token. If the auth fails, respond with 401 or 403.
 
 		Optionally check for resource access and/or add requested user info to headers.
+
+		**Internal endpoint for Nginx auth_request.**
 
 		---
 		parameters:

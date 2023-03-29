@@ -12,7 +12,12 @@ L = logging.getLogger(__name__)
 
 
 class SessionHandler(object):
+	"""
+	OAuth 2.0 Session management
 
+	---
+	- tags: ["OAuth 2.0 / OpenID Connect"]
+	"""
 
 	def __init__(self, app, oidc_svc, session_svc):
 		self.App = app
@@ -29,6 +34,9 @@ class SessionHandler(object):
 
 
 	async def session_logout(self, request):
+		"""
+		OAuth 2.0 Session Logout
+		"""
 		token_value = get_bearer_token_value(request)
 		if token_value is None:
 			L.warning("Invalid or missing Bearer token")
