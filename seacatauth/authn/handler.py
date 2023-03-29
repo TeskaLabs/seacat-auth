@@ -3,6 +3,7 @@ import logging
 
 import asab
 import asab.web.rest
+import asab.exceptions
 
 import aiohttp.web
 
@@ -78,7 +79,7 @@ class AuthenticationHandler(object):
 		- Respond with login session ID, encryption key and available login descriptors
 		"""
 		key = jwcrypto.jwk.JWK.from_json(await request.read())
-		ident = json_data.get('ident')
+		ident = json_data.get("ident")
 
 		# Get arguments specified in login URL query
 		expiration = None
@@ -89,10 +90,12 @@ class AuthenticationHandler(object):
 		else:
 			query_dict = urllib.parse.parse_qs(query_string)
 
-			login_dict = {
-				k: v[0]
-				for k, v in query_dict.items()
-				if k in self.AuthenticationService.CustomLoginParameters}
+			login_dict = {}
+			for k, v in query_dict.items():
+				if k in self.AuthenticationService.CustomLoginParameters:
+					if len(v) > 1:
+						raise asab.exceptions.ValidationError("Repeated query parameters are not supported")
+					login_dict[k] = v[0]
 
 			# Get requested session expiration
 			# TODO: This option should be moved to client config or removed completely
