@@ -30,10 +30,6 @@ class ResourceService(asab.Service):
 			"description": "Grants superuser access, including the access to all tenants. Global-only.",
 		},
 		{
-			"id": "authz:tenant:admin",
-			"description": "Grants administrative rights for the tenant through which this resource is assigned.",
-		},
-		{
 			"id": "authz:tenant:access",
 			"description": "Grants non-superuser access to all tenants. Global-only.",
 		},
