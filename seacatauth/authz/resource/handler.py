@@ -1,6 +1,7 @@
 import logging
 import re
 
+import aiohttp.web
 import asab
 import asab.web.rest
 
@@ -152,5 +153,7 @@ class ResourceHandler(object):
 		"""
 		resource_id = request.match_info["resource_id"]
 		hard_delete = request.query.get("hard_delete") == "true"
+		if hard_delete and not request.is_superuser:
+			raise aiohttp.web.HTTPForbidden()
 		await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
 		return asab.web.rest.json_response(request, {"result": "OK"})
