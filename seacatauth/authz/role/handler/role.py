@@ -188,22 +188,26 @@ class RoleHandler(object):
 			resources_to_remove or []
 		)
 
-		# Only superuser can edit global roles
-		if tenant in (None, "*") and not request.is_superuser:
-			L.warning("Not authorized to edit global roles", struct_data={
-				"role_id": role_id,
-				"cid": request.CredentialsId
-			})
-			raise aiohttp.web.HTTPForbidden()
+		# Perform extra validations when the request is not superuser-authorized
+		if not request.is_superuser:
+			# Cannot edit global roles
+			if tenant in (None, "*"):
+				L.warning("Not authorized to edit global roles", struct_data={
+					"role_id": role_id,
+					"cid": request.CredentialsId
+				})
+				raise aiohttp.web.HTTPForbidden()
 
-		# Only superuser can un/assign "authz:superuser"
-		if "authz:superuser" in resources_to_assign and not request.is_superuser:
-			L.warning("Not authorized to assign 'authz:superuser' resource", struct_data={
-				"role_id": role_id,
-				"tenant": tenant,
-				"cid": request.CredentialsId
-			})
-			raise aiohttp.web.HTTPForbidden()
+			# Cannot un/assign Seacat Auth built-in resources
+			# TODO: This may be too strict, revisit this
+			for resource in resources_to_assign:
+				if self.RoleService.ResourceService.is_builtin_resource(resource):
+					L.warning("Not authorized to assign built-in resources", struct_data={
+						"role_id": role_id,
+						"resource": resource,
+						"cid": request.CredentialsId
+					})
+					raise aiohttp.web.HTTPForbidden()
 
 		try:
 			result = await self.RoleService.update(
