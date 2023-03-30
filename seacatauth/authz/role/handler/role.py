@@ -61,7 +61,7 @@ class RoleHandler(object):
 		"""
 		return await self._list(request, tenant=None)
 
-	@access_control()
+	@access_control("seacat:role:access")
 	async def list(self, request, *, tenant):
 		"""
 		List tenant roles
@@ -97,7 +97,7 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@access_control()
+	@access_control("seacat:role:access")
 	async def get(self, request, *, tenant):
 		"""
 		Get role detail
@@ -117,7 +117,7 @@ class RoleHandler(object):
 		)
 
 
-	@access_control()
+	@access_control("seacat:role:edit")
 	async def create(self, request, *, tenant):
 		"""
 		Create a new role
@@ -131,7 +131,7 @@ class RoleHandler(object):
 		)
 
 
-	@access_control()
+	@access_control("seacat:role:edit")
 	async def delete(self, request, *, tenant):
 		"""
 		Delete role
@@ -172,7 +172,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control()
+	@access_control("seacat:role:edit")
 	async def update(self, request, *, json_data, tenant):
 		"""
 		Edit role description and resources
