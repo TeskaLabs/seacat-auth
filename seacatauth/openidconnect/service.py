@@ -248,6 +248,14 @@ class OpenIdConnectService(asab.Service):
 		code_challenge: str = None,
 		code_challenge_method: str = None
 	):
+		impersonation_target_cid = await self._get_impersonation_target(root_session, scope)
+		if impersonation_target_cid is not None:
+			impersonator_cid = root_session.Credentials.Id
+			credentials_id = impersonation_target_cid
+		else:
+			impersonator_cid = None
+			credentials_id = root_session.Credentials.Id
+
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
@@ -475,3 +483,22 @@ class OpenIdConnectService(asab.Service):
 		if credential_id is not None:
 			d["cid"] = credential_id
 		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+
+
+	async def _get_impersonation_target(self, root_session, scope):
+		impersonation_target_cid = None
+		for claim in scope:
+			if claim.startswith("impersonate:"):
+				if impersonation_target_cid is not None:
+					raise ValueError("Scope contains more than one 'impersonate' claim")
+				impersonation_target_cid = claim[len("impersonate:"):]
+		if impersonation_target_cid is not None:
+			rbac_svc = self.App.get_service("seacatauth.RBACService")
+			if not rbac_svc.has_resource_access(
+					root_session.Authorization.Authz, tenant=None, requested_resources=["authz:impersonate"]):
+				raise exceptions.AccessDeniedError(subject=root_session.Credentials.Id, resource="authz:impersonate")
+			try:
+				await self.CredentialsService.get(impersonation_target_cid)
+			except KeyError:
+				raise ValueError("Impersonation target does not exist")
+		return impersonation_target_cid
