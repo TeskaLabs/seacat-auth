@@ -34,6 +34,7 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 
+	@access_control("seacat:resource:access")
 	async def list(self, request):
 		"""
 		List resources
@@ -94,6 +95,7 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, resources)
 
 
+	@access_control("seacat:resource:access")
 	async def get(self, request):
 		"""
 		Get resource detail
@@ -112,7 +114,7 @@ class ResourceHandler(object):
 		"properties": {
 			"description": {"type": "string"}}
 	})
-	@access_control("authz:superuser")
+	@access_control("seacat:resource:edit")
 	async def create_or_undelete(self, request, *, json_data):
 		"""
 		Create a new resource or undelete a resource that has been soft-deleted
@@ -143,7 +145,7 @@ class ResourceHandler(object):
 			"description": {"type": "string"},
 		}
 	})
-	@access_control("authz:superuser")
+	@access_control("seacat:resource:edit")
 	async def update(self, request, *, json_data):
 		"""
 		Update resource description or rename resource
@@ -157,7 +159,7 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:resource:edit")
 	async def delete(self, request):
 		"""
 		Delete resource
