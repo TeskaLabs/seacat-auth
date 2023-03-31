@@ -719,10 +719,8 @@ class AuthorizeHandler(object):
 
 
 	async def authorize_tenants_by_scope(self, scope, session, client_id):
-		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
-			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
-			or self.OpenIdConnectService.RBACService.has_resource_access(
-			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.can_access_all_tenants(
+			session.Authorization.Authz)
 		try:
 			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
 				scope, session.Credentials.Id, has_access_to_all_tenants)
@@ -734,7 +732,7 @@ class AuthorizeHandler(object):
 				tenant=e.Tenant,
 				scope=scope
 			)
-			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id, resource=e.Tenant)
 		except exceptions.TenantAccessDeniedError as e:
 			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
 			await self.audit_authorize_error(
@@ -743,7 +741,7 @@ class AuthorizeHandler(object):
 				tenant=e.Tenant,
 				scope=scope
 			)
-			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id, resource=e.Tenant)
 		except exceptions.NoTenantsError:
 			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
 			await self.audit_authorize_error(
@@ -751,7 +749,7 @@ class AuthorizeHandler(object):
 				credential_id=session.Credentials.Id,
 				scope=scope
 			)
-			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
+			raise exceptions.AccessDeniedError(subject=session.Credentials.Id, resource="tenant")
 
 		return tenants
 
