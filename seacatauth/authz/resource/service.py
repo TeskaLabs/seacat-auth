@@ -37,6 +37,10 @@ class ResourceService(asab.Service):
 			"id": "authz:tenant:access",
 			"description": "Grants non-superuser access to all tenants. Global-only.",
 		},
+		{
+			"id": "authz:impersonate",
+			"description": "Open a session as a different user",
+		},
 	]
 
 
