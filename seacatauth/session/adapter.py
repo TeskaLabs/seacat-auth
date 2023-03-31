@@ -44,6 +44,7 @@ class AuthenticationData:
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
 	IsAnonymous: typing.Optional[bool]
+	ImpersonatedBy: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -116,6 +117,7 @@ class SessionAdapter:
 			AvailableFactors = "an_af"
 			LastLogin = "an_ll"
 			IsAnonymous = "an_ano"
+			ImpersonatedBy = "an_imp"
 
 		class OAuth2:
 			_prefix = "oa"
@@ -302,6 +304,7 @@ class SessionAdapter:
 			or session_dict.pop("AF", None),
 			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
 			IsAnonymous=session_dict.pop(cls.FN.Authentication.IsAnonymous, None),
+			ImpersonatedBy=session_dict.pop(cls.FN.Authentication.ImpersonatedBy, None),
 		)
 
 	@classmethod
@@ -378,10 +381,10 @@ def rest_get(session_dict):
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
 
-	flags = []
 	if session_dict.get(SessionAdapter.FN.Authentication.IsAnonymous) is True:
-		flags.append("anonymous")
-	if len(flags) > 0:
-		data["flags"] = flags
+		data["anonymous"] = True
+	impersonated_by = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatedBy)
+	if impersonated_by is not None:
+		data["impersonated_by"] = impersonated_by
 
 	return data
