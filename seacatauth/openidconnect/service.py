@@ -248,25 +248,44 @@ class OpenIdConnectService(asab.Service):
 		code_challenge: str = None,
 		code_challenge_method: str = None
 	):
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		session_builders = []
+
 		impersonation_target_cid = await self._get_impersonation_target(root_session, scope)
 		if impersonation_target_cid is not None:
-			impersonator_cid = root_session.Credentials.Id
 			credentials_id = impersonation_target_cid
+			login_descriptor = {
+				"id": "!impersonation",
+				"label": "Impersonated session",
+				"factors": [{
+					"id": "!impersonated:{}".format(root_session.Credentials.Id),
+					"type": "!impersonated:{}".format(root_session.Credentials.Id)}]}
+			session_builders.append((
+				(SessionAdapter.FN.Authentication.ImpersonatedBy, root_session.Credentials.Id),
+			))
 		else:
-			impersonator_cid = None
 			credentials_id = root_session.Credentials.Id
+			login_descriptor = root_session.Authentication.LoginDescriptor
 
 		# TODO: Choose builders based on scope
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
-				tenants=tenants,
-			)
-		]
+		session_builders.append(await credentials_session_builder(self.CredentialsService, credentials_id, scope))
+
+		authz_builder, tenants_builder = await authz_session_builder(
+			tenant_service=self.TenantService,
+			role_service=self.RoleService,
+			credentials_id=credentials_id,
+			tenants=tenants,
+		)
+		if impersonation_target_cid is not None:
+			# To impersonate supersuser credentials, you must be a superuser yourself
+			if self.RBACService.is_superuser(authz_builder[1]) \
+				and not self.RBACService.is_superuser(root_session.Authorization.Authz):
+				L.warning("Not authorized to impersonate a superuser", struct_data={
+					"impersonator_cid": root_session.Credentials.Id,
+					"target_cid": impersonation_target_cid})
+				raise exceptions.AccessDeniedError(
+					subject=root_session.Credentials.Id, resource="impersonate:{}".format(impersonation_target_cid))
+		session_builders.append((authz_builder, tenants_builder))
 
 		if code_challenge is not None:
 			session_builders.append((
@@ -275,10 +294,10 @@ class OpenIdConnectService(asab.Service):
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			authn_service = self.App.get_service("seacatauth.AuthenticationService")
-			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
-			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
+			session_builders.append(login_descriptor_session_builder(login_descriptor))
+			session_builders.append(await external_login_session_builder(ext_login_svc, credentials_id))
 			# TODO: Get factors from root_session?
-			session_builders.append(await available_factors_session_builder(authn_service, root_session.Credentials.Id))
+			session_builders.append(await available_factors_session_builder(authn_service, credentials_id))
 
 		# TODO: if 'openid' in scope
 		oauth2_data = {
@@ -346,6 +365,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Authentication.IsAnonymous:
 			userinfo["anonymous"] = True
+
+		if session.Authentication.ImpersonatedBy is not None:
+			userinfo["impersonated_by"] = session.Authentication.ImpersonatedBy
 
 		if session.TrackId is not None:
 			userinfo["track_id"] = session.TrackId
@@ -466,12 +488,17 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def audit_authorize_success(self, session):
-		await self.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
+		data = {
 			"cid": session.Credentials.Id,
 			"tenants": [t for t in session.Authorization.Authz if t != "*"],
 			"client_id": session.OAuth2.ClientId,
 			"scope": session.OAuth2.Scope,
-		})
+		}
+		if session.Authentication.IsAnonymous:
+			data["anonymous"] = True
+		if session.Authentication.ImpersonatedBy is not None:
+			data["impersonated_by"] = session.Authentication.ImpersonatedBy
+		await self.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, data)
 
 
 	async def audit_authorize_error(self, client_id, error, credential_id=None, **kwargs):
