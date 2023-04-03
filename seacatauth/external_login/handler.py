@@ -221,7 +221,7 @@ class ExternalLoginHandler(object):
 		})
 
 		# Redirect to home screen
-		return self._my_account_redirect_response(state=state, error="external_login_successful")
+		return self._my_account_redirect_response(state=state, result="external_login_successful")
 
 
 	@access_control()
