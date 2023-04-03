@@ -247,18 +247,23 @@ class ExternalLoginHandler(object):
 
 
 	def _login_redirect_response(self, state=None, error=None):
-		query_params = []
+		# TODO: Revise with custom per-client login URIs
 		if state is not None:
-			query_params.append(("state", state))
-		if error is not None:
-			query_params.append(("error", error))
-		if len(query_params) > 0:
-			redirect_uri = "{}?{}".format(
-				self.ExternalLoginService.LoginScreenUrl,
-				urllib.parse.urlencode(query_params)
-			)
+			query = "?state={}".format(state)
 		else:
-			redirect_uri = self.ExternalLoginService.LoginScreenUrl
+			query = ""
+
+		if error is not None:
+			fragment_query = "?error={}".format(error)
+		else:
+			fragment_query = ""
+
+		redirect_uri = "{}{}#{}{}".format(
+			self.ExternalLoginService.AuthUiBaseUrl,
+			query,
+			self.ExternalLoginService.LoginUiFragmentPath,
+			fragment_query,
+		)
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
@@ -273,20 +278,28 @@ class ExternalLoginHandler(object):
 
 
 	def _my_account_redirect_response(self, state=None, error=None, result=None):
-		query_params = []
+		# TODO: Revise with custom per-client login URIs
 		if state is not None:
-			query_params.append(("state", state))
-		if error is not None:
-			query_params.append(("error", error))
-		if result is not None:
-			query_params.append(("result", result))
-		if len(query_params) > 0:
-			redirect_uri = "{}?{}".format(
-				self.ExternalLoginService.HomeScreenUrl,
-				urllib.parse.urlencode(query_params)
-			)
+			query = "?state={}".format(state)
 		else:
-			redirect_uri = self.ExternalLoginService.HomeScreenUrl
+			query = ""
+
+		fragment_query_params = []
+		if error is not None:
+			fragment_query_params.append(("error", error))
+		if result is not None:
+			fragment_query_params.append(("result", result))
+		if len(fragment_query_params) > 0:
+			hash_query = "?{}".format(urllib.parse.urlencode(fragment_query_params))
+		else:
+			hash_query = ""
+
+		redirect_uri = "{}{}#{}{}".format(
+			self.ExternalLoginService.AuthUiBaseUrl,
+			query,
+			self.ExternalLoginService.HomeUiFragmentPath,
+			hash_query,
+		)
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
