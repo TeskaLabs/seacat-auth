@@ -33,8 +33,4 @@ class FeatureHandler(object):
 		Get public login and registration features
 		"""
 		features = await self.FeatureService.get_features()
-		response = {
-			"data": features,
-			"result": "OK",
-		}
-		return asab.web.rest.json_response(request, response)
+		return asab.web.rest.json_response(request, data=features)
