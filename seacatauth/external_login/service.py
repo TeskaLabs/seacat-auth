@@ -28,9 +28,9 @@ class ExternalLoginService(asab.Service):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
-		auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
-		self.HomeScreenUrl = auth_webui_base_url.rstrip("/")
-		self.LoginScreenUrl = "{}/#/login".format(auth_webui_base_url.rstrip("/"))
+		self.AuthUiBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
+		self.HomeUiFragmentPath = "/"
+		self.LoginUiFragmentPath = "/login"
 		self.ExternalLoginPath = "/public/ext-login/{ext_login_provider}"
 		self.AddExternalLoginPath = "/public/ext-login-add/{ext_login_provider}"
 
