@@ -169,7 +169,7 @@ class ExternalLoginHandler(object):
 				"cid": credentials_id,
 				"type": login_provider_type
 			})
-			response = self._my_account_redirect_response(state=state, error="external_login_failed")
+			response = self._my_account_redirect_response(state=state, error="external_login_already_added")
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
@@ -200,7 +200,7 @@ class ExternalLoginHandler(object):
 				"type": login_provider_type,
 				"sub": sub,
 			})
-			response = self._my_account_redirect_response(state=state, error="external_login_failed")
+			response = self._my_account_redirect_response(state=state, error="external_login_already_in_use")
 			return response
 
 		# Update credentials
