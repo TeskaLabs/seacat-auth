@@ -169,7 +169,7 @@ class ExternalLoginHandler(object):
 				"cid": credentials_id,
 				"type": login_provider_type
 			})
-			response = self._my_account_redirect_response(state=state, error="external_login_already_added")
+			response = self._my_account_redirect_response(state=state, error="external_login_already_activated")
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
@@ -181,6 +181,7 @@ class ExternalLoginHandler(object):
 		sub = user_info.get("sub")
 		if sub is None:
 			L.error("Cannot obtain 'sub' field from external login provider", struct_data={
+				"cid": credentials_id,
 				"type": login_provider_type
 			})
 			return self._my_account_redirect_response(state=state, error="external_login_failed")
@@ -197,10 +198,11 @@ class ExternalLoginHandler(object):
 
 		if already_used:
 			L.error("External login already used by different credentials", struct_data={
+				"request_cid": credentials_id,
 				"type": login_provider_type,
 				"sub": sub,
 			})
-			response = self._my_account_redirect_response(state=state, error="external_login_already_in_use")
+			response = self._my_account_redirect_response(state=state, error="external_login_not_activated")
 			return response
 
 		# Update credentials
@@ -212,7 +214,7 @@ class ExternalLoginHandler(object):
 				"type": login_provider_type,
 				"sub": sub,
 			})
-			response = self._my_account_redirect_response(state=state, error="external_login_failed")
+			response = self._my_account_redirect_response(state=state, error="external_login_not_activated")
 			return response
 
 		L.log(asab.LOG_NOTICE, "External login successfully added", struct_data={
@@ -221,7 +223,7 @@ class ExternalLoginHandler(object):
 		})
 
 		# Redirect to home screen
-		return self._my_account_redirect_response(state=state, result="external_login_added")
+		return self._my_account_redirect_response(state=state, result="external_login_activated")
 
 
 	@access_control()
