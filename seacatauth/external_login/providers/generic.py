@@ -58,6 +58,9 @@ class GenericOAuth2Login(asab.ConfigObject):
 		self.Scope = self.Config.get("scope")
 		assert self.Scope is not None
 
+		self.Ident = self.Config.get("ident", "email")
+		assert self.Ident is not None
+
 		# Label for "Sign up with {ext_login_provider}" button
 		# TODO: Make this i18n-compatible (like login descriptors)
 		# TODO: Separate label for "Add external login" button
@@ -150,7 +153,8 @@ class GenericOAuth2Login(asab.ConfigObject):
 			user_info["sub"] = data_dict["sub"]
 		if "email" in data_dict.keys():
 			user_info["email"] = data_dict["email"]
-			user_info["ident"] = data_dict["email"]
+		if self.Ident in data_dict.keys():
+			user_info["ident"] = data_dict[self.Ident]
 		return user_info
 
 	def get_login_authorize_uri(self, state=None):
