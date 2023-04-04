@@ -150,6 +150,7 @@ class GenericOAuth2Login(asab.ConfigObject):
 			user_info["sub"] = data_dict["sub"]
 		if "email" in data_dict.keys():
 			user_info["email"] = data_dict["email"]
+			user_info["ident"] = data_dict["email"]
 		return user_info
 
 	def get_login_authorize_uri(self, state=None):
