@@ -84,7 +84,8 @@ class GenericOAuth2Login(asab.ConfigObject):
 			("response_type", "code"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri)
+			("redirect_uri", redirect_uri),
+			("prompt", "select_account"),
 		]
 		if state is not None:
 			query_params.append(("state", state))
