@@ -3,8 +3,6 @@ import logging
 import aiohttp.web
 import asab
 import asab.web.rest
-import asab.web.authz
-import asab.web.tenant
 import asab.storage.exceptions
 
 from ....decorators import access_control
