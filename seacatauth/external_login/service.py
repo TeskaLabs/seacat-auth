@@ -63,7 +63,7 @@ class ExternalLoginService(asab.Service):
 		)
 
 
-	async def create(self, credentials_id: str, provider_type: str, sub: str):
+	async def create(self, credentials_id: str, provider_type: str, sub: str, email: str = None, ident: str = None):
 		upsertor = self.StorageService.upsertor(
 			self.ExternalLoginCollection,
 			obj_id=self._make_id(provider_type, sub)
@@ -71,6 +71,10 @@ class ExternalLoginService(asab.Service):
 		upsertor.set("t", provider_type)
 		upsertor.set("s", sub)
 		upsertor.set("cid", credentials_id)
+		if email is not None:
+			upsertor.set("e", email)
+		if ident is not None:
+			upsertor.set("i", ident)
 
 		elcid = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_CREATED)
 		L.log(asab.LOG_NOTICE, "External login credential created", struct_data={

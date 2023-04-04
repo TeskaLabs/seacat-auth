@@ -207,7 +207,8 @@ class ExternalLoginHandler(object):
 
 		# Update credentials
 		try:
-			await self.ExternalLoginService.create(credentials_id, login_provider_type, sub)
+			await self.ExternalLoginService.create(
+				credentials_id, login_provider_type, sub, user_info.get("email"), user_info.get("ident"))
 		except Exception as e:
 			L.error("{} when creating external login credentials: {}".format(type(e).__name__, str(e)), struct_data={
 				"cid": credentials_id,
