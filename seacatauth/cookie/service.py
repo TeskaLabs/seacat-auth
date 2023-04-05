@@ -1,5 +1,6 @@
 import base64
 import datetime
+import hashlib
 import re
 import logging
 import secrets
@@ -11,6 +12,7 @@ from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
+	cookie_session_builder
 )
 from ..openidconnect.session import oauth2_session_builder
 from ..events import EventTypes
@@ -86,6 +88,15 @@ class CookieService(asab.Service):
 		return state
 
 
+	def get_cookie_name(self, client_id: str = None):
+		if client_id is not None:
+			client_id_hash = hashlib.sha256(client_id.encode("ascii")).hexdigest()[:16]
+			cookie_name = "{}_{}".format(self.CookieName, client_id_hash)
+		else:
+			cookie_name = self.CookieName
+		return cookie_name
+
+
 	async def get_redirect_uri(self, client_id: str, state: str):
 		"""
 		Pop and return redirect URI from the storage
@@ -121,11 +132,11 @@ class CookieService(asab.Service):
 		return domain or None
 
 
-	def _get_session_cookie_id(self, request):
+	def _get_session_cookie_id(self, request, client_id=None):
 		"""
 		Get Seacat cookie value from request header
 		"""
-		cookie = request.cookies.get(self.CookieName)
+		cookie = request.cookies.get(self.get_cookie_name(client_id))
 		if cookie is None:
 			return None
 		try:
@@ -143,15 +154,12 @@ class CookieService(asab.Service):
 		To search for root session, keep client_id=None.
 		Root sessions have no client_id attribute, which MongoDB matches as None.
 		"""
-		session_cookie_id = self._get_session_cookie_id(request)
+		session_cookie_id = self._get_session_cookie_id(request, client_id)
 		if session_cookie_id is None:
 			return None
 
 		try:
-			session = await self.SessionService.get_by({
-				SessionAdapter.FN.Cookie.Id: session_cookie_id,
-				SessionAdapter.FN.OAuth2.ClientId: client_id,
-			})
+			session = await self.SessionService.get_by({SessionAdapter.FN.Cookie.Id: session_cookie_id})
 		except KeyError:
 			L.info("Session not found.", struct_data={"sci": session_cookie_id})
 			return None
@@ -225,17 +233,8 @@ class CookieService(asab.Service):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 			),
+			cookie_session_builder(),
 		]
-
-		# Get cookie value and domain
-		if client.get("cookie_domain") not in (None, ""):
-			cookie_domain = client["cookie_domain"]
-		else:
-			cookie_domain = self.RootCookieDomain
-		session_builders.append([
-			(SessionAdapter.FN.Cookie.Id, base64.urlsafe_b64decode(root_session.Cookie.Id)),
-			(SessionAdapter.FN.Cookie.Domain, cookie_domain),
-		])
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([

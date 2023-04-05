@@ -299,6 +299,7 @@ class AuthenticationHandler(object):
 		else:
 			response = asab.web.rest.json_response(request, {'result': 'OK'})
 
+		# TODO: Also delete cookies of all the terminated subsessions
 		delete_cookie(self.App, response)
 
 		if self.BatmanService is not None:
