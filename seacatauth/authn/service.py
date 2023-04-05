@@ -9,6 +9,7 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
+from ..authz import build_credentials_authz
 from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
@@ -373,8 +374,11 @@ class AuthenticationService(asab.Service):
 		This is NOT OpenIDConnect/OAuth2 compliant!
 		"""
 		# TODO: Get tenant, scope and other necessary OIDC info from credentials
-		tenants = None
 		scope = frozenset(["tenant:*", "profile", "email"])
+		authz = await build_credentials_authz(self.TenantService, self.RoleService, credentials_id)
+		has_access_to_all_tenants = self.RBACService.can_access_all_tenants(authz)
+		tenants = await self.TenantService.get_tenants_by_scope(
+			scope, credentials_id, has_access_to_all_tenants)
 
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
