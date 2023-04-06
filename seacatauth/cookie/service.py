@@ -243,6 +243,10 @@ class CookieService(asab.Service):
 				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
 			])
 
+		if root_session.TrackId is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
+		# Otherwise keep the session without tracking ID for now
+
 		oauth2_data = {
 			"scope": scope,
 			"client_id": client_id,
@@ -252,7 +256,6 @@ class CookieService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="cookie",
 			parent_session=root_session,
-			track_id=root_session.TrackId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
