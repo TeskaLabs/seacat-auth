@@ -90,7 +90,9 @@ class CookieService(asab.Service):
 
 	def get_cookie_name(self, client_id: str = None):
 		if client_id is not None:
-			client_id_hash = hashlib.sha256(client_id.encode("ascii")).hexdigest()[:16]
+			client_id_hash = base64.b32encode(
+				hashlib.sha256(client_id.encode("ascii")).digest()[:10]
+			).decode("ascii")
 			cookie_name = "{}_{}".format(self.CookieName, client_id_hash)
 		else:
 			cookie_name = self.CookieName
