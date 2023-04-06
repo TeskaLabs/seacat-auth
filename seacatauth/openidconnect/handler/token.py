@@ -13,7 +13,6 @@ import jwcrypto.jws
 import jwcrypto.jwt
 import json
 
-from ...session import SessionAdapter
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
 

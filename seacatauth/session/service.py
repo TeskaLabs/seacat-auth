@@ -3,7 +3,6 @@ import logging
 import secrets
 
 import bson
-import uuid
 
 import hashlib
 import cryptography.hazmat.primitives.ciphers
