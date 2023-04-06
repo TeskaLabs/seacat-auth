@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 import aiohttp
 import aiohttp.web
@@ -8,6 +9,7 @@ from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
 from ..client import validate_redirect_uri
 from ..openidconnect.utils import TokenRequestErrorResponseCode
+from ..session import SessionAdapter
 
 #
 
@@ -323,6 +325,20 @@ class CookieHandler(object):
 			L.warning("State matched no redirect URI.", struct_data={"client_id": client_id, "state": state})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+
+		# Set track ID if not set yet
+		if session.TrackId is None:
+			# Check if the user landed here with a cookie and associate track ID
+			current_session = await self.CookieService.get_session_by_sci(request, client_id)
+			if current_session is not None:
+				track_id = current_session.TrackId
+			else:
+				track_id = uuid.uuid4().bytes
+			# Set the track ID
+			await self.CookieService.SessionService.update_session(
+				session.SessionId,
+				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),)
+			)
 
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):

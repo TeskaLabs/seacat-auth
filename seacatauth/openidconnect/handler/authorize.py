@@ -334,7 +334,12 @@ class AuthorizeHandler(object):
 				state=state
 			)
 
-		root_session = request.Session
+		# Look up anonymous client root session if it exists
+		client_session = await self.CookieService.get_session_by_sci(request, client_id)
+		if client_session is not None and client_session.Session.Type == "root":
+			root_session = client_session
+		else:
+			root_session = request.Session
 
 		# Only root sessions can be used to authorize client sessions
 		if root_session is not None:

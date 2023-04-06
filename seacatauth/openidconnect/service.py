@@ -4,6 +4,7 @@ import os.path
 import base64
 import secrets
 import logging
+import uuid
 
 import asab
 import asab.web.rest
@@ -278,10 +279,21 @@ class OpenIdConnectService(asab.Service):
 			"client_id": client_id,
 		}
 		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		# Obtain Track ID or generate a new one if there is none
+		if root_session.TrackId is not None:
+			track_id = root_session.TrackId
+		else:
+			track_id = uuid.uuid4().bytes
+			await self.SessionService.update_session(
+				root_session.SessionId,
+				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),)
+			)
+		session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
+
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session=root_session,
-			track_id=root_session.TrackId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)

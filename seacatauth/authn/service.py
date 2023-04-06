@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import re
+import uuid
 
 import asab
 
@@ -311,7 +312,7 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
-	async def login(self, login_session, from_info: list = None, track_id=None):
+	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
 		scope = frozenset(["profile", "email", "phone"])
 
@@ -334,7 +335,6 @@ class AuthenticationService(asab.Service):
 			session_type="root",
 			expiration=login_session.RequestedSessionExpiration,
 			session_builders=session_builders,
-			track_id=track_id,  # add link to previous session
 		)
 		L.log(
 			asab.LOG_NOTICE,
@@ -438,7 +438,8 @@ class AuthenticationService(asab.Service):
 			authz_builder,
 			cookie_session_builder(),
 			await available_factors_session_builder(self, credentials_id),
-			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
+			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
+			((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),),  # New anonymous session needs a new track ID
 		]
 
 		oauth2_data = {

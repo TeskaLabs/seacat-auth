@@ -218,13 +218,6 @@ class AuthenticationHandler(object):
 		if ff is not None:
 			access_ips.extend(ff.split(', '))
 
-		# Get the current session's TrackID
-		current_session = await self.CookieService.get_session_by_sci(request)
-		if current_session is not None:
-			track_id = current_session.TrackId
-		else:
-			track_id = None
-
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
@@ -252,7 +245,7 @@ class AuthenticationHandler(object):
 			)
 
 		# Do the actual login
-		session = await self.AuthenticationService.login(login_session, from_info=access_ips, track_id=track_id)
+		session = await self.AuthenticationService.login(login_session, from_info=access_ips)
 
 		# TODO: Note the last successful login time
 		# TODO: Log also the IP address

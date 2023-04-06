@@ -169,12 +169,6 @@ class TokenHandler(object):
 
 		id_token = await self.OpenIdConnectService.build_id_token(session)
 
-		# Save the ID token in the session object
-		await self.SessionService.update_session(
-			session_id,
-			session_builders=[[(SessionAdapter.FN.OAuth2.IdToken, id_token.encode())]]
-		)
-
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
