@@ -317,7 +317,6 @@ class CookieHandler(object):
 
 		# Retrieve the original request URI by the state
 		state = query.get("state")
-		redirect_uri = None
 		if state is not None:
 			try:
 				redirect_uri = await self.CookieService.get_redirect_uri(client_id, state)
