@@ -79,7 +79,7 @@ class ResourceService(asab.Service):
 			"description": "Assign and unassign tenant roles.",
 		},
 	}
-	_GlobalOnlyResources = frozenset({
+	GlobalOnlyResources = frozenset({
 		"authz:superuser", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
 		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
 		"seacat:client:access", "seacat:client:edit"})
@@ -101,7 +101,7 @@ class ResourceService(asab.Service):
 
 
 	def is_global_only_resource(self, resource_id):
-		return resource_id in self._GlobalOnlyResources
+		return resource_id in self.GlobalOnlyResources
 
 
 	async def _ensure_builtin_resources(self):
@@ -146,7 +146,6 @@ class ResourceService(asab.Service):
 			resources.append(resource_dict)
 
 		return {
-			"result": "OK",
 			"data": resources,
 			"count": count,
 		}
