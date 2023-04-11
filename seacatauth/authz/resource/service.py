@@ -112,7 +112,7 @@ class ResourceService(asab.Service):
 		for resource_id, resource_config in self._BuiltinResources.items():
 			description = resource_config.get("description")
 
-			L.info("Checking for builtin resource {!r}".format(resource_id))
+			L.info("Checking for built-in resource {!r}".format(resource_id))
 			try:
 				db_resource = await self.get(resource_id)
 			except KeyError:
@@ -121,7 +121,7 @@ class ResourceService(asab.Service):
 
 			# Update resource description
 			if description is not None and db_resource.get("description") != description:
-				await self.update(resource_id, description, _internal=True)
+				await self._update(resource_id, description)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -183,30 +183,32 @@ class ResourceService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource": resource_id})
 
 
-	async def update(self, resource_id: str, description: str, *, _internal: bool = False):
-		if self.is_builtin_resource(resource_id) and not _internal:
-			raise asab.exceptions.ValidationError("System resource cannot be modified")
+	async def _update(self, resource_id: str, description: str):
 		resource = await self.get(resource_id)
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
 			obj_id=resource_id,
-			version=resource["_v"]
-		)
+			version=resource["_v"])
 
 		assert description is not None
-
 		if description == "":
 			upsertor.unset("description")
 		else:
 			upsertor.set("description", description)
 
 		await upsertor.execute(event_type=EventTypes.RESOURCE_UPDATED)
-		L.log(asab.LOG_NOTICE, "Resource description updated", struct_data={"resource": resource_id})
+		L.log(asab.LOG_NOTICE, "Resource updated", struct_data={"resource": resource_id})
+
+
+	async def update(self, resource_id: str, description: str):
+		if self.is_builtin_resource(resource_id):
+			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
+		await self._update(resource_id, description)
 
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
 		if self.is_builtin_resource(resource_id):
-			raise asab.exceptions.ValidationError("System resource cannot be deleted")
+			raise asab.exceptions.ValidationError("Built-in resource cannot be deleted")
 
 		resource = await self.get(resource_id)
 
@@ -262,7 +264,7 @@ class ResourceService(asab.Service):
 		assigning it to roles that have the original resource and deleting the original resource
 		"""
 		if self.is_builtin_resource(resource_id):
-			raise asab.exceptions.ValidationError("System resource cannot be renamed")
+			raise asab.exceptions.ValidationError("Built-in resource cannot be renamed")
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
 
