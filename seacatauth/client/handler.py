@@ -92,7 +92,7 @@ class ClientHandler(object):
 		)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:client:access")
 	async def features(self, request):
 		"""
 		Get schema of supported client metadata
