@@ -321,7 +321,7 @@ class TenantHandler(object):
 		"properties": {
 			"credential_ids": {
 				"type": "array",
-				"description": "List of the IDs of credentials to manage",
+				"description": "List of the IDs of credentials to manage.",
 				"items": {"type": "string"}},
 			"tenants": {
 				"type": "object",
@@ -430,7 +430,7 @@ class TenantHandler(object):
 		"properties": {
 			"credential_ids": {
 				"type": "array",
-				"description": "List of the IDs of credentials to manage",
+				"description": "List of the IDs of credentials to manage.",
 				"items": {"type": "string"}},
 			"tenants": {
 				"type": "object",
@@ -438,19 +438,22 @@ class TenantHandler(object):
 					"Tenants and roles to be unassigned. \n\n"
 					"The keys are the IDs of tenants to be revoked access to. The values are arrays of the respective "
 					"tenant's roles to be unassigned. \n\n"
-					"To completely revoke credentials' access to the tenant, leave the role array empty. \n\n"
-					"To unassign global roles, list them under the `'*'` key.",
+					"To completely revoke credentials' access to the tenant, provide `\"UNASSIGN-TENANT\"` as the "
+					"tenant value, instead of the array of roles. \n\n"
+					"To unassign global roles, list them under the `\"*\"` key.",
 				"patternProperties": {
 					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
-						"type": "array",
-						"items": {"type": "string"}}}}},
+						"anyOf": [
+							{"type": "array", "items": {"type": "string"}},
+							{"type": "string", "enum": ["UNASSIGN-TENANT"]}
+						]}}}},
 		"example": {
 			"credential_ids": [
 				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
 			"tenants": {
 				"*": ["*/global-editor"],
 				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
-				"my-eshop": []}},
+				"my-eshop": "UNASSIGN-TENANT"}},
 	})
 	@access_control("authz:superuser")
 	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
@@ -467,6 +470,8 @@ class TenantHandler(object):
 
 		# Verify that roles are listed under their proper tenant
 		for tenant, roles in json_data["tenants"].items():
+			if roles == "UNASSIGN-TENANT":
+				continue
 			for role in roles:
 				t, _ = role.split("/", 1)
 				if t != tenant:
@@ -475,12 +480,15 @@ class TenantHandler(object):
 		error_details = []
 		for tenant, roles in json_data["tenants"].items():
 			for credential_id in json_data["credential_ids"]:
-				if len(roles) == 0:
-					# If no roles are listed under the tenant (e.g. `"my-tenant": []`),
-					# revoke access to the tenant completely.
+				if roles == "UNASSIGN-TENANT":
+					# If "UNASSIGN-TENANT" is provided instead of the role array
+					# (e.g. `"my-tenant": "UNASSIGN-TENANT"`), revoke access to the tenant completely.
 					# This also automatically unassigns all the tenant's roles
 					try:
 						await self.TenantService.unassign_tenant(credential_id, tenant)
+					except KeyError:
+						L.info("Skipping: Tenant not assigned.", struct_data={
+							"cid": credential_id, "tenant": tenant})
 					except Exception as e:
 						L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
 							"cid": credential_id, "tenant": tenant})
