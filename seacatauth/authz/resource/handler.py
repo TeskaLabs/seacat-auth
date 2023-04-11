@@ -89,7 +89,7 @@ class ResourceHandler(object):
 		if request.query.get("exclude_global_only") == "true":
 			if "_id" not in query_filter:
 				query_filter["_id"] = {}
-			query_filter["_id"]["$nin"] = list(self.ResourceService._GlobalOnlyResources)
+			query_filter["_id"]["$nin"] = list(self.ResourceService.GlobalOnlyResources)
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
@@ -102,7 +102,6 @@ class ResourceHandler(object):
 		"""
 		resource_id = request.match_info["resource_id"]
 		result = await self.ResourceService.get(resource_id)
-		result["result"] = "OK"
 		return asab.web.rest.json_response(
 			request, result
 		)
