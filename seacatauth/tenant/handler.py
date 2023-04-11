@@ -478,6 +478,9 @@ class TenantHandler(object):
 					# This also automatically unassigns all the tenant's roles
 					try:
 						await self.TenantService.unassign_tenant(credential_id, tenant)
+					except KeyError:
+						L.info("Skipping: Tenant not assigned.", struct_data={
+							"cid": credential_id, "tenant": tenant})
 					except Exception as e:
 						L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
 							"cid": credential_id, "tenant": tenant})
