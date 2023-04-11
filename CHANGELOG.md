@@ -8,6 +8,7 @@
 - Bouncer module replaced by cookie entrypoint (#156, PLUM Sprint 230324)
 - Dropped support for custom cookie domains in the configuration (#156, PLUM Sprint 230324)
 - External login status messages changed (#185, PLUM Sprint 230324)
+- Bulk-unassign tenants using "UNASSIGN-TENANT" (#189, PLUM Sprint 230324)
 
 ### Fix
 - Improve last login search performance (#173, PLUM Sprint 230324)
@@ -20,6 +21,7 @@
 
 ### Refactoring
 - OpenAPI docs updated (#181, PLUM Sprint 230324)
+- Bulk-unassign tenants using "UNASSIGN-TENANT" (#189, PLUM Sprint 230324)
 
 ---
 
