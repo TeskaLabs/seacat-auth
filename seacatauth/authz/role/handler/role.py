@@ -78,12 +78,12 @@ class RoleHandler(object):
 				type: integer
 		-	name: resource
 			in: query
-			description: Show only roles that contain the specified resource
+			description: Show only roles that contain the specified resource.
 			schema:
 				type: string
 		-	name: exclude_global
 			in: query
-			description: Show only proper tenant roles
+			description: Show only proper tenant roles, without globals.
 			schema:
 				type: string
 				enum:
