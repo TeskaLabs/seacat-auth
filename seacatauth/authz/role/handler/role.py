@@ -81,6 +81,13 @@ class RoleHandler(object):
 			description: Show only roles that contain the specified resource
 			schema:
 				type: string
+		-	name: exclude_global
+			in: query
+			description: Show only proper tenant roles
+			schema:
+				type: string
+				enum:
+				- true
 		"""
 		return await self._list(request, tenant=tenant)
 
@@ -90,8 +97,9 @@ class RoleHandler(object):
 		if limit is not None:
 			limit = int(limit)
 		resource = request.query.get("resource")
+		exclude_global = request.query.get("exclude_global", "false") == "true"
 
-		result = await self.RoleService.list(tenant, page, limit, resource=resource)
+		result = await self.RoleService.list(tenant, page, limit, resource=resource, exclude_global=exclude_global)
 		return asab.web.rest.json_response(request, result)
 
 
