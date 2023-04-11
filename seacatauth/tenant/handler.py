@@ -103,7 +103,6 @@ class TenantHandler(object):
 			tenants.append(tenant)
 
 		result = {
-			"result": "OK",
 			"data": tenants,
 			"count": count,
 		}
