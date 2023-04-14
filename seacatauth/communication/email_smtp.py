@@ -25,11 +25,13 @@ class SMTPProvider(CommunicationProviderABC):
 		"password": "",
 		"ssl": "no",  # Use TLS/SSL for connection
 		"starttls": "yes",  # Use STARTTLS protocol
+		"_mock": "no",  # Log messages to console instead of sending them
 	}
 
 	def __init__(self, provider_id, config_section_name):
 		super().__init__(provider_id, config_section_name)
 
+		self.MockMode = self.Config.getboolean("_mock")
 		self.SSL = self.Config.getboolean("ssl")
 		self.StartTLS = self.Config.getboolean("starttls")
 		self.Host = self.Config.get("host")
@@ -85,19 +87,24 @@ class SMTPProvider(CommunicationProviderABC):
 		if bcc is not None:
 			msg['Bcc'] = ', '.join(bcc)
 
-		msg.attach(email.mime.text.MIMEText(message_body, text_type, 'utf-8'))
+		if self.MockMode:
+			L.log(
+				asab.LOG_NOTICE, "SMTP provider is in mock mode. Email will not be sent.",
+				struct_data={**msg, "message_body": message_body}
+			)
+		else:
+			msg.attach(email.mime.text.MIMEText(message_body, text_type, 'utf-8'))
+			result = await aiosmtplib.send(
+				msg,
+				sender=sender,
+				recipients=to,
+				hostname=self.Host,
+				port=self.Port,
+				username=self.User if len(self.User) > 0 else None,
+				password=self.Password,
+				use_tls=self.SSL,
+				start_tls=self.StartTLS
+			)
+			L.log(asab.LOG_NOTICE, "Email sent", struct_data={'result': result[1]})
 
-		result = await aiosmtplib.send(
-			msg,
-			sender=sender,
-			recipients=to,
-			hostname=self.Host,
-			port=self.Port,
-			username=self.User if len(self.User) > 0 else None,
-			password=self.Password,
-			use_tls=self.SSL,
-			start_tls=self.StartTLS
-		)
-
-		L.log(asab.LOG_NOTICE, "Email sent", struct_data={'result': result[1]})
 		return True
