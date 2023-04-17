@@ -29,6 +29,7 @@ RUN apk add --no-cache  \
     cargo \
 && pip3 install --upgrade pip \
 && pip3 install --no-cache-dir \
+    setuptools<66 \
     aiohttp \
     aiosmtplib \
     bson \
