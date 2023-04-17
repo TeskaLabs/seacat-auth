@@ -16,6 +16,7 @@ services:
       - seacat-auth
     network_mode: host
     volumes:
+      - ./nginx-data:/data/nginx
       - ./nginx-conf:/etc/nginx/conf.d
       - ./log/nginx:/log
       - ./webroot:/webroot
