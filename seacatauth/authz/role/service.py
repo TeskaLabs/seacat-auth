@@ -345,7 +345,7 @@ class RoleService(asab.Service):
 			# such as "authz:superuser" or "authz:tenant:access", which is correct.
 			# To get a tenant role assigned, the user needs to have the tenant explicitly assigned.
 			if not await self.TenantService.has_tenant_assigned(credentials_id, tenant):
-				raise exceptions.TenantNotAuthorizedError(credentials_id, tenant)
+				raise exceptions.TenantNotAssignedError(credentials_id, tenant)
 
 		await self._do_assign_role(credentials_id, role_id, tenant)
 
