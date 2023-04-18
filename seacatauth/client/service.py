@@ -220,6 +220,7 @@ class ClientService(asab.Service):
 
 
 	async def initialize(self, app):
+		# TODO: This does not work, self.OIDCService is None
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
 
 
@@ -282,6 +283,8 @@ class ClientService(asab.Service):
 		:type _custom_client_id: str
 		:return: Dict containing the issued client_id and client_secret.
 		"""
+		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+
 		response_types = kwargs.get("response_types", frozenset(["code"]))
 		for v in response_types:
 			assert v in RESPONSE_TYPES
@@ -350,7 +353,7 @@ class ClientService(asab.Service):
 
 		# Register allowed PKCE Code Challenge Methods
 		code_challenge_method = kwargs.get("code_challenge_method", "none")
-		self.OIDCService.PKCE.validate_code_challenge_method_registration(code_challenge_method)
+		oidc_service.PKCE.validate_code_challenge_method_registration(code_challenge_method)
 		upsertor.set("code_challenge_method", code_challenge_method)
 
 		redirect_uri_validation_method = kwargs.get("redirect_uri_validation_method", "full_match")
@@ -407,6 +410,8 @@ class ClientService(asab.Service):
 
 
 	async def update(self, client_id: str, **kwargs):
+		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+
 		client = await self.get(client_id)
 		client_update = {}
 		for k, v in kwargs.items():
@@ -428,7 +433,7 @@ class ClientService(asab.Service):
 
 		# Register allowed PKCE Code Challenge Methods
 		if "code_challenge_method" in kwargs:
-			self.OIDCService.PKCE.validate_code_challenge_method_registration(kwargs["code_challenge_method"])
+			oidc_service.PKCE.validate_code_challenge_method_registration(kwargs["code_challenge_method"])
 
 		for k, v in client_update.items():
 			if v is None or (isinstance(v, str) and len(v) == 0):
