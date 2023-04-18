@@ -188,11 +188,6 @@ class RoleHandler(object):
 		resources_to_set = json_data.get("set")
 		resources_to_add = json_data.get("add")
 		resources_to_remove = json_data.get("del")
-		resources_to_assign = set().union(
-			resources_to_set or [],
-			resources_to_add or [],
-			resources_to_remove or []
-		)
 
 		# Perform extra validations when the request is not superuser-authorized
 		if not request.is_superuser:
@@ -203,17 +198,6 @@ class RoleHandler(object):
 					"cid": request.CredentialsId
 				})
 				raise aiohttp.web.HTTPForbidden()
-
-			# Cannot un/assign Seacat Auth built-in resources
-			# TODO: This may be too strict, revisit this
-			for resource in resources_to_assign:
-				if self.RoleService.ResourceService.is_builtin_resource(resource):
-					L.warning("Not authorized to assign built-in resources", struct_data={
-						"role_id": role_id,
-						"resource": resource,
-						"cid": request.CredentialsId
-					})
-					raise aiohttp.web.HTTPForbidden()
 
 		try:
 			result = await self.RoleService.update(
