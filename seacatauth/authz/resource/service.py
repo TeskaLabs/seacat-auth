@@ -28,6 +28,9 @@ class ResourceService(asab.Service):
 		"authz:superuser": {
 			"description": "Grants superuser access, including the access to all tenants.",
 		},
+		"authz:impersonate": {
+			"description": "Open a session as a different user.",
+		},
 		"authz:tenant:access": {
 			"description": "Grants non-superuser access to all tenants.",
 		},
@@ -83,7 +86,7 @@ class ResourceService(asab.Service):
 		},
 	}
 	GlobalOnlyResources = frozenset({
-		"authz:superuser", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
+		"authz:superuser", "authz:impersonate", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
 		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
 		"seacat:client:access", "seacat:client:edit", "seacat:tenant:create"})
 
