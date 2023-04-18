@@ -61,6 +61,7 @@ def private_auth_middleware_factory(app):
 
 		request.has_resource_access = has_resource_access
 		request.is_superuser = rbac_svc.is_superuser(request.Session.Authorization.Authz)
+		request.can_access_all_tenants = rbac_svc.can_access_all_tenants(request.Session.Authorization.Authz)
 
 		if require_authentication is False:
 			return await handler(request)
