@@ -31,7 +31,6 @@ RUN apk add --no-cache  \
 && pip3 install --no-cache-dir \
     aiohttp \
     aiosmtplib \
-    bson \
     motor \
     cryptography \
     jwcrypto>=0.9.1 \
@@ -44,8 +43,8 @@ RUN apk add --no-cache  \
     pyotp \
     webauthn \
     pyyaml \
-    bson \
-    git+https://github.com/TeskaLabs/asab.git@v22.06-rc7
+    pymongo \
+    git+https://github.com/TeskaLabs/asab.git
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
