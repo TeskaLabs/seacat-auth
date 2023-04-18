@@ -96,7 +96,10 @@ class ProvisioningService(asab.Service):
 		) == "OK")
 
 		# Assign superuser role to the provisioning user
-		await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
+		try:
+			await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
+		except asab.exceptions.Conflict:
+			pass
 
 		await self._initialize_admin_ui_client(app.get_service("seacatauth.ClientService"))
 
@@ -132,7 +135,7 @@ class ProvisioningService(asab.Service):
 			if client is None or client.get(k) != v}
 
 		redirect_uri_validation_method = self.Config["redirect_uri_validation_method"]
-		if client.get("redirect_uri_validation_method") != redirect_uri_validation_method:
+		if client is None or client.get("redirect_uri_validation_method") != redirect_uri_validation_method:
 			update["redirect_uri_validation_method"] = redirect_uri_validation_method
 
 		# Check if the client has the correct redirect URI
