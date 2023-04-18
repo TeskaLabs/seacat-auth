@@ -480,6 +480,14 @@ class CredentialsService(asab.Service):
 		for tenant in tenants:
 			await tenant_svc.unassign_tenant(credentials_id, tenant)
 
+		# Unassign global roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		await role_svc.set_roles(
+			credentials_id,
+			roles=[],
+			include_global=True
+		)
+
 		# Delete credentials in provider
 		result = await provider.delete(credentials_id)
 
