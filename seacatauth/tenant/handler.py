@@ -146,7 +146,7 @@ class TenantHandler(object):
 		"example": {
 			"id": "acme-corp"}
 	})
-	@access_control("seacat:tenant:edit")
+	@access_control("seacat:tenant:create")
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
