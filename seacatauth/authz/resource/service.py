@@ -58,6 +58,9 @@ class ResourceService(asab.Service):
 		"seacat:tenant:access": {
 			"description": "List tenants, view tenant detail and see tenant members.",
 		},
+		"seacat:tenant:create": {
+			"description": "Create new tenants.",
+		},
 		"seacat:tenant:edit": {
 			"description": "Edit tenant data.",
 		},
@@ -82,7 +85,7 @@ class ResourceService(asab.Service):
 	GlobalOnlyResources = frozenset({
 		"authz:superuser", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
 		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
-		"seacat:client:access", "seacat:client:edit"})
+		"seacat:client:access", "seacat:client:edit", "seacat:tenant:create"})
 
 
 	def __init__(self, app, service_name="seacatauth.ResourceService"):
