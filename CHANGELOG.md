@@ -16,6 +16,7 @@
 - Fix tenant check in role assignment (#187, PLUM Sprint 230324)
 - Fix credential service lookup (#192, PLUM Sprint 230412)
 - Fix pymongo import error (#193, PLUM Sprint 230412)
+- Fix client initialization in provisioning (#194, PLUM Sprint 230412)
 
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
