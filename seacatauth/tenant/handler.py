@@ -21,6 +21,7 @@ class TenantHandler(object):
 	"""
 
 	def __init__(self, app, tenant_svc):
+		self.App = app
 		self.TenantService = tenant_svc
 		self.NameProposerService = app.get_service("seacatauth.NameProposerService")
 
@@ -156,16 +157,37 @@ class TenantHandler(object):
 		- oAuth:
 			- authz:superuser
 		"""
-		tenant_id = json_data["id"]
+		role_service = self.App.get_service("seacatauth.RoleService")
+		tenant = json_data["id"]
 
 		# Create tenant
-		result = await self.TenantService.create_tenant(tenant_id, creator_id=credentials_id)
+		tenant_id = await self.TenantService.create_tenant(tenant, creator_id=credentials_id)
+
+		# Assign tenant
+		try:
+			await self.TenantService.assign_tenant(credentials_id, tenant)
+		except:
+			L.error("Error assigning tenant.", exc_info=True, struct_data={"cid": credentials_id, "tenant": tenant})
+
+		# Create role
+		role = "{}/admin".format(tenant)
+		try:
+			# Create admin role in tenant
+			await role_service.create(role)
+			# Assign tenant management resources
+			await role_service.update(role, resources_to_set=[
+				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete"])
+		except:
+			L.error("Error creating role.", exc_info=True, struct_data={"role": role})
+
+		# Assign the admin role to the user
+		try:
+			await role_service.assign_role(credentials_id, role)
+		except:
+			L.error("Error assigning role.", exc_info=True, struct_data={"cid": credentials_id, "role": role})
 
 		return asab.web.rest.json_response(
-			request,
-			data=result,
-			status=200 if result["result"] == "OK" else 400
-		)
+			request, data={"result": "OK", "id": tenant_id})
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
