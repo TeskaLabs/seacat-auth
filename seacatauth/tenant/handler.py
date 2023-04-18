@@ -176,7 +176,8 @@ class TenantHandler(object):
 			await role_service.create(role)
 			# Assign tenant management resources
 			await role_service.update(role, resources_to_set=[
-				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete"])
+				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
+				"seacat:role:access", "seacat:role:edit", "seacat:role:assign"])
 		except:
 			L.error("Error creating role.", exc_info=True, struct_data={"role": role})
 
