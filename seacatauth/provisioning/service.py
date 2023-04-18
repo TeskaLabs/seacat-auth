@@ -45,7 +45,7 @@ class ProvisioningService(asab.Service):
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
-		self.ResourceService = app.get_service("seacatauth.ResourceService")
+		self.ClientService = app.get_service("seacatauth.ClientService")
 
 		self.Config = _PROVISIONING_CONFIG_DEFAULTS
 		config_file = asab.Config.get("seacatauth:provisioning", "provisioning_config_file").strip() or None
@@ -64,6 +64,7 @@ class ProvisioningService(asab.Service):
 
 		# TODO: ResourceService should be already initialized by the app
 		await self.ResourceService.initialize(app)
+		await self.ClientService.initialize(app)
 
 		# Create provisioning credentials provider
 		self.CredentialsService.create_dict_provider(self.CredentialsProviderID)
@@ -101,7 +102,7 @@ class ProvisioningService(asab.Service):
 		except asab.exceptions.Conflict:
 			pass
 
-		await self._initialize_admin_ui_client(app.get_service("seacatauth.ClientService"))
+		await self._initialize_admin_ui_client()
 
 
 	async def finalize(self, app):
@@ -119,12 +120,12 @@ class ProvisioningService(asab.Service):
 		await super().finalize(app)
 
 
-	async def _initialize_admin_ui_client(self, client_service):
+	async def _initialize_admin_ui_client(self):
 		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
 		admin_ui_client_id = self.Config["admin_ui_client_id"]
 
 		try:
-			client = await client_service.get(admin_ui_client_id)
+			client = await self.ClientService.get(admin_ui_client_id)
 		except KeyError:
 			client = None
 
@@ -160,6 +161,6 @@ class ProvisioningService(asab.Service):
 			update["client_name"] = self.Config["admin_ui_client_name"]
 
 		if client is None:
-			await client_service.register(_custom_client_id=admin_ui_client_id, **update)
+			await self.ClientService.register(_custom_client_id=admin_ui_client_id, **update)
 		elif update:
-			await client_service.update(client_id=admin_ui_client_id, **update)
+			await self.ClientService.update(client_id=admin_ui_client_id, **update)
