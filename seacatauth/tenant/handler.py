@@ -254,7 +254,7 @@ class TenantHandler(object):
 		)
 
 
-	@access_control("authz:tenant:assign")
+	@access_control("seacat:tenant:assign")
 	async def assign_tenant(self, request, *, tenant):
 		"""
 		Grant specified tenant access to requested credentials
@@ -271,7 +271,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("authz:tenant:assign")
+	@access_control("seacat:tenant:assign")
 	async def unassign_tenant(self, request, *, tenant):
 		"""
 		Revoke specified tenant access to requested credentials
