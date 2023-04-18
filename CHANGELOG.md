@@ -15,6 +15,7 @@
 - M2M session now has access to all the M2M credentials' assigned tenants (#186, PLUM Sprint 230324)
 - Fix tenant check in role assignment (#187, PLUM Sprint 230324)
 - Fix credential service lookup (#192, PLUM Sprint 230412)
+- Fix pymongo import error (#193, PLUM Sprint 230412)
 
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
