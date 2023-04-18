@@ -62,10 +62,13 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control("seacat:tenant:access")
+	@access_control()
 	async def search(self, request):
 		"""
-		Search registered tenants
+		Search tenants.
+		Results include only the tenants that are authorized in the current session with
+		`seacat:tenant:access` resource. To search all tenants, access to `authz:superuser` or `authz:tenant:access`
+		is required.
 
 		---
 		parameters:
@@ -85,6 +88,18 @@ class TenantHandler(object):
 			schema:
 				type: string
 		"""
+		if not request.can_access_all_tenants:
+			# List only tenants authorized in the current session
+			# NOTE: This ignores pagination and filtering
+			tenants = []
+			for tenant, rs in request.Session.Authorization.Authz.items():
+				if tenant == "*":
+					continue
+				if "seacat:tenant:access" in rs:
+					tenants.append(await self.TenantService.get_tenant(tenant))
+			count = len(tenants)
+			return asab.web.rest.json_response(request, data={"data": tenants, "count": count})
+
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i")
 		if limit is not None:
