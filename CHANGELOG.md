@@ -7,15 +7,24 @@
 - Every cookie introspection should be paired with a cookie entrypoint (#156, PLUM Sprint 230324)
 - Bouncer module replaced by cookie entrypoint (#156, PLUM Sprint 230324)
 - Dropped support for custom cookie domains in the configuration (#156, PLUM Sprint 230324)
+- External login status messages changed (#185, PLUM Sprint 230324)
+- Bulk-unassign tenants using "UNASSIGN-TENANT" (#189, PLUM Sprint 230324)
 
 ### Fix
 - Improve last login search performance (#173, PLUM Sprint 230324)
+- M2M session now has access to all the M2M credentials' assigned tenants (#186, PLUM Sprint 230324)
+- Fix tenant check in role assignment (#187, PLUM Sprint 230324)
+- Fix credential service lookup (#192, PLUM Sprint 230412)
+- Fix pymongo import error (#193, PLUM Sprint 230412)
+- Fix client initialization in provisioning (#194, PLUM Sprint 230412)
 
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
+- External login ident stored (#185, PLUM Sprint 230324)
 
 ### Refactoring
 - OpenAPI docs updated (#181, PLUM Sprint 230324)
+- Bulk-unassign tenants using "UNASSIGN-TENANT" (#189, PLUM Sprint 230324)
 
 ---
 

@@ -55,7 +55,7 @@ class ExternalLoginHandler(object):
 		code = request.query.get("code")
 		if code is None:
 			L.error("Authentication code not provided in external login response")
-			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response
 
@@ -65,12 +65,12 @@ class ExternalLoginHandler(object):
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
-			return self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			return self._my_account_redirect_response(state=state, error="external_login_failed")
 
 		sub = user_info.get("sub")
 		if sub is None:
 			L.error("Cannot obtain sub id from external login provider")
-			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response
 
@@ -81,7 +81,7 @@ class ExternalLoginHandler(object):
 			el_credentials = await self.ExternalLoginService.get(login_provider_type, sub)
 			credentials_id = el_credentials["cid"]
 		except KeyError:
-			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-UNKNOWN-USER")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response
 
@@ -115,7 +115,7 @@ class ExternalLoginHandler(object):
 		session = await self.AuthenticationService.login(login_session, from_info=access_ips)
 		if session is None:
 			L.error("Failed to create session")
-			response = self._login_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response
 
@@ -123,7 +123,7 @@ class ExternalLoginHandler(object):
 			"cid": credentials_id,
 			"login_type": provider.Type
 		})
-		response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-SUCCESSFUL")
+		response = self._my_account_redirect_response(state=state)
 
 		# Get cookie domain
 		cookie_domain = cookie_svc.RootCookieDomain
@@ -169,21 +169,22 @@ class ExternalLoginHandler(object):
 				"cid": credentials_id,
 				"type": login_provider_type
 			})
-			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-SET")
+			response = self._my_account_redirect_response(state=state, error="external_login_already_activated")
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
 		user_info = await login_provider.add_external_login(code)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
-			return self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			return self._my_account_redirect_response(state=state, error="external_login_failed")
 
 		sub = user_info.get("sub")
 		if sub is None:
 			L.error("Cannot obtain 'sub' field from external login provider", struct_data={
+				"cid": credentials_id,
 				"type": login_provider_type
 			})
-			return self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			return self._my_account_redirect_response(state=state, error="external_login_failed")
 
 		sub = str(sub)
 
@@ -197,22 +198,24 @@ class ExternalLoginHandler(object):
 
 		if already_used:
 			L.error("External login already used by different credentials", struct_data={
+				"request_cid": credentials_id,
 				"type": login_provider_type,
 				"sub": sub,
 			})
-			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED-ALREADY-IN-USE")
+			response = self._my_account_redirect_response(state=state, error="external_login_not_activated")
 			return response
 
 		# Update credentials
 		try:
-			await self.ExternalLoginService.create(credentials_id, login_provider_type, sub)
+			await self.ExternalLoginService.create(
+				credentials_id, login_provider_type, sub, user_info.get("email"), user_info.get("ident"))
 		except Exception as e:
 			L.error("{} when creating external login credentials: {}".format(type(e).__name__, str(e)), struct_data={
 				"cid": credentials_id,
 				"type": login_provider_type,
 				"sub": sub,
 			})
-			response = self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-FAILED")
+			response = self._my_account_redirect_response(state=state, error="external_login_not_activated")
 			return response
 
 		L.log(asab.LOG_NOTICE, "External login successfully added", struct_data={
@@ -221,7 +224,7 @@ class ExternalLoginHandler(object):
 		})
 
 		# Redirect to home screen
-		return self._my_account_redirect_response(state=state, result="EXTERNAL-LOGIN-ADDED")
+		return self._my_account_redirect_response(state=state, result="external_login_activated")
 
 
 	@access_control()
@@ -246,19 +249,24 @@ class ExternalLoginHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	def _login_redirect_response(self, state=None, result=None):
-		query_params = []
+	def _login_redirect_response(self, state=None, error=None):
+		# TODO: Revise with custom per-client login URIs
 		if state is not None:
-			query_params.append(("state", state))
-		if result is not None:
-			query_params.append(("result", result))
-		if len(query_params) > 0:
-			redirect_uri = "{}?{}".format(
-				self.ExternalLoginService.LoginScreenUrl,
-				urllib.parse.urlencode(query_params)
-			)
+			query = "?state={}".format(state)
 		else:
-			redirect_uri = self.ExternalLoginService.LoginScreenUrl
+			query = ""
+
+		if error is not None:
+			fragment_query = "?error={}".format(error)
+		else:
+			fragment_query = ""
+
+		redirect_uri = "{}{}#{}{}".format(
+			self.ExternalLoginService.AuthUiBaseUrl,
+			query,
+			self.ExternalLoginService.LoginUiFragmentPath,
+			fragment_query,
+		)
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
@@ -272,19 +280,29 @@ class ExternalLoginHandler(object):
 		return response
 
 
-	def _my_account_redirect_response(self, state=None, result=None):
-		query_params = []
+	def _my_account_redirect_response(self, state=None, error=None, result=None):
+		# TODO: Revise with custom per-client login URIs
 		if state is not None:
-			query_params.append(("state", state))
-		if result is not None:
-			query_params.append(("result", result))
-		if len(query_params) > 0:
-			redirect_uri = "{}?{}".format(
-				self.ExternalLoginService.HomeScreenUrl,
-				urllib.parse.urlencode(query_params)
-			)
+			query = "?state={}".format(state)
 		else:
-			redirect_uri = self.ExternalLoginService.HomeScreenUrl
+			query = ""
+
+		fragment_query_params = []
+		if error is not None:
+			fragment_query_params.append(("error", error))
+		if result is not None:
+			fragment_query_params.append(("result", result))
+		if len(fragment_query_params) > 0:
+			hash_query = "?{}".format(urllib.parse.urlencode(fragment_query_params))
+		else:
+			hash_query = ""
+
+		redirect_uri = "{}{}#{}{}".format(
+			self.ExternalLoginService.AuthUiBaseUrl,
+			query,
+			self.ExternalLoginService.HomeUiFragmentPath,
+			hash_query,
+		)
 
 		response = aiohttp.web.HTTPFound(
 			redirect_uri,
