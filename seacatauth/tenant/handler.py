@@ -147,7 +147,7 @@ class TenantHandler(object):
 		"example": {
 			"id": "acme-corp"}
 	})
-	@access_control("seacat:tenant:create")
+	@access_control("authz:superuser")  # TODO: "seacat:tenant:create"
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
@@ -342,7 +342,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control("seacat:tenant:access")
+	@access_control()
 	async def propose_tenant_name(self, request):
 		"""
 		Propose name for a new tenant.
