@@ -173,8 +173,8 @@ class CredentialsPolicy:
 				return False
 			return self.RBACService.has_resource_access(
 				authz,
-				tenant="*",
-				requested_resources=["authz:superuser"],
+				tenant=None,
+				requested_resources=["seacat:credentials:edit"],
 			)
 
 		policy = self.UpdatePolicy.get(attribute)
@@ -190,9 +190,9 @@ class CredentialsPolicy:
 				return False
 			return self.RBACService.has_resource_access(
 				authz,
-				tenant="*",
-				requested_resources=["authz:superuser"],
-			) == "OK"
+				tenant=None,
+				requested_resources=["seacat:credentials:edit"],
+			)
 
 		# TODO: Check configurable resource-based policy
 		else:
