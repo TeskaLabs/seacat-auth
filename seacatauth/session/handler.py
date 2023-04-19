@@ -40,7 +40,7 @@ class SessionHandler(object):
 		web_app_public.router.add_delete(r"/public/sessions", self.delete_own_sessions)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:session:access")
 	async def session_list(self, request):
 		"""
 		List sessions
@@ -64,7 +64,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:session:access")
 	async def session_detail(self, request):
 		"""
 		Get session detail
@@ -79,7 +79,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, session)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:session:terminate")
 	async def session_delete(self, request):
 		"""
 		Terminate a session
@@ -104,7 +104,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:session:access")
 	async def search_by_credentials_id(self, request):
 		"""
 		List all active sessions of given credentials
@@ -131,7 +131,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, sessions)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:session:terminate")
 	async def delete_by_credentials_id(self, request, *, credentials_id):
 		"""
 		Terminate all sessions of given credentials

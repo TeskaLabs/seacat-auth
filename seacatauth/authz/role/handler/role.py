@@ -59,7 +59,7 @@ class RoleHandler(object):
 		"""
 		return await self._list(request, tenant=None)
 
-	@access_control()
+	@access_control("seacat:role:access")
 	async def list(self, request, *, tenant):
 		"""
 		List tenant roles
@@ -103,7 +103,7 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@access_control()
+	@access_control("seacat:role:access")
 	async def get(self, request, *, tenant):
 		"""
 		Get role detail
@@ -123,21 +123,18 @@ class RoleHandler(object):
 		)
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:role:edit")
 	async def create(self, request, *, tenant):
 		"""
 		Create a new role
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		result = await self.RoleService.create(role_id)
-		return asab.web.rest.json_response(
-			request, result,
-			status=200 if result == "OK" else 400
-		)
+		role_id = await self.RoleService.create(role_id)
+		return asab.web.rest.json_response(request, {"result": "OK", "id": role_id})
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:role:edit")
 	async def delete(self, request, *, tenant):
 		"""
 		Delete role
@@ -178,7 +175,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:role:edit")
 	async def update(self, request, *, json_data, tenant):
 		"""
 		Edit role description and resources
@@ -188,28 +185,16 @@ class RoleHandler(object):
 		resources_to_set = json_data.get("set")
 		resources_to_add = json_data.get("add")
 		resources_to_remove = json_data.get("del")
-		resources_to_assign = set().union(
-			resources_to_set or [],
-			resources_to_add or [],
-			resources_to_remove or []
-		)
 
-		# Only superuser can edit global roles
-		if tenant in (None, "*") and not request.is_superuser:
-			L.warning("Not authorized to edit global roles", struct_data={
-				"role_id": role_id,
-				"cid": request.CredentialsId
-			})
-			raise aiohttp.web.HTTPForbidden()
-
-		# Only superuser can un/assign "authz:superuser"
-		if "authz:superuser" in resources_to_assign and not request.is_superuser:
-			L.warning("Not authorized to assign 'authz:superuser' resource", struct_data={
-				"role_id": role_id,
-				"tenant": tenant,
-				"cid": request.CredentialsId
-			})
-			raise aiohttp.web.HTTPForbidden()
+		# Perform extra validations when the request is not superuser-authorized
+		if not request.is_superuser:
+			# Cannot edit global roles
+			if tenant in (None, "*"):
+				L.warning("Not authorized to edit global roles", struct_data={
+					"role_id": role_id,
+					"cid": request.CredentialsId
+				})
+				raise aiohttp.web.HTTPForbidden()
 
 		try:
 			result = await self.RoleService.update(

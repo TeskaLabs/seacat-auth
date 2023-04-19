@@ -34,10 +34,10 @@ class RolesHandler(object):
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
-	@access_control()
+	@access_control("seacat:role:access")
 	async def get_roles_by_credentials(self, request, *, tenant):
 		"""
-		Get credential's roles
+		Get credentials' roles
 		"""
 		creds_id = request.match_info["credentials_id"]
 		try:
@@ -58,7 +58,7 @@ class RolesHandler(object):
 		"description": "Credential IDs",
 		"items": {"type": "string"}
 	})
-	@access_control()
+	@access_control("seacat:role:access")
 	async def get_roles_batch(self, request, *, tenant, json_data):
 		"""
 		Get the assigned roles for several credentials
@@ -77,7 +77,7 @@ class RolesHandler(object):
 				"type": "array",
 				"items": {"type": "string"}}}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:role:assign")
 	async def set_roles(self, request, *, json_data, tenant, resources):
 		"""
 		For given credentials, assign listed roles and unassign existing roles that are not in the list
@@ -110,7 +110,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:role:assign")
 	async def assign_role(self, request, *, tenant):
 		"""
 		Assign role to credentials
@@ -141,7 +141,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:role:assign")
 	async def unassign_role(self, request, *, tenant):
 		"""
 		Unassign role from credentials
