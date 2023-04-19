@@ -46,8 +46,8 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 		self.TimestampFormat = self.Config.get("timestamp_format")
 		self.URL = self.Config.get("url")
 
-		if "_mock" in self.Config:
-			raise ValueError("To activate mock mode, use 'url=<mocked>' instead of the '_mock' option.")
+		if "mock" in self.Config:
+			raise ValueError("To activate mock mode, use 'url=<mocked>' instead of the 'mock' option.")
 		self.MockMode = (self.URL == "<mocked>")
 		if self.MockMode:
 			L.warning(
