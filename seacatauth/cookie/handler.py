@@ -251,6 +251,7 @@ class CookieHandler(object):
 
 		if anonymous_session_created:
 			set_cookie(self.App, response, session, cookie_domain)
+			await self._set_custom_cookies_from_webhook(response, client, session)
 
 		return response
 
