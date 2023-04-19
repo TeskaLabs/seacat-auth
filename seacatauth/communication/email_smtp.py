@@ -36,6 +36,12 @@ class SMTPProvider(CommunicationProviderABC):
 		self.User = self.Config.get("user")
 		self.Password = self.Config.get("password")
 
+		self.MockMode = (self.Host == "<mocked>")
+		if self.MockMode:
+			L.warning(
+				"SMTP provider is running in mock mode. "
+				"Emails will not be sent, but instead will be printed to log.")
+
 		port = self.Config.get("port")
 		if len(port) == 0:
 			if self.SSL:
@@ -85,19 +91,24 @@ class SMTPProvider(CommunicationProviderABC):
 		if bcc is not None:
 			msg['Bcc'] = ', '.join(bcc)
 
-		msg.attach(email.mime.text.MIMEText(message_body, text_type, 'utf-8'))
+		if self.MockMode:
+			L.log(
+				asab.LOG_NOTICE, "SMTP provider is in mock mode. Email will not be sent.",
+				struct_data={**msg, "message_body": message_body}
+			)
+		else:
+			msg.attach(email.mime.text.MIMEText(message_body, text_type, 'utf-8'))
+			result = await aiosmtplib.send(
+				msg,
+				sender=sender,
+				recipients=to,
+				hostname=self.Host,
+				port=self.Port,
+				username=self.User if len(self.User) > 0 else None,
+				password=self.Password,
+				use_tls=self.SSL,
+				start_tls=self.StartTLS
+			)
+			L.log(asab.LOG_NOTICE, "Email sent", struct_data={'result': result[1]})
 
-		result = await aiosmtplib.send(
-			msg,
-			sender=sender,
-			recipients=to,
-			hostname=self.Host,
-			port=self.Port,
-			username=self.User if len(self.User) > 0 else None,
-			password=self.Password,
-			use_tls=self.SSL,
-			start_tls=self.StartTLS
-		)
-
-		L.log(asab.LOG_NOTICE, "Email sent", struct_data={'result': result[1]})
 		return True
