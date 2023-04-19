@@ -61,9 +61,9 @@ class ResourceService(asab.Service):
 		"seacat:tenant:access": {
 			"description": "List tenants, view tenant detail and see tenant members.",
 		},
-		"seacat:tenant:create": {
-			"description": "Create new tenants.",
-		},
+		# "seacat:tenant:create": {  # Requires superuser for now
+		# 	"description": "Create new tenants.",
+		# },
 		"seacat:tenant:edit": {
 			"description": "Edit tenant data.",
 		},
