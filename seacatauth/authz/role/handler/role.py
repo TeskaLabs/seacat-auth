@@ -130,11 +130,8 @@ class RoleHandler(object):
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		result = await self.RoleService.create(role_id)
-		return asab.web.rest.json_response(
-			request, result,
-			status=200 if result == "OK" else 400
-		)
+		role_id = await self.RoleService.create(role_id)
+		return asab.web.rest.json_response(request, {"result": "OK", "id": role_id})
 
 
 	@access_control("seacat:role:edit")

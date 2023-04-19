@@ -166,8 +166,8 @@ class TenantHandler(object):
 		# Assign tenant
 		try:
 			await self.TenantService.assign_tenant(credentials_id, tenant)
-		except:
-			L.error("Error assigning tenant.", exc_info=True, struct_data={"cid": credentials_id, "tenant": tenant})
+		except Exception as e:
+			L.error("Error assigning tenant: {}".format(e), exc_info=True, struct_data={"cid": credentials_id, "tenant": tenant})
 
 		# Create role
 		role = "{}/admin".format(tenant)
@@ -178,14 +178,14 @@ class TenantHandler(object):
 			await role_service.update(role, resources_to_set=[
 				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
 				"seacat:role:access", "seacat:role:edit", "seacat:role:assign"])
-		except:
-			L.error("Error creating role.", exc_info=True, struct_data={"role": role})
+		except Exception as e:
+			L.error("Error creating admin role: {}".format(e), exc_info=True, struct_data={"role": role})
 
 		# Assign the admin role to the user
 		try:
 			await role_service.assign_role(credentials_id, role)
-		except:
-			L.error("Error assigning role.", exc_info=True, struct_data={"cid": credentials_id, "role": role})
+		except Exception as e:
+			L.error("Error assigning role: {}".format(e), exc_info=True, struct_data={"cid": credentials_id, "role": role})
 
 		return asab.web.rest.json_response(
 			request, data={"result": "OK", "id": tenant_id})
