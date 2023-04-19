@@ -319,12 +319,16 @@ class CookieHandler(object):
 
 		# Retrieve the original request URI by the state
 		state = query.get("state")
-		try:
-			redirect_uri = await self.CookieService.get_redirect_uri(client_id, state)
-		except KeyError:
-			L.warning("State matched no redirect URI.", struct_data={"client_id": client_id, "state": state})
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+		if state is not None:
+			try:
+				redirect_uri = await self.CookieService.get_redirect_uri(client_id, state)
+			except KeyError:
+				L.warning("State matched no redirect URI.", struct_data={"client_id": client_id, "state": state})
+				return asab.web.rest.json_response(
+					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+		else:
+			# Fallback to client URI or Auth UI
+			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl
 
 		# Set track ID if not set yet
 		if session.TrackId is None:

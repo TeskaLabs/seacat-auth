@@ -65,6 +65,8 @@ class CookieService(asab.Service):
 		self.RedirectTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("seacatauth:cookie", "redirect_timeout"))
 
+		self.AuthWebUiBaseUrl = asab.Config.get("general", "auth_webui_base_url")
+
 		self.App.PubSub.subscribe("Application.tick/60!", self._every_minute)
 
 
