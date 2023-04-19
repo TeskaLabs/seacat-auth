@@ -273,9 +273,8 @@ class CredentialsService(asab.Service):
 
 
 	def create_dict_provider(self, provider_id):
-		try:
-			service = self.App.get_service("seacatauth.credentials.dict")
-		except KeyError:
+		service = self.App.get_service("seacatauth.credentials.dict")
+		if service is None:
 			from .providers.dictionary import DictCredentialsService
 			service = DictCredentialsService(self.App)
 		provider = service.create_provider(provider_id, None)
@@ -480,6 +479,14 @@ class CredentialsService(asab.Service):
 		tenants = await tenant_svc.get_tenants(credentials_id)
 		for tenant in tenants:
 			await tenant_svc.unassign_tenant(credentials_id, tenant)
+
+		# Unassign global roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		await role_svc.set_roles(
+			credentials_id,
+			roles=[],
+			include_global=True
+		)
 
 		# Delete credentials in provider
 		result = await provider.delete(credentials_id)
