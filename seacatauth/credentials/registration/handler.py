@@ -69,7 +69,7 @@ class RegistrationHandler(object):
 				"examples": ["6 h", "3d", "1w", 7200]},
 		},
 	})
-	@access_control("authz:tenant:admin")  # TODO: Maybe create a dedicated resource for invitations
+	@access_control("seacat:tenant:assign")  # TODO: Maybe create a dedicated resource for invitations
 	async def create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
@@ -116,7 +116,7 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, payload)
 
 
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:tenant:assign")
 	async def resend_invitation(self, request):
 		"""
 		Resend invitation to an already invited user
