@@ -107,7 +107,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 			u.set("data", data)
 		tenant_id = await u.execute()
 
-		L.log(asab.LOG_NOTICE, "Tenant data updated", struct_data={"tenant": tenant_id})
+		L.log(asab.LOG_NOTICE, "Tenant data updated.", struct_data={"tenant": tenant_id})
 		return "OK"
 
 
@@ -115,34 +115,8 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		"""
 		Delete tenant. Also delete all its roles and assignments.
 		"""
-
-		# Unassign and delete tenant roles
-		role_svc = self.App.get_service("seacatauth.RoleService")
-		tenant_roles = (await role_svc.list(tenant=tenant_id))["data"]
-		for role in tenant_roles:
-			role_id = role["_id"]
-
-			# Skip global roles
-			if role_id.startswith("*/"):
-				continue
-
-			# Delete role
-			try:
-				await role_svc.delete(role_id)
-			except KeyError:
-				# Role has probably been improperly deleted before; continue
-				L.error("Role not found", struct_data={
-					"role_id": role_id
-				})
-				continue
-
-		# Unassign tenant from credentials
-		await self.delete_tenant_assignments(tenant_id)
-
-		# Delete tenant
 		await self.MongoDBStorageService.delete(self.TenantsCollection, tenant_id)
-		L.log(asab.LOG_NOTICE, "Tenant deleted", struct_data={"tenant": tenant_id})
-		return True
+		L.log(asab.LOG_NOTICE, "Tenant deleted.", struct_data={"tenant": tenant_id})
 
 
 	async def get(self, tenant_id) -> Optional[dict]:

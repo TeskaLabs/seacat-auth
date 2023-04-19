@@ -97,7 +97,7 @@ class ChangePasswordHandler(object):
 			"expiration": {"type": "number"},
 		}
 	})
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:credentials:edit")
 	async def init_password_change(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
