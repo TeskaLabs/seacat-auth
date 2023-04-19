@@ -25,7 +25,6 @@ class SMTPProvider(CommunicationProviderABC):
 		"password": "",
 		"ssl": "no",  # Use TLS/SSL for connection
 		"starttls": "yes",  # Use STARTTLS protocol
-		"_mock": "no",  # Log messages to console instead of sending them
 	}
 
 	def __init__(self, provider_id, config_section_name):
@@ -37,6 +36,12 @@ class SMTPProvider(CommunicationProviderABC):
 		self.Host = self.Config.get("host")
 		self.User = self.Config.get("user")
 		self.Password = self.Config.get("password")
+
+		self.MockMode = (self.Host == "<mocked>")
+		if self.MockMode:
+			L.warning(
+				"SMTP provider is running in mock mode. "
+				"Emails will not be sent, but instead will be printed to log.")
 
 		port = self.Config.get("port")
 		if len(port) == 0:
