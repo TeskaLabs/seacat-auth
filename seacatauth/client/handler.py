@@ -35,7 +35,7 @@ class ClientHandler(object):
 		web_app.router.add_delete("/client/{client_id}", self.delete)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:client:access")
 	async def list(self, request):
 		"""
 		List registered clients
@@ -78,7 +78,7 @@ class ClientHandler(object):
 		})
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:client:access")
 	async def get(self, request):
 		"""
 		Get client by client_id
@@ -92,7 +92,7 @@ class ClientHandler(object):
 		)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:client:access")
 	async def features(self, request):
 		"""
 		Get schema of supported client metadata
@@ -109,7 +109,7 @@ class ClientHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(REGISTER_CLIENT_SCHEMA)
-	@access_control("authz:superuser")
+	@access_control("seacat:client:edit")
 	async def register(self, request, *, json_data):
 		"""
 		Register a new client
@@ -125,7 +125,7 @@ class ClientHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CLIENT_SCHEMA)
-	@access_control("authz:superuser")
+	@access_control("seacat:client:edit")
 	async def update(self, request, *, json_data):
 		"""
 		Edit an existing client
@@ -142,7 +142,7 @@ class ClientHandler(object):
 		)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:client:edit")
 	async def reset_secret(self, request):
 		"""
 		Reset client secret
@@ -155,7 +155,7 @@ class ClientHandler(object):
 		)
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:client:edit")
 	async def delete(self, request):
 		"""
 		Delete a client

@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.16-beta
 
 ### Breaking changes
 - Introspection requests require client_id in the query (#156, PLUM Sprint 230324)
@@ -9,6 +9,10 @@
 - Dropped support for custom cookie domains in the configuration (#156, PLUM Sprint 230324)
 - External login status messages changed (#185, PLUM Sprint 230324)
 - Bulk-unassign tenants using "UNASSIGN-TENANT" (#189, PLUM Sprint 230324)
+- Resource "authz:tenant:admin" is deprecated and replaced by several resources (#183, PLUM Sprint 230412)
+- Viewing and browsing all tenants requires superuser privileges (#183, PLUM Sprint 230412)
+- Seacat Admin built-in resources are not editable (#183, PLUM Sprint 230412)
+- Mock mode option of SMSbrana.cz provider changed (#191, PLUM Sprint 230412)
 
 ### Fix
 - Improve last login search performance (#173, PLUM Sprint 230324)
@@ -21,6 +25,8 @@
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
 - External login ident stored (#185, PLUM Sprint 230324)
+- Granular access control for Admin API (#183, PLUM Sprint 230412)
+- SMTP provider mock mode (#191, PLUM Sprint 230412)
 
 ### Refactoring
 - OpenAPI docs updated (#181, PLUM Sprint 230324)

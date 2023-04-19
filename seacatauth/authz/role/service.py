@@ -95,22 +95,19 @@ class RoleService(asab.Service):
 
 
 	async def create(self, role_id: str):
-		# TODO: No return dicts! This should return role_id or raise (custom) error.
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
-			return {
-				"result": "INVALID-VALUE",
-				"message":
-					"Role ID must match the format {tenant_name}/{role_name}, "
-					"where {tenant_name} is either '*' or the name of an existing tenant "
-					"and {role_name} consists only of characters 'a-z0-9_-', "
-					"starts with a letter or underscore, and is between 1 and 32 characters long.",
-			}
+			raise asab.exceptions.ValidationError(
+				"Role ID must match the format {tenant_name}/{role_name}, "
+				"where {tenant_name} is either '*' or the name of an existing tenant "
+				"and {role_name} consists only of characters 'a-z0-9_-', "
+				"starts with a letter or underscore, and is between 1 and 32 characters long."
+			)
 		try:
 			tenant = await self.get_role_tenant(role_id)
 		except KeyError:
 			tenant, _ = role_id.split("/", 1)
-			raise KeyError("Tenant '{}' not found.".format(tenant))
+			raise KeyError("Tenant {!r} not found.".format(tenant))
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
@@ -120,15 +117,12 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
 		try:
-			await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
+			role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 		except asab.storage.exceptions.DuplicateError:
-			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
-			return {
-				"result": "CONFLICT",
-				"message": "Role '{}' already exists.".format(role_id)
-			}
-		return "OK"
+			raise asab.exceptions.Conflict(key="role", value=role_id)
+
+		return role_id
 
 
 	async def delete(self, role_id: str):
@@ -158,7 +152,7 @@ class RoleService(asab.Service):
 		try:
 			tenant = await self.get_role_tenant(role_id)
 		except KeyError as e:
-			raise KeyError("Tenant of role '{}' not found. Please delete this role.".format(role_id)) from e
+			raise KeyError("Tenant of role {!r} not found. Please delete this role.".format(role_id)) from e
 
 		# Validate resources
 		resources_to_assign = set().union(
@@ -168,12 +162,12 @@ class RoleService(asab.Service):
 		)
 		if tenant != "*":
 			# TENANT role
-			# Resource "authz:superuser" cannot be assigned to a tenant role
-			for global_only_resource in frozenset(["authz:superuser", "authz:tenant:access"]):
-				if global_only_resource in resources_to_assign:
-					message = "Cannot assign a global-only resource '{}' to a tenant role ({}).".format(global_only_resource, role_id)
-					L.warning(message)
-					raise ValueError(message)
+			# Global-only resources cannot be assigned to a tenant role
+			for resource in resources_to_assign:
+				if self.ResourceService.is_global_only_resource(resource):
+					message = "Cannot assign global-only resources to tenant roles"
+					L.warning(message, struct_data={"resource": resource, "role": role_id})
+					raise asab.exceptions.ValidationError(message)
 
 		if resources_to_set is None:
 			resources_to_set = set(role_current["resources"])
@@ -345,7 +339,7 @@ class RoleService(asab.Service):
 			# such as "authz:superuser" or "authz:tenant:access", which is correct.
 			# To get a tenant role assigned, the user needs to have the tenant explicitly assigned.
 			if not await self.TenantService.has_tenant_assigned(credentials_id, tenant):
-				raise exceptions.TenantNotAuthorizedError(credentials_id, tenant)
+				raise exceptions.TenantNotAssignedError(credentials_id, tenant)
 
 		await self._do_assign_role(credentials_id, role_id, tenant)
 

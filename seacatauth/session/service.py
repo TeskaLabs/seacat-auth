@@ -420,32 +420,10 @@ class SessionService(asab.Service):
 
 
 	async def delete_all_sessions(self):
-		to_delete = []
-		async for session_dict in self._iterate_raw():
-			to_delete.append(session_dict)
+		await self._delete_sessions_by_filter()
 
-		deleted = 0
-		failed = 0
-		# Delete iteratively so that every session is terminated properly
-		for session_dict in to_delete:
-			try:
-				# TODO: Publish pubsub message for session deletion
-				await self.StorageService.delete(self.SessionCollection, session_dict["_id"])
-				deleted += 1
-			except Exception as e:
-				L.error("Cannot delete session", struct_data={
-					"sid": session_dict["_id"],
-					"error": type(e).__name__
-				})
-				failed += 1
-
-		L.log(asab.LOG_NOTICE, "Sessions deleted", struct_data={
-			"deleted_count": deleted,
-			"failed_count": failed
-		})
-
-	async def delete_sessions_by_credentials_id(self, credentials_id):
-		query_filter = {SessionAdapter.FN.Credentials.Id: credentials_id}
+	async def _delete_sessions_by_filter(self, query_filter=None):
+		query_filter = query_filter or {}
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
 			to_delete.append(session_dict)
@@ -469,6 +447,16 @@ class SessionService(asab.Service):
 			"deleted_count": deleted,
 			"failed_count": failed
 		})
+
+	async def delete_sessions_by_credentials_id(self, credentials_id):
+		await self._delete_sessions_by_filter(
+			query_filter={SessionAdapter.FN.Credentials.Id: credentials_id})
+
+
+	async def delete_sessions_by_tenant_in_scope(self, tenant):
+		await self._delete_sessions_by_filter(
+			query_filter={"{}.{}".format(SessionAdapter.FN.Authorization.Authz, tenant): {"$exists": True}})
+
 
 	def aes_encrypt(self, raw_bytes: bytes):
 		algorithm = cryptography.hazmat.primitives.ciphers.algorithms.AES(self.AESKey)
