@@ -50,6 +50,7 @@ class CookieService(asab.Service):
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.AuthenticationService = None
+		self.OpenIdConnectService = None
 
 		# Configure root cookie
 		self.CookieName = asab.Config.get("seacatauth:cookie", "name")
@@ -72,6 +73,7 @@ class CookieService(asab.Service):
 
 	async def initialize(self, app):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
+		self.OpenIdConnectService = self.App.get_service("seacatauth.OpenIdConnectService")
 
 
 	async def _every_minute(self, event_name):
