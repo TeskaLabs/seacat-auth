@@ -64,6 +64,8 @@ class TenantService(asab.Service):
 
 
 	async def delete_tenant(self, tenant_id: str):
+		session_service = self.App.get_service("seacatauth.SessionService")
+
 		# Unassign and delete tenant roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
 		tenant_roles = (await role_svc.list(tenant=tenant_id, exclude_global=True))["data"]
@@ -83,6 +85,9 @@ class TenantService(asab.Service):
 
 		# Delete tenant from provider
 		await self.TenantsProvider.delete(tenant_id)
+
+		# Delete sessions that have the tenant in scope
+		await session_service.delete_sessions_by_tenant_in_scope(tenant_id)
 
 
 	def get_provider(self):
