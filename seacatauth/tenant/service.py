@@ -64,20 +64,25 @@ class TenantService(asab.Service):
 
 
 	async def delete_tenant(self, tenant_id: str):
-		try:
-			result = await self.TenantsProvider.delete(tenant_id)
-		except KeyError:
-			euid = uuid.uuid4()
-			L.error("Cannot delete tenant: ID not found", struct_data={"t": tenant_id, "uuid": euid})
-			return {
-				"result": "NOT-FOUND",
-				"uuid": euid,
-			}
+		# Unassign and delete tenant roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		tenant_roles = (await role_svc.list(tenant=tenant_id, exclude_global=True))["data"]
+		for role in tenant_roles:
+			role_id = role["_id"]
+			try:
+				await role_svc.delete(role_id)
+			except KeyError:
+				# Role has probably been improperly deleted before; continue
+				L.error("Role not found", struct_data={
+					"role_id": role_id
+				})
+				continue
 
-		if result is True:
-			return {"result": "OK"}
-		else:
-			return {"result": "FAILED"}
+		# Unassign tenant from credentials
+		await self.TenantsProvider.delete_tenant_assignments(tenant_id)
+
+		# Delete tenant from provider
+		await self.TenantsProvider.delete(tenant_id)
 
 
 	def get_provider(self):

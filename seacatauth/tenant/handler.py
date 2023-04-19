@@ -238,8 +238,8 @@ class TenantHandler(object):
 		- oAuth:
 			- authz:superuser
 		"""
-		result = await self.TenantService.delete_tenant(tenant)
-		return asab.web.rest.json_response(request, data=result)
+		await self.TenantService.delete_tenant(tenant)
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@asab.web.rest.json_schema_handler({
