@@ -48,11 +48,15 @@ class RoleService(asab.Service):
 		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *,
 		resource: str = None,
 		active_only: bool = False,
+		exclude_global: bool = False,
 	):
 		collection = self.StorageService.Database[self.RoleCollection]
 		query_filter = {}
 		if tenant is not None:
-			query_filter["tenant"] = {"$in": [tenant, None]}
+			if exclude_global:
+				query_filter["tenant"] = {"$in": [tenant]}
+			else:
+				query_filter["tenant"] = {"$in": [tenant, None]}
 		if resource is not None:
 			query_filter["resources"] = resource
 		if active_only is True:
@@ -326,7 +330,7 @@ class RoleService(asab.Service):
 		tenant, _ = role_id.split("/", 1)
 		if verify_tenant and tenant != "*":
 			try:
-				tenant = await self.TenantService.get_tenant(role_id)
+				await self.TenantService.get_tenant(tenant)
 			except KeyError:
 				raise exceptions.TenantNotFoundError(tenant)
 
