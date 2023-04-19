@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v23.18-beta
+## v23.16-beta
 
 ### Breaking changes
 - Introspection requests require client_id in the query (#156, PLUM Sprint 230324)
