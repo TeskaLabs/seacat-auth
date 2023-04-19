@@ -5,6 +5,7 @@ import aiohttp
 import aiohttp.web
 import asab.web.rest
 
+from .. import exceptions
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
 from ..client import validate_redirect_uri
@@ -364,14 +365,21 @@ class CookieHandler(object):
 
 		set_cookie(self.App, response, session, cookie_domain)
 
+		# Obtain and set custom client cookies
+		try:
+			await self._set_custom_cookies_from_webhook(response, client, session)
+		except exceptions.ClientResponseError as e:
+			L.error("Webhook responded with error.", struct_data={
+				"status": e.Status, "text": e.Data})
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
+
 		# TODO: Set additional client cookies (obtained via synchronous HTTP request to a preconfigured endpoint)
 
 		return response
 
-
 	async def _authenticate_request(self, request, client_id=None):
 		return await self.CookieService.get_session_by_sci(request, client_id)
-
 
 	async def _set_response_state_query(self, request, response, client_id):
 		client_svc = self.App.get_service("seacatauth.ClientService")
@@ -380,7 +388,7 @@ class CookieHandler(object):
 			# Validate redirect URI
 			client = await client_svc.get(client_id)
 			if validate_redirect_uri(
-				redirect_uri, client["redirect_uris"], client.get("validation_method")
+					redirect_uri, client["redirect_uris"], client.get("validation_method")
 			):
 				state = await self.CookieService.store_redirect_uri(redirect_uri, client_id)
 				response.headers.add("X-State", state)
@@ -389,3 +397,23 @@ class CookieHandler(object):
 					"client_id": client_id, "redirect_uri": redirect_uri})
 				response = aiohttp.web.HTTPForbidden()
 		return response
+
+
+	async def _set_custom_cookies_from_webhook(self, response, client, session):
+		cookie_webhook_uri = client.get("cookie_webhook_uri")
+		if cookie_webhook_uri is not None:
+			async with aiohttp.ClientSession() as http_session:
+				# TODO: Better serialization
+				userinfo = await self.CookieService.OpenIdConnectService.build_userinfo(session)
+				data = asab.web.rest.json.JSONDumper(pretty=False)(userinfo)
+				async with http_session.put(cookie_webhook_uri, data=data, headers={
+					"Content-Type": "application/json"}) as resp:
+					if resp.status != 200:
+						text = await resp.text()
+						raise exceptions.ClientResponseError(resp.status, text)
+
+					webhook_data = await resp.json()
+
+			for name, options in webhook_data.items():
+				# TODO: Validate the options
+				response.set_cookie(name, **options)

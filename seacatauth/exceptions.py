@@ -73,3 +73,10 @@ class TOTPNotActiveError(Exception):
 	def __init__(self, credential_id: str):
 		self.CredentialID: str = credential_id
 		super().__init__("TOTP not active for credentials.")
+
+
+class ClientResponseError(Exception):
+	def __init__(self, status: int, data: str | dict):
+		self.Status = status
+		self.Data = data
+		super().__init__("Client responded with error {}: {}".format(status, data))
