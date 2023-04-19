@@ -1,6 +1,5 @@
 import logging
 import re
-import uuid
 
 import asab
 import asab.storage.exceptions
