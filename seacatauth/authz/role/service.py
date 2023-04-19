@@ -95,22 +95,19 @@ class RoleService(asab.Service):
 
 
 	async def create(self, role_id: str):
-		# TODO: No return dicts! This should return role_id or raise (custom) error.
 		match = self.RoleIdRegex.match(role_id)
 		if match is None:
-			return {
-				"result": "INVALID-VALUE",
-				"message":
-					"Role ID must match the format {tenant_name}/{role_name}, "
-					"where {tenant_name} is either '*' or the name of an existing tenant "
-					"and {role_name} consists only of characters 'a-z0-9_-', "
-					"starts with a letter or underscore, and is between 1 and 32 characters long.",
-			}
+			raise asab.exceptions.ValidationError(
+				"Role ID must match the format {tenant_name}/{role_name}, "
+				"where {tenant_name} is either '*' or the name of an existing tenant "
+				"and {role_name} consists only of characters 'a-z0-9_-', "
+				"starts with a letter or underscore, and is between 1 and 32 characters long."
+			)
 		try:
 			tenant = await self.get_role_tenant(role_id)
 		except KeyError:
 			tenant, _ = role_id.split("/", 1)
-			raise KeyError("Tenant '{}' not found.".format(tenant))
+			raise KeyError("Tenant {!r} not found.".format(tenant))
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
@@ -120,15 +117,12 @@ class RoleService(asab.Service):
 		if tenant != "*":
 			upsertor.set("tenant", tenant)
 		try:
-			await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
+			role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 		except asab.storage.exceptions.DuplicateError:
-			L.error("Couldn't create role: Already exists", struct_data={"role_id": role_id})
-			return {
-				"result": "CONFLICT",
-				"message": "Role '{}' already exists.".format(role_id)
-			}
-		return "OK"
+			raise asab.exceptions.Conflict(key="role", value=role_id)
+
+		return role_id
 
 
 	async def delete(self, role_id: str):
