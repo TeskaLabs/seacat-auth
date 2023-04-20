@@ -38,7 +38,7 @@ class AuthorizeHandler(object):
 	def __init__(self, app, oidc_svc, credentials_svc, public_api_base_url, auth_webui_base_url):
 		self.App = app
 		self.SessionService = app.get_service("seacatauth.SessionService")
-		self.CookieService = app.get_service('seacatauth.CookieService')
+		self.CookieService = app.get_service("seacatauth.CookieService")
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		self.OpenIdConnectService = oidc_svc
@@ -334,14 +334,8 @@ class AuthorizeHandler(object):
 				state=state
 			)
 
-		# Look up anonymous client root session if it exists
-		client_session = await self.CookieService.get_session_by_sci(request, client_id)
-		if client_session is not None and client_session.Session.Type == "root":
-			root_session = client_session
-		else:
-			root_session = request.Session
-
 		# Only root sessions can be used to authorize client sessions
+		root_session = request.Session
 		if root_session is not None:
 			if root_session.Session.Type != "root":
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
