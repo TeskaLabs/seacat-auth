@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import urllib.parse
 import passlib.pwd
 
@@ -84,23 +85,35 @@ class ProvisioningService(asab.Service):
 		L.log(asab.LOG_NOTICE, _PROVISIONING_INTRO_MESSAGE.format(username=self.SuperuserName, password=password))
 
 		# Create provisioning tenant
-		await self.TenantService.create_tenant(self.TenantID)
+		try:
+			await self.TenantService.create_tenant(self.TenantID)
+		except asab.exceptions.Conflict:
+			L.log(asab.LOG_NOTICE, "Tenant already exists.", struct_data={"tenant": self.TenantID})
 
 		# Assign tenant to provisioning user
-		await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
+		try:
+			await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
+		except asab.exceptions.Conflict:
+			L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={
+				"cid": self.SuperuserID, "tenant": self.TenantID})
 
 		# Create superuser role
-		await self.RoleService.create(self.SuperroleID)
-		assert (await self.RoleService.update(
+		try:
+			await self.RoleService.create(self.SuperroleID)
+		except asab.exceptions.Conflict:
+			L.log(asab.LOG_NOTICE, "Role already exists.", struct_data={"role": self.SuperroleID})
+
+		# Ensure the role has superuser access
+		await self.RoleService.update(
 			role_id=self.SuperroleID,
-			resources_to_set=["authz:superuser"]
-		) == "OK")
+			resources_to_set=["authz:superuser"])
 
 		# Assign superuser role to the provisioning user
 		try:
 			await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
 		except asab.exceptions.Conflict:
-			pass
+			L.log(asab.LOG_NOTICE, "Role already assigned.", struct_data={
+				"cid": self.SuperuserID, "role": self.SuperroleID})
 
 		await self._initialize_admin_ui_client()
 
@@ -115,7 +128,7 @@ class ProvisioningService(asab.Service):
 		try:
 			await tenant_provider.delete(self.TenantID)
 		except KeyError:
-			L.error("Failed to delete tenant", struct_data={"tenant": self.TenantID})
+			L.error("Tenant already deleted.", struct_data={"tenant": self.TenantID})
 
 		await super().finalize(app)
 
