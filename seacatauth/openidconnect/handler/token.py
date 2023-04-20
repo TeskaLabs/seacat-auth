@@ -1,6 +1,7 @@
 import logging
 import urllib.parse
 import datetime
+import uuid
 
 import aiohttp.web
 
@@ -15,6 +16,7 @@ import json
 
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
+from ...session import SessionAdapter
 
 #
 
@@ -35,6 +37,7 @@ class TokenHandler(object):
 		self.OpenIdConnectService = oidc_svc
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/token", self.token_request)
@@ -134,17 +137,17 @@ class TokenHandler(object):
 
 		# Locate the session using session id
 		try:
-			session = await self.SessionService.get(session_id)
+			new_session = await self.SessionService.get(session_id)
 		except KeyError:
 			L.error("Session not found", struct_data={"sid": session_id})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
-		if session.OAuth2.PKCE is not None:
+		if new_session.OAuth2.PKCE is not None:
 			try:
 				self.OpenIdConnectService.PKCE.evaluate_code_challenge(
-					session.OAuth2.PKCE["method"],
-					session.OAuth2.PKCE["challenge"],
+					new_session.OAuth2.PKCE["method"],
+					new_session.OAuth2.PKCE["challenge"],
 					qs_data.get("code_verifier"))
 			except CodeChallengeFailedError as e:
 				L.log(asab.LOG_NOTICE, "Code challenge failed.", struct_data={"reason": str(e)})
@@ -159,21 +162,40 @@ class TokenHandler(object):
 		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
 		# 	  return await self.token_error_response(request, "The redirect URL is not associated with the client.")
 
+		if new_session.TrackId is None:
+			# Try to get Track ID from client cookie session if there is any
+			client_cookie_session = await self.CookieService.get_session_by_sci(request, new_session.OAuth2.ClientId)
+			if client_cookie_session is not None and client_cookie_session.TrackId is not None:
+				track_id = client_cookie_session.TrackId
+			else:
+				track_id = uuid.uuid4().bytes
+
+			# Update track ID in both the root session and the current subsession
+			await self.SessionService.update_session(
+				new_session.Session.ParentSessionId,
+				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),))
+			await self.SessionService.update_session(
+				new_session.SessionId,
+				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),))
+
+			# Refresh the subsession
+			new_session = await self.SessionService.get(new_session.SessionId)
+
 		headers = {
 			"Cache-Control": "no-store",
 			"Pragma": "no-cache",
 		}
 
-		expires_in = int((session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+		expires_in = int((new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
 
-		id_token = await self.OpenIdConnectService.build_id_token(session)
+		id_token = await self.OpenIdConnectService.build_id_token(new_session)
 
 		# 3.1.3.3.  Successful Token Response
 		body = {
 			"token_type": "Bearer",
-			"scope": " ".join(session.OAuth2.Scope),
-			"access_token": session.OAuth2.AccessToken,
-			"refresh_token": session.OAuth2.RefreshToken,
+			"scope": " ".join(new_session.OAuth2.Scope),
+			"access_token": new_session.OAuth2.AccessToken,
+			"refresh_token": new_session.OAuth2.RefreshToken,
 			"id_token": id_token,
 			"expires_in": expires_in,
 		}
