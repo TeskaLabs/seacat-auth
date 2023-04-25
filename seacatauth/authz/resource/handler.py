@@ -59,8 +59,8 @@ class ResourceHandler(object):
 		-	name: exclude
 			in: query
 			description:
-				Exclude resources based on their type/status.
-				If omitted, this parameter defaults to `exclude=deleted`.
+				Exclude resources based on their type/status. If omitted, this parameter defaults
+				to `exclude=deleted`, which means the results include all active resources.
 			required: false
 			explode: false
 			schema:
