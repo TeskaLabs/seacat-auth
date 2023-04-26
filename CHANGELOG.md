@@ -2,8 +2,14 @@
 
 ## Release candidate
 
+### Breaking changes
+- In resource list, the `include_deleted` and `exclude_global_only` params are replaced by `exclude` param (#196, PLUM Sprint 230421)
+
 ### Fix
 - Fix provisioning initialization (#195, PLUM Sprint 230412)
+
+### Features
+- Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)
 
 ---
 
