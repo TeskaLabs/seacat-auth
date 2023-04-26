@@ -146,6 +146,9 @@ CLIENT_METADATA_SCHEMA = {
 	"authorize_anonymous_users": {  # NON-CANONICAL
 		"type": "boolean",
 		"description": "Allow authorize requests with anonymous users."},
+	"anonymous_cid": {  # NON-CANONICAL
+		"type": "string",
+		"description": "ID of credentials that is used for authenticating anonymous sessions."},
 	"redirect_uri_validation_method": {  # NON-CANONICAL
 		"type": "string",
 		"description":
@@ -370,7 +373,8 @@ class ClientService(asab.Service):
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
-			"authorize_anonymous_users", "authorize_uri", "cookie_webhook_uri", "cookie_entry_uri"]):
+			"authorize_anonymous_users", "authorize_uri", "cookie_webhook_uri", "cookie_entry_uri",
+			"anonymous_cid"]):
 			v = kwargs.get(k)
 			if v is not None and not (isinstance(v, str) and len(v) == 0):
 				upsertor.set(k, v)
