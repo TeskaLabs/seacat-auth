@@ -411,9 +411,13 @@ class AuthorizeHandler(object):
 			# Cookie flow implicitly redirects to the cookie entry point
 			cookie_entry_uri = client_dict.get("cookie_entry_uri")
 			if cookie_entry_uri is not None:
+				# TODO: More clever formatting (what if the cookie_entry_uri already has a query)
 				redirect_uri = "{}?{}".format(
 					cookie_entry_uri,
-					urllib.parse.urlencode([("redirect_uri", redirect_uri)]))
+					urllib.parse.urlencode([
+						("client_id", client_id),
+						("grant_type", "authorization_code"),
+						("redirect_uri", redirect_uri)]))
 		else:
 			raise ValueError("Unexpected authorize_type: {}".format(authorize_type))
 
