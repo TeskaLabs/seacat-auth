@@ -413,7 +413,7 @@ class AuthorizeHandler(object):
 			if cookie_entry_uri is not None:
 				redirect_uri = "{}?{}".format(
 					cookie_entry_uri,
-					urllib.urlparse.urlencode([("redirect_uri", redirect_uri)]))
+					urllib.parse.urlencode([("redirect_uri", redirect_uri)]))
 		else:
 			raise ValueError("Unexpected authorize_type: {}".format(authorize_type))
 
