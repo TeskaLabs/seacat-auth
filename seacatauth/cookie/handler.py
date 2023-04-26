@@ -8,7 +8,6 @@ import asab.web.rest
 from .. import exceptions
 from ..generic import nginx_introspection
 from .utils import set_cookie, delete_cookie
-from ..client import validate_redirect_uri
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 from ..session import SessionAdapter
 
@@ -92,13 +91,13 @@ class CookieHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/cookie/nginx", self.nginx)
 		web_app.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
-		web_app.router.add_post("/cookie/entry", self.bouncer)
+		web_app.router.add_get("/cookie/entry", self.bouncer)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/cookie/nginx", self.nginx)
 		web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
-		web_app_public.router.add_post("/cookie/entry", self.bouncer)
+		web_app_public.router.add_get("/cookie/entry", self.bouncer)
 
 
 	async def nginx(self, request):
@@ -166,7 +165,6 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
-			response = await self._set_response_state_query(request, response, client_id)
 			delete_cookie(self.App, response)
 			return response
 
@@ -258,11 +256,7 @@ class CookieHandler(object):
 
 	async def bouncer(self, request):
 		"""
-		Exchange authorization code for cookie and redirect to the original request URI,
-		which was stored by the failed introspection call.
-
-		Used as callback endpoint for OAuth Authorize request. Together with cookie introspection, this endpoint
-		replaces the obsolete `seacatauth.bouncer` module.
+		Exchange authorization code for cookie and redirect to specified redirect URI.
 
 		---
 		parameters:
@@ -270,9 +264,9 @@ class CookieHandler(object):
 			in: query
 			description: OAuth Client ID
 			required: true
-		-	name: state
+		-	name: redirect_uri
 			in: query
-			description: State string generated before the authorize call
+			description: Original request URI
 			required: true
 		-	name: grant_type
 			in: query
@@ -287,7 +281,7 @@ class CookieHandler(object):
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		query = await request.post()
+		query = request.query
 
 		client_id = query.get("client_id")
 		if client_id is None:
@@ -319,15 +313,10 @@ class CookieHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
-		# Retrieve the original request URI by the state
-		state = query.get("state")
-		if state is not None:
-			try:
-				redirect_uri = await self.CookieService.get_redirect_uri(client_id, state)
-			except KeyError:
-				L.warning("State matched no redirect URI.", struct_data={"client_id": client_id, "state": state})
-				return asab.web.rest.json_response(
-					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+		# Determine the destination URI
+		if "redirect_uri" in query:
+			# Use the redirect URI from request query
+			redirect_uri = query["redirect_uri"]
 		else:
 			# Fallback to client URI or Auth UI
 			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl
@@ -375,29 +364,11 @@ class CookieHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
-		# TODO: Set additional client cookies (obtained via synchronous HTTP request to a preconfigured endpoint)
-
 		return response
+
 
 	async def _authenticate_request(self, request, client_id=None):
 		return await self.CookieService.get_session_by_sci(request, client_id)
-
-	async def _set_response_state_query(self, request, response, client_id):
-		client_svc = self.App.get_service("seacatauth.ClientService")
-		redirect_uri = request.headers.get("X-Request-Uri")
-		if redirect_uri is not None:
-			# Validate redirect URI
-			client = await client_svc.get(client_id)
-			if validate_redirect_uri(
-					redirect_uri, client["redirect_uris"], client.get("validation_method")
-			):
-				state = await self.CookieService.store_redirect_uri(redirect_uri, client_id)
-				response.headers.add("X-State", state)
-			else:
-				L.warning("Redirect URI not valid for client.", struct_data={
-					"client_id": client_id, "redirect_uri": redirect_uri})
-				response = aiohttp.web.HTTPForbidden()
-		return response
 
 
 	async def _set_custom_cookies_from_webhook(self, response, client, session):
