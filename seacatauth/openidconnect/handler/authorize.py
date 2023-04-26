@@ -408,7 +408,7 @@ class AuthorizeHandler(object):
 		elif authorize_type == "cookie":
 			session = await self.CookieService.create_cookie_client_session(
 				root_session, client_id, scope, tenants, requested_expiration)
-			# Cookie flow implicitly redirects to the cookie entry point
+			# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 			cookie_entry_uri = client_dict.get("cookie_entry_uri")
 			if cookie_entry_uri is not None:
 				# TODO: More clever formatting (what if the cookie_entry_uri already has a query)
