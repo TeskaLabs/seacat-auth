@@ -460,7 +460,6 @@ class ClientService(asab.Service):
 	async def authorize_client(
 		self,
 		client: dict,
-		scope: list,
 		redirect_uri: str,
 		client_secret: str = None,
 		grant_type: str = None,
