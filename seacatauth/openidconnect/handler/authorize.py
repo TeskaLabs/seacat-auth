@@ -259,41 +259,11 @@ class AuthorizeHandler(object):
 		"""
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-		except KeyError:
-			L.error("Client ID not found.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "client_id_not_found"})
-		try:
-			await self.OpenIdConnectService.ClientService.authorize_client(
-				client=client_dict,
-				client_secret=client_secret,
-				redirect_uri=redirect_uri,
-				scope=scope,
-				response_type="code",
-			)
-		except client.exceptions.InvalidClientSecret:
-			L.error("Invalid client secret.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.UnauthorizedClient, client_id,
-				redirect_uri=redirect_uri,
-				state=state)
-		except client.exceptions.InvalidRedirectURI:
-			L.error("Invalid client secret.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "invalid_redirect_uri"})
-		except client.exceptions.ClientError as e:
-			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state)
+			client_dict = await self._authorize_client(client_id, redirect_uri, client_secret)
+		except OAuthAuthorizeError as e:
+			e.State = state
+			e.RedirectUri = redirect_uri
+			raise e
 
 		try:
 			code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
@@ -430,18 +400,57 @@ class AuthorizeHandler(object):
 		if requested_expiration is not None:
 			requested_expiration = int(requested_expiration)
 
-		if "cookie" in scope:
-			session = await self.CookieService.create_cookie_client_session(
-				root_session, client_id, scope, tenants, requested_expiration)
-		else:
+		if authorize_type == "openid":
 			session = await self.OpenIdConnectService.create_oidc_session(
 				root_session, client_id, scope, tenants, requested_expiration,
 				code_challenge=code_challenge,
 				code_challenge_method=code_challenge_method)
+		elif authorize_type == "cookie":
+			session = await self.CookieService.create_cookie_client_session(
+				root_session, client_id, scope, tenants, requested_expiration)
+			# Cookie flow implicitly redirects to the cookie entry point
+			cookie_entry_uri = client_dict.get("cookie_entry_uri")
+			if cookie_entry_uri is not None:
+				redirect_uri = "{}?{}".format(
+					cookie_entry_uri,
+					urllib.urlparse.urlencode([("redirect_uri", redirect_uri)]))
+		else:
+			raise ValueError("Unexpected authorize_type: {}".format(authorize_type))
 
 		await self.audit_authorize_success(session)
-
 		return await self.reply_with_successful_response(session, scope, redirect_uri, state)
+
+
+	async def _authorize_client(self, client_id, redirect_uri, client_secret=None):
+		try:
+			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+		except KeyError:
+			L.error("Client ID not found.", struct_data={"client_id": client_id})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidRequest, client_id,
+				struct_data={"reason": "client_id_not_found"})
+		try:
+			await self.OpenIdConnectService.ClientService.authorize_client(
+				client=client_dict,
+				client_secret=client_secret,
+				redirect_uri=redirect_uri,
+				response_type="code",
+			)
+		except client.exceptions.InvalidClientSecret:
+			L.error("Invalid client secret.", struct_data={"client_id": client_id})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.UnauthorizedClient, client_id)
+		except client.exceptions.InvalidRedirectURI:
+			L.error("Invalid client secret.", struct_data={"client_id": client_id})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidRequest, client_id,
+				struct_data={"reason": "invalid_redirect_uri"})
+		except client.exceptions.ClientError as e:
+			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidRequest, client_id)
+		return client_dict
+
 
 	async def _get_authorize_type(self, client_id, scope):
 		if "openid" in scope:
