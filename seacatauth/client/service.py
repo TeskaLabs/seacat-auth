@@ -68,6 +68,10 @@ CLIENT_METADATA_SCHEMA = {
 			"Webhook URI for setting additional custom cookies at the cookie entrypoint. "
 			"It must be a back-channel URI and it must accept a JSON PUT request and "
 			"respond with a JSON object of cookies to set."},
+	"cookie_entry_uri": {  # NON-CANONICAL
+		"type": "string",
+		"description":
+			"Public URI of the client's cookie entrypoint."},
 	"redirect_uris": {
 		"type": "array",
 		"description": "Array of Redirection URI values used by the Client."},
@@ -366,7 +370,7 @@ class ClientService(asab.Service):
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
-			"authorize_anonymous_users", "authorize_uri", "cookie_webhook_uri"]):
+			"authorize_anonymous_users", "authorize_uri", "cookie_webhook_uri", "cookie_entry_uri"]):
 			v = kwargs.get(k)
 			if v is not None and not (isinstance(v, str) and len(v) == 0):
 				upsertor.set(k, v)
