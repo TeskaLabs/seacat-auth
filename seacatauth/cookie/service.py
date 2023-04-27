@@ -13,7 +13,7 @@ from ..session import (
 	cookie_session_builder
 )
 from ..openidconnect.session import oauth2_session_builder
-
+from ..audit import AuditCode
 
 #
 
@@ -34,6 +34,7 @@ class CookieService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.AuthenticationService = None
 		self.OpenIdConnectService = None
 
@@ -144,9 +145,6 @@ class CookieService(asab.Service):
 	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
 		"""
 		Create a new cookie-based session
-
-		Cookie-based sessions are uniquely identified by the combination of Cookie ID (SCI) and Client ID
-		and do not have any Access Token.
 		"""
 		# Check if the Client exists
 		client_svc = self.App.get_service("seacatauth.ClientService")
@@ -154,17 +152,6 @@ class CookieService(asab.Service):
 			await client_svc.get(client_id)
 		except KeyError:
 			raise KeyError("Client '{}' not found".format(client_id))
-
-		# Check if session with the same cookie+client_id exists
-		# If so, delete it
-		try:
-			session = await self.SessionService.get_by({
-				SessionAdapter.FN.Cookie.Id: base64.urlsafe_b64decode(root_session.Cookie.Id.encode("ascii")),
-				SessionAdapter.FN.OAuth2.ClientId: client_id,
-			})
-			await self.SessionService.delete(session.SessionId)
-		except KeyError:
-			pass
 
 		# Build the session
 		session_builders = [
@@ -201,5 +188,69 @@ class CookieService(asab.Service):
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
+
+		return session
+
+
+	async def create_anonymous_cookie_client_session(
+		self, anonymous_cid, client_id, scope,
+		tenants=None,
+		track_id=None,
+		root_session_id=None,
+		requested_expiration=None,
+		from_info=None,
+	):
+		"""
+		Create a new anonymous cookie-based session
+		"""
+		# Check if the Client exists
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		try:
+			await client_svc.get(client_id)
+		except KeyError:
+			raise KeyError("Client '{}' not found".format(client_id))
+
+		# Build the session
+		session_builders = [
+			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
+			await credentials_session_builder(self.CredentialsService, anonymous_cid, scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=anonymous_cid,
+				tenants=tenants,
+			),
+			cookie_session_builder(),
+		]
+
+		if track_id is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
+		# Otherwise keep the session without tracking ID for now
+
+		oauth2_data = {
+			"scope": scope,
+			"client_id": client_id,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		session = await self.SessionService.create_session(
+			session_type="cookie",
+			parent_session_id=root_session_id,
+			expiration=requested_expiration,
+			session_builders=session_builders,
+		)
+
+		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
+			"cid": anonymous_cid,
+			"client_id": client_id,
+			"sid": str(session.Session.Id),
+			"fi": from_info})
+
+		# Add an audit entry
+		await self.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
+			"cid": anonymous_cid,
+			"client_id": client_id,
+			"sid": str(session.Session.Id),
+			"fi": from_info})
 
 		return session
