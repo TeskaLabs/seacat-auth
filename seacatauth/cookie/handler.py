@@ -208,6 +208,9 @@ class CookieHandler(object):
 
 		# Get anonymous_cid from client
 		anonymous_cid = client.get("anonymous_cid")
+		if anonymous_cid is None:
+			L.error("Client has no 'anonymous_cid' configured.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPBadRequest()
 
 		# Validate anonymous anonymous_cid
 		try:
