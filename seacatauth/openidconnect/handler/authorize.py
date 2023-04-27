@@ -900,7 +900,7 @@ class AuthorizeHandler(object):
 				state=state,
 				struct_data={"reason": "missing_query_parameter"})
 		elif response_type != "code":
-			L.warning("Unsupported response type.".format(response_type), struct_data=request_parameters)
+			L.warning("Unsupported response type.", struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.UnsupportedResponseType, client_id,
 				redirect_uri=redirect_uri,
