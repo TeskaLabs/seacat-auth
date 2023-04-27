@@ -346,7 +346,7 @@ class OpenIdConnectService(asab.Service):
 			userinfo["anonymous"] = True
 
 		if session.TrackId is not None:
-			userinfo["track_id"] = session.TrackId
+			userinfo["track_id"] = uuid.UUID(bytes=session.TrackId)
 
 		if await otp_service.has_activated_totp(session.Credentials.Id):
 			userinfo["totp_set"] = True
