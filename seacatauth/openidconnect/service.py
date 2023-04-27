@@ -243,7 +243,10 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_oidc_session(
-		self, root_session, client_id, scope,
+		self, credentials_id, client_id, scope,
+		login_descriptor=None,
+		track_id=None,
+		root_session_id=None,
 		tenants=None,
 		requested_expiration=None,
 		code_challenge: str = None,
@@ -252,11 +255,11 @@ class OpenIdConnectService(asab.Service):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
+			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
+				credentials_id=credentials_id,
 				tenants=tenants,
 			)
 		]
@@ -268,10 +271,10 @@ class OpenIdConnectService(asab.Service):
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			authn_service = self.App.get_service("seacatauth.AuthenticationService")
-			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
-			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
+			session_builders.append(login_descriptor_session_builder(login_descriptor))
+			session_builders.append(await external_login_session_builder(ext_login_svc, credentials_id))
 			# TODO: Get factors from root_session?
-			session_builders.append(await available_factors_session_builder(authn_service, root_session.Credentials.Id))
+			session_builders.append(await available_factors_session_builder(authn_service, credentials_id))
 
 		# TODO: if 'openid' in scope
 		oauth2_data = {
@@ -281,18 +284,18 @@ class OpenIdConnectService(asab.Service):
 		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		# Obtain Track ID if there is any in the root session
-		if root_session.TrackId is not None:
-			track_id = root_session.TrackId
+		if track_id is not None:
 			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
 
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
-			parent_session_id=root_session.SessionId,
+			parent_session_id=root_session_id,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
 
 		return session
+
 
 
 	async def build_userinfo(self, session):
