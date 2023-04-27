@@ -79,9 +79,10 @@ class ResourceHandler(object):
 			query_filter["_id"] = {"$regex": "^{}".format(re.escape(request.query["f"]))}
 
 		# Get the types of resources to exclude from the results
+		# By default, exclude only deleted resources
 		exclude = request.query.get("exclude", "")
 		if len(exclude) == 0:
-			exclude = ["deleted"]
+			exclude = "deleted"
 		exclude = exclude.split(",")
 		if "deleted" in exclude:
 			if "active" in exclude:
