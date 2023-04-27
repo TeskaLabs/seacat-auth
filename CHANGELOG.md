@@ -4,6 +4,7 @@
 
 ### Fix
 - Fix provisioning initialization (#195, PLUM Sprint 230412)
+- Fix request access control attributes and methods (#197, PLUM Sprint 230421)
 
 ---
 
