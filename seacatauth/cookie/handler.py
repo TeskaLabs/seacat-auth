@@ -178,17 +178,12 @@ class CookieHandler(object):
 		corresponding ID token. If the auth fails with 401, initialize an "unauthenticated" anonymous session
 		and set a session cookie in the response.
 
+		This requires that the client has a valid "anonymous_cid" attribute configured.
+
 		Optionally check for resource access and/or add requested user info to headers.
 
 		---
 		parameters:
-		-	name: cid
-			in: query
-			description: Credentials ID which will be used to create the anonymous sessions
-			required: true
-			schema:
-				type: string
-				default: mongodb:default:abc123def456
 		-	name: client_id
 			in: query
 			description: ID of the Client who requested the introspection
@@ -199,10 +194,6 @@ class CookieHandler(object):
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		anonymous_cid = request.query.get("cid")
-		if anonymous_cid is None:
-			L.error("No 'cid' parameter specified in anonymous introspection query.")
-			return aiohttp.web.HTTPBadRequest()
 		anonymous_session_created = False
 
 		client_id = request.query.get("client_id")
@@ -213,6 +204,17 @@ class CookieHandler(object):
 			client = await client_svc.get(client_id)
 		except KeyError:
 			L.error("Client not found.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPBadRequest()
+
+		# Get anonymous_cid from client
+		anonymous_cid = client.get("anonymous_cid")
+
+		# Validate anonymous anonymous_cid
+		try:
+			await self.CredentialsService.get(anonymous_cid)
+		except KeyError:
+			L.error("Credentials for anonymous access not found.", struct_data={
+				"cid": anonymous_cid, "client_id": client_id})
 			return aiohttp.web.HTTPBadRequest()
 
 		scope = request.query.get("scope", "")
