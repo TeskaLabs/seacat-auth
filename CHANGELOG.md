@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Fix provisioning initialization (#195, PLUM Sprint 230412)
+
+---
+
+
 ## v23.16-beta
 
 ### Breaking changes
