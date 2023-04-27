@@ -228,8 +228,9 @@ class CookieHandler(object):
 			forwarded_for = request.headers.get("X-Forwarded-For")
 			if forwarded_for is not None:
 				from_info.extend(forwarded_for.split(", "))
+			track_id = uuid.uuid4().bytes
 			session = await self.CookieService.AuthenticationService.create_anonymous_session(
-				anonymous_cid, client_id, scope, from_info=from_info)
+				anonymous_cid, client_id, scope, from_info=from_info, track_id=track_id)
 			anonymous_session_created = True
 
 		if session is None:
