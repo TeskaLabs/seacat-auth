@@ -423,11 +423,22 @@ class AuthenticationService(asab.Service):
 	async def create_anonymous_session(
 		self, credentials_id: str, client_id: str, scope: list,
 		session_expiration: float = None,
+		root_session_id=None,
+		track_id=None,
 		from_info: list = None
 	):
 		"""
 		Create anonymous session for unauthenticated access
 		"""
+		if "cookie" in scope:
+			assert "openid" not in scope
+			session_type = "cookie"
+		elif "openid" in scope:
+			assert "cookie" not in scope
+			session_type = "openidconnect"
+		else:
+			raise ValueError("Cannot determine session type from scope.")
+
 		authz_builder = await authz_session_builder(
 			tenant_service=self.TenantService,
 			role_service=self.RoleService,
@@ -436,11 +447,14 @@ class AuthenticationService(asab.Service):
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, credentials_id),
 			authz_builder,
-			cookie_session_builder(),
-			await available_factors_session_builder(self, credentials_id),
 			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
-			((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),),  # New anonymous session needs a new track ID
 		]
+
+		if session_type == "cookie":
+			session_builders.append(cookie_session_builder())
+
+		if track_id is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
 
 		oauth2_data = {
 			"scope": scope,
@@ -449,9 +463,10 @@ class AuthenticationService(asab.Service):
 		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		session = await self.SessionService.create_session(
-			session_type="root",
+			session_type=session_type,
 			expiration=session_expiration,
 			session_builders=session_builders,
+			parent_session_id=root_session_id,
 		)
 		L.log(
 			asab.LOG_NOTICE,
