@@ -149,7 +149,7 @@ class SessionService(asab.Service):
 	async def create_session(
 		self,
 		session_type: str,
-		parent_session: SessionAdapter = None,
+		parent_session_id: bson.ObjectId = None,
 		expiration: float = None,
 		session_builders: list = None
 	):
@@ -160,8 +160,8 @@ class SessionService(asab.Service):
 			L.error("Unsupported session type", struct_data={"type": session_type})
 			return None
 		upsertor.set(SessionAdapter.FN.Session.Type, session_type)
-		if parent_session is not None:
-			upsertor.set(SessionAdapter.FN.Session.ParentSessionId, parent_session.SessionId)
+		if parent_session_id is not None:
+			upsertor.set(SessionAdapter.FN.Session.ParentSessionId, parent_session_id)
 
 		# Set up expiration variables
 		if expiration is not None:
@@ -197,8 +197,8 @@ class SessionService(asab.Service):
 			"sid": session_id,
 			"type": session_type,
 		}
-		if parent_session is not None:
-			struct_data["parent_sid"] = parent_session.SessionId
+		if parent_session_id is not None:
+			struct_data["parent_sid"] = parent_session_id
 		L.log(asab.LOG_NOTICE, "Session created", struct_data=struct_data)
 		return await self.get(session_id)
 
