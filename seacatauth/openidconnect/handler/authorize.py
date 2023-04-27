@@ -245,6 +245,12 @@ class AuthorizeHandler(object):
 			e.RedirectUri = redirect_uri
 			raise e
 
+		# Extract request source
+		from_info = [request.remote]
+		ff = request.headers.get("X-Forwarded-For")
+		if ff is not None:
+			from_info.extend(ff.split(", "))
+
 		try:
 			code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
 				client_dict, code_challenge, code_challenge_method)
@@ -419,17 +425,22 @@ class AuthorizeHandler(object):
 						struct_data={"reason": "tenant_not_found"})
 
 				if authorize_type == "openid":
-					new_session = await self.OpenIdConnectService.create_oidc_session(
+					new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
 						root_session.Credentials.Id, client_id, scope,
 						tenants=tenants,
 						login_descriptor=root_session.Authentication.LoginDescriptor,
 						track_id=root_session.TrackId,
 						root_session_id=root_session.SessionId,
 						code_challenge=code_challenge,
-						code_challenge_method=code_challenge_method)
+						code_challenge_method=code_challenge_method,
+						from_info=from_info)
 				elif authorize_type == "cookie":
-					new_session = await self.CookieService.create_cookie_client_session(
-						root_session, client_id, scope, tenants)
+					new_session = await self.CookieService.create_anonymous_cookie_client_session(
+						root_session.Credentials.Id, client_id, scope,
+						root_session_id=root_session.SessionId,
+						track_id=root_session.TrackId,
+						tenants=tenants,
+						from_info=from_info)
 					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 				else:
@@ -466,18 +477,27 @@ class AuthorizeHandler(object):
 						struct_data={"reason": "tenant_not_found"})
 
 				if authorize_type == "openid":
-					new_session = await self.OpenIdConnectService.create_oidc_session(
+					new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
 						anonymous_cid, client_id, scope,
 						tenants=tenants,
 						code_challenge=code_challenge,
-						code_challenge_method=code_challenge_method)
+						code_challenge_method=code_challenge_method,
+						from_info=from_info)
 				elif authorize_type == "cookie":
-					new_session = await self.CookieService.create_cookie_client_session(
-						root_session, client_id, scope, tenants)
+					new_session = await self.CookieService.create_anonymous_cookie_client_session(
+						anonymous_cid, client_id, scope,
+						tenants=tenants,
+						from_info=from_info)
 					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 				else:
 					raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
+
+			# Anonymous sessions need to be audited
+			await self.OpenIdConnectService.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
+				"cid": new_session.Credentials.Id,
+				"sid": str(new_session.SessionId),
+				"fi": from_info})
 
 		await self.audit_authorize_success(new_session)
 		return await self.reply_with_successful_response(new_session, scope, redirect_uri, state)
