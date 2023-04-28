@@ -249,6 +249,7 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		cookie_domain = client.get("cookie_domain") or None
+		# cookie_domain = "auth.local.loc"
 
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
@@ -256,7 +257,13 @@ class CookieHandler(object):
 
 		if anonymous_session_created:
 			set_cookie(self.App, response, session, cookie_domain)
-			await self._set_custom_cookies_from_webhook(response, client, session)
+			try:
+				response.headers.update(await self._fetch_headers_from_webhook(client, session))
+			except exceptions.ClientResponseError as e:
+				L.error("Webhook responded with error.", struct_data={
+					"status": e.Status, "text": e.Data})
+				return asab.web.rest.json_response(
+					request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
 		return response
 
@@ -374,7 +381,7 @@ class CookieHandler(object):
 
 		# Obtain and set custom client cookies
 		try:
-			await self._set_custom_cookies_from_webhook(response, client, session)
+			response.headers.update(await self._fetch_headers_from_webhook(client, session))
 		except exceptions.ClientResponseError as e:
 			L.error("Webhook responded with error.", struct_data={
 				"status": e.Status, "text": e.Data})
@@ -388,7 +395,11 @@ class CookieHandler(object):
 		return await self.CookieService.get_session_by_request_cookie(request, client_id)
 
 
-	async def _set_custom_cookies_from_webhook(self, response, client, session):
+	async def _fetch_headers_from_webhook(self, client, session):
+		"""
+		Make a webhook request and return the response body.
+		It is expected to be a JSON object mapping HTTP headers to their values.
+		"""
 		cookie_webhook_uri = client.get("cookie_webhook_uri")
 		if cookie_webhook_uri is not None:
 			async with aiohttp.ClientSession() as http_session:
@@ -400,9 +411,5 @@ class CookieHandler(object):
 					if resp.status != 200:
 						text = await resp.text()
 						raise exceptions.ClientResponseError(resp.status, text)
-
-					webhook_data = await resp.json()
-
-			for name, options in webhook_data.items():
-				# TODO: Validate the options
-				response.set_cookie(name, **options)
+					# Return the whole response body as header mapping
+					return await resp.json()
