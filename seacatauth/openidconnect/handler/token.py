@@ -16,6 +16,7 @@ import json
 
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
+from ...generic import get_bearer_token_value
 from ...session import SessionAdapter
 
 #
@@ -162,24 +163,30 @@ class TokenHandler(object):
 		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
 		# 	  return await self.token_error_response(request, "The redirect URL is not associated with the client.")
 
+		# Set track ID if not set yet
 		if new_session.TrackId is None:
-			# Try to get Track ID from client cookie session if there is any
-			client_cookie_session = await self.CookieService.get_session_by_sci(request, new_session.OAuth2.ClientId)
-			if client_cookie_session is not None and client_cookie_session.TrackId is not None:
-				track_id = client_cookie_session.TrackId
+			new_session = await self.SessionService.inherit_track_id_from_root(new_session)
+		if new_session.TrackId is None:
+			# Obtain the old session by request access token or cookie
+			token_value = get_bearer_token_value(request)
+			cookie_value = self.CookieService.get_session_cookie_value(request, new_session.OAuth2.ClientId)
+			if token_value is not None:
+				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+				if old_session is None:
+					L.error("Cannot transfer Track ID: Invalid access token.", struct_data={"value": token_value})
+					raise aiohttp.web.HTTPBadRequest()
+			elif cookie_value is not None:
+				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
+				if old_session is None:
+					L.error("Cannot transfer Track ID: Invalid cookie value.", struct_data={"value": token_value})
+					raise aiohttp.web.HTTPBadRequest()
 			else:
-				track_id = uuid.uuid4().bytes
+				old_session = None
 
-			# Update track ID in both the root session and the current subsession
-			await self.SessionService.update_session(
-				new_session.Session.ParentSessionId,
-				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),))
-			await self.SessionService.update_session(
-				new_session.SessionId,
-				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),))
-
-			# Refresh the subsession
-			new_session = await self.SessionService.get(new_session.SessionId)
+			try:
+				new_session = await self.SessionService.inherit_or_generate_new_track_id(new_session, old_session)
+			except ValueError:
+				raise aiohttp.web.HTTPBadRequest()
 
 		headers = {
 			"Cache-Control": "no-store",
