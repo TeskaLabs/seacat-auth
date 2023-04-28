@@ -332,7 +332,7 @@ class CookieHandler(object):
 		# Set track ID if not set yet
 		if session.TrackId is None:
 			# Check if the user landed here with a cookie and associate track ID
-			current_session = await self.CookieService.get_session_by_sci(request, client_id)
+			current_session = await self.CookieService.get_session_by_request_cookie(request, client_id)
 			if current_session is not None:
 				track_id = current_session.TrackId
 			else:
@@ -376,7 +376,7 @@ class CookieHandler(object):
 
 
 	async def _authenticate_request(self, request, client_id=None):
-		return await self.CookieService.get_session_by_sci(request, client_id)
+		return await self.CookieService.get_session_by_request_cookie(request, client_id)
 
 
 	async def _set_custom_cookies_from_webhook(self, response, client, session):

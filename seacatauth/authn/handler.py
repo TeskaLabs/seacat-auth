@@ -280,7 +280,7 @@ class AuthenticationHandler(object):
 		"""
 		Log out of the current session and all its subsessions
 		"""
-		session = await self.CookieService.get_session_by_sci(request)
+		session = await self.CookieService.get_session_by_request_cookie(request)
 		if session is None:
 			raise aiohttp.web.HTTPBadRequest()
 
