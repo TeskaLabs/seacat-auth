@@ -292,6 +292,12 @@ class AuthorizeHandler(object):
 
 		authenticated = root_session is not None and not root_session.Authentication.IsAnonymous
 		allow_anonymous = "anonymous" in scope
+		if allow_anonymous and not client_dict.get("authorize_anonymous_users", False):
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidScope, client_id,
+				redirect_uri=redirect_uri,
+				state=state,
+				struct_data={"reason": "anonymous_access_not_allowed"})
 
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
