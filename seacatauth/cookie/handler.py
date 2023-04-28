@@ -6,7 +6,7 @@ import aiohttp.web
 import asab.web.rest
 
 from .. import exceptions
-from ..generic import nginx_introspection
+from ..generic import nginx_introspection, get_bearer_token_value
 from .utils import set_cookie, delete_cookie
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 from ..session import SessionAdapter
@@ -236,7 +236,7 @@ class CookieHandler(object):
 			track_id = uuid.uuid4().bytes
 			session = await self.CookieService.create_anonymous_cookie_client_session(
 				anonymous_cid, client_id, scope,
-				track_id = track_id,
+				track_id=track_id,
 				from_info=from_info)
 			anonymous_session_created = True
 
@@ -331,17 +331,27 @@ class CookieHandler(object):
 
 		# Set track ID if not set yet
 		if session.TrackId is None:
-			# Check if the user landed here with a cookie and associate track ID
-			current_session = await self.CookieService.get_session_by_request_cookie(request, client_id)
-			if current_session is not None:
-				track_id = current_session.TrackId
+			session = await self.SessionService.inherit_track_id_from_root(session)
+		if session.TrackId is None:
+			# Obtain the old session by request cookie or access token
+			cookie_value = self.CookieService.get_session_cookie_value(request, session.OAuth2.ClientId)
+			token_value = get_bearer_token_value(request)
+			if cookie_value is not None:
+				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
+				if old_session is None:
+					L.error("Cannot transfer Track ID: Invalid cookie value.", struct_data={"value": token_value})
+					raise aiohttp.web.HTTPBadRequest()
+			elif token_value is not None:
+				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
+				if old_session is None:
+					L.error("Cannot transfer Track ID: Invalid access token.", struct_data={"value": token_value})
+					raise aiohttp.web.HTTPBadRequest()
 			else:
-				track_id = uuid.uuid4().bytes
-			# Set the track ID
-			await self.CookieService.SessionService.update_session(
-				session.SessionId,
-				session_builders=(((SessionAdapter.FN.Session.TrackId, track_id),),)
-			)
+				old_session = None
+			try:
+				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
+			except ValueError:
+				raise aiohttp.web.HTTPBadRequest()
 
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):
