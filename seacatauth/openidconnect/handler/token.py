@@ -1,7 +1,6 @@
 import logging
 import urllib.parse
 import datetime
-import uuid
 
 import aiohttp.web
 
@@ -17,7 +16,6 @@ import json
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
 from ...generic import get_bearer_token_value
-from ...session import SessionAdapter
 
 #
 

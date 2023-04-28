@@ -10,7 +10,6 @@ from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
 from ..authz import build_credentials_authz
-from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
@@ -18,7 +17,7 @@ from ..session import (
 	cookie_session_builder,
 	login_descriptor_session_builder,
 	available_factors_session_builder,
-	external_login_session_builder, SessionAdapter,
+	external_login_session_builder,
 )
 
 from ..events import EventTypes
