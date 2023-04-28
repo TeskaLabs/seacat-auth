@@ -9,7 +9,6 @@ from .. import exceptions
 from ..generic import nginx_introspection, get_bearer_token_value
 from .utils import set_cookie, delete_cookie
 from ..openidconnect.utils import TokenRequestErrorResponseCode
-from ..session import SessionAdapter
 
 #
 
