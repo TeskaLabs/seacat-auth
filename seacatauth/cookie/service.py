@@ -75,9 +75,9 @@ class CookieService(asab.Service):
 		return domain or None
 
 
-	def _get_session_cookie_id(self, request, client_id=None):
+	def get_session_cookie_value(self, request, client_id=None):
 		"""
-		Get Seacat cookie value from request header
+		Get Seacat session cookie value from request header
 		"""
 		cookie = request.cookies.get(self.get_cookie_name(client_id))
 		if cookie is None:
@@ -90,24 +90,30 @@ class CookieService(asab.Service):
 		return session_cookie_id
 
 
-	async def get_session_by_sci(self, request, client_id=None):
+	async def get_session_by_request_cookie(self, request, client_id=None):
 		"""
 		Find session by the combination of SCI (cookie ID) and client ID
 
 		To search for root session, keep client_id=None.
 		Root sessions have no client_id attribute, which MongoDB matches as None.
 		"""
-		session_cookie_id = self._get_session_cookie_id(request, client_id)
+		session_cookie_id = self.get_session_cookie_value(request, client_id)
 		if session_cookie_id is None:
 			return None
+		return await self.get_session_by_session_cookie_value(session_cookie_id)
 
+
+	async def get_session_by_session_cookie_value(self, cookie_value):
+		"""
+		Get session by cookie value.
+		"""
 		try:
-			session = await self.SessionService.get_by({SessionAdapter.FN.Cookie.Id: session_cookie_id})
+			session = await self.SessionService.get_by({SessionAdapter.FN.Cookie.Id: cookie_value})
 		except KeyError:
-			L.info("Session not found.", struct_data={"sci": session_cookie_id})
+			L.info("Session not found.", struct_data={"sci": cookie_value})
 			return None
 		except ValueError:
-			L.warning("Error retrieving session.", exc_info=True, struct_data={"sci": session_cookie_id})
+			L.warning("Error retrieving session.", exc_info=True, struct_data={"sci": cookie_value})
 			return None
 
 		return session
