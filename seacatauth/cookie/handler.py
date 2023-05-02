@@ -249,7 +249,6 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		cookie_domain = client.get("cookie_domain") or None
-		# cookie_domain = "auth.local.loc"
 
 		if response.status_code != 200:
 			delete_cookie(self.App, response)
@@ -257,6 +256,8 @@ class CookieHandler(object):
 
 		if anonymous_session_created:
 			set_cookie(self.App, response, session, cookie_domain)
+
+			# Trigger webhook and add custom HTTP headers
 			try:
 				data = await self._fetch_webhook_data(client, session)
 				response.headers.update(data.get("response_headers", {}))
@@ -380,7 +381,7 @@ class CookieHandler(object):
 
 		set_cookie(self.App, response, session, cookie_domain)
 
-		# Obtain and set custom client cookies
+		# Trigger webhook and set custom client response headers
 		try:
 			data = await self._fetch_webhook_data(client, session)
 			response.headers.update(data.get("response_headers", {}))
