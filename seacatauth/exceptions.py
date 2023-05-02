@@ -1,3 +1,6 @@
+import typing
+
+
 class TenantNotSpecifiedError(Exception):
 	pass
 
@@ -87,7 +90,7 @@ class TOTPNotActiveError(Exception):
 
 
 class ClientResponseError(Exception):
-	def __init__(self, status: int, data: str | dict):
+	def __init__(self, status: int, data: typing.Union[str, dict]):
 		self.Status = status
 		self.Data = data
 		super().__init__("Client responded with error {}: {}".format(status, data))
