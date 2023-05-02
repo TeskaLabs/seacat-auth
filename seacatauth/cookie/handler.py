@@ -258,7 +258,8 @@ class CookieHandler(object):
 		if anonymous_session_created:
 			set_cookie(self.App, response, session, cookie_domain)
 			try:
-				response.headers.update(await self._fetch_headers_from_webhook(client, session))
+				data = await self._fetch_webhook_data(client, session)
+				response.headers.update(data.get("response_headers", {}))
 			except exceptions.ClientResponseError as e:
 				L.error("Webhook responded with error.", struct_data={
 					"status": e.Status, "text": e.Data})
@@ -381,7 +382,8 @@ class CookieHandler(object):
 
 		# Obtain and set custom client cookies
 		try:
-			response.headers.update(await self._fetch_headers_from_webhook(client, session))
+			data = await self._fetch_webhook_data(client, session)
+			response.headers.update(data.get("response_headers", {}))
 		except exceptions.ClientResponseError as e:
 			L.error("Webhook responded with error.", struct_data={
 				"status": e.Status, "text": e.Data})
@@ -395,10 +397,21 @@ class CookieHandler(object):
 		return await self.CookieService.get_session_by_request_cookie(request, client_id)
 
 
-	async def _fetch_headers_from_webhook(self, client, session):
+	async def _fetch_webhook_data(self, client, session):
 		"""
 		Make a webhook request and return the response body.
-		It is expected to be a JSON object mapping HTTP headers to their values.
+		The response should match the following schema:
+		```json
+		{
+			"type": "object",
+			"properties": {
+				"response_headers": {
+					"type": "object",
+					"description": "HTTP headers and their values that will be added to the response."
+				}
+			}
+		}
+		```
 		"""
 		cookie_webhook_uri = client.get("cookie_webhook_uri")
 		if cookie_webhook_uri is not None:
@@ -411,5 +424,4 @@ class CookieHandler(object):
 					if resp.status != 200:
 						text = await resp.text()
 						raise exceptions.ClientResponseError(resp.status, text)
-					# Return the whole response body as header mapping
 					return await resp.json()
