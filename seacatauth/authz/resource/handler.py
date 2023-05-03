@@ -56,20 +56,17 @@ class ResourceHandler(object):
 			description: Filter string
 			schema:
 				type: string
-		-	name: include_deleted
+		-	name: exclude
 			in: query
-			description: Whether to include soft-deleted resources
+			description:
+				Exclude resources based on their type/status. If omitted, this parameter defaults
+				to `exclude=deleted`, which means the results include all active resources.
 			required: false
+			explode: false
 			schema:
-				type: string
-				enum: ["true"]
-		-	name: exclude_global_only
-			in: query
-			description: Whether to exclude global-only resources
-			required: false
-			schema:
-				type: string
-				enum: ["true"]
+				type: array
+				items:
+					enum: ["active", "deleted", "globalonly"]
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
@@ -81,12 +78,24 @@ class ResourceHandler(object):
 		if "f" in request.query:
 			query_filter["_id"] = {"$regex": "^{}".format(re.escape(request.query["f"]))}
 
-		# Do not include soft-deleted resources unless requested
-		if request.query.get("include_deleted") != "true":
-			query_filter["deleted"] = {"$in": [None, False]}
+		# Get the types of resources to exclude from the results
+		# By default, exclude only deleted resources
+		exclude = request.query.get("exclude", "")
+		if len(exclude) == 0:
+			exclude = "deleted"
+		exclude = exclude.split(",")
+		if "deleted" in exclude:
+			if "active" in exclude:
+				return asab.web.rest.json_response(request, {"data": [], "count": 0})
+			else:
+				query_filter["deleted"] = {"$in": [None, False]}
+		else:
+			if "active" in exclude:
+				query_filter["deleted"] = True
+			else:
+				pass
 
-		# Exclude global-only resources if requested
-		if request.query.get("exclude_global_only") == "true":
+		if "globalonly" in exclude:
 			if "_id" not in query_filter:
 				query_filter["_id"] = {}
 			query_filter["_id"]["$nin"] = list(self.ResourceService.GlobalOnlyResources)
