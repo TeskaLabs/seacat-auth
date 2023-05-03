@@ -10,7 +10,6 @@ from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from ..audit import AuditCode
 from ..authz import build_credentials_authz
-from ..openidconnect.session import oauth2_session_builder
 
 from ..session import (
 	credentials_session_builder,
@@ -18,7 +17,7 @@ from ..session import (
 	cookie_session_builder,
 	login_descriptor_session_builder,
 	available_factors_session_builder,
-	external_login_session_builder, SessionAdapter,
+	external_login_session_builder,
 )
 
 from ..events import EventTypes
@@ -311,7 +310,7 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
-	async def login(self, login_session, from_info: list = None, track_id=None):
+	async def login(self, login_session, from_info: list = None):
 		# TODO: Move this to LoginService
 		scope = frozenset(["profile", "email", "phone"])
 
@@ -334,7 +333,6 @@ class AuthenticationService(asab.Service):
 			session_type="root",
 			expiration=login_session.RequestedSessionExpiration,
 			session_builders=session_builders,
-			track_id=track_id,  # add link to previous session
 		)
 		L.log(
 			asab.LOG_NOTICE,
@@ -414,61 +412,6 @@ class AuthenticationService(asab.Service):
 				'cid': credentials_id,
 				'sid': str(session.Session.Id),
 				'fi': from_info,
-			}
-		)
-
-		return session
-
-
-	async def create_anonymous_session(
-		self, credentials_id: str, client_id: str, scope: list,
-		session_expiration: float = None,
-		from_info: list = None
-	):
-		"""
-		Create anonymous session for unauthenticated access
-		"""
-		authz_builder = await authz_session_builder(
-			tenant_service=self.TenantService,
-			role_service=self.RoleService,
-			credentials_id=credentials_id
-		)
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, credentials_id),
-			authz_builder,
-			cookie_session_builder(),
-			await available_factors_session_builder(self, credentials_id),
-			((SessionAdapter.FN.Authentication.IsAnonymous, True),)
-		]
-
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
-
-		session = await self.SessionService.create_session(
-			session_type="root",
-			expiration=session_expiration,
-			session_builders=session_builders,
-		)
-		L.log(
-			asab.LOG_NOTICE,
-			"Anonymous session created.",
-			struct_data={
-				"cid": credentials_id,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
-			}
-		)
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.ANONYMOUS_SESSION_CREATED,
-			{
-				"cid": credentials_id,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
 			}
 		)
 

@@ -4,6 +4,7 @@ import os.path
 import base64
 import secrets
 import logging
+import uuid
 
 import asab
 import asab.web.rest
@@ -242,7 +243,10 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_oidc_session(
-		self, root_session, client_id, scope,
+		self, credentials_id, client_id, scope,
+		login_descriptor=None,
+		track_id=None,
+		root_session_id=None,
 		tenants=None,
 		requested_expiration=None,
 		code_challenge: str = None,
@@ -251,11 +255,11 @@ class OpenIdConnectService(asab.Service):
 		# TODO: Choose builders based on scope
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
+			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
+				credentials_id=credentials_id,
 				tenants=tenants,
 			)
 		]
@@ -267,10 +271,10 @@ class OpenIdConnectService(asab.Service):
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			authn_service = self.App.get_service("seacatauth.AuthenticationService")
-			session_builders.append(login_descriptor_session_builder(root_session.Authentication.LoginDescriptor))
-			session_builders.append(await external_login_session_builder(ext_login_svc, root_session.Credentials.Id))
+			session_builders.append(login_descriptor_session_builder(login_descriptor))
+			session_builders.append(await external_login_session_builder(ext_login_svc, credentials_id))
 			# TODO: Get factors from root_session?
-			session_builders.append(await available_factors_session_builder(authn_service, root_session.Credentials.Id))
+			session_builders.append(await available_factors_session_builder(authn_service, credentials_id))
 
 		# TODO: if 'openid' in scope
 		oauth2_data = {
@@ -278,13 +282,86 @@ class OpenIdConnectService(asab.Service):
 			"client_id": client_id,
 		}
 		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		# Obtain Track ID if there is any in the root session
+		if track_id is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
+
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
-			parent_session=root_session,
-			track_id=root_session.TrackId,
+			parent_session_id=root_session_id,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
+
+		return session
+
+
+	async def create_anonymous_oidc_session(
+		self, anonymous_cid, client_id, scope,
+		login_descriptor=None,
+		track_id=None,
+		root_session_id=None,
+		tenants=None,
+		requested_expiration=None,
+		code_challenge: str = None,
+		code_challenge_method: str = None,
+		from_info=None,
+	):
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		session_builders = [
+			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
+			await credentials_session_builder(self.CredentialsService, anonymous_cid, scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=anonymous_cid,
+				tenants=tenants,
+			)
+		]
+
+		if code_challenge is not None:
+			session_builders.append((
+				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
+			))
+
+		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
+			authn_service = self.App.get_service("seacatauth.AuthenticationService")
+			session_builders.append(login_descriptor_session_builder(login_descriptor))
+			session_builders.append(await external_login_session_builder(ext_login_svc, anonymous_cid))
+			# TODO: Get factors from root_session?
+			session_builders.append(await available_factors_session_builder(authn_service, anonymous_cid))
+
+		# TODO: if 'openid' in scope
+		oauth2_data = {
+			"scope": scope,
+			"client_id": client_id,
+		}
+		session_builders.append(oauth2_session_builder(oauth2_data))
+
+		# Obtain Track ID if there is any in the root session
+		if track_id is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
+
+		session = await self.SessionService.create_session(
+			session_type="openidconnect",
+			parent_session_id=root_session_id,
+			expiration=requested_expiration,
+			session_builders=session_builders,
+		)
+
+		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
+			"cid": anonymous_cid,
+			"client_id": client_id,
+			"sid": str(session.Session.Id),
+			"fi": from_info})
+
+		# Add an audit entry
+		await self.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
+			"cid": anonymous_cid,
+			"client_id": client_id,
+			"sid": str(session.Session.Id),
+			"fi": from_info})
 
 		return session
 
@@ -340,7 +417,7 @@ class OpenIdConnectService(asab.Service):
 			userinfo["anonymous"] = True
 
 		if session.TrackId is not None:
-			userinfo["track_id"] = session.TrackId
+			userinfo["track_id"] = uuid.UUID(bytes=session.TrackId)
 
 		if await otp_service.has_activated_totp(session.Credentials.Id):
 			userinfo["totp_set"] = True
