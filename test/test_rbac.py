@@ -9,7 +9,7 @@ class RBACTestCase(unittest.TestCase):
 
 	authz_test_data = {
 		"*": ["post:read", "post:write", "post:edit"],
-		"first-tenant": ["post:read", "post:write", "post:edit", "authz:tenant:admin"],
+		"first-tenant": ["post:read", "post:write", "post:edit", "seacat:tenant:access"],
 	}
 
 	notenant_authz_test_data = {
@@ -62,7 +62,7 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"first-tenant",
-			["authz:tenant:admin"]
+			["seacat:tenant:access"]
 		)
 		self.assertTrue(access)
 
@@ -119,7 +119,7 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"*",
-			["authz:tenant:admin"]
+			["seacat:tenant:access"]
 		)
 		self.assertTrue(access)
 
@@ -143,20 +143,20 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"*",
-			["authz:tenant:admin", "post:edit"]
+			["seacat:tenant:access", "post:edit"]
 		)
 		self.assertTrue(access)
 
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			"*",
-			["authz:tenant:admin", "post:delete"]
+			["seacat:tenant:access", "post:delete"]
 		)
 		self.assertFalse(access)
 
 		# Check superuser
 		access = RBACService.has_resource_access(
-			self.superuser_authz_test_data, "*", ["authz:tenant:admin", "post:edit"]
+			self.superuser_authz_test_data, "*", ["seacat:tenant:access", "post:edit"]
 		)
 		self.assertTrue(access)
 
@@ -176,7 +176,7 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			None,
-			["authz:tenant:admin"]
+			["seacat:tenant:access"]
 		)
 		self.assertFalse(access)
 
@@ -200,12 +200,12 @@ class RBACTestCase(unittest.TestCase):
 		access = RBACService.has_resource_access(
 			self.authz_test_data,
 			None,
-			["post:write", "authz:tenant:admin"]
+			["post:write", "seacat:tenant:access"]
 		)
 		self.assertFalse(access)
 
 		# Check superuser
-		access = RBACService.has_resource_access(self.superuser_authz_test_data, None, ["authz:tenant:admin", "post:edit"])
+		access = RBACService.has_resource_access(self.superuser_authz_test_data, None, ["seacat:tenant:access", "post:edit"])
 		self.assertTrue(access)
 
 

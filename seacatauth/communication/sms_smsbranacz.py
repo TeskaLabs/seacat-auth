@@ -32,7 +32,6 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 	Channel = "sms"
 
 	ConfigDefaults = {
-		"mock": False,  # If True, messages are not sent, but rather printed to the log
 		"login": "",
 		"password": "",
 		"url": "https://api.smsbrana.cz/smsconnect/http.php",
@@ -46,7 +45,14 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 		self.Password = self.Config.get("password")
 		self.TimestampFormat = self.Config.get("timestamp_format")
 		self.URL = self.Config.get("url")
-		self.Mock = self.Config.getboolean("mock")
+
+		if "mock" in self.Config:
+			raise ValueError("To activate mock mode, use 'url=<mocked>' instead of the 'mock' option.")
+		self.MockMode = (self.URL == "<mocked>")
+		if self.MockMode:
+			L.warning(
+				"SMSbrana.cz provider is running in mock mode. "
+				"Messages will not be sent, but instead will be printed to log.")
 
 	def _init_template_provider(self):
 		pass
@@ -80,7 +86,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 			url_params["salt"] = salt
 			url_params["auth"] = auth
 
-			if self.Mock:
+			if self.MockMode:
 				L.log(
 					asab.LOG_NOTICE, "SMSBrana.cz provider is in mock mode. Message will not be sent.",
 					struct_data=url_params

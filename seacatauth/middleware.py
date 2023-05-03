@@ -57,13 +57,15 @@ def private_auth_middleware_factory(app):
 					L.info("Invalid Bearer token")
 
 		def has_resource_access(tenant: str, resource: str) -> bool:
+			if request.Session is None:
+				return False
 			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
 
-		def is_superuser() -> bool:
-			return has_resource_access("*", "authz:superuser")
-
 		request.has_resource_access = has_resource_access
-		request.is_superuser = is_superuser
+		request.is_superuser = rbac_svc.is_superuser(request.Session.Authorization.Authz) \
+			if request.Session is not None else False
+		request.can_access_all_tenants = rbac_svc.can_access_all_tenants(request.Session.Authorization.Authz) \
+			if request.Session is not None else False
 
 		if require_authentication is False:
 			return await handler(request)
@@ -132,7 +134,7 @@ def public_auth_middleware_factory(app):
 					raise aiohttp.web.HTTPUnauthorized()
 		else:
 			# No Bearer token exists, authorize using cookie
-			request.Session = await cookie_service.get_session_by_sci(request)
+			request.Session = await cookie_service.get_session_by_request_cookie(request)
 
 		return await handler(request)
 

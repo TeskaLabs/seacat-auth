@@ -1,9 +1,9 @@
 import datetime
 import logging
 import secrets
+import uuid
 
 import bson
-import uuid
 
 import hashlib
 import cryptography.hazmat.primitives.ciphers
@@ -150,8 +150,7 @@ class SessionService(asab.Service):
 	async def create_session(
 		self,
 		session_type: str,
-		parent_session: SessionAdapter = None,
-		track_id: str = None,
+		parent_session_id: bson.ObjectId = None,
 		expiration: float = None,
 		session_builders: list = None
 	):
@@ -162,8 +161,8 @@ class SessionService(asab.Service):
 			L.error("Unsupported session type", struct_data={"type": session_type})
 			return None
 		upsertor.set(SessionAdapter.FN.Session.Type, session_type)
-		if parent_session is not None:
-			upsertor.set(SessionAdapter.FN.Session.ParentSessionId, parent_session.SessionId)
+		if parent_session_id is not None:
+			upsertor.set(SessionAdapter.FN.Session.ParentSessionId, parent_session_id)
 
 		# Set up expiration variables
 		if expiration is not None:
@@ -184,12 +183,6 @@ class SessionService(asab.Service):
 		upsertor.set(SessionAdapter.FN.Session.MaxExpiration, max_expiration)
 		upsertor.set(SessionAdapter.FN.Session.ExpirationExtension, touch_extension_seconds)
 
-		# Session transition
-		if track_id is not None:
-			upsertor.set(SessionAdapter.FN.Session.TrackId, track_id)
-		else:
-			upsertor.set(SessionAdapter.FN.Session.TrackId, str(uuid.uuid4()))
-
 		# Add builder fields
 		if session_builders is None:
 			session_builders = list()
@@ -205,8 +198,8 @@ class SessionService(asab.Service):
 			"sid": session_id,
 			"type": session_type,
 		}
-		if parent_session is not None:
-			struct_data["parent_sid"] = parent_session.SessionId
+		if parent_session_id is not None:
+			struct_data["parent_sid"] = parent_session_id
 		L.log(asab.LOG_NOTICE, "Session created", struct_data=struct_data)
 		return await self.get(session_id)
 
@@ -428,32 +421,10 @@ class SessionService(asab.Service):
 
 
 	async def delete_all_sessions(self):
-		to_delete = []
-		async for session_dict in self._iterate_raw():
-			to_delete.append(session_dict)
+		await self._delete_sessions_by_filter()
 
-		deleted = 0
-		failed = 0
-		# Delete iteratively so that every session is terminated properly
-		for session_dict in to_delete:
-			try:
-				# TODO: Publish pubsub message for session deletion
-				await self.StorageService.delete(self.SessionCollection, session_dict["_id"])
-				deleted += 1
-			except Exception as e:
-				L.error("Cannot delete session", struct_data={
-					"sid": session_dict["_id"],
-					"error": type(e).__name__
-				})
-				failed += 1
-
-		L.log(asab.LOG_NOTICE, "Sessions deleted", struct_data={
-			"deleted_count": deleted,
-			"failed_count": failed
-		})
-
-	async def delete_sessions_by_credentials_id(self, credentials_id):
-		query_filter = {SessionAdapter.FN.Credentials.Id: credentials_id}
+	async def _delete_sessions_by_filter(self, query_filter=None):
+		query_filter = query_filter or {}
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
 			to_delete.append(session_dict)
@@ -477,6 +448,122 @@ class SessionService(asab.Service):
 			"deleted_count": deleted,
 			"failed_count": failed
 		})
+
+	async def delete_sessions_by_credentials_id(self, credentials_id):
+		await self._delete_sessions_by_filter(
+			query_filter={SessionAdapter.FN.Credentials.Id: credentials_id})
+
+
+	async def delete_sessions_by_tenant_in_scope(self, tenant):
+		await self._delete_sessions_by_filter(
+			query_filter={"{}.{}".format(SessionAdapter.FN.Authorization.Authz, tenant): {"$exists": True}})
+
+
+	async def inherit_track_id_from_root(self, session: SessionAdapter) -> SessionAdapter:
+		"""
+		Fetch the session's parent and check for track ID. If there is any, copy it to the session.
+		"""
+		# Get root session if it exists
+		if session.Session.ParentSessionId is not None:
+			root_session = await self.get(session.Session.ParentSessionId)
+			if root_session.TrackId is not None:
+				# This can happen if there are multiple authorize calls from the same subject
+				L.warning("Root session changed between authorize and token request.", struct_data={
+					"client_session": session.SessionId,
+					"root_session": root_session.SessionId,
+				})
+				# Transfer the new track ID from the root session to the new session
+				sub_session_builders = [
+					((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),),
+				]
+				await self.update_session(
+					session.SessionId,
+					session_builders=sub_session_builders)
+				session = await self.get(session.SessionId)
+		return session
+
+
+	async def inherit_or_generate_new_track_id(
+		self, dst_session: SessionAdapter, src_session: SessionAdapter
+	) -> SessionAdapter:
+		"""
+		Check if the request has a session identifier (access token or cookie, in this order)
+		and try to inherit the track id.
+		If needed, create a root session for these two sessions.
+		"""
+		if src_session is None:
+			# No source session
+			# Update the destination session with a new track ID
+			# Also update its root session if there is any
+			root_session_id = dst_session.Session.ParentSessionId
+			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			await self.update_session(dst_session.SessionId, session_builders)
+			if root_session_id is not None:
+				await self.update_session(root_session_id, session_builders)
+
+		elif not src_session.Authentication.IsAnonymous:
+			L.error("Cannot transfer Track ID: Source session is not anonymous.", struct_data={
+				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
+			raise ValueError("Source session is not anonymous.")
+
+		elif src_session.OAuth2.ClientId != dst_session.OAuth2.ClientId:
+			L.error("Cannot transfer Track ID: Mismatching client IDs.", struct_data={
+				"src_clid": src_session.OAuth2.ClientId, "dst_clid": dst_session.OAuth2.ClientId})
+			raise ValueError("Mismatching client IDs.")
+
+		elif src_session.TrackId is None:
+			L.error("Cannot transfer Track ID: Source session has no Track ID.", struct_data={
+				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
+			raise ValueError("Source session has no Track ID.")
+
+		elif not dst_session.Authentication.IsAnonymous:
+			# The destination session is authenticated while the source one is anonymous
+			# Transfer the track ID to the destination session and delete the source session
+			assert dst_session.Session.ParentSessionId is not None
+			session_builders = [((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),)]
+			old_session_group_id = src_session.Session.ParentSessionId or src_session.SessionId
+			await self.delete(old_session_group_id)
+			await self.update_session(dst_session.SessionId, session_builders)
+			await self.update_session(dst_session.Session.ParentSessionId, session_builders)
+
+		elif src_session.Session.Type != dst_session.Session.Type:
+			# The source and the destination sessions are both anonymous but of a different type (cookie vs token)
+			# Group them together under the same root session
+			root_session_id = dst_session.Session.ParentSessionId or src_session.Session.ParentSessionId
+			root_session_builders = [
+				((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),),
+			]
+			if root_session_id is not None:
+				# Update the root session
+				root_session = await self.get(root_session_id)
+				assert root_session.Session.TrackId is None
+				await self.update_session(root_session_id, session_builders=root_session_builders)
+			else:
+				# Create a new root session
+				root_session_builders.extend([
+					((SessionAdapter.FN.Credentials.Id, dst_session.Credentials.Id),),
+					((SessionAdapter.FN.Authentication.IsAnonymous, True),),
+				])
+				await self.create_session("root", session_builders=root_session_builders)
+			sub_session_builders = [
+				((SessionAdapter.FN.Session.ParentSessionId, root_session_id),),
+				((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),),
+			]
+			await self.update_session(dst_session.SessionId, session_builders=sub_session_builders)
+			await self.update_session(src_session.SessionId, session_builders=sub_session_builders)
+
+		else:
+			# The source and the destination sessions are both anonymous and of the same type (cookie or token)
+			# There shouldn't be more than one anonymous session per credentials per client per type
+			# Transfer the track ID and delete the source session
+			assert dst_session.Session.ParentSessionId is None
+			session_builders = [((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),)]
+			old_session_group_id = src_session.Session.ParentSessionId or src_session.SessionId
+			await self.delete(old_session_group_id)
+			await self.update_session(dst_session.SessionId, session_builders)
+
+		return await self.get(dst_session.SessionId)
+
 
 	def aes_encrypt(self, raw_bytes: bytes):
 		algorithm = cryptography.hazmat.primitives.ciphers.algorithms.AES(self.AESKey)

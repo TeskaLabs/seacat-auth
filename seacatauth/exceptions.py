@@ -1,3 +1,6 @@
+import typing
+
+
 class TenantNotSpecifiedError(Exception):
 	pass
 
@@ -59,17 +62,35 @@ class CredentialsNotFoundError(KeyError):
 		super().__init__("Credentials not found.", *args)
 
 
-class TenantNotAuthorizedError(AccessDeniedError):
+class UnauthorizedTenantAccessError(AccessDeniedError):
 	"""
-	Credentials do not have access to tenant
+	Session not authorized for the tenant.
+	"""
+	def __init__(self, session_id, tenant, credentials_id=None, *args):
+		self.SessionId = session_id
+		self.CredentialsId = credentials_id
+		self.Tenant = tenant
+		super().__init__("Credentials are not authorized under tenant.", *args)
+
+
+class TenantNotAssignedError(KeyError):
+	"""
+	Credentials do not have the tenant assigned.
 	"""
 	def __init__(self, credentials_id, tenant, *args):
 		self.CredentialsId = credentials_id
 		self.Tenant = tenant
-		super().__init__("Credentials not authorized under tenant.", *args)
+		super().__init__("Credentials do not have the tenant assigned.", *args)
 
 
 class TOTPNotActiveError(Exception):
 	def __init__(self, credential_id: str):
 		self.CredentialID: str = credential_id
 		super().__init__("TOTP not active for credentials.")
+
+
+class ClientResponseError(Exception):
+	def __init__(self, status: int, data: typing.Union[str, dict]):
+		self.Status = status
+		self.Data = data
+		super().__init__("Client responded with error {}: {}".format(status, data))
