@@ -1,6 +1,5 @@
 import logging
 import re
-import uuid
 
 import asab
 import asab.storage.exceptions
@@ -44,77 +43,18 @@ class TenantService(asab.Service):
 
 	async def create_tenant(self, tenant_id: str, creator_id: str = None):
 		if not self.TenantNameRegex.match(tenant_id):
-			euid = uuid.uuid4()
-			L.error("Cannot create tenant: Invalid ID", struct_data={"t": tenant_id, "uuid": euid})
-			return {
-				"result": "INVALID-VALUE",
-				"uuid": euid,
-				"message":
-					"Tenant ID must consist only of characters 'a-z0-9._-', "
-					"start with a letter, and be between 3 and 32 characters long.",
-			}
+			raise asab.exceptions.ValidationError(
+				"Invalid tenant ID {!r}. "
+				"Tenant ID must consist only of characters 'a-z0-9._-', "
+				"start with a letter, and be between 3 and 32 characters long.".format(tenant_id))
 
 		try:
 			tenant_id = await self.TenantsProvider.create(tenant_id, creator_id)
 		except asab.storage.exceptions.DuplicateError:
-			euid = uuid.uuid4()
-			L.error("Cannot create tenant: ID already exists", struct_data={"t": tenant_id, "uuid": euid})
-			return {
-				"result": "CONFLICT",
-				"uuid": euid,
-				"message": "A tenant with the name '{}' already exists.".format(tenant_id),
-			}
+			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
+			raise asab.exceptions.Conflict(value=tenant_id)
 
-		if tenant_id is None:
-			euid = uuid.uuid4()
-			return {
-				"result": "FAILED",
-				"uuid": euid,
-			}
-
-		# TODO: configurable name
-		role_id = "{}/admin".format(tenant_id)
-		role_service = self.App.get_service("seacatauth.RoleService")
-
-		if creator_id is not None:
-			# Assign the tenant to the user who created it
-			try:
-				await self.assign_tenant(creator_id, tenant_id)
-			except Exception as e:
-				L.error("Error assigning tenant", struct_data={
-					"cid": creator_id,
-					"tenant": tenant_id,
-					"reason": "{}: {}".format(type(e).__name__, e)
-				})
-
-		try:
-			# Create admin role in tenant
-			await role_service.create(role_id)
-			# Assign "authz:tenant:admin" resource
-			await role_service.update(role_id, resources_to_set=["authz:tenant:admin"])
-			role_created = True
-		except Exception as e:
-			role_created = False
-			L.error("Error creating role:", struct_data={
-				"role": role_id,
-				"error": "{}: {}".format(type(e).__name__, str(e))
-			})
-
-		if creator_id is not None and role_created is True:
-			# Assign the tenant admin role to the user
-			try:
-				await role_service.assign_role(creator_id, role_id)
-			except Exception as e:
-				L.error("Error assigning role", struct_data={
-					"cid": creator_id,
-					"role": role_id,
-					"reason": "{}: {}".format(type(e).__name__, e)
-				})
-
-		return {
-			"result": "OK",
-			"id": tenant_id,
-		}
+		return tenant_id
 
 
 	async def update_tenant(self, tenant_id: str, **kwargs):
@@ -123,20 +63,30 @@ class TenantService(asab.Service):
 
 
 	async def delete_tenant(self, tenant_id: str):
-		try:
-			result = await self.TenantsProvider.delete(tenant_id)
-		except KeyError:
-			euid = uuid.uuid4()
-			L.error("Cannot delete tenant: ID not found", struct_data={"t": tenant_id, "uuid": euid})
-			return {
-				"result": "NOT-FOUND",
-				"uuid": euid,
-			}
+		session_service = self.App.get_service("seacatauth.SessionService")
 
-		if result is True:
-			return {"result": "OK"}
-		else:
-			return {"result": "FAILED"}
+		# Unassign and delete tenant roles
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		tenant_roles = (await role_svc.list(tenant=tenant_id, exclude_global=True))["data"]
+		for role in tenant_roles:
+			role_id = role["_id"]
+			try:
+				await role_svc.delete(role_id)
+			except KeyError:
+				# Role has probably been improperly deleted before; continue
+				L.error("Role not found", struct_data={
+					"role_id": role_id
+				})
+				continue
+
+		# Unassign tenant from credentials
+		await self.TenantsProvider.delete_tenant_assignments(tenant_id)
+
+		# Delete tenant from provider
+		await self.TenantsProvider.delete(tenant_id)
+
+		# Delete sessions that have the tenant in scope
+		await session_service.delete_sessions_by_tenant_in_scope(tenant_id)
 
 
 	def get_provider(self):
@@ -191,7 +141,7 @@ class TenantService(asab.Service):
 					"message": message,
 				}
 			# Check permission
-			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["authz:tenant:admin"]):
+			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["seacat:tenant:assign"]):
 				message = "Not authorized for tenant un/assignment"
 				L.error(message, struct_data={
 					"agent_cid": session.Credentials.Id,

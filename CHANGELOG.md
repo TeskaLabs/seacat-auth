@@ -3,12 +3,38 @@
 ## Release candidate
 
 ### Breaking changes
+- In resource list, the `include_deleted` and `exclude_global_only` params are replaced by `exclude` param (#196, PLUM Sprint 230421)
+- Cookie authorize requests require that cookie_entry_uri be configured (#188, PLUM Sprint 230421)
+- The state-redirect mechanism in cookie flow has been removed (#188, PLUM Sprint 230421)
+
+### Fix
+- Fix provisioning initialization (#195, PLUM Sprint 230412)
+- Fix request access control attributes and methods (#197, PLUM Sprint 230421)
+- Reintroduce metrics (#198, PLUM Sprint 230421)
+
+### Features
+- Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)
+- Cookie entrypoint webhook for setting custom response headers (#188, PLUM Sprint 230421)
+
+### Refactoring
+- Each client has their unique cookie name (#188, PLUM Sprint 230421)
+
+---
+
+
+## v23.16-beta
+
+### Breaking changes
 - Introspection requests require client_id in the query (#156, PLUM Sprint 230324)
 - Every cookie introspection should be paired with a cookie entrypoint (#156, PLUM Sprint 230324)
 - Bouncer module replaced by cookie entrypoint (#156, PLUM Sprint 230324)
 - Dropped support for custom cookie domains in the configuration (#156, PLUM Sprint 230324)
 - External login status messages changed (#185, PLUM Sprint 230324)
 - Bulk-unassign tenants using "UNASSIGN-TENANT" (#189, PLUM Sprint 230324)
+- Resource "authz:tenant:admin" is deprecated and replaced by several resources (#183, PLUM Sprint 230412)
+- Viewing and browsing all tenants requires superuser privileges (#183, PLUM Sprint 230412)
+- Seacat Admin built-in resources are not editable (#183, PLUM Sprint 230412)
+- Mock mode option of SMSbrana.cz provider changed (#191, PLUM Sprint 230412)
 
 ### Fix
 - Improve last login search performance (#173, PLUM Sprint 230324)
@@ -21,6 +47,8 @@
 ### Features
 - Per-client configurable authorization, login and cookies (#156, PLUM Sprint 230324)
 - External login ident stored (#185, PLUM Sprint 230324)
+- Granular access control for Admin API (#183, PLUM Sprint 230412)
+- SMTP provider mock mode (#191, PLUM Sprint 230412)
 
 ### Refactoring
 - OpenAPI docs updated (#181, PLUM Sprint 230324)

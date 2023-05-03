@@ -218,13 +218,6 @@ class AuthenticationHandler(object):
 		if ff is not None:
 			access_ips.extend(ff.split(', '))
 
-		# Get the current session's TrackID
-		current_session = await self.CookieService.get_session_by_sci(request)
-		if current_session is not None:
-			track_id = current_session.TrackId
-		else:
-			track_id = None
-
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
@@ -252,7 +245,7 @@ class AuthenticationHandler(object):
 			)
 
 		# Do the actual login
-		session = await self.AuthenticationService.login(login_session, from_info=access_ips, track_id=track_id)
+		session = await self.AuthenticationService.login(login_session, from_info=access_ips)
 
 		# TODO: Note the last successful login time
 		# TODO: Log also the IP address
@@ -287,7 +280,7 @@ class AuthenticationHandler(object):
 		"""
 		Log out of the current session and all its subsessions
 		"""
-		session = await self.CookieService.get_session_by_sci(request)
+		session = await self.CookieService.get_session_by_request_cookie(request)
 		if session is None:
 			raise aiohttp.web.HTTPBadRequest()
 
@@ -299,6 +292,7 @@ class AuthenticationHandler(object):
 		else:
 			response = asab.web.rest.json_response(request, {'result': 'OK'})
 
+		# TODO: Also delete cookies of all the terminated subsessions
 		delete_cookie(self.App, response)
 
 		if self.BatmanService is not None:

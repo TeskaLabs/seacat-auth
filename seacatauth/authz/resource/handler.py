@@ -16,10 +16,10 @@ L = logging.getLogger(__name__)
 
 class ResourceHandler(object):
 	"""
-	Manage resources
+	Resource management
 
 	---
-	tags: ["Manage resources"]
+	tags: ["Resource management"]
 	"""
 
 	def __init__(self, app, rbac_svc):
@@ -34,6 +34,7 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 
+	@access_control("seacat:resource:access")
 	async def list(self, request):
 		"""
 		List resources
@@ -55,6 +56,17 @@ class ResourceHandler(object):
 			description: Filter string
 			schema:
 				type: string
+		-	name: exclude
+			in: query
+			description:
+				Exclude resources based on their type/status. If omitted, this parameter defaults
+				to `exclude=deleted`, which means the results include all active resources.
+			required: false
+			explode: false
+			schema:
+				type: array
+				items:
+					enum: ["active", "deleted", "globalonly"]
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
@@ -64,24 +76,41 @@ class ResourceHandler(object):
 		# Filter by ID.startswith()
 		query_filter = {}
 		if "f" in request.query:
-			query_filter["_id"] = re.compile(
-				"^{}".format(re.escape(request.query["f"])))
+			query_filter["_id"] = {"$regex": "^{}".format(re.escape(request.query["f"]))}
 
-		# Do not include soft-deleted resources unless requested
-		if request.query.get("include_deleted") != "true":
-			query_filter["deleted"] = {"$in": [None, False]}
+		# Get the types of resources to exclude from the results
+		# By default, exclude only deleted resources
+		exclude = request.query.get("exclude", "")
+		if len(exclude) == 0:
+			exclude = "deleted"
+		exclude = exclude.split(",")
+		if "deleted" in exclude:
+			if "active" in exclude:
+				return asab.web.rest.json_response(request, {"data": [], "count": 0})
+			else:
+				query_filter["deleted"] = {"$in": [None, False]}
+		else:
+			if "active" in exclude:
+				query_filter["deleted"] = True
+			else:
+				pass
+
+		if "globalonly" in exclude:
+			if "_id" not in query_filter:
+				query_filter["_id"] = {}
+			query_filter["_id"]["$nin"] = list(self.ResourceService.GlobalOnlyResources)
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
 
 
+	@access_control("seacat:resource:access")
 	async def get(self, request):
 		"""
 		Get resource detail
 		"""
 		resource_id = request.match_info["resource_id"]
 		result = await self.ResourceService.get(resource_id)
-		result["result"] = "OK"
 		return asab.web.rest.json_response(
 			request, result
 		)
@@ -93,7 +122,7 @@ class ResourceHandler(object):
 		"properties": {
 			"description": {"type": "string"}}
 	})
-	@access_control("authz:superuser")
+	@access_control("seacat:resource:edit")
 	async def create_or_undelete(self, request, *, json_data):
 		"""
 		Create a new resource or undelete a resource that has been soft-deleted
@@ -124,7 +153,7 @@ class ResourceHandler(object):
 			"description": {"type": "string"},
 		}
 	})
-	@access_control("authz:superuser")
+	@access_control("seacat:resource:edit")
 	async def update(self, request, *, json_data):
 		"""
 		Update resource description or rename resource
@@ -138,7 +167,7 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:resource:edit")
 	async def delete(self, request):
 		"""
 		Delete resource

@@ -32,36 +32,37 @@ class CredentialsHandler(object):
 	def __init__(self, app, credentials_svc):
 		self.CredentialsService = credentials_svc
 
-		self.SessionService = app.get_service('seacatauth.SessionService')
+		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service('seacatauth.AuditService')
+		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
 
-		web_app.router.add_get('/credentials', self.list_credentials)
-		web_app.router.add_put('/idents', self.get_idents_from_ids)
-		web_app.router.add_put('/usernames', self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
-		web_app.router.add_get('/locate', self.locate_credentials)
-		web_app.router.add_get('/credentials/{credentials_id}', self.get_credentials)
+		web_app.router.add_get("/credentials", self.list_credentials)
+		web_app.router.add_put("/idents", self.get_idents_from_ids)
+		web_app.router.add_put("/usernames", self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
+		web_app.router.add_get("/locate", self.locate_credentials)
+		web_app.router.add_get("/credentials/{credentials_id}", self.get_credentials)
 
-		web_app.router.add_post('/credentials/{provider}', self.create_credentials)
-		web_app.router.add_put('/credentials/{credentials_id}', self.update_credentials)
-		web_app.router.add_delete('/credentials/{credentials_id}', self.delete_credentials)
+		web_app.router.add_post("/credentials/{provider}", self.create_credentials)
+		web_app.router.add_put("/credentials/{credentials_id}", self.update_credentials)
+		web_app.router.add_delete("/credentials/{credentials_id}", self.delete_credentials)
 
-		web_app.router.add_put('/public/credentials', self.update_my_credentials)
+		web_app.router.add_put("/public/credentials", self.update_my_credentials)
 
 		# Providers
-		web_app.router.add_get('/provider/{provider_id}', self.get_provider_info)
-		web_app.router.add_get('/providers', self.list_providers)
-		web_app.router.add_get('/public/provider', self.get_my_provider_info)
-		web_app.router.add_put('/enforce-factors/{credentials_id}', self.enforce_factors)
+		web_app.router.add_get("/provider/{provider_id}", self.get_provider_info)
+		web_app.router.add_get("/providers", self.list_providers)
+		web_app.router.add_get("/public/provider", self.get_my_provider_info)
+		web_app.router.add_put("/enforce-factors/{credentials_id}", self.enforce_factors)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put('/public/credentials', self.update_my_credentials)
-		web_app_public.router.add_get('/public/provider', self.get_my_provider_info)
+		web_app_public.router.add_put("/public/credentials", self.update_my_credentials)
+		web_app_public.router.add_get("/public/provider", self.get_my_provider_info)
 
 
+	@access_control("seacat:credentials:access")
 	async def list_providers(self, request):
 		"""
 		Get credential providers and their metadata
@@ -72,6 +73,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, providers)
 
 
+	@access_control("seacat:credentials:access")
 	async def get_provider_info(self, request):
 		"""
 		Get the metadata of the requested credential provider.
@@ -99,6 +101,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	@access_control("seacat:credentials:access")
 	async def locate_credentials(self, request):
 		"""
 		Return the IDs of credentials that match the specified ident.
@@ -126,6 +129,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"credentials_ids": credentials_ids})
 
 
+	@access_control("seacat:credentials:access")
 	async def list_credentials(self, request):
 		"""
 		List credentials
@@ -182,14 +186,14 @@ class CredentialsHandler(object):
 				L.error("No filter string specified.", struct_data={"mode": mode})
 				raise aiohttp.web.HTTPBadRequest()
 
-			# These filters require access to authz:tenant:admin resource
+			# These filters require access dedicated resource
 			rbac_svc = self.CredentialsService.App.get_service("seacatauth.RBACService")
 
 			if mode == "role":
 				# Check if the user has admin access to the role's tenant
 				tenant = filtr.split("/")[0]
 				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]
+					request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
 				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
@@ -201,7 +205,7 @@ class CredentialsHandler(object):
 				# Check if the user has admin access to the requested tenant
 				tenant = filtr
 				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["authz:tenant:admin"]
+					request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
 				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
@@ -209,6 +213,9 @@ class CredentialsHandler(object):
 				tenant_svc = self.CredentialsService.App.get_service("seacatauth.TenantService")
 				provider = tenant_svc.get_provider()
 				assignments = await provider.list_tenant_assignments(tenant, page, limit)
+
+			else:
+				raise ValueError("Unknown mode: {}".format(mode))
 
 			if assignments["count"] == 0:
 				return asab.web.rest.json_response(request, {
@@ -294,6 +301,7 @@ class CredentialsHandler(object):
 			"type": "string"
 		}
 	})
+	@access_control("seacat:credentials:access")
 	async def get_idents_from_ids(self, request, *, json_data):
 		"""
 		Get human-intelligible identifiers for a list of credential IDs
@@ -321,10 +329,10 @@ class CredentialsHandler(object):
 			"data": result_data
 		})
 
-
+	@access_control("seacat:credentials:access")
 	async def get_credentials(self, request):
 		"""
-		Get requested credentials' metadata
+		Get requested credentials' detail
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		_, provider_id, _ = credentials_id.split(':', 2)
@@ -338,7 +346,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(CREATE_CREDENTIALS)
-	@access_control("authz:tenant:admin")
+	@access_control("seacat:credentials:edit")
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
@@ -370,7 +378,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CREDENTIALS)
-	@access_control("authz:superuser")
+	@access_control("seacat:credentials:edit")
 	async def update_credentials(self, request, *, json_data):
 		"""
 		Update credentials
@@ -419,6 +427,7 @@ class CredentialsHandler(object):
 			}
 		}
 	})
+	@access_control("seacat:credentials:edit")
 	async def enforce_factors(self, request, *, json_data):
 		"""
 		Specify authentication factors to be enforced from the user
@@ -440,7 +449,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	@access_control("authz:superuser")
+	@access_control("seacat:credentials:edit")
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials
