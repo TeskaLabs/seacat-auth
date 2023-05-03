@@ -33,14 +33,18 @@ class SeaCatAuthApplication(asab.Application):
 		# Locate web service
 		self.WebService = self.get_service("asab.WebService")
 
-		# Create
+		# Create admin container
 		self.WebContainer = asab.web.WebContainer(self.WebService, "web")
 		self.WebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 		self.WebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
+		# Create public container
 		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 		self.PublicWebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
+
+		# Initialize metrics service
+		self.add_module(asab.metrics.Module)
 
 		# Api service
 		from asab.api import ApiService
