@@ -56,13 +56,16 @@ def private_auth_middleware_factory(app):
 				else:
 					L.info("Invalid Bearer token")
 
-		if request.Session is not None:
-			def has_resource_access(tenant: str, resource: str) -> bool:
-				return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
+		def has_resource_access(tenant: str, resource: str) -> bool:
+			if request.Session is None:
+				return False
+			return rbac_svc.has_resource_access(request.Session.Authorization.Authz, tenant, [resource])
 
-			request.has_resource_access = has_resource_access
-			request.is_superuser = rbac_svc.is_superuser(request.Session.Authorization.Authz)
-			request.can_access_all_tenants = rbac_svc.can_access_all_tenants(request.Session.Authorization.Authz)
+		request.has_resource_access = has_resource_access
+		request.is_superuser = rbac_svc.is_superuser(request.Session.Authorization.Authz) \
+			if request.Session is not None else False
+		request.can_access_all_tenants = rbac_svc.can_access_all_tenants(request.Session.Authorization.Authz) \
+			if request.Session is not None else False
 
 		if require_authentication is False:
 			return await handler(request)
