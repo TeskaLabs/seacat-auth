@@ -510,15 +510,21 @@ class AuthorizeHandler(object):
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
 		cookie_entry_uri = client_dict.get("cookie_entry_uri")
-		if cookie_entry_uri is not None:
+		if cookie_entry_uri is None:
+			L.error("Client has no cookie_entry_uri configured.", struct_data={"client_id": client_dict["_id"]})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidRequest, client_dict["_id"],
+				redirect_uri=redirect_uri,
+				struct_data={"reason": "cookie_entry_uri_not_configured"})
+		else:
 			# TODO: More clever formatting (what if the cookie_entry_uri already has a query)
-			redirect_uri = "{}?{}".format(
+			return "{}?{}".format(
 				cookie_entry_uri,
 				urllib.parse.urlencode([
-					("client_id", client_dict["_id"]),
-					("grant_type", "authorization_code"),
+					("client_id", client_dict["_id"]),  # TODO: Remove, this should be a client responsibility
+					("grant_type", "authorization_code"),  # TODO: Remove, this should be a client responsibility
 					("redirect_uri", redirect_uri)]))
-		return redirect_uri
+
 
 	async def _authorize_client(self, client_id, redirect_uri, client_secret=None):
 		try:
