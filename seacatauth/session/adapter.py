@@ -209,6 +209,7 @@ class SessionAdapter:
 				self.FN.Authentication.LoginDescriptor: self.Authentication.LoginDescriptor,
 				self.FN.Authentication.AvailableFactors: self.Authentication.AvailableFactors,
 				self.FN.Authentication.TOTPSet: self.Authentication.TOTPSet,
+				self.FN.Authentication.IsAnonymous: self.Authentication.IsAnonymous,
 			})
 
 		if self.Authorization is not None:
