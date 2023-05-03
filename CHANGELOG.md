@@ -3,6 +3,7 @@
 ## Release candidate
 
 ### Breaking changes
+- In resource list, the `include_deleted` and `exclude_global_only` params are replaced by `exclude` param (#196, PLUM Sprint 230421)
 - Cookie authorize requests require that cookie_entry_uri be configured (#188, PLUM Sprint 230421)
 - The state-redirect mechanism in cookie flow has been removed (#188, PLUM Sprint 230421)
 
@@ -11,6 +12,7 @@
 - Fix request access control attributes and methods (#197, PLUM Sprint 230421)
 
 ### Features
+- Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)
 - Cookie entrypoint webhook for setting custom response headers (#188, PLUM Sprint 230421)
 
 ### Refactoring
