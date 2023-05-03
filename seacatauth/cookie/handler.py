@@ -90,13 +90,15 @@ class CookieHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/cookie/nginx", self.nginx)
 		web_app.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
-		web_app.router.add_get("/cookie/entry", self.bouncer)
+		web_app.router.add_get("/cookie/entry", self.bouncer_get)
+		web_app.router.add_post("/cookie/entry", self.bouncer_post)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/cookie/nginx", self.nginx)
 		web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
-		web_app_public.router.add_get("/cookie/entry", self.bouncer)
+		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
+		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
 
 
 	async def nginx(self, request):
@@ -270,7 +272,7 @@ class CookieHandler(object):
 		return response
 
 
-	async def bouncer(self, request):
+	async def bouncer_get(self, request):
 		"""
 		Exchange authorization code for cookie and redirect to specified redirect URI.
 
@@ -295,11 +297,52 @@ class CookieHandler(object):
 			description: OAuth Authorization code returned by the authorize endpoint
 			required: true
 		"""
+		params = request.query
+		return await self._bouncer(request, params)
+
+
+	async def bouncer_post(self, request):
+		"""
+		Exchange authorization code for cookie and redirect to specified redirect URI.
+
+		---
+		requestBody:
+			content:
+				application/x-www-form-urlencoded:
+					schema:
+						type: object
+						properties:
+							client_id:
+								type: string
+								enum: ["authorization_code", "refresh_token"]
+								description: The type of grant being requested.
+							redirect_uri:
+								type: string
+								description: The destination to redirect to.
+							grant_type:
+								type: string
+								enum: ["authorization_code"]
+								description: OAuth Grant Type.
+							code:
+								type: string
+								description: The authorization code returned by the authorization server.
+						required:
+							- grant_type
+							- code
+							- client_id
+							- redirect_uri
+		"""
+		params = await request.post()
+		return await self._bouncer(request, params)
+
+
+	async def _bouncer(self, request, parameters):
+		"""
+		Exchange authorization code for cookie and redirect to specified redirect URI.
+		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		query = request.query
-
-		client_id = query.get("client_id")
+		client_id = parameters.get("client_id")
 		if client_id is None:
 			L.error("No 'client_id' specified in cookie entrypoint query.")
 			return asab.web.rest.json_response(
@@ -311,14 +354,14 @@ class CookieHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidClient}, status=400)
 
-		grant_type = query.get("grant_type")
+		grant_type = parameters.get("grant_type")
 		if grant_type != "authorization_code":
 			L.error("Grant type not supported.", struct_data={"grant_type": grant_type})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.UnsupportedGrantType}, status=400)
 
 		# Use the code to get session ID
-		code = query.get("code")
+		code = parameters.get("code")
 		if code in (None, ""):
 			L.warning("Empty or missing 'code' parameter in query.", struct_data={"client_id": client_id})
 			return asab.web.rest.json_response(
@@ -330,9 +373,9 @@ class CookieHandler(object):
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
 		# Determine the destination URI
-		if "redirect_uri" in query:
+		if "redirect_uri" in parameters:
 			# Use the redirect URI from request query
-			redirect_uri = query["redirect_uri"]
+			redirect_uri = parameters["redirect_uri"]
 		else:
 			# Fallback to client URI or Auth UI
 			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl
