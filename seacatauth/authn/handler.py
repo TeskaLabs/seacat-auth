@@ -12,6 +12,7 @@ import jwcrypto.jwk
 
 from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
+from ..decorators import access_control
 
 #
 
@@ -44,6 +45,7 @@ class AuthenticationHandler(object):
 		web_app.router.add_put(r'/public/login/{lsid}/smslogin', self.smslogin)
 		web_app.router.add_put(r'/public/login/{lsid}/webauthn', self.webauthn_login)
 		web_app.router.add_put(r'/public/logout', self.logout)
+		web_app.router.add_put("/impersonate", self.impersonate)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
@@ -372,3 +374,65 @@ class AuthenticationHandler(object):
 		except KeyError:
 			login_key = None
 		return login_key
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": ["credentials_id"],
+		"properties": {
+			"credentials_id": {
+				"type": "string",
+				"description": "ID of the credentials to impersonate."}}
+	})
+	@access_control("authz:impersonate")
+	async def impersonate(self, request, *, json_data, credentials_id):
+		"""
+		Open a root session as a different user. Requires `authz:impersonate`.
+		"""
+		from_info = [request.remote]
+		ff = request.headers.get("X-Forwarded-For")
+		if ff is not None:
+			from_info.extend(ff.split(", "))
+
+		impersonator_session = request.Session
+		target_cid = json_data["credentials_id"]
+
+		try:
+			session = await self.AuthenticationService.create_impersonated_session(impersonator_session, target_cid)
+		except Exception as e:
+			await self.AuditService.append(
+				AuditCode.IMPERSONATION_FAILED,
+				{
+					"impersonator_cid": credentials_id,
+					"impersonator_sid": impersonator_session.SessionId,
+					"target_cid": target_cid,
+					"fi": from_info,
+				}
+			)
+			raise e
+		else:
+			L.log(
+				asab.LOG_NOTICE,
+				"Impersonation successful.",
+				struct_data={
+					"impersonator_cid": credentials_id,
+					"impersonator_sid": impersonator_session.SessionId,
+					"target_cid": target_cid,
+					"target_sid": str(session.Session.Id),
+					"from_info": from_info,
+				}
+			)
+			await self.AuditService.append(
+				AuditCode.IMPERSONATION_SUCCESSFUL,
+				{
+					"impersonator_cid": credentials_id,
+					"impersonator_sid": impersonator_session.SessionId,
+					"target_cid": target_cid,
+					"target_sid": session.Session.Id,
+					"fi": from_info,
+				}
+			)
+
+		response = asab.web.rest.json_response(request, {"result": "OK"})
+		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
+		return response

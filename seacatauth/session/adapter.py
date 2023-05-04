@@ -44,7 +44,8 @@ class AuthenticationData:
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
 	IsAnonymous: typing.Optional[bool]
-	ImpersonatedBy: typing.Optional[str]
+	ImpersonatorCredentialsId: typing.Optional[str]
+	ImpersonatorSessionId: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -117,7 +118,8 @@ class SessionAdapter:
 			AvailableFactors = "an_af"
 			LastLogin = "an_ll"
 			IsAnonymous = "an_ano"
-			ImpersonatedBy = "an_imp"
+			ImpersonatorCredentialsId = "an_imcid"
+			ImpersonatorSessionId = "an_imsid"
 
 		class OAuth2:
 			_prefix = "oa"
@@ -212,6 +214,8 @@ class SessionAdapter:
 				self.FN.Authentication.AvailableFactors: self.Authentication.AvailableFactors,
 				self.FN.Authentication.TOTPSet: self.Authentication.TOTPSet,
 				self.FN.Authentication.IsAnonymous: self.Authentication.IsAnonymous,
+				self.FN.Authentication.ImpersonatorCredentialsId: self.Authentication.ImpersonatorCredentialsId,
+				self.FN.Authentication.ImpersonatorSessionId: self.Authentication.ImpersonatorSessionId,
 			})
 
 		if self.Authorization is not None:
@@ -305,7 +309,8 @@ class SessionAdapter:
 			or session_dict.pop("AF", None),
 			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
 			IsAnonymous=session_dict.pop(cls.FN.Authentication.IsAnonymous, None),
-			ImpersonatedBy=session_dict.pop(cls.FN.Authentication.ImpersonatedBy, None),
+			ImpersonatorCredentialsId=session_dict.pop(cls.FN.Authentication.ImpersonatorCredentialsId, None),
+			ImpersonatorSessionId=session_dict.pop(cls.FN.Authentication.ImpersonatorSessionId, None),
 		)
 
 	@classmethod
@@ -384,8 +389,11 @@ def rest_get(session_dict):
 
 	if session_dict.get(SessionAdapter.FN.Authentication.IsAnonymous) is True:
 		data["anonymous"] = True
-	impersonated_by = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatedBy)
-	if impersonated_by is not None:
-		data["impersonated_by"] = impersonated_by
+	impersonator_cid = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId)
+	if impersonator_cid is not None:
+		data["impersonator_cid"] = impersonator_cid
+	impersonator_sid = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatorSessionId)
+	if impersonator_sid is not None:
+		data["impersonator_sid"] = impersonator_sid
 
 	return data
