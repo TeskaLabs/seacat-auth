@@ -396,12 +396,9 @@ class AuthorizeHandler(object):
 
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
-					root_session.Credentials.Id, client_id, scope,
+					root_session, client_id, scope,
 					tenants=tenants,
-					login_descriptor=root_session.Authentication.LoginDescriptor,
 					requested_expiration=requested_expiration,
-					track_id=root_session.TrackId,
-					root_session_id=root_session.SessionId,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method)
 			elif authorize_type == "cookie":
