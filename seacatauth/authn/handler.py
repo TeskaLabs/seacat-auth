@@ -403,17 +403,21 @@ class AuthenticationHandler(object):
 		if ff is not None:
 			from_info.extend(ff.split(", "))
 
-		impersonator_session = request.Session
 		target_cid = json_data["credentials_id"]
 
+		if request.Session.Session.Type == "root":
+			impersonator_root_session = request.Session
+		else:
+			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
+
 		try:
-			session = await self.AuthenticationService.create_impersonated_session(impersonator_session, target_cid)
+			session = await self.AuthenticationService.create_impersonated_session(impersonator_root_session, target_cid)
 		except Exception as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
 				{
 					"impersonator_cid": credentials_id,
-					"impersonator_sid": impersonator_session.SessionId,
+					"impersonator_sid": impersonator_root_session.SessionId,
 					"target_cid": target_cid,
 					"fi": from_info,
 				}
@@ -425,7 +429,7 @@ class AuthenticationHandler(object):
 				"Impersonation successful.",
 				struct_data={
 					"impersonator_cid": credentials_id,
-					"impersonator_sid": impersonator_session.SessionId,
+					"impersonator_sid": impersonator_root_session.SessionId,
 					"target_cid": target_cid,
 					"target_sid": str(session.Session.Id),
 					"from_info": from_info,
@@ -435,7 +439,7 @@ class AuthenticationHandler(object):
 				AuditCode.IMPERSONATION_SUCCESSFUL,
 				{
 					"impersonator_cid": credentials_id,
-					"impersonator_sid": impersonator_session.SessionId,
+					"impersonator_sid": impersonator_root_session.SessionId,
 					"target_cid": target_cid,
 					"target_sid": session.Session.Id,
 					"fi": from_info,
