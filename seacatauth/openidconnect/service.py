@@ -287,6 +287,19 @@ class OpenIdConnectService(asab.Service):
 		if track_id is not None:
 			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
 
+		# Transfer impersonation data
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			session_builders.append((
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					root_session.Authentication.ImpersonatorSessionId
+				),
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					root_session.Authentication.ImpersonatorCredentialsId
+				),
+			))
+
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session_id=root_session_id,

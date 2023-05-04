@@ -180,7 +180,19 @@ class CookieService(asab.Service):
 
 		if root_session.TrackId is not None:
 			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
-		# Otherwise keep the session without tracking ID for now
+
+		# Transfer impersonation data
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			session_builders.append((
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					root_session.Authentication.ImpersonatorSessionId
+				),
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					root_session.Authentication.ImpersonatorCredentialsId
+				),
+			))
 
 		oauth2_data = {
 			"scope": scope,
