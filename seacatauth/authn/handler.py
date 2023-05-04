@@ -294,8 +294,17 @@ class AuthenticationHandler(object):
 		else:
 			response = asab.web.rest.json_response(request, {'result': 'OK'})
 
-		# TODO: Also delete cookies of all the terminated subsessions
 		delete_cookie(self.App, response)
+
+		# If the current session is impersonated, try to restore the original session
+		if session.Authentication.ImpersonatorSessionId is not None:
+			try:
+				impersonator_session = await self.SessionService.get(session.Authentication.ImpersonatorSessionId)
+				print(impersonator_session)
+				set_cookie(self.App, response, impersonator_session)
+			except KeyError:
+				L.log(asab.LOG_NOTICE, "Impersonator session not found.", struct_data={
+					"sid": session.Authentication.ImpersonatorSessionId})
 
 		if self.BatmanService is not None:
 			response.del_cookie(self.BatmanService.CookieName)
