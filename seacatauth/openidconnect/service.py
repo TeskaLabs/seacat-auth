@@ -419,6 +419,10 @@ class OpenIdConnectService(asab.Service):
 		if session.TrackId is not None:
 			userinfo["track_id"] = uuid.UUID(bytes=session.TrackId)
 
+		if session.Authentication.ImpersonatorSessionId:
+			userinfo["impersonator_sid"] = session.Authentication.ImpersonatorSessionId
+			userinfo["impersonator_cid"] = session.Authentication.ImpersonatorCredentialsId
+
 		if await otp_service.has_activated_totp(session.Credentials.Id):
 			userinfo["totp_set"] = True
 
