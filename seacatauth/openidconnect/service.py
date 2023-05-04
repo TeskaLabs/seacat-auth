@@ -268,9 +268,11 @@ class OpenIdConnectService(asab.Service):
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions,
-				 root_session.Authentication.ExternalLoginOptions),
 				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
+				(
+					SessionAdapter.FN.Authentication.ExternalLoginOptions,
+					root_session.Authentication.ExternalLoginOptions
+				),
 			])
 
 		# TODO: if 'openid' in scope
@@ -283,8 +285,6 @@ class OpenIdConnectService(asab.Service):
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
 			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
-		if track_id is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
 
 		# Transfer impersonation data
 		if root_session.Authentication.ImpersonatorSessionId is not None:
