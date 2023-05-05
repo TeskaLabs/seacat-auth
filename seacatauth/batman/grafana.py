@@ -42,9 +42,12 @@ class GrafanaIntegration(asab.config.Configurable):
 		self.RBACService = self.BatmanService.App.get_service("seacatauth.RBACService")
 		self.ResourceService = self.BatmanService.App.get_service("seacatauth.ResourceService")
 
-		username = self.Config.get('username')
-		password = self.Config.get('password')
-		self.BasicAuth = aiohttp.BasicAuth(username, password)
+		username = self.Config.get("username")
+		password = self.Config.get("password")
+		if username != "":
+			self.Authorization = aiohttp.BasicAuth(username, password)
+		else:
+			self.Authorization = None
 
 		self.URL = self.Config.get('url').rstrip('/')
 
@@ -129,7 +132,7 @@ class GrafanaIntegration(asab.config.Configurable):
 
 		# TODO: Check if user exists
 		try:
-			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
+			async with aiohttp.ClientSession(auth=self.Authorization) as session:
 				async with session.post('{}/api/admin/users'.format(self.URL), json=json) as resp:
 					if resp.status == 200:
 						pass
