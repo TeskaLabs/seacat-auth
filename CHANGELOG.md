@@ -13,6 +13,7 @@
 - Reintroduce metrics (#198, PLUM Sprint 230421)
 - Allow batman to be configured without basic auth (#199, PLUM Sprint 230421)
 - Include client cookie name in client detail (#200, PLUM Sprint 230421)
+- Fix cookie entrypoint when no webhook is configured (#201, PLUM Sprint 230421)
 
 ### Features
 - Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)
