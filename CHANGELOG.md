@@ -11,6 +11,7 @@
 - Fix provisioning initialization (#195, PLUM Sprint 230412)
 - Fix request access control attributes and methods (#197, PLUM Sprint 230421)
 - Reintroduce metrics (#198, PLUM Sprint 230421)
+- Allow batman to be configured without basic auth (#199, PLUM Sprint 230421)
 
 ### Features
 - Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)
