@@ -54,7 +54,10 @@ class ELKIntegration(asab.config.Configurable):
 
 		username = self.Config.get("username")
 		password = self.Config.get("password")
-		self.BasicAuth = aiohttp.BasicAuth(username, password)
+		if username != "":
+			self.Authorization = aiohttp.BasicAuth(username, password)
+		else:
+			self.Authorization = None
 
 		self.URL = self.Config.get("url").rstrip("/")
 		self.ResourcePrefix = self.Config.get("resource_prefix")
@@ -85,7 +88,7 @@ class ELKIntegration(asab.config.Configurable):
 		"""
 		# Fetch ELK roles
 		try:
-			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
+			async with aiohttp.ClientSession(auth=self.Authorization) as session:
 				async with session.get("{}/_xpack/security/role".format(self.URL)) as resp:
 					if resp.status != 200:
 						text = await resp.text()
@@ -176,7 +179,7 @@ class ELKIntegration(asab.config.Configurable):
 		json["roles"] = list(elk_roles)
 
 		try:
-			async with aiohttp.ClientSession(auth=self.BasicAuth) as session:
+			async with aiohttp.ClientSession(auth=self.Authorization) as session:
 				async with session.post("{}/_xpack/security/user/{}".format(self.URL, username), json=json) as resp:
 					if resp.status == 200:
 						# Everything is alright here
