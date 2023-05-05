@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.18-beta
 
 ### Breaking changes
 - In resource list, the `include_deleted` and `exclude_global_only` params are replaced by `exclude` param (#196, PLUM Sprint 230421)
