@@ -273,9 +273,11 @@ class ClientService(asab.Service):
 
 
 	async def get(self, client_id: str):
+		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client = await self.StorageService.get(self.ClientCollection, client_id, decrypt=["__client_secret"])
 		if "__client_secret" in client:
 			client["__client_secret"] = client["__client_secret"].decode("ascii")
+		client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
 		return client
 
 
