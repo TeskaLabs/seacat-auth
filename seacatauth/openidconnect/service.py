@@ -15,6 +15,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from ..generic import add_params_to_url_query
 from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
@@ -45,6 +46,7 @@ class OpenIdConnectService(asab.Service):
 	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationCodeCollection = "ac"
+	AuthorizePath = "/openidconnect/authorize"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
@@ -68,6 +70,12 @@ class OpenIdConnectService(asab.Service):
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
+
+		public_api_base_url = asab.Config.get("general", "public_api_base_url")
+		if public_api_base_url.endswith("/"):
+			self.PublicApiBaseUrl = public_api_base_url[:-1]
+		else:
+			self.PublicApiBaseUrl = public_api_base_url
 
 		self.PrivateKey = self._load_private_key()
 
@@ -568,3 +576,18 @@ class OpenIdConnectService(asab.Service):
 		if credential_id is not None:
 			d["cid"] = credential_id
 		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+
+
+	def build_authorize_uri(self, client_dict, redirect_uri, response_type, **query_params):
+		"""
+		Check if the client has a registered OAuth Authorize URI. If not, use the default.
+		Extend the URI with query parameters.
+		"""
+		authorize_uri = client_dict.get("authorize_uri")
+		if authorize_uri is None:
+			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+		return add_params_to_url_query(
+			authorize_uri,
+			client_id=client_dict["_id"], redirect_uri=redirect_uri, response_type=response_type,
+			**query_params
+		)
