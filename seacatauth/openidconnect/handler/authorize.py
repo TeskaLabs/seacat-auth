@@ -682,7 +682,7 @@ class AuthorizeHandler(object):
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
 		# Build redirect uri
-		callback_uri = self._build_login_callback_uri(client_dict, authorize_query_params)
+		callback_uri = self.OpenIdConnectService.build_authorize_uri(client_dict, authorize_query_params)
 
 		login_query_params.append(("redirect_uri", callback_uri))
 		login_query_params.append(("client_id", client_id))
@@ -876,22 +876,6 @@ class AuthorizeHandler(object):
 
 		return urlunparse(**parsed)
 
-
-	def _build_login_callback_uri(self, client_dict, authorize_query_params):
-		"""
-		Check if the client has a registered OAuth Authorize URI. If not, use the default.
-		Extend the URI with query parameters.
-		"""
-		authorize_uri = client_dict.get("authorize_uri")
-		if authorize_uri is None:
-			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
-
-		parsed = urlparse(authorize_uri)
-		query = urllib.parse.parse_qs(parsed["query"])
-		query.update(authorize_query_params)
-		parsed["query"] = urllib.parse.urlencode(query)
-
-		return urlunparse(**parsed)
 
 	def _validate_request_parameters(self, request_parameters):
 		state = request_parameters.get("state") or None
