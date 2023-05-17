@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.18-beta
 
 ### Breaking changes
 - In resource list, the `include_deleted` and `exclude_global_only` params are replaced by `exclude` param (#196, PLUM Sprint 230421)
@@ -11,6 +11,9 @@
 - Fix provisioning initialization (#195, PLUM Sprint 230412)
 - Fix request access control attributes and methods (#197, PLUM Sprint 230421)
 - Reintroduce metrics (#198, PLUM Sprint 230421)
+- Allow batman to be configured without basic auth (#199, PLUM Sprint 230421)
+- Include client cookie name in client detail (#200, PLUM Sprint 230421)
+- Fix cookie entrypoint when no webhook is configured (#201, PLUM Sprint 230421)
 
 ### Features
 - Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)

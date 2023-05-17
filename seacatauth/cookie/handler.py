@@ -262,7 +262,8 @@ class CookieHandler(object):
 			# Trigger webhook and add custom HTTP headers
 			try:
 				data = await self._fetch_webhook_data(client, session)
-				response.headers.update(data.get("response_headers", {}))
+				if data is not None:
+					response.headers.update(data.get("response_headers", {}))
 			except exceptions.ClientResponseError as e:
 				L.error("Webhook responded with error.", struct_data={
 					"status": e.Status, "text": e.Data})
@@ -427,7 +428,8 @@ class CookieHandler(object):
 		# Trigger webhook and set custom client response headers
 		try:
 			data = await self._fetch_webhook_data(client, session)
-			response.headers.update(data.get("response_headers", {}))
+			if data is not None:
+				response.headers.update(data.get("response_headers", {}))
 		except exceptions.ClientResponseError as e:
 			L.error("Webhook responded with error.", struct_data={
 				"status": e.Status, "text": e.Data})
@@ -458,14 +460,15 @@ class CookieHandler(object):
 		```
 		"""
 		cookie_webhook_uri = client.get("cookie_webhook_uri")
-		if cookie_webhook_uri is not None:
-			async with aiohttp.ClientSession() as http_session:
-				# TODO: Better serialization
-				userinfo = await self.CookieService.OpenIdConnectService.build_userinfo(session)
-				data = asab.web.rest.json.JSONDumper(pretty=False)(userinfo)
-				async with http_session.put(cookie_webhook_uri, data=data, headers={
-					"Content-Type": "application/json"}) as resp:
-					if resp.status != 200:
-						text = await resp.text()
-						raise exceptions.ClientResponseError(resp.status, text)
-					return await resp.json()
+		if cookie_webhook_uri is None:
+			return None
+		async with aiohttp.ClientSession() as http_session:
+			# TODO: Better serialization
+			userinfo = await self.CookieService.OpenIdConnectService.build_userinfo(session)
+			data = asab.web.rest.json.JSONDumper(pretty=False)(userinfo)
+			async with http_session.put(cookie_webhook_uri, data=data, headers={
+				"Content-Type": "application/json"}) as resp:
+				if resp.status != 200:
+					text = await resp.text()
+					raise exceptions.ClientResponseError(resp.status, text)
+				return await resp.json()
