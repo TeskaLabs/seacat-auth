@@ -172,6 +172,14 @@ def urlunparse(
 	return urllib.parse.urlunparse((scheme, netloc, path, params, query, fragment))
 
 
+def add_params_to_url_query(url, **params):
+	parsed = urlparse(url)
+	query = urllib.parse.parse_qs(parsed["query"])
+	query.update(params)
+	parsed["query"] = urllib.parse.urlencode(query)
+	return urlunparse(**parsed)
+
+
 def generate_ergonomic_token(length: int):
 	'''
 	This function generates random string that is "ergonomic".
