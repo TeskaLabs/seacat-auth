@@ -15,6 +15,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from ..generic import add_params_to_url_query
 from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
@@ -45,6 +46,7 @@ class OpenIdConnectService(asab.Service):
 	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationCodeCollection = "ac"
+	AuthorizePath = "/openidconnect/authorize"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
@@ -68,6 +70,12 @@ class OpenIdConnectService(asab.Service):
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
+
+		public_api_base_url = asab.Config.get("general", "public_api_base_url")
+		if public_api_base_url.endswith("/"):
+			self.PublicApiBaseUrl = public_api_base_url[:-1]
+		else:
+			self.PublicApiBaseUrl = public_api_base_url
 
 		self.PrivateKey = self._load_private_key()
 
@@ -243,23 +251,19 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_oidc_session(
-		self, credentials_id, client_id, scope,
-		login_descriptor=None,
-		track_id=None,
-		root_session_id=None,
+		self, root_session, client_id, scope,
 		tenants=None,
 		requested_expiration=None,
 		code_challenge: str = None,
 		code_challenge_method: str = None
 	):
 		# TODO: Choose builders based on scope
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=credentials_id,
+				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 			)
 		]
@@ -270,11 +274,14 @@ class OpenIdConnectService(asab.Service):
 			))
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			authn_service = self.App.get_service("seacatauth.AuthenticationService")
-			session_builders.append(login_descriptor_session_builder(login_descriptor))
-			session_builders.append(await external_login_session_builder(ext_login_svc, credentials_id))
-			# TODO: Get factors from root_session?
-			session_builders.append(await available_factors_session_builder(authn_service, credentials_id))
+			session_builders.append([
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
+				(
+					SessionAdapter.FN.Authentication.ExternalLoginOptions,
+					root_session.Authentication.ExternalLoginOptions
+				),
+			])
 
 		# TODO: if 'openid' in scope
 		oauth2_data = {
@@ -284,12 +291,25 @@ class OpenIdConnectService(asab.Service):
 		session_builders.append(oauth2_session_builder(oauth2_data))
 
 		# Obtain Track ID if there is any in the root session
-		if track_id is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
+		if root_session.TrackId is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
+
+		# Transfer impersonation data
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			session_builders.append((
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					root_session.Authentication.ImpersonatorSessionId
+				),
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					root_session.Authentication.ImpersonatorCredentialsId
+				),
+			))
 
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
-			parent_session_id=root_session_id,
+			parent_session_id=root_session.SessionId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
@@ -418,6 +438,10 @@ class OpenIdConnectService(asab.Service):
 
 		if session.TrackId is not None:
 			userinfo["track_id"] = uuid.UUID(bytes=session.TrackId)
+
+		if session.Authentication.ImpersonatorSessionId:
+			userinfo["impersonator_sid"] = session.Authentication.ImpersonatorSessionId
+			userinfo["impersonator_cid"] = session.Authentication.ImpersonatorCredentialsId
 
 		if await otp_service.has_activated_totp(session.Credentials.Id):
 			userinfo["totp_set"] = True
@@ -552,3 +576,18 @@ class OpenIdConnectService(asab.Service):
 		if credential_id is not None:
 			d["cid"] = credential_id
 		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+
+
+	def build_authorize_uri(self, client_dict, redirect_uri, response_type, **query_params):
+		"""
+		Check if the client has a registered OAuth Authorize URI. If not, use the default.
+		Extend the URI with query parameters.
+		"""
+		authorize_uri = client_dict.get("authorize_uri")
+		if authorize_uri is None:
+			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+		return add_params_to_url_query(
+			authorize_uri,
+			client_id=client_dict["_id"], redirect_uri=redirect_uri, response_type=response_type,
+			**query_params
+		)

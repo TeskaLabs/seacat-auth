@@ -175,9 +175,6 @@ class TokenHandler(object):
 					raise aiohttp.web.HTTPBadRequest()
 			elif cookie_value is not None:
 				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
-				if old_session is None:
-					L.error("Cannot transfer Track ID: Invalid cookie value.", struct_data={"value": token_value})
-					raise aiohttp.web.HTTPBadRequest()
 			else:
 				old_session = None
 
