@@ -7,6 +7,7 @@
 
 ### Features
 - User impersonation (#188, PLUM Sprint 230509)
+- Configurable client session expiration (#204, PLUM Sprint 230509)
 
 ---
 
