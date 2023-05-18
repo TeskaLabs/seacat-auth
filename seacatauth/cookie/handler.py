@@ -388,18 +388,14 @@ class CookieHandler(object):
 			# Obtain the old session by request cookie or access token
 			cookie_value = self.CookieService.get_session_cookie_value(request, session.OAuth2.ClientId)
 			token_value = get_bearer_token_value(request)
+			old_session = None
 			if cookie_value is not None:
 				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
-				if old_session is None:
-					L.error("Cannot transfer Track ID: Invalid cookie value.", struct_data={"value": token_value})
-					raise aiohttp.web.HTTPBadRequest()
-			elif token_value is not None:
+			if old_session is None and token_value is not None:
 				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
 					L.error("Cannot transfer Track ID: Invalid access token.", struct_data={"value": token_value})
 					raise aiohttp.web.HTTPBadRequest()
-			else:
-				old_session = None
 			try:
 				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
 			except ValueError:
