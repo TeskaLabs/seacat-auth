@@ -8,6 +8,7 @@ import asab.storage.exceptions
 import asab.exceptions
 
 from seacatauth.client import exceptions
+from asab.utils import convert_to_seconds
 
 from ..events import EventTypes
 
@@ -149,6 +150,11 @@ CLIENT_METADATA_SCHEMA = {
 	"anonymous_cid": {  # NON-CANONICAL
 		"type": "string",
 		"description": "ID of credentials that is used for authenticating anonymous sessions."},
+	"session_expiration": {  # NON-CANONICAL
+		"oneOf": [{"type": "string"}, {"type": "number"}],
+		"description":
+			"Client session expiration. The value can be either the number of seconds "
+			"or a time-unit string such as '4 h' or '3 d'."},
 	"redirect_uri_validation_method": {  # NON-CANONICAL
 		"type": "string",
 		"description":
@@ -372,6 +378,12 @@ class ClientService(asab.Service):
 		assert redirect_uri_validation_method in REDIRECT_URI_VALIDATION_METHODS
 		upsertor.set("redirect_uri_validation_method", redirect_uri_validation_method)
 
+		session_expiration = kwargs.get("session_expiration")
+		if session_expiration is not None:
+			if isinstance(convert_to_seconds, str):
+				session_expiration = convert_to_seconds(convert_to_seconds)
+			upsertor.set("session_expiration", session_expiration)
+
 		# Optional client metadata
 		for k in frozenset([
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
@@ -450,6 +462,8 @@ class ClientService(asab.Service):
 			if v is None or (isinstance(v, str) and len(v) == 0):
 				upsertor.unset(k)
 			else:
+				if k == "session_expiration" and isinstance(v, str):
+					v = convert_to_seconds(v)
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
