@@ -578,7 +578,7 @@ class OpenIdConnectService(asab.Service):
 		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
 
 
-	def build_authorize_uri(self, client_dict, redirect_uri, response_type, **query_params):
+	def build_authorize_uri(self, client_dict, **query_params):
 		"""
 		Check if the client has a registered OAuth Authorize URI. If not, use the default.
 		Extend the URI with query parameters.
@@ -586,8 +586,4 @@ class OpenIdConnectService(asab.Service):
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
-		return add_params_to_url_query(
-			authorize_uri,
-			client_id=client_dict["_id"], redirect_uri=redirect_uri, response_type=response_type,
-			**query_params
-		)
+		return add_params_to_url_query(authorize_uri, **query_params)

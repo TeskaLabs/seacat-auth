@@ -665,24 +665,26 @@ class AuthorizeHandler(object):
 			login_query_params = list(login_parameters.items())
 
 		# Gather params which will be passed to the after-login oidc/authorize call
-		authorize_query_params = [
-			("response_type", response_type),
-			("scope", " ".join(scope)),
-			("client_id", client_id),
-			("redirect_uri", redirect_uri),
-		]
+		authorize_query_params = {
+			"response_type": response_type,
+			"scope": " ".join(scope),
+			"client_id": client_id,
+			"redirect_uri": redirect_uri,
+		}
+
 		if state is not None:
-			authorize_query_params.append(("state", state))
+			authorize_query_params["state"] = state
+
 		if code_challenge is not None:
-			authorize_query_params.append(("code_challenge", code_challenge))
+			authorize_query_params["code_challenge"] = code_challenge
 			if code_challenge_method not in (None, "none"):
-				authorize_query_params.append(("code_challenge_method", code_challenge_method))
+				authorize_query_params["code_challenge_method"] = code_challenge_method
 
 		# Get client collection
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
 		# Build redirect uri
-		callback_uri = self.OpenIdConnectService.build_authorize_uri(client_dict, authorize_query_params)
+		callback_uri = self.OpenIdConnectService.build_authorize_uri(client_dict, **authorize_query_params)
 
 		login_query_params.append(("redirect_uri", callback_uri))
 		login_query_params.append(("client_id", client_id))

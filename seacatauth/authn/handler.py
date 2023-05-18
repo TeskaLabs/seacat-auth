@@ -483,7 +483,7 @@ class AuthenticationHandler(object):
 			if k in frozenset([
 				"redirect_uri", "response_type", "scope", "prompt", "code_challenge", "code_challenge_method"])
 		}
-		authorize_uri = oidc_service.build_authorize_uri(client_dict, **query)
+		authorize_uri = oidc_service.build_authorize_uri(client_dict, client_id=request_data["client_id"], **query)
 
 		response = aiohttp.web.HTTPFound(
 			authorize_uri,
