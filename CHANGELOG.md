@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Fix login redirect at the authorize endpoint (#203, PLUM Sprint 230509)
+
+### Features
+- User impersonation (#188, PLUM Sprint 230509)
+
+---
+
+
 ## v23.18-beta
 
 ### Breaking changes
@@ -18,7 +29,6 @@
 ### Features
 - Filter resource list by resource type using the `exclude` query parameter (#196, PLUM Sprint 230421)
 - Cookie entrypoint webhook for setting custom response headers (#188, PLUM Sprint 230421)
-- User impersonation (#188, PLUM Sprint 230509)
 
 ### Refactoring
 - Each client has their unique cookie name (#188, PLUM Sprint 230421)
