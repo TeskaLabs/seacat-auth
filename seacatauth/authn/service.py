@@ -8,6 +8,7 @@ import asab
 from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
+from .. import exceptions
 from ..audit import AuditCode
 from ..authz import build_credentials_authz
 
@@ -17,7 +18,7 @@ from ..session import (
 	cookie_session_builder,
 	login_descriptor_session_builder,
 	available_factors_session_builder,
-	external_login_session_builder,
+	external_login_session_builder, SessionAdapter,
 )
 
 from ..events import EventTypes
@@ -413,6 +414,56 @@ class AuthenticationService(asab.Service):
 				'sid': str(session.Session.Id),
 				'fi': from_info,
 			}
+		)
+
+		return session
+
+
+	async def create_impersonated_session(self, impersonator_session, target_cid: str):
+		"""
+		Create a new root session as a different user. Equivalent to logging in as the target user.
+		"""
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		impersonator_cid = impersonator_session.Credentials.Id
+
+		# Check if target exists
+		try:
+			await self.CredentialsService.get(target_cid)
+		except KeyError:
+			L.warning("Impersonation target does not exist.", struct_data={
+				"impersonator_cid": impersonator_cid, "target_cid": target_cid})
+			raise exceptions.CredentialsNotFoundError(target_cid)
+
+		# Make sure that the target is not a superuser
+		target_authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, target_cid, tenants=None)
+		if self.RBACService.is_superuser(target_authz):
+			L.warning("Cannot impersonate a superuser.", struct_data={
+				"impersonator_cid": impersonator_cid, "target_cid": target_cid})
+			raise exceptions.AccessDeniedError(
+				subject=impersonator_cid, resource="impersonate:{}".format(target_cid))
+
+		scope = frozenset(["profile", "email", "phone"])
+		session_builders = [
+			await credentials_session_builder(self.CredentialsService, target_cid, scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=target_cid,
+				tenants=None  # Root session is tenant-agnostic
+			),
+			cookie_session_builder(),
+			await available_factors_session_builder(self, target_cid),
+			await external_login_session_builder(ext_login_svc, target_cid),
+			(
+				(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId, impersonator_cid),
+				(SessionAdapter.FN.Authentication.ImpersonatorSessionId, impersonator_session.SessionId)
+			)
+		]
+
+		session = await self.SessionService.create_session(
+			session_type="root",
+			session_builders=session_builders,
 		)
 
 		return session
