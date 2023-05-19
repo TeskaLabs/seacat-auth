@@ -254,25 +254,28 @@ delete=
     WHERE `id` = %(_id)s;
 ```
 
-
 ---
+
 
 # Htpasswd
 
 - Read-only
-- To create a htpasswd provider, add a `[seacatauth:credentials:htpasswd:<provider_name>]` section in the config
-
+- To create a htpasswd provider, add a `[seacatauth:credentials:htpasswd:<provider_name>]` section in the config 
+  and specify a path to your htpasswd file.
+- You can create a new htpasswd file using the `htpasswd` command, for example
+```bash
+htpasswd /opt/site/seacatauth-conf/htpasswd john-smith
+```
 
 ## Example config
 
 ```ini
-[seacatauth:credentials:htpasswd:static]
+[seacatauth:credentials:htpasswd:local]
 path=/conf/htpasswd
-
 ```
 
-
 ---
+
 
 # In-memory (Dictionary)
 
