@@ -98,7 +98,7 @@ jobs:
     - name: Create Docker Starter
       uses: papeloto/action-zip@v1
       with:
-        files: doc/docker
+        files: example/docker
         dest: seacat-auth-docker-starter.zip
 
     - name: Upload Docker Starter
