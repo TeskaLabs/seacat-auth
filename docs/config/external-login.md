@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: External login
 ---
 
 # External login
@@ -15,10 +14,6 @@ SeaCat Auth currently supports these login providers:
 - Github
 - MojeID
 
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
 
 ## Usage
 

@@ -1,16 +1,10 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
 ---
 
 # ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
 
 This is a guide to configuring SeaCat Auth as a proxy to [Kibana](https://www.elastic.co/kibana/) users and roles.
-
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
 
 
 ## Prerequisites

@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Resources
 ---
 
 # Resources
@@ -11,4 +10,6 @@ title: TeskaLabs SeaCat Auth Documentation
 
 ### `authz:superuser`
 
-### `authz:tenant:admin`
+### `authz:tenant:access`
+
+### `authz:impersonate`

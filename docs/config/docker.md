@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Deploying SeaCat Auth in Docker environment
 ---
 
 # Deploying SeaCat Auth in Docker environment
