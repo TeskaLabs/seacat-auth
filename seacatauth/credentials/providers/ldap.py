@@ -130,7 +130,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 	def _enable_tls(self, ldap_client):
 		tls_cafile = self.Config["tls_cafile"]
 
-		# Add certificate
+		# Add certificate authority
 		if len(tls_cafile) > 0:
 			ldap_client.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
 
@@ -150,10 +150,16 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
 
 		# Misc TLS options
-		if self.Config["tls_protocol_min"] != "":
-			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[self.Config["tls_protocol_min"]])
-		if self.Config["tls_protocol_max"] != "":
-			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MAX, _TLS_VERSION[self.Config["tls_protocol_max"]])
+		tls_protocol_min = self.Config["tls_protocol_min"]
+		if tls_protocol_min != "":
+			if tls_protocol_min not in _TLS_VERSION:
+				raise ValueError("'tls_protocol_min' must be one of {} or empty.".format(str(_TLS_VERSION)))
+			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[tls_protocol_min])
+		tls_protocol_max = self.Config["tls_protocol_max"]
+		if tls_protocol_max != "":
+			if tls_protocol_max not in _TLS_VERSION:
+				raise ValueError("'tls_protocol_max' must be one of {} or empty.".format(str(_TLS_VERSION)))
+			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[tls_protocol_max])
 		if self.Config["tls_cipher_suite"] != "":
 			ldap_client.set_option(ldap.OPT_X_TLS_CIPHER_SUITE, self.Config["tls_cipher_suite"])
 
