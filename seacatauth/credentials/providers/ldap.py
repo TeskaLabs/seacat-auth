@@ -22,6 +22,15 @@ L = logging.getLogger(__name__)
 #
 
 
+_TLS_VERSION = {
+	"1": ldap.OPT_X_TLS_PROTOCOL_TLS1_0,
+	"1.0": ldap.OPT_X_TLS_PROTOCOL_TLS1_0,
+	"1.1": ldap.OPT_X_TLS_PROTOCOL_TLS1_1,
+	"1.2": ldap.OPT_X_TLS_PROTOCOL_TLS1_2,
+	"1.3": ldap.OPT_X_TLS_PROTOCOL_TLS1_3,
+}
+
+
 class LDAPObject(ldap.ldapobject.LDAPObject, ldap.resiter.ResultProcessor):
 	pass
 
@@ -119,24 +128,38 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		finally:
 			lc.unbind_s()
 
-	def _enable_tls(self, lc):
-		tls_cafile = self.Config['tls_cafile']
+	def _enable_tls(self, ldap_client):
+		tls_cafile = self.Config["tls_cafile"]
+
+		# Add certificate
 		if len(tls_cafile) > 0:
-			lc.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
-		if self.Config['tls_require_cert'] == 'never':
-			lc.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-		elif self.Config['tls_require_cert'] == 'demand':
-			lc.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
-		elif self.Config['tls_require_cert'] == 'allow':
-			lc.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_ALLOW)
-		elif self.Config['tls_require_cert'] == 'hard':
-			lc.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_HARD)
+			ldap_client.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
+
+		# Set cert policy
+		if self.Config["tls_require_cert"] == "never":
+			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+		elif self.Config["tls_require_cert"] == "demand":
+			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
+		elif self.Config["tls_require_cert"] == "allow":
+			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_ALLOW)
+		elif self.Config["tls_require_cert"] == "hard":
+			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_HARD)
 		else:
-			L.warning("Invalid 'tls_require_cert' value: '{}'. Defaulting to 'demand'.".format(
-				self.Config['tls_require_cert']
+			L.warning("Invalid 'tls_require_cert' value: {!r}. Defaulting to 'demand'.".format(
+				self.Config["tls_require_cert"]
 			))
-			lc.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
-		lc.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
+			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
+
+		# Misc TLS options
+		if self.Config["tls_protocol_min"] != "":
+			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[self.Config["tls_protocol_min"]])
+		if self.Config["tls_protocol_max"] != "":
+			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MAX, _TLS_VERSION[self.Config["tls_protocol_max"]])
+		if self.Config["tls_cipher_suite"] != "":
+			ldap_client.set_option(ldap.OPT_X_TLS_CIPHER_SUITE, self.Config["tls_cipher_suite"])
+
+		# NEWCTX needs to be the last option, because it applies all the prepared options to the new context
+		ldap_client.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
 
 	def _get_worker(self, prefix, credentials_id, include=None) -> Optional[dict]:
 
