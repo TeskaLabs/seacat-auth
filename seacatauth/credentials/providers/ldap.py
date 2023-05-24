@@ -111,25 +111,25 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 
 	@contextlib.contextmanager
-	def _ldap(self):
-		lc = LDAPObject(self.Config["uri"])
-		lc.protocol_version = ldap.VERSION3
-		lc.set_option(ldap.OPT_REFERRALS, 0)
+	def _ldap_client(self):
+		ldap_client = LDAPObject(self.Config["uri"])
+		ldap_client.protocol_version = ldap.VERSION3
+		ldap_client.set_option(ldap.OPT_REFERRALS, 0)
 
 		network_timeout = int(self.Config.get("network_timeout"))
-		lc.set_option(ldap.OPT_NETWORK_TIMEOUT, network_timeout)
+		ldap_client.set_option(ldap.OPT_NETWORK_TIMEOUT, network_timeout)
 
 		# Enable TLS
 		if self.Config["uri"].startswith("ldaps"):
-			self._enable_tls(lc)
+			self._enable_tls(ldap_client)
 
-		lc.simple_bind_s(self.Config["username"], self.Config["password"])
+		ldap_client.simple_bind_s(self.Config["username"], self.Config["password"])
 
 		try:
-			yield lc
+			yield ldap_client
 
 		finally:
-			lc.unbind_s()
+			ldap_client.unbind_s()
 
 	def _enable_tls(self, ldap_client):
 		tls_cafile = self.Config["tls_cafile"]
@@ -157,13 +157,15 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		tls_protocol_min = self.Config["tls_protocol_min"]
 		if tls_protocol_min != "":
 			if tls_protocol_min not in _TLS_VERSION:
-				raise ValueError("'tls_protocol_min' must be one of {} or empty.".format(str(_TLS_VERSION)))
+				raise ValueError("'tls_protocol_min' must be one of {} or empty.".format(list(_TLS_VERSION)))
 			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[tls_protocol_min])
+
 		tls_protocol_max = self.Config["tls_protocol_max"]
 		if tls_protocol_max != "":
 			if tls_protocol_max not in _TLS_VERSION:
-				raise ValueError("'tls_protocol_max' must be one of {} or empty.".format(str(_TLS_VERSION)))
-			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[tls_protocol_max])
+				raise ValueError("'tls_protocol_max' must be one of {} or empty.".format(list(_TLS_VERSION)))
+			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MAX, _TLS_VERSION[tls_protocol_max])
+
 		if self.Config["tls_cipher_suite"] != "":
 			ldap_client.set_option(ldap.OPT_X_TLS_CIPHER_SUITE, self.Config["tls_cipher_suite"])
 
@@ -179,7 +181,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		if not base.endswith(self.Config["base"]):
 			raise KeyError("Credentials {!r} do not end with {!r}".format(credentials_id, self.Config["base"]))
 
-		with self._ldap() as lc:
+		with self._ldap_client() as lc:
 			try:
 				sr = lc.search_s(
 					base,
@@ -216,7 +218,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 	def _count_worker(self, filterstr):
 		count = 0
-		with self._ldap() as lc:
+		with self._ldap_client() as lc:
 			msgid = lc.search(
 				self.Config["base"],
 				ldap.SCOPE_SUBTREE,
@@ -247,7 +249,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
 		result = []
 
-		with self._ldap() as lc:
+		with self._ldap_client() as lc:
 			msgid = lc.search(
 				self.Config["base"],
 				ldap.SCOPE_SUBTREE,
@@ -300,7 +302,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return filterstr
 
 	def _locate_worker(self, ident: str):
-		with self._ldap() as lc:
+		with self._ldap_client() as lc:
 
 			# Build the filter template
 			# Example: (|(cn=%s)(mail=%s)(mobile=%s)(sAMAccountName=%s))
