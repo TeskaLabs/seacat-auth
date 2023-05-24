@@ -51,7 +51,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 	Type = "ldap"
 
 	ConfigDefaults = {
-		"uri": "ldap://localhost:389/",
+		"uri": "ldap://localhost:389/",  # Multiple URIs need to be separated by comma or whitespace
 		"network_timeout": "10",  # set network_timeout to -1 for no timeout
 		"username": "cn=admin,dc=example,dc=org",
 		"password": "admin",
