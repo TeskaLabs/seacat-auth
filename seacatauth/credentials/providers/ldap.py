@@ -23,7 +23,6 @@ L = logging.getLogger(__name__)
 
 
 _TLS_VERSION = {
-	"1": ldap.OPT_X_TLS_PROTOCOL_TLS1_0,
 	"1.0": ldap.OPT_X_TLS_PROTOCOL_TLS1_0,
 	"1.1": ldap.OPT_X_TLS_PROTOCOL_TLS1_1,
 	"1.2": ldap.OPT_X_TLS_PROTOCOL_TLS1_2,
