@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: OAuth 2.0 in SeaCat Auth
 ---
 
 # OAuth 2.0 in SeaCat Auth
@@ -8,10 +7,6 @@ title: TeskaLabs SeaCat Auth Documentation
 The specification is available here:
 [https://tools.ietf.org/html/rfc6749](https://tools.ietf.org/html/rfc6749)
 
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
 
 ## Protocol Endpoints
 

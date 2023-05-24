@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Web UI
 ---
 
 # Web UI

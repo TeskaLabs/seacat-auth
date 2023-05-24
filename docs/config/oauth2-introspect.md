@@ -1,14 +1,9 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: OAuth2 introspection
 ---
 
 # OAuth2 introspection
 
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
 
 ## Set up OAuth2 introspection for a web application
 

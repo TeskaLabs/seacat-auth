@@ -1,16 +1,10 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: TheHive and TeskaLabs SeaCat Auth
 ---
 
 # TheHive and TeskaLabs SeaCat Auth
 
 This is a guide to configuring [TheHive](https://thehive-project.org/) to use SeaCat Auth as its _Single Sign-on_ (SSO) OAuth2 provider.
-
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
 
 
 ## Prerequisites
