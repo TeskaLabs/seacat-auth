@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Main features of TeskaLabs SeaCat Auth
 ---
 
 # Main features of TeskaLabs SeaCat Auth

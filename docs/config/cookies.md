@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: 🍪 HTTP Cookies 🍪
 ---
 
 # 🍪 HTTP Cookies 🍪
@@ -9,10 +8,6 @@ SeaCat Auth provides cookie-based authentication for applications that do not im
 Different configuration is needed for [single-domain](#single-domain-setting) and 
 for [multi-domain](#multi-domain-setting) settings.
 
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
 
 ## <a name="single-domain-setting"></a> Single-domain setting
 

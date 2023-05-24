@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Recommended deployment
 ---
 
 # Recommended deployment
@@ -10,7 +9,7 @@ This chapter describes the recommended way of how TeskaLabs SeaCat Auth deployme
 
 ## Architecture overview
 
-<img src="./teskalabs-seacat-auth-tokens.drawio.svg" alt="TeskaLabs SeaCat Auth: Diagram of the Recommended deployment architecture"/>
+<img src=".././teskalabs-seacat-auth-tokens.drawio.svg" alt="TeskaLabs SeaCat Auth: Diagram of the Recommended deployment architecture"/>
 
 
 ## Description

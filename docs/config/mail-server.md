@@ -1,13 +1,11 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Configure SeaCat Auth to send mails
 ---
 
 # Configure SeaCat Auth to send mails
 
 SeaCat Auth can send mails respective emails to users, eg. when they forget password and so on.
 For this, outbound mailing server aka SMTP has to be configured.
-
 
 
 ## Generic SMTP configuration

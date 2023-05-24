@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Resource-based Access Control (RBAC)
 ---
 
 # Resource-based Access Control (RBAC)

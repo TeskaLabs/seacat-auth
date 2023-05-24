@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Using SeaCat Auth with Postman
 ---
 
 # Using SeaCat Auth with Postman
@@ -20,8 +19,8 @@ The major advantage is that Postman natively **handles OAuth2.0 authentication**
 
 ## Configure your Postman environment
 
-- [Import the latest collection](https://learning.postman.com/docs/getting-started/importing-and-exporting-data/) 
-  from the SeaCat Auth repo (located at `doc/seacat-auth-api.postman_collection.json`)
+- [Import the OpenAPI specs](https://learning.postman.com/docs/integrations/available-integrations/working-with-openAPI/) 
+  from `/asab/v1/openapi` in the SeaCat Auth API.
 - Set up a SeaCat Auth [Postman environment](https://learning.postman.com/docs/sending-requests/managing-environments/). 
   The following variables need to be defined:
   - `BASE_URL` should contain the base URL of your SeaCat API, for example `https://my-domain.int/seacat/api/seacat_auth` 
