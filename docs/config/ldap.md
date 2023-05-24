@@ -1,6 +1,5 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: SeaCat Auth and LDAP or Active directory
 ---
 
 # SeaCat Auth and LDAP or Active directory

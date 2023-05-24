@@ -85,7 +85,8 @@ There are two separate Web UIs (user interfaces):
 
 #### Docker and Docker Compose
 
-The whole site installation can be dockerized and deployed using docker-compose, see [the documentation](./doc/docker/README.md).
+The whole site installation can be dockerized and deployed using docker-compose, 
+see [the documentation](https://docs.teskalabs.com/seacat-auth/getting-started/quick-start).
 
 [Docker image is available from DockerHub](https://hub.docker.com/r/teskalabs/seacat-auth)
 

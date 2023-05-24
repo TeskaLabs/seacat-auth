@@ -1,16 +1,10 @@
 ---
-layout: default
-title: TeskaLabs SeaCat Auth Documentation
+title: Credentials providers
 ---
 
 # Credentials providers
 
-* This will become a table of contents (this text will be scrapped).
-{:toc}
-
----
-
-# MongoDB
+## MongoDB
 
 - MongoDB is the default storage backend for SeaCat Auth.
 - Credentials follow a predefined schema:
@@ -32,7 +26,7 @@ credential:
 - To add a MongoDB provider, add a `[seacatauth:credentials:mongodb:<provider_name>]` section in the config.
 
 
-## Example config
+### Example config
 
 ```ini
 [seacatauth:credentials:mongodb:default]
@@ -44,7 +38,7 @@ register=no
 
 ---
 
-# External MongoDB (`xmongodb`)
+## External MongoDB (`xmongodb`)
 
 - Suitable for external Mongo databases with credentials that do not follow the schema expected by the default MongoDB provider.
 - *Read-only*.
@@ -74,7 +68,7 @@ register=no
 - Query result is expected to contain `_id`, optionally `username` and `email`.
 - Use the `$match` operation with the bind parameter `%(ident)s` to match credentials by ident (the string that the user entered in the login form).
 
-## Example config
+### Example config
 
 ```ini
 [seacatauth:credentials:xmongodb:users]
@@ -131,13 +125,13 @@ locate=
 
 ---
 
-# LDAP / ActiveDirectory
+## LDAP / ActiveDirectory
 
 - Read-only
 - Declared by `[seacatauth:credentials:ldap:<provider_name>]` config section
 
 
-## Example config
+### Example config
 
 ```ini
 [seacatauth:credentials:ldap:external]
@@ -153,13 +147,13 @@ tls_require_cert=allow
 
 ---
 
-# MySQL
+## MySQL
 
 - To add a MySQL provider, add a `[seacatauth:credentials:mysql:<provider_id>]` section in the config.
 - It can be configured to be either *editable* or *read-only*.
 
 
-## Read-only provider
+### Read-only provider
 
 - MySQL provider is read-only by default.
 - `list`, `get` and `locate` queries must be specified.
@@ -188,7 +182,7 @@ Use `AS` clauses to add these aliases to the database fields.
 - Use `WHERE` clause with the bind parameter `%(ident)s` to match credentials by ident (the string that the user entered in the login form).
 
 
-### Example config
+#### Example config
 
 ```
 [seacatauth:credentials:mysql:external]
@@ -215,12 +209,12 @@ locate=
 ---
 
 
-## Editable provider
+### Editable provider
 
 - To enable creating, updating and deleting users, specify `editable=yes` in config.
 - This requires specifying the `create`, `update` and `delete` queries.
 
-### Example config
+#### Example config
 
 ```
 [seacatauth:credentials:mysql:external]
@@ -254,33 +248,36 @@ delete=
     WHERE `id` = %(_id)s;
 ```
 
-
 ---
 
-# Htpasswd
+
+## Htpasswd
 
 - Read-only
-- To create a htpasswd provider, add a `[seacatauth:credentials:htpasswd:<provider_name>]` section in the config
-
-
-## Example config
-
-```ini
-[seacatauth:credentials:htpasswd:static]
-path=/conf/htpasswd
-
+- To create a htpasswd provider, add a `[seacatauth:credentials:htpasswd:<provider_name>]` section in the config 
+  and specify a path to your htpasswd file.
+- You can create a new htpasswd file using the `htpasswd` command, for example
+```bash
+htpasswd /opt/site/seacatauth-conf/htpasswd john-smith
 ```
 
+### Example config
+
+```ini
+[seacatauth:credentials:htpasswd:local]
+path=/conf/htpasswd
+```
 
 ---
 
-# In-memory (Dictionary)
+
+## In-memory (Dictionary)
 
 - Non-persistent editable provider
 - Declared by `[seacatauth:credentials:dict:<provider_name>]` config section
 
 
-## Example config
+### Example config
 
 ```ini
 [seacatauth:credentials:dict:inmemory]
