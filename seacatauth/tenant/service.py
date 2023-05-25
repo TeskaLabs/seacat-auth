@@ -190,6 +190,7 @@ class TenantService(asab.Service):
 		Optionally, verify first that the tenant and the credentials exist.
 		"""
 		assert (self.is_enabled())
+		assert tenant != "*"
 
 		if verify_tenant:
 			try:
@@ -224,6 +225,7 @@ class TenantService(asab.Service):
 		Revoke credentials' access to specified tenant and unassign the tenant's roles.
 		"""
 		assert (self.is_enabled())
+		assert tenant != "*"
 
 		# Unassign tenant roles
 		role_svc = self.App.get_service("seacatauth.RoleService")

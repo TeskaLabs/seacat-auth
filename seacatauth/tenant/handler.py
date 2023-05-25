@@ -522,6 +522,8 @@ class TenantHandler(object):
 					# If "UNASSIGN-TENANT" is provided instead of the role array
 					# (e.g. `"my-tenant": "UNASSIGN-TENANT"`), revoke access to the tenant completely.
 					# This also automatically unassigns all the tenant's roles
+					if tenant == "*":
+						raise asab.exceptions.ValidationError("Cannot unassign '*' because it is not a tenant.")
 					try:
 						await self.TenantService.unassign_tenant(credential_id, tenant)
 					except KeyError:
