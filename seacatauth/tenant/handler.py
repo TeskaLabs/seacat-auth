@@ -423,21 +423,22 @@ class TenantHandler(object):
 		error_details = []
 		for tenant, roles in json_data["tenants"].items():
 			for credential_id in json_data["credential_ids"]:
-				success = False
-				try:
-					await self.TenantService.assign_tenant(
-						credential_id, tenant, verify_tenant=False, verify_credentials=False)
-					success = True
-				except asab.exceptions.Conflict:
-					L.info("Skipping: Tenant already assigned.", struct_data={
-						"cid": credential_id, "tenant": tenant})
-					success = True
-				except Exception as e:
-					L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
-						"cid": credential_id, "tenant": tenant})
-					error_details.append({"cid": credential_id, "tenant": tenant})
-				if not success:
-					continue
+				if tenant != "*":
+					success = False
+					try:
+						await self.TenantService.assign_tenant(
+							credential_id, tenant, verify_tenant=False, verify_credentials=False)
+						success = True
+					except asab.exceptions.Conflict:
+						L.info("Skipping: Tenant already assigned.", struct_data={
+							"cid": credential_id, "tenant": tenant})
+						success = True
+					except Exception as e:
+						L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
+							"cid": credential_id, "tenant": tenant})
+						error_details.append({"cid": credential_id, "tenant": tenant})
+					if not success:
+						continue
 
 				if len(roles) == 0:
 					continue
@@ -521,6 +522,8 @@ class TenantHandler(object):
 					# If "UNASSIGN-TENANT" is provided instead of the role array
 					# (e.g. `"my-tenant": "UNASSIGN-TENANT"`), revoke access to the tenant completely.
 					# This also automatically unassigns all the tenant's roles
+					if tenant == "*":
+						raise asab.exceptions.ValidationError("Cannot unassign '*' because it is not a tenant.")
 					try:
 						await self.TenantService.unassign_tenant(credential_id, tenant)
 					except KeyError:
