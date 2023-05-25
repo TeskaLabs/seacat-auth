@@ -45,7 +45,8 @@ class AuthenticationHandler(object):
 		web_app.router.add_put(r'/public/login/{lsid}/smslogin', self.smslogin)
 		web_app.router.add_put(r'/public/login/{lsid}/webauthn', self.webauthn_login)
 		web_app.router.add_put(r'/public/logout', self.logout)
-		web_app.router.add_post("/impersonate", self.impersonate)
+		web_app.router.add_put("/impersonate", self.impersonate)
+		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
@@ -54,7 +55,7 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put(r'/public/login/{lsid}/smslogin', self.smslogin)
 		web_app_public.router.add_put(r'/public/login/{lsid}/webauthn', self.webauthn_login)
 		web_app_public.router.add_put(r'/public/logout', self.logout)
-		web_app_public.router.add_post("/impersonate", self.impersonate)
+		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -385,13 +386,57 @@ class AuthenticationHandler(object):
 			login_key = None
 		return login_key
 
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": ["credentials_id"],
+		"properties": {
+			"credentials_id": {
+				"type": "string",
+				"description": "Credentials ID of the impersonation target."},
+			"expiration": {
+				"oneOf": [{"type": "string"}, {"type": "string"}],
+				"description":
+					"Expiration of the impersonated session. The value can be either the number of seconds "
+					"or a time-unit string such as '4 h' or '3 d'."}},
+		"example": {
+			"credentials_id": "mongodb:default:abc123def456",
+			"expiration": "5m"}
+	})
+	@access_control("authz:impersonate")
+	async def impersonate(self, request):
+		"""
+		Open a root session impersonated as a different user.
+		Response contains a Set-Cookie header with the new root session cookie.
+
+		Requires `authz:impersonate`.
+		"""
+		from_info = [request.remote]
+		ff = request.headers.get("X-Forwarded-For")
+		if ff is not None:
+			from_info.extend(ff.split(", "))
+
+		request_data = await request.post()
+		target_cid = request_data["credentials_id"]
+		if request.Session.Session.ParentSessionId is None:
+			impersonator_root_session = request.Session
+		else:
+			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
+
+		assert impersonator_root_session.Cookie.Id is not None
+
+		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		response = asab.web.rest.json_response(request, {"result": "OK"})
+		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
+		return response
+
 
 	@access_control("authz:impersonate")
-	async def impersonate(self, request, *, credentials_id):
+	async def impersonate_and_redirect(self, request):
 		"""
-		Open a root session as a different user. Responds contains a Set-Cookie header with the new root session cookie.
-		This effectively overwrites user's current root cookie. Reference to current root session is kept in the
-		impersonated session. On logout, the original root cookie is set again.
+		Open a root session impersonated as a different user. Response contains a Set-Cookie header with the new
+		root session cookie and redirection to the authorize endpoint. This effectively overwrites user's current
+		root cookie. Reference to current root session is kept in the impersonated session.
+		On logout, the original root cookie is set again.
 
 		Requires `authz:impersonate`.
 		---
@@ -427,7 +472,6 @@ class AuthenticationHandler(object):
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
 		client_service = self.App.get_service("seacatauth.ClientService")
 
-		# TODO: Restrict impersonation based on agent X target resource intersection
 		from_info = [request.remote]
 		ff = request.headers.get("X-Forwarded-For")
 		if ff is not None:
@@ -435,47 +479,12 @@ class AuthenticationHandler(object):
 
 		request_data = await request.post()
 		target_cid = request_data["credentials_id"]
-
 		if request.Session.Session.Type == "root":
 			impersonator_root_session = request.Session
 		else:
 			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
 
-		try:
-			session = await self.AuthenticationService.create_impersonated_session(impersonator_root_session, target_cid)
-		except Exception as e:
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": credentials_id,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": from_info,
-				}
-			)
-			raise e
-		else:
-			L.log(
-				asab.LOG_NOTICE,
-				"Impersonation successful.",
-				struct_data={
-					"impersonator_cid": credentials_id,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": str(session.Session.Id),
-					"from_info": from_info,
-				}
-			)
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_SUCCESSFUL,
-				{
-					"impersonator_cid": credentials_id,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": session.Session.Id,
-					"fi": from_info,
-				}
-			)
+		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
 
 		client_dict = await client_service.get(request_data["client_id"])
 		query = {
@@ -496,3 +505,47 @@ class AuthenticationHandler(object):
 		)
 		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
 		return response
+
+	async def _impersonate(self, impersonator_root_session, impersonator_from_info, target_cid):
+		"""
+		Create a new impersonated session and log the event.
+		"""
+		# TODO: Restrict impersonation based on agent X target resource intersection
+		impersonator_cid = impersonator_root_session.Credentials.Id
+		try:
+			session = await self.AuthenticationService.create_impersonated_session(
+				impersonator_root_session, target_cid)
+		except Exception as e:
+			await self.AuditService.append(
+				AuditCode.IMPERSONATION_FAILED,
+				{
+					"impersonator_cid": impersonator_cid,
+					"impersonator_sid": impersonator_root_session.SessionId,
+					"target_cid": target_cid,
+					"fi": impersonator_from_info,
+				}
+			)
+			raise e
+		else:
+			L.log(
+				asab.LOG_NOTICE,
+				"Impersonation successful.",
+				struct_data={
+					"impersonator_cid": impersonator_cid,
+					"impersonator_sid": impersonator_root_session.SessionId,
+					"target_cid": target_cid,
+					"target_sid": str(session.Session.Id),
+					"from_info": impersonator_from_info,
+				}
+			)
+			await self.AuditService.append(
+				AuditCode.IMPERSONATION_SUCCESSFUL,
+				{
+					"impersonator_cid": impersonator_cid,
+					"impersonator_sid": impersonator_root_session.SessionId,
+					"target_cid": target_cid,
+					"target_sid": session.Session.Id,
+					"fi": impersonator_from_info,
+				}
+			)
+		return session
