@@ -4,6 +4,7 @@
 
 ### Fix
 - Fix login redirect at the authorize endpoint (#203, PLUM Sprint 230509)
+- Do not assign the tenant "*" in bulk assignment (#209, PLUM Sprint 230519)
 
 ### Features
 - User impersonation (#188, PLUM Sprint 230509)
