@@ -112,6 +112,16 @@ class SessionService(asab.Service):
 		except Exception as e:
 			L.error("Failed to create compound index (cookie ID, client ID): {}".format(e))
 
+		# Expiration descending
+		try:
+			await collection.create_index(
+				[
+					(SessionAdapter.FN.Session.Expiration, pymongo.DESCENDING)
+				]
+			)
+		except Exception as e:
+			L.error("Failed to create index (expiration desc): {}".format(e))
+
 
 	async def _on_start(self, event_name):
 		await self.delete_expired_sessions()
@@ -346,7 +356,7 @@ class SessionService(asab.Service):
 		collection = self.StorageService.Database[self.SessionCollection]
 
 		if query_filter is None:
-			query_filter = {}
+			return await collection.estimated_document_count()
 
 		return await collection.count_documents(query_filter)
 
