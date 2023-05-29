@@ -55,6 +55,7 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
 		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
 		web_app_public.router.add_put(r"/public/logout", self.logout)
+		web_app_public.router.add_put("/impersonate", self.impersonate)
 		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
 
 	@asab.web.rest.json_schema_handler({
@@ -298,15 +299,18 @@ class AuthenticationHandler(object):
 
 		delete_cookie(self.App, response)
 
-		# If the current session is impersonated, try to restore the original session
+		# If the current session is impersonated and the original session has a
+		# root cookie, try to restore the original session
 		if session.Authentication.ImpersonatorSessionId is not None:
 			try:
 				impersonator_session = await self.SessionService.get(session.Authentication.ImpersonatorSessionId)
-				print(impersonator_session)
-				set_cookie(self.App, response, impersonator_session)
+
 			except KeyError:
 				L.log(asab.LOG_NOTICE, "Impersonator session not found.", struct_data={
 					"sid": session.Authentication.ImpersonatorSessionId})
+			else:
+				if impersonator_session.Cookie is not None:
+					set_cookie(self.App, response, impersonator_session)
 
 		if self.BatmanService is not None:
 			response.del_cookie(self.BatmanService.CookieName)
@@ -394,7 +398,7 @@ class AuthenticationHandler(object):
 				"type": "string",
 				"description": "Credentials ID of the impersonation target."},
 			"expiration": {
-				"oneOf": [{"type": "string"}, {"type": "string"}],
+				"oneOf": [{"type": "string"}, {"type": "number"}],
 				"description":
 					"Expiration of the impersonated session. The value can be either the number of seconds "
 					"or a time-unit string such as '4 h' or '3 d'."}},
@@ -403,7 +407,7 @@ class AuthenticationHandler(object):
 			"expiration": "5m"}
 	})
 	@access_control("authz:impersonate")
-	async def impersonate(self, request):
+	async def impersonate(self, request, *, json_data):
 		"""
 		Open a root session impersonated as a different user.
 		Response contains a Set-Cookie header with the new root session cookie.
@@ -415,14 +419,11 @@ class AuthenticationHandler(object):
 		if ff is not None:
 			from_info.extend(ff.split(", "))
 
-		request_data = await request.post()
-		target_cid = request_data["credentials_id"]
+		target_cid = json_data["credentials_id"]
 		if request.Session.Session.ParentSessionId is None:
 			impersonator_root_session = request.Session
 		else:
 			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
-
-		assert impersonator_root_session.Cookie.Id is not None
 
 		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
 		response = asab.web.rest.json_response(request, {"result": "OK"})
