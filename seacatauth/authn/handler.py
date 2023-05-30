@@ -10,6 +10,7 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
+import seacatauth.exceptions
 from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
@@ -304,12 +305,14 @@ class AuthenticationHandler(object):
 		if session.Authentication.ImpersonatorSessionId is not None:
 			try:
 				impersonator_session = await self.SessionService.get(session.Authentication.ImpersonatorSessionId)
-
 			except KeyError:
 				L.log(asab.LOG_NOTICE, "Impersonator session not found.", struct_data={
 					"sid": session.Authentication.ImpersonatorSessionId})
 			else:
-				if impersonator_session.Cookie is not None:
+				if impersonator_session.Cookie is None:
+					# Case when the impersonation was started by an M2M session, which has no cookie
+					pass
+				else:
 					set_cookie(self.App, response, impersonator_session)
 
 		if self.BatmanService is not None:
@@ -516,6 +519,17 @@ class AuthenticationHandler(object):
 		try:
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)
+		except seacatauth.exceptions.AccessDeniedError as e:
+			await self.AuditService.append(
+				AuditCode.IMPERSONATION_FAILED,
+				{
+					"impersonator_cid": impersonator_cid,
+					"impersonator_sid": impersonator_root_session.SessionId,
+					"target_cid": target_cid,
+					"fi": impersonator_from_info,
+				}
+			)
+			raise aiohttp.web.HTTPForbidden() from e
 		except Exception as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
