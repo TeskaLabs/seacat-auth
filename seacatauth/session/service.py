@@ -151,18 +151,12 @@ class SessionService(asab.Service):
 
 
 	async def delete_expired_sessions(self):
+		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
 			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		):
-			try:
-				if datetime.datetime.now(datetime.timezone.utc) > (
-					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
-				):
-					expired.append(session["_id"])
-			except KeyError:
-				L.warning("Session is missing expiration. Deleting.", struct_data={"sid": session["_id"]})
-				expired.append(session["_id"])
+			expired.append(session["_id"])
 
 		for sid in expired:
 			# Use the delete method for proper session termination
