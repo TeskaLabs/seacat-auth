@@ -113,6 +113,7 @@ class SessionService(asab.Service):
 			L.error("Failed to create compound index (cookie ID, client ID): {}".format(e))
 
 		# Expiration descending
+		# Optimizes deleting expired sessions
 		try:
 			await collection.create_index(
 				[
@@ -120,7 +121,18 @@ class SessionService(asab.Service):
 				]
 			)
 		except Exception as e:
-			L.error("Failed to create index (expiration desc): {}".format(e))
+			L.error("Failed to create index (expiration descending): {}".format(e))
+
+		# Parent session
+		# For searching session groups
+		try:
+			await collection.create_index(
+				[
+					(SessionAdapter.FN.Session.ParentSessionId, pymongo.ASCENDING)
+				]
+			)
+		except Exception as e:
+			L.error("Failed to create index (parent session ID): {}".format(e))
 
 
 	async def _on_start(self, event_name):
