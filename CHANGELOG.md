@@ -11,6 +11,9 @@
 - Configurable client session expiration (#204, PLUM Sprint 230509)
 - Additional TLS options in LDAP provider (#208, PLUM Sprint 230519)
 
+### Refactoring
+- Session performance improvement (#211)
+
 ---
 
 
