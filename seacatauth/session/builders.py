@@ -45,7 +45,7 @@ async def external_login_session_builder(external_login_service, credentials_id)
 
 async def authz_session_builder(
 	tenant_service, role_service, credentials_id,
-	tenants=None, exclude_resources=frozenset()
+	tenants=None, exclude_resources=None
 ):
 	"""
 	Add 'authz' dict with currently authorized tenants and their resources

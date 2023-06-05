@@ -1,6 +1,6 @@
 async def build_credentials_authz(
 	tenant_service, role_service, credentials_id,
-	tenants=None, exclude_resources=frozenset()
+	tenants=None, exclude_resources=None
 ):
 	"""
 	Creates a nested 'authz' dict with tenant:resource structure:
@@ -10,6 +10,8 @@ async def build_credentials_authz(
 		'tenantB': ['resourceA', 'resourceB', 'resourceE', 'resourceD'],
 	}
 	"""
+	exclude_resources = exclude_resources or frozenset()
+
 	# Add global roles and resources under "*"
 	authz = {}
 	tenant = "*"
