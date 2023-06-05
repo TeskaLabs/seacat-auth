@@ -258,6 +258,12 @@ class OpenIdConnectService(asab.Service):
 		code_challenge_method: str = None
 	):
 		# TODO: Choose builders based on scope
+		# Make sure dangerous resources are removed from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
+		else:
+			exclude_resources = set()
+
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
 			await authz_session_builder(
@@ -265,6 +271,7 @@ class OpenIdConnectService(asab.Service):
 				role_service=self.RoleService,
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
+				exclude_resources=exclude_resources,
 			)
 		]
 

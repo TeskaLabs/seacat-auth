@@ -159,6 +159,12 @@ class CookieService(asab.Service):
 		except KeyError:
 			raise KeyError("Client '{}' not found".format(client_id))
 
+		# Make sure dangerous resources are removed from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
+		else:
+			exclude_resources = None
+
 		# Build the session
 		session_builders = [
 			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
@@ -167,6 +173,7 @@ class CookieService(asab.Service):
 				role_service=self.RoleService,
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
+				exclude_resources=exclude_resources,
 			),
 			cookie_session_builder(),
 		]
