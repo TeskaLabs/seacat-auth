@@ -79,7 +79,8 @@ class SessionService(asab.Service):
 		# Metrics
 		self.MetricsService = app.get_service('asab.MetricsService')
 		self.TaskService = app.get_service('asab.TaskService')
-		self.SessionGauge = self.MetricsService.create_gauge("sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
+		self.SessionGauge = self.MetricsService.create_gauge(
+			"sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
 
 
@@ -112,6 +113,28 @@ class SessionService(asab.Service):
 		except Exception as e:
 			L.error("Failed to create compound index (cookie ID, client ID): {}".format(e))
 
+		# Expiration descending
+		# Optimizes deleting expired sessions
+		try:
+			await collection.create_index(
+				[
+					(SessionAdapter.FN.Session.Expiration, pymongo.DESCENDING)
+				]
+			)
+		except Exception as e:
+			L.error("Failed to create index (expiration descending): {}".format(e))
+
+		# Parent session
+		# For searching session groups
+		try:
+			await collection.create_index(
+				[
+					(SessionAdapter.FN.Session.ParentSessionId, pymongo.ASCENDING)
+				]
+			)
+		except Exception as e:
+			L.error("Failed to create index (parent session ID): {}".format(e))
+
 
 	async def _on_start(self, event_name):
 		await self.delete_expired_sessions()
@@ -129,18 +152,12 @@ class SessionService(asab.Service):
 
 
 	async def delete_expired_sessions(self):
+		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
 			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		):
-			try:
-				if datetime.datetime.now(datetime.timezone.utc) > (
-					session.get(SessionAdapter.FN.Session.Expiration) or session["exp"]  # BACK-COMPAT, delete Dec 2022
-				):
-					expired.append(session["_id"])
-			except KeyError:
-				L.warning("Session is missing expiration. Deleting.", struct_data={"sid": session["_id"]})
-				expired.append(session["_id"])
+			expired.append(session["_id"])
 
 		for sid in expired:
 			# Use the delete method for proper session termination
@@ -346,7 +363,7 @@ class SessionService(asab.Service):
 		collection = self.StorageService.Database[self.SessionCollection]
 
 		if query_filter is None:
-			query_filter = {}
+			return await collection.estimated_document_count()
 
 		return await collection.count_documents(query_filter)
 

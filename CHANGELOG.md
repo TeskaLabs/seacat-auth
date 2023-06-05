@@ -15,6 +15,9 @@
 ### Refactoring
 - Allow impersonating superuser credentials, but exclude the superuser resource (#210, PLUM Sprint 230602)
 
+### Refactoring
+- Session performance improvement (#211)
+
 ---
 
 
