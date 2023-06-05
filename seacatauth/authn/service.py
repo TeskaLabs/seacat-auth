@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import re
+import uuid
 
 import asab
 
@@ -460,6 +461,9 @@ class AuthenticationService(asab.Service):
 				(SessionAdapter.FN.Authentication.ImpersonatorSessionId, impersonator_session.SessionId)
 			)
 		]
+
+		if (impersonator_session.TrackId is not None):
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),))
 
 		session = await self.SessionService.create_session(
 			session_type="root",
