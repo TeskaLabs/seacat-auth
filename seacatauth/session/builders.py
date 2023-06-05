@@ -43,13 +43,16 @@ async def external_login_session_builder(external_login_service, credentials_id)
 	return ((SessionAdapter.FN.Authentication.ExternalLoginOptions, external_logins),)
 
 
-async def authz_session_builder(tenant_service, role_service, credentials_id, tenants=None):
+async def authz_session_builder(
+	tenant_service, role_service, credentials_id,
+	tenants=None, exclude_resources=None
+):
 	"""
 	Add 'authz' dict with currently authorized tenants and their resources
 	Add 'tenants' list with complete list of credential's tenants
 	"""
 	tenants = tenants or []
-	authz = await build_credentials_authz(tenant_service, role_service, credentials_id, tenants)
+	authz = await build_credentials_authz(tenant_service, role_service, credentials_id, tenants, exclude_resources)
 	user_tenants = list(set(await tenant_service.get_tenants(credentials_id)).union(tenants))
 	return (
 		(SessionAdapter.FN.Authorization.Authz, authz),

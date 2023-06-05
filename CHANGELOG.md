@@ -10,8 +10,10 @@
 - User impersonation (#188, PLUM Sprint 230509)
 - Configurable client session expiration (#204, PLUM Sprint 230509)
 - Additional TLS options in LDAP provider (#208, PLUM Sprint 230519)
+- Impersonation REST API (#210, PLUM Sprint 230602)
 
 ### Refactoring
+- Allow impersonating superuser credentials, but exclude the superuser resource (#210, PLUM Sprint 230602)
 - Session performance improvement (#211)
 
 ---
