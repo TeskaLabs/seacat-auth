@@ -439,10 +439,10 @@ class AuthenticationService(asab.Service):
 		target_authz = await build_credentials_authz(
 			self.TenantService, self.RoleService, target_cid, tenants=None)
 		if self.RBACService.is_superuser(target_authz):
-			L.warning("Cannot impersonate a superuser.", struct_data={
-				"impersonator_cid": impersonator_cid, "target_cid": target_cid})
-			raise exceptions.AccessDeniedError(
-				subject=impersonator_cid, resource="impersonate:{}".format(target_cid))
+			L.warning(
+				"Impersonation target is a superuser. Resource 'authz:superuser' will be excluded "
+				"from the impersonated session.",
+				struct_data={"impersonator_cid": impersonator_cid, "target_cid": target_cid})
 
 		scope = frozenset(["profile", "email", "phone"])
 		session_builders = [
@@ -451,7 +451,8 @@ class AuthenticationService(asab.Service):
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
 				credentials_id=target_cid,
-				tenants=None  # Root session is tenant-agnostic
+				tenants=None,  # Root session is tenant-agnostic
+				exclude_resources={"authz:superuser", "authz:impersonate"},
 			),
 			cookie_session_builder(),
 			await available_factors_session_builder(self, target_cid),
