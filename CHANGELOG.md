@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.23-beta
 
 ### Fix
 - Fix login redirect at the authorize endpoint (#203, PLUM Sprint 230509)
