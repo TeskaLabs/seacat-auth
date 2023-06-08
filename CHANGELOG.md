@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Release candidate
+
+### Refactoring
+- Bump Python version to 3.11 and Alpine to 3.18 (#215, PLUM Sprint 230602)
+
+---
+
 ## v23.23-beta
 
 ### Fix
