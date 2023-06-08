@@ -1,10 +1,11 @@
 # CHANGELOG
 
-## Release candidate
+## v23.23-beta
 
 ### Fix
 - Fix login redirect at the authorize endpoint (#203, PLUM Sprint 230509)
 - Do not assign the tenant "*" in bulk assignment (#209, PLUM Sprint 230519)
+- If track id cannot be transferred, generate a new one instead of returning error (#214, PLUM Sprint 230602)
 
 ### Features
 - User impersonation (#188, PLUM Sprint 230509)

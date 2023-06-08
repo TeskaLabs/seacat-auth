@@ -519,19 +519,31 @@ class SessionService(asab.Service):
 				await self.update_session(root_session_id, session_builders)
 
 		elif not src_session.Authentication.IsAnonymous:
-			L.error("Cannot transfer Track ID: Source session is not anonymous.", struct_data={
+			L.info("Cannot transfer Track ID: Source session is not anonymous.", struct_data={
 				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
-			raise ValueError("Source session is not anonymous.")
+			root_session_id = dst_session.Session.ParentSessionId
+			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			await self.update_session(dst_session.SessionId, session_builders)
+			if root_session_id is not None:
+				await self.update_session(root_session_id, session_builders)
 
 		elif src_session.OAuth2.ClientId != dst_session.OAuth2.ClientId:
-			L.error("Cannot transfer Track ID: Mismatching client IDs.", struct_data={
+			L.info("Cannot transfer Track ID: Mismatching client IDs.", struct_data={
 				"src_clid": src_session.OAuth2.ClientId, "dst_clid": dst_session.OAuth2.ClientId})
-			raise ValueError("Mismatching client IDs.")
+			root_session_id = dst_session.Session.ParentSessionId
+			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			await self.update_session(dst_session.SessionId, session_builders)
+			if root_session_id is not None:
+				await self.update_session(root_session_id, session_builders)
 
 		elif src_session.TrackId is None:
-			L.error("Cannot transfer Track ID: Source session has no Track ID.", struct_data={
+			L.info("Cannot transfer Track ID: Source session has no Track ID.", struct_data={
 				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
-			raise ValueError("Source session has no Track ID.")
+			root_session_id = dst_session.Session.ParentSessionId
+			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			await self.update_session(dst_session.SessionId, session_builders)
+			if root_session_id is not None:
+				await self.update_session(root_session_id, session_builders)
 
 		elif not dst_session.Authentication.IsAnonymous:
 			# The destination session is authenticated while the source one is anonymous
