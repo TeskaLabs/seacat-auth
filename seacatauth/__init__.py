@@ -150,6 +150,11 @@ asab.Config.add_defaults({
 		# Timeout for password reset requests
 		"password_reset_expiration": "3 d",
 	},
+
+	"seacatauth:batman": {
+		# Key used for generating Basic auth passwords
+		"password_key": "",
+	},
 })
 
 __all__ = [

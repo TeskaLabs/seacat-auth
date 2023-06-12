@@ -14,13 +14,17 @@ L = logging.getLogger(__name__)
 
 class BatmanService(asab.Service):
 
-	def __init__(self, app, service_name='seacatauth.BatmanService'):
+	def __init__(self, app, service_name="seacatauth.BatmanService"):
 		super().__init__(app, service_name)
 
 		self.CookieName = "BatMan"
 
 		self.Integrations = []
-		self.Key = b"12345678901234567890123456789012"
+		key = asab.Config.get("seacatauth:batman", "password_key")
+		if key != "":
+			self.Key = key.encode("utf-8")
+		else:
+			self.Key = b"12345678901234567890123456789012"
 
 		if "batman:elk" in asab.Config.sections():
 			from .elk import ELKIntegration
