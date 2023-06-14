@@ -57,16 +57,18 @@ class BatmanHandler(object):
 
 		**Internal endpoint for Nginx auth_request.**
 		"""
-		bid = request.cookies.get(self.BatmanService.CookieName, None)
-		if bid is not None:
-			batman_token = self.Grants.get(bid)
-			if batman_token is not None:
-				return aiohttp.web.HTTPOk(headers={
-					"Authorization": "Basic " + batman_token["ba"]
-				})
+		cookie_service = self.BatmanService.App.get_service("seacatauth.CookieService")
+		cookie_value = cookie_service.get_session_cookie_value(request, request.query.get("client_id"))
+		if cookie_value is None:
+			return aiohttp.web.HTTPUnauthorized()
 
-		# The authorization of the access failed
-		return aiohttp.web.HTTPUnauthorized()
+		session = await cookie_service.get_session_by_session_cookie_value(cookie_value)
+		if session is None or session.Batman is None:
+			return aiohttp.web.HTTPUnauthorized()
+
+		return aiohttp.web.HTTPOk(headers={
+			"Authorization": "Basic {}".format(session.Batman.Token.decode("ascii"))
+		})
 
 
 	async def batman_oidc_authorize_callback(self, request):
