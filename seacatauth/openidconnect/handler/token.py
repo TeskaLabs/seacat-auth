@@ -94,16 +94,12 @@ class TokenHandler(object):
 		qs_data = dict(urllib.parse.parse_qsl(data))
 
 		# 3.1.3.2.  Token Request Validation
-		grant_type = qs_data.get("grant_type", "<missing>")
+		grant_type = qs_data.get("grant_type")
 
 		if grant_type == "authorization_code":
 			return await self._token_request_authorization_code(request, qs_data)
 
-		if grant_type == "batman":
-			# TODO: Call the batman service (when implemented)
-			return await self._token_request_batman(request, qs_data)
-
-		L.warning("Grant Type is not 'authorization_code' but '{}'".format(grant_type))
+		L.error("Unsupported grant type: {}".format(grant_type))
 		return aiohttp.web.HTTPBadRequest()
 
 
@@ -200,47 +196,6 @@ class TokenHandler(object):
 			"refresh_token": new_session.OAuth2.RefreshToken,
 			"id_token": id_token,
 			"expires_in": expires_in,
-		}
-
-		return asab.web.rest.json_response(request, body, headers=headers)
-
-
-	async def _token_request_batman(self, request, qs_data):
-		# Ensure the Authorization Code was issued to the authenticated Client
-		# If possible, verify that the Authorization Code has not been previously used
-		authorization_code = qs_data.get("code", "")
-		if len(authorization_code) == 0:
-			L.warning("Authorization Code not provided")
-			return aiohttp.web.HTTPBadRequest()
-
-		# Translate authorization code into session id
-		try:
-			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
-		except KeyError:
-			L.warning("Authorization code not found", struct_data={"code": authorization_code})
-			return aiohttp.web.HTTPBadRequest()
-
-		# Locate the session using session id
-		try:
-			session = await self.SessionService.get(session_id)
-		except KeyError:
-			return aiohttp.web.HTTPBadRequest()
-
-		if session is None:
-			L.warning("Authorization Code not valid")
-			return aiohttp.web.HTTPBadRequest()
-
-		credentials = await self.CredentialsService.get(session.Credentials.Id)
-
-		headers = {
-			"Cache-Control": "no-store",
-			"Pragma": "no-cache",
-		}
-
-		body = {
-			"token_type": "Batman",
-			"cid": session.Credentials.Id,
-			"username": credentials["username"],
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
