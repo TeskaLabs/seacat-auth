@@ -120,7 +120,10 @@ class ClientHandler(object):
 			if not self.ClientService._AllowCustomClientID:
 				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
-		data = await self.ClientService.register(**json_data)
+		result = await self.ClientService.register(**json_data)
+		data = self._rest_normalize(
+			await self.ClientService.get(result["client_id"]),
+			include_client_secret=True)
 		return asab.web.rest.json_response(request, data=data)
 
 
