@@ -70,6 +70,11 @@ class CookieData:
 	Domain: typing.Optional[str]
 
 
+@dataclasses.dataclass
+class BatmanData:
+	Token: typing.Optional[str]
+
+
 class SessionAdapter:
 	"""
 	Light object that represent a momentary view on the persisted session
@@ -135,13 +140,17 @@ class SessionAdapter:
 			Id = "ck_sci"
 			Domain = "ck_d"
 
+		class Batman:
+			_prefix = "ba"
+			Token = "ba_t"
+
 	# Fields that are stored encrypted
 	SensitiveFields = frozenset([
 		FN.OAuth2.IdToken,
 		FN.OAuth2.AccessToken,
 		FN.OAuth2.RefreshToken,
 		FN.Cookie.Id,
-		"oa.Ti", "oa.Ta", "oa.Tr",  # BACK COMPAT
+		FN.Batman.Token,
 	])
 
 	EncryptedPrefix = b"$aescbc$"
@@ -162,6 +171,7 @@ class SessionAdapter:
 		self.Authorization = self._deserialize_authorization_data(session_dict)
 		self.Cookie = self._deserialize_cookie_data(session_dict)
 		self.OAuth2 = self._deserialize_oauth2_data(session_dict)
+		self.Batman = self._deserialize_batman_data(session_dict)
 
 		if len(session_dict) > 0:
 			self.Data = session_dict
@@ -227,6 +237,7 @@ class SessionAdapter:
 		if self.Cookie is not None:
 			session_dict.update({
 				self.FN.Cookie.Id: self.Cookie.Id,
+				self.FN.Cookie.Domain: self.Cookie.Domain,
 			})
 
 		if self.OAuth2 is not None:
@@ -237,6 +248,11 @@ class SessionAdapter:
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
 				self.FN.OAuth2.PKCE: self.OAuth2.PKCE,
+			})
+
+		if self.Batman is not None:
+			session_dict.update({
+				self.FN.Batman.Token: self.Batman.Token,
 			})
 
 		# TODO: encrypt sensitive fields
@@ -360,6 +376,15 @@ class SessionAdapter:
 		return CookieData(
 			Id=base64.urlsafe_b64encode(sci).decode("ascii"),
 			Domain=session_dict.pop(cls.FN.Cookie.Domain, None),
+		)
+
+	@classmethod
+	def _deserialize_batman_data(cls, session_dict):
+		token = session_dict.pop(cls.FN.Batman.Token, None)
+		if token is None:
+			return None
+		return BatmanData(
+			Token=token
 		)
 
 

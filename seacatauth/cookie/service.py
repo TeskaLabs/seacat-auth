@@ -178,6 +178,15 @@ class CookieService(asab.Service):
 			cookie_session_builder(),
 		]
 
+		if "batman" in scope:
+			batman_service = self.OpenIdConnectService.App.get_service("seacatauth.BatmanService")
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
