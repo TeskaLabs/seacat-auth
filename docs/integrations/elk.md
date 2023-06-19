@@ -5,78 +5,146 @@ title: ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
 # ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
 
 This is a guide to configuring SeaCat Auth as a proxy to [Kibana](https://www.elastic.co/kibana/) users and roles.
+As Kibana is not OAuth-compatible and supports only Basic Authentication, 
+integrating it into a Single Sign-On environment requires a special approach.
+The Batman component (Basic Auth Token MANager) is designed exactly for this task -
+it "translates" Seacat session cookies into Basic Auth headers and
+synchronizes Kibana/ElasticSearch users with Seacat Auth credentials and their access rights.
 
 
-## Prerequisites
+## How does it work?
 
-- [Installation of SeaCat Auth with a reverse proxy and both web UIs.](../getting-started/quick-start)
-- [ElasticSearch](https://www.elastic.co/elasticsearch/)
-- [Kibana](https://www.elastic.co/kibana/)
+The flow for using Batman auth is almost the same as the [cookie auth flow](index#cookie-authorization-flow), 
+the only difference being in the type of introspection used. 
+Instead of the `PUT /cookie/nginx` endpoint (which exchanges Seacat client cookie for ID token), 
+Batman auth uses `PUT /batman/nginx` (which exchanges Seacat client cookie for Basic auth header).
 
 
-## Configuration
+# Configuration example
 
-Update SeaCat configuration with `[batman:elk]` section containing your ElasticSearch API base URL and admin credentials:
+Let's say we want to Seacat Batman authorization for our Kibana app.
+We have [ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
+up and running, as well as [a working instance of Seacat Auth with Nginx reverse proxy](../getting-started/quick-start). 
+We will need to configure these three components:
+- Update **Seacat Auth configuration** with `[batman:elk]` section to allow it to use ElasticSearch API to synchronize 
+  users and manage their authorization.
+- Create and configure a **Kibana client**. This client object represents and identifies Kibana 
+  in communication with Seacat Auth.
+- Prepare the necessary **server locations** in Nginx config.
+
+## Seacat Auth configuration
+
+Create the respective Batman section for the type of your app and provide the app's base URL and API credentials, e.g.
 
 ```ini
 [batman:elk]
-url=<ELASTICSERCH_API_BASE_URL>
-username=<ELASTICSERCH_ADMIN_USERNAME>
-password=<ELASTICSERCH_ADMIN_PASSWORD>
+url=http://localhost:9200
+username=admin
+password=elasticpassword
 ```
 
-In your Nginx server configuration, create an internal reverse proxy location for `/batman/nginx` endpoint 
-in SeaCat Auth public API. 
-The following example assumes a SeaCat Auth public container running at `http://localhost:8081`.
+## Client configuration
 
-```nginx
-location = /_batman_introspect {
-	internal;
-	proxy_method          PUT;
-	proxy_set_body        "";
-	proxy_set_header      X-Request-URI "$request_uri";
-	proxy_pass            http://localhost:8081/batman/nginx;
-	proxy_cache_key       $cookie_BatMan;
-	proxy_cache_lock      on;
-	proxy_cache_valid     200 10s;
-	proxy_ignore_headers  Cache-Control Expires Set-Cookie;
+Use Seacat Auth client API (or Seacat Admin UI) to register your app as a client. In our case, we can send the following request:
+
+```
+POST /client
+{
+	"client_name": "Kibana",
+	"redirect_uri_validation_method": "prefix_match",
+	"redirect_uris": [
+		"https://example.com/kibana"
+	]
 }
 ```
 
-Create a reverse proxy for Kibana.
+The server will respond with our client's assigned ID and other attributes:
+
+```
+{
+	"client_id": "RZhlE-D4yuJxoKitYVL4dg",
+	"client_id_issued_at": 1687170414,
+	"application_type": "web",
+	...,
+	"cookie_name": "SeaCatSCI_QLFLEAU4D726UPA3"
+}
+```
+
+We will use the `client_id` and `client_cookie` in the next step.
+
+## Nginx configuration
+
+The minimal configuration requires the following three locations to be defined in nginx:
+- **Client site location:** Protected public location with client content (e.g. Kibana app) .
+- **Client introspection:** Internal endpoint used by the nginx `auth_request` directive.
+- **Client cookie entry point:** Public endpoint which dispenses the Seacat client cookie at the end of a successful authorization flow.
+
+### Client site location
 
 ```nginx
 location /kibana/ {
-	proxy_pass http://localhost:5601/;
-	
-	auth_request /_batman_introspect;
-	auth_request_set $batman $upstream_http_authorization;
-	proxy_set_header Authorization $batman;
+	# Kibana upstream
+	proxy_pass http://kibana_api;
 
+	# Auth introspection endpoint
+	auth_request /_kibana_introspection;
+
+	# Pass the Batman header obtained from Seacat Auth introspection to Kibana
+	auth_request_set $auth_header $upstream_http_authorization;
+	proxy_set_header Authorization $auth_header;
+
+	# In the case when introspection detects invalid authorization, redirect to OAuth authorize endpoint
+	# !! Use your client's actual client_id !!
+	error_page 401 https://example.com/auth/api/openidconnect/authorize?response_type=code&scope=cookie%20batman&client_id=RZhlE-D4yuJxoKitYVL4dg&redirect_uri=https://example.com$request_uri;
+
+	# Headers required by Kibana
 	proxy_http_version 1.1;
 	proxy_set_header Upgrade $http_upgrade;
 	proxy_set_header Connection 'upgrade';
 	proxy_set_header Host $host;
 	proxy_cache_bypass $http_upgrade;
-
-	error_page 401 <BASE_OIDC_API_PATH>/authorize?response_type=code&scope=openid&client_id=signin&redirect_uri=<BASE_SEACAT_AUTH_API_PATH>/batman&state=$request_uri;
 }
 ```
 
-- `<BASE_OIDC_API_PATH>` is the public (accessible from the user browser) base path to the OpenIDConnect API.
-- `<BASE_SEACAT_AUTH_API_PATH>` is the public (accessible from the user browser) base path to SeaCat Auth public API.
+### Client introspection
 
+```nginx
+location = /_kibana_introspection {
+	internal;
 
-## Managing user access
+	# Seacat Auth Batman introspection upstream
+	# !! Use your client's actual client_id !!
+	proxy_method          PUT;
+	proxy_pass            http://seacat_auth_api/batman/nginx?client_id=RZhlE-D4yuJxoKitYVL4dg;
 
-SeaCat Auth Batman automatically scans the roles in your ElasticSearch/Kibana and creates a SeaCat resource for each of them.
-For example a role that is called `kibana_admin` becomes available as a resource called `elk:kibana_admin`.
-Assigning this resource to a user results in assigning the corresponding Kibana role to them.
+	proxy_set_header      X-Request-URI "$request_uri";
+	proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 
-- First ensure that your desired Kibana role exists in the list of SeaCat Resources.
-- Create a new global SeaCat role or pick an existing one.
-- Assign the `elk:...` resource to your SeaCat role.
-- Assign the SeaCat role to the chosen user/credential.
-- Let the user log out and in again. 
+	# Introspection response caching
+	proxy_buffer_size     128k;
+	proxy_buffers         4 256k;
+	proxy_busy_buffers_size  256k;
+	proxy_cache           kibana_auth;
+	# !! Fill in your client's actual cookie_name !!
+	proxy_cache_key       $cookie_SeaCatSCI_QLFLEAU4D726UPA3;
+	proxy_cache_lock      on;
+	proxy_cache_valid     200 10s;
+}
+```
 
-The user should now be able to access Kibana with the newly assigned role.
+### Client cookie entry point
+
+Must be located on the same hostname as the protected client location.
+
+```nginx
+location = /auth/api/cookie/kibana {
+	# Seacat Auth cookie entry upstream
+	proxy_method          POST;
+	proxy_pass            http://seacat_auth_api/cookie/entry;
+
+	# Transfer the OAuth authorization code from query to request body
+	# !! Use your client's actual client_id !!
+	proxy_set_header      Content-Type "application/x-www-form-urlencoded";
+	proxy_set_body        "client_id=RZhlE-D4yuJxoKitYVL4dg&grant_type=authorization_code&code=$arg_code";
+}
+```

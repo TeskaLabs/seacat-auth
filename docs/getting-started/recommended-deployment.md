@@ -9,8 +9,7 @@ This chapter describes the recommended way of how TeskaLabs SeaCat Auth deployme
 
 ## Architecture overview
 
-<img src=".././teskalabs-seacat-auth-tokens.drawio.svg" alt="TeskaLabs SeaCat Auth: Diagram of the Recommended deployment architecture"/>
-
+![Authorization token architecture](teskalabs-seacat-auth-token-architecture.drawio.svg)
 
 ## Description
 
