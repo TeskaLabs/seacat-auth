@@ -2,7 +2,7 @@
 title: ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
 ---
 
-# ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
+# ElasticSearch + Kibana and Seacat Batman
 
 This is a guide to configuring SeaCat Auth as a proxy to [Kibana](https://www.elastic.co/kibana/) users and roles.
 As Kibana is not OAuth-compatible and supports only Basic Authentication, 
@@ -22,10 +22,11 @@ Batman auth uses `PUT /batman/nginx` (which exchanges Seacat client cookie for B
 
 # Configuration example
 
-Let's say we want to Seacat Batman authorization for our Kibana app.
-We have [ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
+Let's set up Seacat Batman authorization for our Kibana app. We need to have 
+[ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
 up and running, as well as [a working instance of Seacat Auth with Nginx reverse proxy](../getting-started/quick-start). 
 We will need to configure these three components:
+
 - Update **Seacat Auth configuration** with `[batman:elk]` section to allow it to use ElasticSearch API to synchronize 
   users and manage their authorization.
 - Create and configure a **Kibana client**. This client object represents and identifies Kibana 
@@ -34,7 +35,7 @@ We will need to configure these three components:
 
 ## Seacat Auth configuration
 
-Create the respective Batman section for the type of your app and provide the app's base URL and API credentials, e.g.
+Create the ELK Batman section and provide ElasticSearch base URL and API credentials, e.g.
 
 ```ini
 [batman:elk]
@@ -45,7 +46,8 @@ password=elasticpassword
 
 ## Client configuration
 
-Use Seacat Auth client API (or Seacat Admin UI) to register your app as a client. In our case, we can send the following request:
+Use Seacat Auth client API (or Seacat Admin UI) to register Kibana as a client. 
+In our case, we can send the following request:
 
 ```
 POST /client
@@ -75,9 +77,11 @@ We will use the `client_id` and `client_cookie` in the next step.
 ## Nginx configuration
 
 The minimal configuration requires the following three locations to be defined in nginx:
-- **Client site location:** Protected public location with client content (e.g. Kibana app) .
+
+- **Client site location:** Protected public location with Kibana web app.
 - **Client introspection:** Internal endpoint used by the nginx `auth_request` directive.
-- **Client cookie entry point:** Public endpoint which dispenses the Seacat client cookie at the end of a successful authorization flow.
+- **Client cookie entry point:** Public endpoint which dispenses the Seacat client cookie at the end of a successful 
+  authorization flow.
 
 ### Client site location
 
