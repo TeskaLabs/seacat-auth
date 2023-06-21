@@ -16,6 +16,25 @@ deploy staging:
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     - mkdir /output
     - mkdocs build --site-dir /output
-    - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$TARGET_DIR"
+    - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$STAGING_DIR"
   only:
     - main
+
+deploy production:
+  stage: deploy
+  tags:
+    - docker
+  image: 
+    name: squidfunk/mkdocs-material
+    entrypoint: [""]
+  script:
+    - apk update && apk add openssh-client rsync
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - mkdir /output
+    - mkdocs build --site-dir /output
+    - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$PRODUCTION_DIR"
+  only:
+    - production
