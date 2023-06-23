@@ -123,8 +123,12 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:session": {
-		# Default session expiration in seconds
+		# Root session expiration, also works as the default value for client sessions
 		"expiration": "4 h",
+
+		# Anonymous session expiration
+		# By default it is the same as root session expiration
+		"anonymous_expiration": "",
 
 		# Touch extension specifies the timespan by which sessions are extended when session activity is detected
 		# It can be either
