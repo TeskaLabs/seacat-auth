@@ -435,7 +435,7 @@ class AuthorizeHandler(object):
 						root_session_id=root_session.SessionId,
 						code_challenge=code_challenge,
 						code_challenge_method=code_challenge_method,
-						requested_expiration=session_expiration,
+						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 				elif authorize_type == "cookie":
 					new_session = await self.CookieService.create_anonymous_cookie_client_session(
@@ -443,7 +443,7 @@ class AuthorizeHandler(object):
 						root_session_id=root_session.SessionId,
 						track_id=root_session.TrackId,
 						tenants=tenants,
-						requested_expiration=session_expiration,
+						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
@@ -486,13 +486,13 @@ class AuthorizeHandler(object):
 						tenants=tenants,
 						code_challenge=code_challenge,
 						code_challenge_method=code_challenge_method,
-						requested_expiration=session_expiration,
+						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 				elif authorize_type == "cookie":
 					new_session = await self.CookieService.create_anonymous_cookie_client_session(
 						anonymous_cid, client_id, scope,
 						tenants=tenants,
-						requested_expiration=session_expiration,
+						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)

@@ -54,6 +54,11 @@ class SessionService(asab.Service):
 			seconds=asab.Config.getseconds("seacatauth:session", "expiration")
 		)
 
+		if len(asab.Config.get("seacatauth:session", "anonymous_expiration")) > 0:
+			self.AnonymousExpiration = asab.Config.getseconds("seacatauth:session", "anonymous_expiration")
+		else:
+			self.AnonymousExpiration = asab.Config.getseconds("seacatauth:session", "expiration")
+
 		touch_extension = asab.Config.get("seacatauth:session", "touch_extension")
 		# Touch extension can be either
 		#   specified as a ratio of the original expiration (float between 0 and 1)
@@ -573,7 +578,8 @@ class SessionService(asab.Service):
 					((SessionAdapter.FN.Credentials.Id, dst_session.Credentials.Id),),
 					((SessionAdapter.FN.Authentication.IsAnonymous, True),),
 				])
-				await self.create_session("root", session_builders=root_session_builders)
+				await self.create_session(
+					"root", session_builders=root_session_builders, expiration=self.AnonymousExpiration)
 			sub_session_builders = [
 				((SessionAdapter.FN.Session.ParentSessionId, root_session_id),),
 				((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),),
