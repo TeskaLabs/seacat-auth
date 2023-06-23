@@ -123,7 +123,7 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:session": {
-		# Root session expiration
+		# Root session expiration, also works as the default value for client sessions
 		"expiration": "4 h",
 
 		# Anonymous session expiration
