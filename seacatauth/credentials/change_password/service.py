@@ -33,19 +33,19 @@ class ChangePasswordService(asab.Service):
 
 		self.ResetPwdPath = "/#/reset-password"
 
-		app.PubSub.subscribe("Application.tick/3600!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
-	async def _on_tick(self, event_name):
-		await self.delete_expired_pwdreset_tokens()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_pwdreset_tokens()
 
-	async def delete_expired_pwdreset_tokens(self):
-		expired = []
-		requests = await self.list_pwdreset_tokens()
-		for r in requests["data"]:
-			if datetime.datetime.now(datetime.timezone.utc) > r["exp"]:
-				expired.append(r["_id"])
-		for pwd_id in expired:
-			await self.delete_pwdreset_token(pwdreset_id=pwd_id)
+	async def _delete_expired_pwdreset_tokens(self):
+		collection = self.StorageService.Database[self.ChangePasswordCollection]
+		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Expired password reset tokens deleted.", struct_data={
+				"count": result.deleted_count
+			})
 
 	async def delete_pwdreset_tokens_by_cid(self, cid):
 		expired = []
