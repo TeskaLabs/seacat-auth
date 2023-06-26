@@ -91,7 +91,10 @@ class ChangePasswordService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={"pwd_token": pwdreset_id})
 
 	async def get_pwdreset_token(self, pwdreset_id: str):
-		return await self.StorageService.get(self.ChangePasswordCollection, pwdreset_id)
+		token = await self.StorageService.get(self.ChangePasswordCollection, pwdreset_id)
+		if token["exp"] < datetime.datetime.now(datetime.timezone.utc):
+			raise KeyError("Password reset token expired.")
+		return token
 
 	async def init_password_change(self, credentials_id: str, is_new_user: bool = False, expiration: float = None):
 		'''
