@@ -43,12 +43,14 @@ class CredentialsHandler(object):
 		web_app.router.add_put("/usernames", self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
 		web_app.router.add_get("/locate", self.locate_credentials)
 		web_app.router.add_get("/credentials/{credentials_id}", self.get_credentials)
+		web_app.router.add_get("/last-login/{credentials_id}", self.get_last_login_data)
 
 		web_app.router.add_post("/credentials/{provider}", self.create_credentials)
 		web_app.router.add_put("/credentials/{credentials_id}", self.update_credentials)
 		web_app.router.add_delete("/credentials/{credentials_id}", self.delete_credentials)
 
 		web_app.router.add_put("/public/credentials", self.update_my_credentials)
+		web_app.router.add_get("/public/last-login", self.get_my_last_login_data)
 
 		# Providers
 		web_app.router.add_get("/provider/{provider_id}", self.get_provider_info)
@@ -60,6 +62,7 @@ class CredentialsHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_put("/public/credentials", self.update_my_credentials)
 		web_app_public.router.add_get("/public/provider", self.get_my_provider_info)
+		web_app_public.router.add_get("/public/last-login", self.get_my_last_login_data)
 
 
 	@access_control("seacat:credentials:access")
@@ -99,6 +102,25 @@ class CredentialsHandler(object):
 			"data": data,
 		}
 		return asab.web.rest.json_response(request, response)
+
+
+	@access_control("seacat:credentials:access")
+	async def get_last_login_data(self, request):
+		"""
+		Get the credentials' last successful/failed login data.
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		data = await self.AuditService.get_last_logins(credentials_id)
+		return asab.web.rest.json_response(request, data)
+
+
+	@access_control()
+	async def get_my_last_login_data(self, request, *, credentials_id):
+		"""
+		Get the current user's last successful/failed login data.
+		"""
+		data = await self.AuditService.get_last_logins(credentials_id)
+		return asab.web.rest.json_response(request, data)
 
 
 	@access_control("seacat:credentials:access")
