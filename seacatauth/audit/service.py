@@ -23,17 +23,6 @@ class AuditService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
-	async def initialize(self, app):
-		coll = await self.StorageService.collection(self.AuditCollection)
-
-		# Create index to improve the performance of last login searches
-		await coll.create_index(
-			[
-				("cid", pymongo.ASCENDING),
-				("_c", pymongo.DESCENDING),
-				("c", pymongo.ASCENDING)
-			],
-		)
 
 	async def append(self, code: AuditCode, attributes: dict = None):
 		assert (isinstance(code, AuditCode))
