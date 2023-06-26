@@ -49,11 +49,11 @@ class WebAuthnService(asab.Service):
 
 		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
 
-		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
-		await self.delete_expired_challenges()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_challenges()
 
 
 	async def create_webauthn_credential(
@@ -240,7 +240,7 @@ class WebAuthnService(asab.Service):
 		})
 
 
-	async def delete_expired_challenges(self):
+	async def _delete_expired_challenges(self):
 		"""
 		Delete expired WebAuthn registration challenges
 		"""
