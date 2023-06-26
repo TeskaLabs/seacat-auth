@@ -333,6 +333,16 @@ class CredentialsHandler(object):
 	async def get_credentials(self, request):
 		"""
 		Get requested credentials' detail
+
+		---
+		parameters:
+		-	name: last_login
+			in: query
+			description: Whether to include the last successful and failed login data
+			required: false
+			schema:
+				type: boolean
+				default: no
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		_, provider_id, _ = credentials_id.split(':', 2)
@@ -340,7 +350,8 @@ class CredentialsHandler(object):
 
 		credentials = await provider.get(request.match_info["credentials_id"])
 
-		credentials['_ll'] = await self.AuditService.get_last_logins(credentials_id)
+		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
+			credentials["_ll"] = await self.AuditService.get_last_logins(credentials_id)
 
 		return asab.web.rest.json_response(request, credentials)
 
