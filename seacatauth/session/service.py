@@ -79,7 +79,6 @@ class SessionService(asab.Service):
 		self.MinimalRefreshInterval = datetime.timedelta(seconds=60)
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
-		app.PubSub.subscribe("Application.run!", self._on_start)
 
 		# Metrics
 		self.MetricsService = app.get_service("asab.MetricsService")
@@ -139,10 +138,6 @@ class SessionService(asab.Service):
 			)
 		except Exception as e:
 			L.error("Failed to create index (parent session ID): {}".format(e))
-
-
-	async def _on_start(self, event_name):
-		await self._delete_expired_sessions()
 
 
 	async def _on_housekeeping(self, event_name):
