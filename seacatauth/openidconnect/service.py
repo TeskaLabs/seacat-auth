@@ -81,11 +81,11 @@ class OpenIdConnectService(asab.Service):
 
 		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
-		await self.delete_expired_authorization_codes()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_authorization_codes()
 
 
 	def _load_private_key(self):
@@ -166,7 +166,7 @@ class OpenIdConnectService(asab.Service):
 		return code
 
 
-	async def delete_expired_authorization_codes(self):
+	async def _delete_expired_authorization_codes(self):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
