@@ -2,7 +2,6 @@ import datetime
 import logging
 
 import asab.storage.exceptions
-import pymongo
 
 from .codes import AuditCode
 
