@@ -249,7 +249,7 @@ class WebAuthnService(asab.Service):
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.info("Expired WebAuthn challenges deleted", struct_data={
+			L.log(asab.LOG_NOTICE, "Expired WebAuthn challenges deleted.", struct_data={
 				"count": result.deleted_count
 			})
 
