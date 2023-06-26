@@ -142,11 +142,11 @@ class SessionService(asab.Service):
 
 
 	async def _on_start(self, event_name):
-		await self.delete_expired_sessions()
+		await self._delete_expired_sessions()
 
 
 	async def _on_housekeeping(self, event_name):
-		await self.delete_expired_sessions()
+		await self._delete_expired_sessions()
 
 	def _on_tick_metric(self, event_name):
 		self.TaskService.schedule(self._metrics_task())
@@ -156,7 +156,7 @@ class SessionService(asab.Service):
 		self.SessionGauge.set("sessions", session_count)
 
 
-	async def delete_expired_sessions(self):
+	async def _delete_expired_sessions(self):
 		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
@@ -167,6 +167,9 @@ class SessionService(asab.Service):
 		for sid in expired:
 			# Use the delete method for proper session termination
 			await self.delete(session_id=sid)
+
+		if len(expired) > 0:
+			L.log(asab.LOG_NOTICE, "Expired sessions deleted.", struct_data={"count": len(expired)})
 
 
 	async def create_session(
@@ -313,11 +316,14 @@ class SessionService(asab.Service):
 			yield session_dict
 
 
-	async def list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
 		collection = self.StorageService.Database[self.SessionCollection]
 
 		if query_filter is None:
 			query_filter = {}
+
+		if not include_expired:
+			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		sessions = []
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
@@ -329,7 +335,7 @@ class SessionService(asab.Service):
 		}
 
 
-	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
 		"""
 		List top-level sessions with all their children sessions inside the "children" attribute
 		"""
@@ -337,6 +343,9 @@ class SessionService(asab.Service):
 
 		if query_filter is None:
 			query_filter = {}
+
+		if not include_expired:
+			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		# Find only top-level sessions (with no parent)
 		query_filter.update({SessionAdapter.FN.Session.ParentSessionId: None})
@@ -361,7 +370,8 @@ class SessionService(asab.Service):
 				continue
 			# Include children sessions
 			children = await self.list(
-				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])}
+				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])},
+				include_expired=include_expired,
 			)
 			if children["count"] > 0:
 				session["children"] = children
