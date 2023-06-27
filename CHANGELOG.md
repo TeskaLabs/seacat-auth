@@ -4,6 +4,7 @@
 
 ### Breaking changes
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
+- Last login info is no longer included in userinfo and credentials detail (#219, PLUM Sprint 230616)
 
 ### Features
 - Configurable anonymous session expiration (#217, PLUM Sprint 230616)
@@ -11,6 +12,7 @@
 ### Refactoring
 - ~~Bump Python version to 3.11 and Alpine to 3.18 (#215, PLUM Sprint 230602)~~(d415691)
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
+- Reduce last login reads (#219, PLUM Sprint 230616)
 
 ---
 
