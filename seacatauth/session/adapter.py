@@ -153,11 +153,7 @@ class SessionAdapter:
 		FN.Batman.Token,
 	])
 
-	EncryptedPrefix = b"$aescbc$"
-
 	def __init__(self, session_svc, session_dict):
-		self._decrypt_sensitive_fields(session_dict, session_svc)
-
 		self.Session = self._deserialize_session_data(session_dict)
 		self.Id = self.Session.Id
 		self.SessionId = self.Session.Id
@@ -262,24 +258,6 @@ class SessionAdapter:
 	def rest_get(self):
 		session_dict = self.serialize()
 		return rest_get(session_dict)
-
-	def _decrypt_sensitive_fields(self, session_dict, session_svc):
-		# Decrypt sensitive fields
-		for field in self.SensitiveFields:
-			# BACK COMPAT: Handle nested dictionaries
-			obj = session_dict
-			keys = field.split(".")
-			for key in keys[:-1]:
-				if key not in obj:
-					break
-				obj = obj[key]
-			else:
-				# BACK COMPAT: Keep values without prefix raw
-				# TODO: Remove support once proper m2m tokens are in place
-				value = obj.get(keys[-1])
-				if value is not None and value.startswith(self.EncryptedPrefix):
-					obj[keys[-1]] = session_svc.aes_decrypt(value[len(self.EncryptedPrefix):])
-
 	@classmethod
 	def _deserialize_session_data(cls, session_dict):
 		return SessionData(

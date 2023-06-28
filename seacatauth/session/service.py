@@ -210,9 +210,9 @@ class SessionService(asab.Service):
 			session_builders = list()
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				if key in SessionAdapter.SensitiveFields and value is not None:
-					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-				upsertor.set(key, value)
+				if value is None:
+					continue
+				upsertor.set(key, value, encrypt=(key in SessionAdapter.SensitiveFields))
 
 		session_id = await upsertor.execute(event_type=EventTypes.SESSION_CREATED)
 
@@ -229,7 +229,9 @@ class SessionService(asab.Service):
 	async def update_session(self, session_id: str, session_builders: list):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
-		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+		session_dict = await self.StorageService.get(
+			self.SessionCollection, session_id,
+			decrypt=SessionAdapter.SensitiveFields)
 
 		upsertor = self.StorageService.upsertor(
 			self.SessionCollection,
@@ -239,26 +241,21 @@ class SessionService(asab.Service):
 
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				upsertor.set(key, value)
+				if value is None:
+					upsertor.unset(key)
+				else:
+					upsertor.set(key, value, encrypt=(key in SessionAdapter.SensitiveFields))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
 		return await self.get(session_id)
 
 
-	async def get_by(self, criteria: dict):
-		# Encrypt sensitive fields
-		query_filter = {}
-		for key, value in criteria.items():
-			if key in SessionAdapter.SensitiveFields:
-				query_filter[key] = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-			else:
-				query_filter[key] = value
-
-		collection = self.StorageService.Database[self.SessionCollection]
-		session_dict = await collection.find_one(query_filter)
-		if session_dict is None:
-			raise KeyError("Session not found")
+	async def get_by(self, key: str, value):
+		session_dict = await self.StorageService.get_by(
+			self.SessionCollection, key, value,
+			decrypt=SessionAdapter.SensitiveFields,
+			search_encrypted=(key in SessionAdapter.SensitiveFields))
 
 		try:
 			session = SessionAdapter(self, session_dict)
@@ -274,7 +271,9 @@ class SessionService(asab.Service):
 	async def get(self, session_id):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
-		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+		session_dict = await self.StorageService.get(
+			self.SessionCollection, session_id,
+			decrypt=SessionAdapter.SensitiveFields)
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
@@ -598,22 +597,3 @@ class SessionService(asab.Service):
 			await self.update_session(dst_session.SessionId, session_builders)
 
 		return await self.get(dst_session.SessionId)
-
-
-	def aes_encrypt(self, raw_bytes: bytes):
-		algorithm = cryptography.hazmat.primitives.ciphers.algorithms.AES(self.AESKey)
-		iv, token = raw_bytes[:self.AESBlockSize], raw_bytes[self.AESBlockSize:]
-		mode = cryptography.hazmat.primitives.ciphers.modes.CBC(iv)
-		cipher = cryptography.hazmat.primitives.ciphers.Cipher(algorithm, mode)
-		encryptor = cipher.encryptor()
-		encrypted = iv + (encryptor.update(token) + encryptor.finalize())
-		return encrypted
-
-	def aes_decrypt(self, encrypted_bytes: bytes):
-		algorithm = cryptography.hazmat.primitives.ciphers.algorithms.AES(self.AESKey)
-		iv, token = encrypted_bytes[:self.AESBlockSize], encrypted_bytes[self.AESBlockSize:]
-		mode = cryptography.hazmat.primitives.ciphers.modes.CBC(iv)
-		cipher = cryptography.hazmat.primitives.ciphers.Cipher(algorithm, mode)
-		decryptor = cipher.decryptor()
-		raw = iv + (decryptor.update(token) + decryptor.finalize())
-		return raw
