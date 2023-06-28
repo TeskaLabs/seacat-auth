@@ -140,14 +140,12 @@ class OTPService(asab.Service):
 		Get TOTP secret from `PreparedTOTPCollection`. If it has already expired, raise `KeyError`.
 		"""
 		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id, decrypt=["__s"])
-		secret: str = data["__s"]
+		secret: bytes | None = data["__s"]
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
 
-		secret = secret.decode("ascii")
-
-		return secret
+		return secret.decode("ascii")
 
 	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> Optional[str]:
 		"""
@@ -156,7 +154,7 @@ class OTPService(asab.Service):
 		"""
 		try:
 			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
-			secret: str = totp_object.get("__totp")
+			secret: bytes | None = totp_object.get("__totp")
 		except KeyError:
 			secret = None
 
