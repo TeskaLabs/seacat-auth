@@ -142,6 +142,8 @@ asab.Config.add_defaults({
 		#   Every time introspection happens, the expiration is postponed to CURRENT TIME + 20 minutes.
 		"touch_extension": "0.5",
 
+		"touch_cooldown": "60 s",
+
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
 
