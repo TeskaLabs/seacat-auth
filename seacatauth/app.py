@@ -1,5 +1,6 @@
 import os
 import logging
+import secrets
 
 import asab
 import asab.web
@@ -23,6 +24,7 @@ class SeaCatAuthApplication(asab.Application):
 	def __init__(self):
 		super().__init__()
 		self.Provisioning = self._should_activate_provisioning()
+		self._check_encryption_config()
 
 		# Load modules
 		self.add_module(asab.web.Module)
@@ -167,6 +169,19 @@ class SeaCatAuthApplication(asab.Application):
 		if self.Provisioning:
 			from .provisioning import ProvisioningService
 			self.ProvisioningService = ProvisioningService(self)
+
+	def _check_encryption_config(self):
+		if len(asab.Config.get("asab:storage", "aes_key", fallback="")) == 0:
+			raise ValueError(
+				"No encryption 'aes_key' specified in [asab:storage] config section. Please supply an encryption key. "
+				"You may use the following randomly generated example: "
+				"""
+				```
+				[asab:storage]
+				aes_key={}
+				```
+				""".replace("\t", "").format(secrets.token_urlsafe(16))
+			)
 
 	def _should_activate_provisioning(self):
 		# Activate via argparse flag
