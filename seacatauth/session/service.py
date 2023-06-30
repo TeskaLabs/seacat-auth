@@ -76,7 +76,8 @@ class SessionService(asab.Service):
 			seconds=asab.Config.getseconds("seacatauth:session", "maximum_age")
 		)
 
-		self.MinimalRefreshInterval = datetime.timedelta(seconds=60)
+		touch_cooldown = asab.Config.getseconds("seacatauth:session", "touch_cooldown")
+		self.TouchCooldown = datetime.timedelta(seconds=touch_cooldown)
 
 		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
 		app.PubSub.subscribe("Application.run!", self._on_start)
@@ -375,7 +376,8 @@ class SessionService(asab.Service):
 
 	async def touch(self, session: SessionAdapter, expiration: int = None):
 		"""
-		Extend the expiration of the session group if it hasn't been updated recently.
+		Update session modification time to record activity.
+		Also extend session expiration if possible.
 
 		Return the updated session object.
 		"""
@@ -383,28 +385,11 @@ class SessionService(asab.Service):
 		if session.Session.ParentSessionId is not None:
 			await self.touch(await self.get(session.Session.ParentSessionId))
 
-		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
-			# Session has been extended recently
-			return session
-		if session.Session.Expiration >= session.Session.MaxExpiration:
-			# Session expiration is already maxed out
+		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown:
+			# Session has been touched recently
 			return session
 
-		if expiration is not None:
-			expiration = datetime.timedelta(seconds=expiration)
-		elif session.Session.ExpirationExtension is not None:
-			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
-		else:
-			# May be a legacy "machine credentials session". Do not extend.
-			return session
-		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
-
-		if expires < session.Session.Expiration:
-			# Do not shorten the session!
-			return session
-		if expires > session.Session.MaxExpiration:
-			# Do not cross maximum expiration
-			expires = session.Session.MaxExpiration
+		expires = self._calculate_extended_expiration(session, expiration)
 
 		# Update session
 		version = session.Session.Version
@@ -413,15 +398,39 @@ class SessionService(asab.Service):
 			session.SessionId,
 			version=version
 		)
-		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+		if expires is not None:
+			upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+			L.info("Extending session expiration.", struct_data={"sid": session.Session.Id, "exp": expires})
 
 		try:
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
-			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.Id, "exp": expires})
 		except KeyError:
-			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.Id})
+			L.warning("Conflict: Session already extended.", struct_data={"sid": session.Session.Id})
 
 		return await self.get(session.SessionId)
+
+
+	def _calculate_extended_expiration(self, session: SessionAdapter, expiration: int = None):
+		if session.Session.Expiration >= session.Session.MaxExpiration:
+			return None
+
+		if expiration is not None:
+			expiration = datetime.timedelta(seconds=expiration)
+		elif session.Session.ExpirationExtension is not None:
+			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
+		else:
+			# May be a legacy "machine credentials session". Do not extend.
+			return None
+		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+
+		if expires < session.Session.Expiration:
+			# Do not shorten the session!
+			return None
+		if expires > session.Session.MaxExpiration:
+			# Do not cross maximum expiration
+			expires = session.Session.MaxExpiration
+
+		return expires
 
 
 	async def delete(self, session_id):
