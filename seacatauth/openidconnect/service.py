@@ -480,20 +480,6 @@ class OpenIdConnectService(asab.Service):
 
 		# TODO: Last password change
 
-		# Get last successful and failed login times
-		# TODO: Store last login in session
-		try:
-			last_login = await self.AuditService.get_last_logins(session.Credentials.Id)
-		except Exception as e:
-			last_login = None
-			L.warning("Could not fetch last logins: {}".format(e))
-
-		if last_login is not None:
-			if "fat" in last_login:
-				userinfo["last_failed_login"] = last_login["fat"]
-			if "sat" in last_login:
-				userinfo["last_successful_login"] = last_login["sat"]
-
 		# RFC 7519 states that the exp and iat claim values must be NumericDate values
 		# Convert ALL datetimes to UTC timestamps for consistency
 		for k, v in userinfo.items():
