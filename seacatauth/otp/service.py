@@ -103,7 +103,7 @@ class OTPService(asab.Service):
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
 		upsertor.set("__totp", secret.encode("ascii"), encrypt=True)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
-		L.log(asab.LOG_NOTICE, "TOTP secret registered", struct_data={"cid": credentials_id})
+		L.log(asab.LOG_NOTICE, "TOTP secret registered.", struct_data={"cid": credentials_id})
 
 		await self._delete_prepared_totp_secret(session.SessionId)
 
@@ -130,7 +130,7 @@ class OTPService(asab.Service):
 		upsertor.set("__s", secret, encrypt=True)
 
 		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)
-		L.log(asab.LOG_NOTICE, "TOTP secret created", struct_data={"sid": session_id})
+		L.log(asab.LOG_NOTICE, "TOTP secret created.", struct_data={"sid": session_id})
 
 		return secret
 
@@ -140,14 +140,12 @@ class OTPService(asab.Service):
 		Get TOTP secret from `PreparedTOTPCollection`. If it has already expired, raise `KeyError`.
 		"""
 		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id, decrypt=["__s"])
-		secret: None | bytes = data["__s"]
+		secret: bytes = data["__s"]
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
 
-		secret = secret.decode("ascii")
-
-		return secret
+		return secret.decode("ascii")
 
 	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> Optional[str]:
 		"""
@@ -173,7 +171,7 @@ class OTPService(asab.Service):
 		Delete TOTP secret from `PreparedTOTPCollection`.
 		"""
 		await self.StorageService.delete(collection=self.PreparedTOTPCollection, obj_id=session_id)
-		L.info("TOTP secret deleted", struct_data={"sid": session_id})
+		L.info("TOTP secret deleted.", struct_data={"sid": session_id})
 
 
 	async def _delete_expired_totp_secrets(self):
