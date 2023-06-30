@@ -94,3 +94,10 @@ class ClientResponseError(Exception):
 		self.Status = status
 		self.Data = data
 		super().__init__("Client responded with error {}: {}".format(status, data))
+
+
+class SessionNotFoundError(KeyError):
+	def __init__(self, message, session_id=None, query=None, *args):
+		self.SessionId = session_id
+		self.Query = query
+		super().__init__(message, *args)

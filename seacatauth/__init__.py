@@ -142,12 +142,11 @@ asab.Config.add_defaults({
 		#   Every time introspection happens, the expiration is postponed to CURRENT TIME + 20 minutes.
 		"touch_extension": "0.5",
 
+		# Specifies how often session can be touched to indicate their activity
+		"touch_cooldown": "60 s",
+
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
-
-		# Key used for sensitive field encryption
-		# MUST NOT BE EMPTY!
-		"aes_key": ""
 	},
 
 	"seacatauth:password": {

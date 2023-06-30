@@ -48,15 +48,15 @@ class RegistrationService(asab.Service):
 		self.Enabled = self.CredentialProvider is not None
 
 		if self.Enabled:
-			self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+			self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
 	async def initialize(self, app):
 		self.RoleService = app.get_service("seacatauth.RoleService")
 
 
-	async def _on_tick(self, event_name):
-		await self.delete_expired_unregistered_credentials()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_unregistered_credentials()
 
 
 	async def draft_credentials(
@@ -167,7 +167,7 @@ class RegistrationService(asab.Service):
 		await self.CredentialProvider.delete(credentials["_id"])
 
 
-	async def delete_expired_unregistered_credentials(self):
+	async def _delete_expired_unregistered_credentials(self):
 		"""
 		Delete all credentials that have expired registration time
 		"""
