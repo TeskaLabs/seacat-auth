@@ -147,10 +147,6 @@ asab.Config.add_defaults({
 
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
-
-		# Key used for sensitive field encryption
-		# MUST NOT BE EMPTY!
-		"aes_key": ""
 	},
 
 	"seacatauth:password": {
