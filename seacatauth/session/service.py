@@ -16,7 +16,7 @@ import asab.storage
 import pymongo
 
 from .adapter import SessionAdapter, rest_get
-
+from .. import exceptions
 from ..events import EventTypes
 
 #
@@ -30,7 +30,7 @@ class SessionService(asab.Service):
 
 	SessionCollection = "s"
 
-	def __init__(self, app, service_name='seacatauth.SessionService'):
+	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
@@ -79,12 +79,11 @@ class SessionService(asab.Service):
 		touch_cooldown = asab.Config.getseconds("seacatauth:session", "touch_cooldown")
 		self.TouchCooldown = datetime.timedelta(seconds=touch_cooldown)
 
-		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
-		app.PubSub.subscribe("Application.run!", self._on_start)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 		# Metrics
-		self.MetricsService = app.get_service('asab.MetricsService')
-		self.TaskService = app.get_service('asab.TaskService')
+		self.MetricsService = app.get_service("asab.MetricsService")
+		self.TaskService = app.get_service("asab.TaskService")
 		self.SessionGauge = self.MetricsService.create_gauge(
 			"sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
@@ -142,12 +141,8 @@ class SessionService(asab.Service):
 			L.error("Failed to create index (parent session ID): {}".format(e))
 
 
-	async def _on_start(self, event_name):
-		await self.delete_expired_sessions()
-
-
-	async def _on_tick(self, event_name):
-		await self.delete_expired_sessions()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_sessions()
 
 	def _on_tick_metric(self, event_name):
 		self.TaskService.schedule(self._metrics_task())
@@ -157,7 +152,7 @@ class SessionService(asab.Service):
 		self.SessionGauge.set("sessions", session_count)
 
 
-	async def delete_expired_sessions(self):
+	async def _delete_expired_sessions(self):
 		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
@@ -168,6 +163,9 @@ class SessionService(asab.Service):
 		for sid in expired:
 			# Use the delete method for proper session termination
 			await self.delete(session_id=sid)
+
+		if len(expired) > 0:
+			L.log(asab.LOG_NOTICE, "Expired sessions deleted.", struct_data={"count": len(expired)})
 
 
 	async def create_session(
@@ -259,7 +257,11 @@ class SessionService(asab.Service):
 		collection = self.StorageService.Database[self.SessionCollection]
 		session_dict = await collection.find_one(query_filter)
 		if session_dict is None:
-			raise KeyError("Session not found")
+			raise exceptions.SessionNotFoundError("Session not found in database.", query=criteria)
+
+		# Do not return expired sessions
+		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.SessionNotFoundError("Session expired.", query=criteria)
 
 		try:
 			session = SessionAdapter(self, session_dict)
@@ -267,7 +269,7 @@ class SessionService(asab.Service):
 			L.error("Failed to create SessionAdapter from database object", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise KeyError("Session not found") from e
+			raise exceptions.SessionNotFoundError("Session not found in database.", query=criteria) from e
 
 		return session
 
@@ -276,13 +278,18 @@ class SessionService(asab.Service):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
 		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+
+		# Do not return expired sessions
+		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.SessionNotFoundError("Session expired.", session_id=session_id)
+
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.error("Failed to create SessionAdapter from database object", struct_data={
+			L.exception("Failed to create SessionAdapter from database object", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise e
+			raise exceptions.SessionNotFoundError("Session not found in database.", session_id=session_id) from e
 		return session
 
 
@@ -305,11 +312,14 @@ class SessionService(asab.Service):
 			yield session_dict
 
 
-	async def list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
 		collection = self.StorageService.Database[self.SessionCollection]
 
 		if query_filter is None:
 			query_filter = {}
+
+		if not include_expired:
+			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		sessions = []
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
@@ -321,7 +331,7 @@ class SessionService(asab.Service):
 		}
 
 
-	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
 		"""
 		List top-level sessions with all their children sessions inside the "children" attribute
 		"""
@@ -329,6 +339,9 @@ class SessionService(asab.Service):
 
 		if query_filter is None:
 			query_filter = {}
+
+		if not include_expired:
+			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		# Find only top-level sessions (with no parent)
 		query_filter.update({SessionAdapter.FN.Session.ParentSessionId: None})
@@ -353,7 +366,8 @@ class SessionService(asab.Service):
 				continue
 			# Include children sessions
 			children = await self.list(
-				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])}
+				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])},
+				include_expired=include_expired,
 			)
 			if children["count"] > 0:
 				session["children"] = children
