@@ -34,10 +34,10 @@ class OTPService(asab.Service):
 			seconds=asab.Config.getseconds("seacatauth:otp", "registration_timeout")
 		)
 
-		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
+	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_totp_secrets()
 
 
@@ -140,7 +140,7 @@ class OTPService(asab.Service):
 		Get TOTP secret from `PreparedTOTPCollection`. If it has already expired, raise `KeyError`.
 		"""
 		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id, decrypt=["__s"])
-		secret: str = data["__s"]
+		secret: None | bytes = data["__s"]
 		expiration_time: Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
@@ -156,7 +156,7 @@ class OTPService(asab.Service):
 		"""
 		try:
 			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
-			secret: str = totp_object.get("__totp")
+			secret: None | bytes = totp_object.get("__totp")
 		except KeyError:
 			secret = None
 
@@ -180,11 +180,11 @@ class OTPService(asab.Service):
 		"""
 		Delete expired TOTP secrets
 		"""
-		collection: dict = self.StorageService.Database[self.PreparedTOTPCollection]
+		collection = self.StorageService.Database[self.PreparedTOTPCollection]
 		query_filter: dict = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.info("Expired TOTP secrets deleted", struct_data={
+			L.log(asab.LOG_NOTICE, "Expired TOTP secrets deleted.", struct_data={
 				"count": result.deleted_count
 			})
 
