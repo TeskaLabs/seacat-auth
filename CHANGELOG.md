@@ -7,10 +7,12 @@
 
 ### Features
 - Configurable anonymous session expiration (#217, PLUM Sprint 230616)
+- Update modtime of active sessions (#226, PLUM Sprint 230616)
 
 ### Refactoring
 - ~~Bump Python version to 3.11 and Alpine to 3.18 (#215, PLUM Sprint 230602)~~(d415691)
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
+- Clear expired objects during housekeeping (#218, PLUM Sprint 230616)
 
 ---
 
