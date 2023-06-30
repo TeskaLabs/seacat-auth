@@ -38,22 +38,11 @@ class SessionService(asab.Service):
 		# It needs to be able to search by encrypted values and thus requires
 		# a different way of handling AES CBC init vectors.
 		aes_key = asab.Config.get("asab:storage", "aes_key")
-		if len(aes_key) == 0:
-			aes_key = asab.Config.get("seacatauth:session", "aes_key", fallback="")
-			if len(aes_key) > 0:
-				raise ValueError(
-					"The 'aes_key' config option has been moved from [seacatauth:session] "
-					"into [asab:storage] section. Please update your configuration accordingly.")
-		if len(aes_key) == 0:
-			raise ValueError("""Storage AES key must not be empty.
-				Please specify it in the [asab:storage] section of your Seacat Auth configuration file.
-				You may use the following randomly generated example:
-				```
-				[asab:storage]
-				aes_key={}
-				```
-			""".replace("\t", "").format(secrets.token_urlsafe(16)))
 		self.AESKey = hashlib.sha256(aes_key.encode("utf-8")).digest()
+		if "aes_key" in asab.Config["seacatauth:session"]:
+			L.warning(
+				"The 'aes_key' config option has been moved into [asab:storage] section. "
+				"The key specified in [seacatauth:session] will be ignored.")
 
 		# Block size is used for determining the size of CBC initialization vector
 		self.AESBlockSize = cryptography.hazmat.primitives.ciphers.algorithms.AES.block_size // 8
