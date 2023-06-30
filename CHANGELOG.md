@@ -5,6 +5,7 @@
 ### Breaking changes
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
 - `aes_key` option has been moved to `[asab:storage]` section (#221, PLUM Sprint 230616)
+- Last login info is no longer included in userinfo and credentials detail (#219, PLUM Sprint 230616)
 
 ### Features
 - Configurable anonymous session expiration (#217, PLUM Sprint 230616)
@@ -15,6 +16,7 @@
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
 - Clear expired objects during housekeeping (#218, PLUM Sprint 230616)
 - `aes_key` option has been moved to `[asab:storage]` section (#221, PLUM Sprint 230616)
+- Reduce last login reads (#219, PLUM Sprint 230616)
 
 ---
 
