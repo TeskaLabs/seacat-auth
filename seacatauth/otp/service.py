@@ -34,10 +34,10 @@ class OTPService(asab.Service):
 			seconds=asab.Config.getseconds("seacatauth:otp", "registration_timeout")
 		)
 
-		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
+	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_totp_secrets()
 
 
@@ -154,7 +154,7 @@ class OTPService(asab.Service):
 		"""
 		try:
 			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
-			secret: bytes | None = totp_object.get("__totp")
+			secret: None | bytes = totp_object.get("__totp")
 		except KeyError:
 			secret = None
 

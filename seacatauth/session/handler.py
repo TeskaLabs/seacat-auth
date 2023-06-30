@@ -57,10 +57,18 @@ class SessionHandler(object):
 			description: Items per page
 			schema:
 				type: integer
+		-	name: include_expired
+			in: query
+			description: Whether to include expired sessions in the results
+			required: false
+			schema:
+				type: boolean
+				default: no
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = int(request.query.get("i", 10))
-		data = await self.SessionService.recursive_list(page, limit)
+		include_expired = asab.config.utils.string_to_boolean(request.query.get("include_expired", "no"))
+		data = await self.SessionService.recursive_list(page, limit, include_expired=include_expired)
 		return asab.web.rest.json_response(request, data)
 
 
