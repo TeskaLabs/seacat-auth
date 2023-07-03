@@ -7,6 +7,9 @@
 - `aes_key` option has been moved to `[asab:storage]` section (#221, PLUM Sprint 230616)
 - Last login info is no longer included in userinfo and credentials detail (#219, PLUM Sprint 230616)
 
+### Fix
+- Fix broken webauthn dependency (#227, PLUM Sprint 230630)
+
 ### Features
 - Configurable anonymous session expiration (#217, PLUM Sprint 230616)
 - Update modtime of active sessions (#226, PLUM Sprint 230616)
