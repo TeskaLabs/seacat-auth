@@ -44,7 +44,11 @@ RUN apk add --no-cache  \
     webauthn \
     pyyaml \
     pymongo \
+    pydantic==1.10 \
     git+https://github.com/TeskaLabs/asab.git
+# There is a broken pydantic dependency in py_webauthn.
+# Remove the "pydantic==1.10" requirement once this is fixed.
+# https://github.com/duo-labs/py_webauthn/issues/156
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
