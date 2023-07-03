@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.26-beta
 
 ### Breaking changes
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
