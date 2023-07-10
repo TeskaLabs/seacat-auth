@@ -416,12 +416,13 @@ class SessionService(asab.Service):
 		)
 		if expires is not None:
 			upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
-			L.info("Extending session expiration.", struct_data={"sid": session.Session.Id, "exp": expires})
+			L.info("Extending session expiration.", struct_data={
+				"sid": session.Session.Id, "exp": expires, "v": version})
 
 		try:
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
 		except KeyError:
-			L.warning("Conflict: Session already extended.", struct_data={"sid": session.Session.Id})
+			L.warning("Conflict: Session already extended.", struct_data={"sid": session.Session.Id, "v": version})
 
 		return await self.get(session.SessionId)
 
