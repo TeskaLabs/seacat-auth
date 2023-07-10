@@ -18,4 +18,3 @@ def oauth2_session_builder(oauth2_data):
 	if scope is None or "cookie" not in scope:
 		yield (SessionAdapter.FN.OAuth2.AccessToken, secrets.token_bytes(token_length))
 		yield (SessionAdapter.FN.OAuth2.RefreshToken, secrets.token_bytes(token_length))
-		yield (SessionAdapter.FN.OAuth2.IdToken, None)
