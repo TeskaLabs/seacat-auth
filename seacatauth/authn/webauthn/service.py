@@ -268,12 +268,17 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialcreationoptions
 		"""
 		credentials = await self.CredentialsService.get(session.Credentials.Id)
+		# User_name should be a unique human-palatable identifier (typically email, phone)
+		user_name = credentials.get("email") or credentials.get("phone")
+		if not user_name:
+			raise Exception("Credentials have no email address nor phone number.")
+
 		challenge = await self.create_registration_challenge(session.Session.Id)
 		options = webauthn.generate_registration_options(
 			rp_id=self.RelyingPartyId,
 			rp_name=self.RelyingPartyName,
 			user_id=session.Credentials.Id,
-			user_name=credentials.get("email"),
+			user_name=user_name,
 			user_display_name=credentials.get("username"),
 			challenge=challenge,
 			timeout=self.RegistrationTimeout,
