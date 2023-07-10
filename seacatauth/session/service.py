@@ -384,22 +384,28 @@ class SessionService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def touch(self, session: SessionAdapter, expiration: int = None):
+	async def touch(self, session: SessionAdapter, expires: datetime.datetime = None):
 		"""
 		Update session modification time to record activity.
 		Also extend session expiration if possible.
 
 		Return the updated session object.
 		"""
-		# Extend parent session
-		if session.Session.ParentSessionId is not None:
-			await self.touch(await self.get(session.Session.ParentSessionId))
-
 		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown:
 			# Session has been touched recently
 			return session
 
-		expires = self._calculate_extended_expiration(session, expiration)
+		expires = self._calculate_extended_expiration(session, expires)
+
+		# Extend root session
+		if session.Session.ParentSessionId is not None:
+			try:
+				root_session = await self.get(session.Session.ParentSessionId)
+				await self.touch(root_session, expires)
+			except exceptions.SessionNotFoundError:
+				L.info("Will not extend subsession expiration: Root session not found.", struct_data={
+					"sid": session.Session.Id, "psid": session.Session.ParentSessionId})
+				expires = None
 
 		# Update session
 		version = session.Session.Version
@@ -410,33 +416,32 @@ class SessionService(asab.Service):
 		)
 		if expires is not None:
 			upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
-			L.info("Extending session expiration.", struct_data={"sid": session.Session.Id, "exp": expires})
+			L.info("Extending session expiration.", struct_data={
+				"sid": session.Session.Id, "exp": expires, "v": version})
 
 		try:
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
 		except KeyError:
-			L.warning("Conflict: Session already extended.", struct_data={"sid": session.Session.Id})
+			L.warning("Conflict: Session already touched.", struct_data={"sid": session.Session.Id, "v": version})
 
 		return await self.get(session.SessionId)
 
 
-	def _calculate_extended_expiration(self, session: SessionAdapter, expiration: int = None):
+	def _calculate_extended_expiration(self, session: SessionAdapter, expires: datetime.datetime = None):
 		if session.Session.Expiration >= session.Session.MaxExpiration:
 			return None
 
-		if expiration is not None:
-			expiration = datetime.timedelta(seconds=expiration)
-		elif session.Session.ExpirationExtension is not None:
-			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
-		else:
-			# May be a legacy "machine credentials session". Do not extend.
-			return None
-		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+		if expires is None:
+			if session.Session.ExpirationExtension is None:
+				# May be a legacy "machine credentials session". Do not extend.
+				return None
+			expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+				seconds=session.Session.ExpirationExtension)
 
 		if expires < session.Session.Expiration:
 			# Do not shorten the session!
 			return None
-		if expires > session.Session.MaxExpiration:
+		if session.Session.MaxExpiration is not None and expires > session.Session.MaxExpiration:
 			# Do not cross maximum expiration
 			expires = session.Session.MaxExpiration
 
