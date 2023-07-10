@@ -70,7 +70,7 @@ class M2MIntrospectHandler(object):
 
 		# Find session object
 		try:
-			session = await self.SessionService.get_by({SessionAdapter.FN.Credentials.Id: credentials_id})
+			session = await self.SessionService.get_by(SessionAdapter.FN.Credentials.Id, credentials_id)
 		except KeyError:
 			session = None
 
