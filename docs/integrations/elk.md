@@ -20,7 +20,7 @@ Instead of the `PUT /cookie/nginx` endpoint (which exchanges Seacat client cooki
 Batman auth uses `PUT /batman/nginx` (which exchanges Seacat client cookie for Basic auth header).
 
 
-# Configuration example
+## Configuration example
 
 Let's set up Seacat Batman authorization for our Kibana app. We need to have 
 [ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
@@ -33,7 +33,7 @@ We will need to configure these three components:
   in communication with Seacat Auth.
 - Prepare the necessary **server locations** in Nginx config.
 
-## Seacat Auth configuration
+### Seacat Auth configuration
 
 Create the ELK Batman section and provide ElasticSearch base URL and API credentials, e.g.
 
@@ -44,7 +44,7 @@ username=admin
 password=elasticpassword
 ```
 
-## Client configuration
+### Client configuration
 
 Use Seacat Auth client API (or Seacat Admin UI) to register Kibana as a client. 
 In our case, we can send the following request:
@@ -74,7 +74,7 @@ The server will respond with our client's assigned ID and other attributes:
 
 We will use the `client_id` and `client_cookie` in the next step.
 
-## Nginx configuration
+### Nginx configuration
 
 The minimal configuration requires the following three locations to be defined in nginx:
 
@@ -83,7 +83,7 @@ The minimal configuration requires the following three locations to be defined i
 - **Client cookie entry point:** Public endpoint which dispenses the Seacat client cookie at the end of a successful 
   authorization flow.
 
-### Client site location
+#### Client site location
 
 ```nginx
 location /kibana/ {
@@ -110,7 +110,7 @@ location /kibana/ {
 }
 ```
 
-### Client introspection
+#### Client introspection
 
 ```nginx
 location = /_kibana_introspection {
@@ -136,7 +136,7 @@ location = /_kibana_introspection {
 }
 ```
 
-### Client cookie entry point
+#### Client cookie entry point
 
 Must be located on the same hostname as the protected client location.
 
