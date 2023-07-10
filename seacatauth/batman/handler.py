@@ -39,11 +39,12 @@ class BatmanHandler(object):
 		**Internal endpoint for Nginx auth_request.**
 		"""
 		cookie_service = self.BatmanService.App.get_service("seacatauth.CookieService")
-		cookie_value = cookie_service.get_session_cookie_value(request, request.query.get("client_id"))
-		if cookie_value is None:
-			return aiohttp.web.HTTPUnauthorized()
 
-		session = await cookie_service.get_session_by_session_cookie_value(cookie_value)
+		client_id = request.query.get("client_id")
+		if client_id is None:
+			raise ValueError("No 'client_id' parameter specified in Batman introspection query.")
+
+		session = await cookie_service.get_session_by_request_cookie(request, request.query.get("client_id"))
 		if session is None or session.Batman is None:
 			return aiohttp.web.HTTPUnauthorized()
 
