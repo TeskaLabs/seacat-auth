@@ -397,6 +397,16 @@ class SessionService(asab.Service):
 
 		expires = self._calculate_extended_expiration(session, expires)
 
+		# Extend root session
+		if session.Session.ParentSessionId is not None:
+			try:
+				root_session = await self.get(session.Session.ParentSessionId)
+				await self.touch(root_session, expires)
+			except exceptions.SessionNotFoundError:
+				L.info("Will not extend subsession expiration: Root session not found.", struct_data={
+					"sid": session.Session.Id, "psid": session.Session.ParentSessionId})
+				expires = None
+
 		# Update session
 		version = session.Session.Version
 		upsertor = self.StorageService.upsertor(
@@ -412,10 +422,6 @@ class SessionService(asab.Service):
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
 		except KeyError:
 			L.warning("Conflict: Session already extended.", struct_data={"sid": session.Session.Id})
-
-		# Extend parent session
-		if session.Session.ParentSessionId is not None:
-			await self.touch(await self.get(session.Session.ParentSessionId), expires)
 
 		return await self.get(session.SessionId)
 
