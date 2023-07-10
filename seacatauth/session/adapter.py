@@ -144,19 +144,25 @@ class SessionAdapter:
 			_prefix = "ba"
 			Token = "ba_t"
 
-	# Fields that are stored encrypted
-	SensitiveFields = frozenset([
-		FN.OAuth2.IdToken,
+	# Session identifiers are stored encrypted
+	# They are used as session lookup keys and need special encryption treatment for that
+	EncryptedIdentifierFields = frozenset([
 		FN.OAuth2.AccessToken,
 		FN.OAuth2.RefreshToken,
 		FN.Cookie.Id,
+	])
+
+	# Other sensitive fields (not used as lookup keys)
+	# They use regular encryption provided by asab.storage
+	EncryptedAttributes = frozenset([
 		FN.Batman.Token,
+		FN.OAuth2.IdToken,
 	])
 
 	EncryptedPrefix = b"$aescbc$"
 
 	def __init__(self, session_svc, session_dict):
-		self._decrypt_sensitive_fields(session_dict, session_svc)
+		self._decrypt_encrypted_identifiers(session_dict, session_svc)
 
 		self.Session = self._deserialize_session_data(session_dict)
 		self.Id = self.Session.Id
@@ -263,9 +269,9 @@ class SessionAdapter:
 		session_dict = self.serialize()
 		return rest_get(session_dict)
 
-	def _decrypt_sensitive_fields(self, session_dict, session_svc):
+	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields
-		for field in self.SensitiveFields:
+		for field in self.EncryptedIdentifierFields:
 			# BACK COMPAT: Handle nested dictionaries
 			obj = session_dict
 			keys = field.split(".")
