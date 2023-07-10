@@ -118,7 +118,7 @@ class ResourceService(asab.Service):
 		for resource_id, resource_config in self._BuiltinResources.items():
 			description = resource_config.get("description")
 
-			L.info("Checking for built-in resource {!r}".format(resource_id))
+			L.debug("Checking for built-in resource {!r}".format(resource_id))
 			try:
 				db_resource = await self.get(resource_id)
 			except KeyError:
