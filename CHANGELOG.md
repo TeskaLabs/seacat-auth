@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Root session must be as long as its longest subsession (#228, PLUM Sprint 230630)
+
+---
+
+
 ## v23.27-beta
 
 ### Breaking changes
