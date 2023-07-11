@@ -205,9 +205,11 @@ class SessionService(asab.Service):
 			session_builders = list()
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				if key in SessionAdapter.SensitiveFields and value is not None:
+				if key in SessionAdapter.EncryptedIdentifierFields and value is not None:
 					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-				upsertor.set(key, value)
+					upsertor.set(key, value)
+				else:
+					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		session_id = await upsertor.execute(event_type=EventTypes.SESSION_CREATED)
 
@@ -234,38 +236,34 @@ class SessionService(asab.Service):
 
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				upsertor.set(key, value)
+				upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
 		return await self.get(session_id)
 
 
-	async def get_by(self, criteria: dict):
+	async def get_by(self, key: str, value):
 		# Encrypt sensitive fields
-		query_filter = {}
-		for key, value in criteria.items():
-			if key in SessionAdapter.SensitiveFields:
-				query_filter[key] = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-			else:
-				query_filter[key] = value
+		if key in SessionAdapter.EncryptedIdentifierFields:
+			value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 
-		collection = self.StorageService.Database[self.SessionCollection]
-		session_dict = await collection.find_one(query_filter)
+		session_dict = await self.StorageService.get_by(
+			self.SessionCollection, key, value, decrypt=SessionAdapter.EncryptedAttributes)
 		if session_dict is None:
-			raise exceptions.SessionNotFoundError("Session not found in database.", query=criteria)
+			raise exceptions.SessionNotFoundError("Session not found in database.", query={key: value})
 
 		# Do not return expired sessions
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.SessionNotFoundError("Session expired.", query=criteria)
+			raise exceptions.SessionNotFoundError("Session expired.", query={key: value})
 
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.error("Failed to create SessionAdapter from database object", struct_data={
+			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise exceptions.SessionNotFoundError("Session not found in database.", query=criteria) from e
+			raise exceptions.SessionNotFoundError("Session deserialization failed.", query={key: value}) from e
 
 		return session
 
@@ -273,7 +271,8 @@ class SessionService(asab.Service):
 	async def get(self, session_id):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
-		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+		session_dict = await self.StorageService.get(
+			self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
 
 		# Do not return expired sessions
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
@@ -282,10 +281,10 @@ class SessionService(asab.Service):
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.exception("Failed to create SessionAdapter from database object", struct_data={
+			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise exceptions.SessionNotFoundError("Session not found in database.", session_id=session_id) from e
+			raise exceptions.SessionNotFoundError("Session deserialization failed.", session_id=session_id) from e
 		return session
 
 

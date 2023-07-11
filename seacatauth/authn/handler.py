@@ -315,9 +315,6 @@ class AuthenticationHandler(object):
 				else:
 					set_cookie(self.App, response, impersonator_session)
 
-		if self.BatmanService is not None:
-			response.del_cookie(self.BatmanService.CookieName)
-
 		return response
 
 	async def smslogin(self, request):
