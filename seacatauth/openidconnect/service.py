@@ -404,7 +404,7 @@ class OpenIdConnectService(asab.Service):
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
 			"exp": session.Session.Expiration,
-			"iat": datetime.datetime.now(datetime.timezone.utc),
+			"iat": session.CreatedAt,
 			"sid": session.SessionId,
 		}
 
