@@ -4,6 +4,7 @@ import uuid
 import aiohttp
 import aiohttp.web
 import asab.web.rest
+import asab.exceptions
 
 from .. import exceptions
 from ..generic import nginx_introspection, get_bearer_token_value
@@ -236,7 +237,7 @@ class CookieHandler(object):
 				from_info.extend(forwarded_for.split(", "))
 			track_id = uuid.uuid4().bytes
 			session = await self.CookieService.create_anonymous_cookie_client_session(
-				anonymous_cid, client_id, scope,
+				anonymous_cid, client, scope,
 				track_id=track_id,
 				from_info=from_info)
 			anonymous_session_created = True
@@ -436,7 +437,22 @@ class CookieHandler(object):
 
 
 	async def _authenticate_request(self, request, client_id=None):
-		return await self.CookieService.get_session_by_request_cookie(request, client_id)
+		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
+		if cookie_value is None:
+			return None
+
+		# First try if the cookie is a JWToken
+		try:
+			session = await self.CookieService.OpenIdConnectService.build_algorithmic_session_from_token(cookie_value)
+		except asab.exceptions.NotAuthenticatedError:
+			# The JWToken is invalid or expired
+			return None
+
+		if session is not None:
+			return session
+
+		# Then try looking in the database
+		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 
 
 	async def _fetch_webhook_data(self, client, session):

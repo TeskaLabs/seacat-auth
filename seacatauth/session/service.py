@@ -223,6 +223,24 @@ class SessionService(asab.Service):
 		return await self.get(session_id)
 
 
+	def build_algorithmic_anonymous_session(self, created_at, expires_at, track_id, client_dict, scope):
+		session_dict = {
+			SessionAdapter.FN.SessionId: None,  # FIXME: Should we use track ID as the session ID?
+			SessionAdapter.FN.Version: None,
+			SessionAdapter.FN.CreatedAt: created_at,
+			SessionAdapter.FN.ModifiedAt: created_at,
+			SessionAdapter.FN.Session.Expiration: expires_at,
+			SessionAdapter.FN.Session.TrackId: track_id,
+			SessionAdapter.FN.OAuth2.ClientId: client_dict["_id"],
+			SessionAdapter.FN.OAuth2.Scope: scope,
+			SessionAdapter.FN.Credentials.Id: client_dict["anonymous_cid"],
+			SessionAdapter.FN.Authentication.IsAnonymous: True,
+			SessionAdapter.FN.Authorization.Tenants: ["default"],  # FIXME: Get tenants by scope
+			SessionAdapter.FN.Authorization.Authz: {"default": ["blabla"]},  # FIXME: Get resources by scope
+		}
+		return SessionAdapter(self, session_dict)
+
+
 	async def update_session(self, session_id: str, session_builders: list):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
@@ -578,8 +596,6 @@ class SessionService(asab.Service):
 			# Transfer the track ID to the destination session and delete the source session
 			assert dst_session.Session.ParentSessionId is not None
 			session_builders = [((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),)]
-			old_session_group_id = src_session.Session.ParentSessionId or src_session.SessionId
-			await self.delete(old_session_group_id)
 			await self.update_session(dst_session.SessionId, session_builders)
 			await self.update_session(dst_session.Session.ParentSessionId, session_builders)
 

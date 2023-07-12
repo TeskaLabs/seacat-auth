@@ -112,7 +112,9 @@ async def nginx_introspection(
 			return aiohttp.web.HTTPForbidden()
 
 	# Extend session expiration
-	session = await session_service.touch(session)
+	# FIXME: This condition is a workaround.
+	if not session.Authentication.IsAnonymous:
+		session = await session_service.touch(session)
 
 	id_token = await oidc_service.build_id_token(session)
 

@@ -438,8 +438,9 @@ class AuthorizeHandler(object):
 						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 				elif authorize_type == "cookie":
+					# FIXME: Not tested!!!
 					new_session = await self.CookieService.create_anonymous_cookie_client_session(
-						root_session.Credentials.Id, client_id, scope,
+						root_session.Credentials.Id, client_dict, scope,
 						root_session_id=root_session.SessionId,
 						track_id=root_session.TrackId,
 						tenants=tenants,
@@ -489,8 +490,9 @@ class AuthorizeHandler(object):
 						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 				elif authorize_type == "cookie":
+					# FIXME: Not tested!!!
 					new_session = await self.CookieService.create_anonymous_cookie_client_session(
-						anonymous_cid, client_id, scope,
+						anonymous_cid, client_dict, scope,
 						tenants=tenants,
 						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
