@@ -8,6 +8,7 @@ import uuid
 
 import asab
 import asab.web.rest
+import asab.exceptions
 
 import aiohttp.web
 import urllib.parse
@@ -511,6 +512,55 @@ class OpenIdConnectService(asab.Service):
 		id_token = token.serialize()
 
 		return id_token
+
+
+	def build_algorithmic_session_token(self, session):
+		# FIXME: Not OIDC related. Refactor away.
+		payload = {
+			"iat": int(session.CreatedAt.timestamp()),
+			"exp": int(session.CreatedAt.timestamp()) + 60,  # FIXME: Get actual expiration from client settings.
+			"azp": session.OAuth2.ClientId,
+			"scope": session.OAuth2.Scope,
+			"track_id": uuid.UUID(bytes=session.Session.TrackId),
+		}
+		header = {
+			"alg": "ES256",
+			"typ": "JWT",
+			"kid": self.PrivateKey.key_id,
+		}
+		token = jwcrypto.jwt.JWT(
+			header=header,
+			claims=self.JSONDumper(payload)
+		)
+		token.make_signed_token(self.PrivateKey)
+		id_token = token.serialize()
+		return id_token
+
+
+	async def build_algorithmic_session_from_token(self, token_value):
+		# FIXME: Not OIDC related. Refactor away.
+		try:
+			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
+		except ValueError:
+			# This is not a JWToken
+			return None
+		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
+			# JWToken invalid
+			raise asab.exceptions.NotAuthenticatedError() from e
+
+		data_dict = json.loads(token.claims)
+		client_dict = await self.ClientService.get(data_dict["azp"])
+		try:
+			session = self.SessionService.build_algorithmic_anonymous_session(
+				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
+				expires_at=datetime.datetime.fromtimestamp(data_dict["exp"], datetime.timezone.utc),
+				track_id=uuid.UUID(data_dict["track_id"]).bytes,
+				client_dict=client_dict,
+				scope=data_dict["scope"])
+		except Exception as e:
+			raise asab.exceptions.NotAuthenticatedError() from e
+
+		return session
 
 
 	async def authorize_tenants_by_scope(self, scope, session, client_id):
