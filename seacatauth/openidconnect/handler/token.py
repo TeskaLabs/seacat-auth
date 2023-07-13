@@ -121,20 +121,11 @@ class TokenHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
-		# Translate authorization code into session id
-		# Verify that the Authorization Code has not been previously used (using `pop` operation)
+		# Locate the session by authorization code
 		try:
-			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
+			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(authorization_code)
 		except KeyError:
-			L.warning("Authorization code not found", struct_data={"code": authorization_code})
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-
-		# Locate the session using session id
-		try:
-			new_session = await self.SessionService.get(session_id)
-		except KeyError:
-			L.error("Session not found", struct_data={"sid": session_id})
+			L.warning("Session not found.", struct_data={"code": authorization_code})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 

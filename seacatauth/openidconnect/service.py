@@ -178,18 +178,23 @@ class OpenIdConnectService(asab.Service):
 			})
 
 
-	async def pop_session_id_by_authorization_code(self, code):
+	async def pop_session_by_authorization_code(self, code):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 		data = await collection.find_one_and_delete(filter={"_id": code})
 		if data is None:
-			raise KeyError("Authorization code not found")
+			raise KeyError("Authorization code not found.")
 
-		session_id = data["sid"]
 		exp = data["exp"]
 		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Authorization code expired")
+			raise KeyError("Authorization code expired.")
 
-		return session_id
+		if "sid" in data:
+			return await self.SessionService.get(data["sid"])
+		elif "token" in data:
+			return self.build_algorithmic_session_from_token(data["token"])
+		else:
+			L.error("Unexpected authorization code object.", struct_data=data)
+			raise KeyError("Invalid authorization code.")
 
 
 	async def get_session_by_access_token(self, token_value):

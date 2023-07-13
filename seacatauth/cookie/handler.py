@@ -368,8 +368,9 @@ class CookieHandler(object):
 			L.warning("Empty or missing 'code' parameter in query.", struct_data={"client_id": client_id})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
-		session = await self.CookieService.get_session_by_authorization_code(code)
-		if session is None:
+		try:
+			session = await self.CookieService.get_session_by_authorization_code(code)
+		except KeyError:
 			L.warning("Session not found: Authorization code invalid or expired.", struct_data={"client_id": client_id})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
