@@ -198,9 +198,10 @@ class AuthorizeHandler(object):
 		# Check the presence of required parameters
 		self._validate_request_parameters(request_parameters)
 
+		# TODO: Remove this. These extra options should either be in scope or in client config.
 		login_parameters = {
 			k: v for k, v in request_parameters.items()
-			if k in frozenset(("ldid", "expiration"))
+			if k in frozenset(("ldid",))
 		}
 
 		# Authentication Code Flow

@@ -26,7 +26,6 @@ class LoginSession(object):
 		remaining_login_attempts,
 		expires_at,
 		ident,
-		requested_session_expiration=None,
 		public_key=None,
 		data=None
 	):
@@ -44,7 +43,6 @@ class LoginSession(object):
 
 		# Login descriptor that successfully authenticated the login session
 		self.AuthenticatedVia = None
-		self.RequestedSessionExpiration = requested_session_expiration
 
 
 	@classmethod
@@ -56,7 +54,6 @@ class LoginSession(object):
 		login_descriptors,
 		login_attempts,
 		timeout,
-		requested_session_expiration=None,
 		data=None
 	):
 		# Generate shared encryption key
@@ -83,7 +80,6 @@ class LoginSession(object):
 			remaining_login_attempts=login_attempts,
 			expires_at=expires_at,
 			public_key=server_login_key.public_key(),
-			requested_session_expiration=requested_session_expiration,
 			data=data,
 		)
 
@@ -104,7 +100,6 @@ class LoginSession(object):
 				for descriptor in self.LoginDescriptors
 			],
 			"idt": self.Ident,
-			"rse": self.RequestedSessionExpiration,
 			"d": self.Data,
 		}
 		return db_object
@@ -124,7 +119,6 @@ class LoginSession(object):
 			remaining_login_attempts=db_object["la"],
 			expires_at=db_object["exp"],
 			public_key=cryptography.hazmat.primitives.serialization.load_pem_public_key(db_object["pk"]),
-			requested_session_expiration=db_object["rse"],
 			data=db_object["d"],
 		)
 
