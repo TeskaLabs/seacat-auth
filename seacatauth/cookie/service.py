@@ -133,21 +133,7 @@ class CookieService(asab.Service):
 
 
 	async def get_session_by_authorization_code(self, code):
-		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
-		try:
-			session_id = await oidc_svc.pop_session_id_by_authorization_code(code)
-		except KeyError:
-			L.warning("Authorization code not found", struct_data={"code": code})
-			return None
-
-		# Get the session
-		try:
-			session = await self.SessionService.get(session_id)
-		except KeyError:
-			L.error("Session not found", struct_data={"sid": session_id})
-			return None
-
-		return session
+		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
 
 
 	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
