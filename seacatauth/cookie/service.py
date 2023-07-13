@@ -8,6 +8,7 @@ import asab
 import asab.storage
 
 from ..session import SessionAdapter
+from ..session.adapter import CookieData
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
@@ -224,9 +225,9 @@ class CookieService(asab.Service):
 			client_dict=client_dict,
 			scope=scope)
 
-		# FIXME: Solve this properly.
-		from ..session.adapter import CookieData
-		session.Cookie = CookieData(Id=oidc_svc.build_algorithmic_session_token(session), Domain=None)
+		session.Cookie = CookieData(
+			Id=oidc_svc.build_algorithmic_session_token(session),
+			Domain=client_dict.get("cookie_domain") or None)
 
 		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
 			"cid": anonymous_cid,
