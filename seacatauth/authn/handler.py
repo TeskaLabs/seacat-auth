@@ -88,7 +88,6 @@ class AuthenticationHandler(object):
 		ident = json_data.get("ident")
 
 		# Get arguments specified in login URL query
-		expiration = None
 		login_preferences = None
 		query_string = json_data.get("qs")
 		if query_string is None:
@@ -103,15 +102,6 @@ class AuthenticationHandler(object):
 						L.error("Repeated query parameters are not supported", struct_data={"qs": query_string})
 						raise asab.exceptions.ValidationError("Invalid request")
 					login_dict[k] = v[0]
-
-			# Get requested session expiration
-			# TODO: This option should be moved to client config or removed completely
-			expiration = query_dict.get("expiration")
-			if expiration is not None:
-				try:
-					expiration = float(expiration[0])
-				except Exception as e:
-					L.warning("Error when parsing expiration: {}".format(e))
 
 			# Get preferred login descriptor IDs
 			# TODO: This option should be moved to client config or removed completely
@@ -159,7 +149,6 @@ class AuthenticationHandler(object):
 			client_public_key=key.get_op_key("encrypt"),  # extract EC public key from JWT
 			login_descriptors=login_descriptors,
 			ident=ident,
-			requested_session_expiration=expiration,
 		)
 
 		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
