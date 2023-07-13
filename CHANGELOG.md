@@ -4,11 +4,13 @@
 
 ### Breaking changes
 - Old Batman sessions are invalidated (#230, PLUM Sprint 230630)
+- Expiration removed from login query params (#233, PLUM Sprint 230630)
 
 ### Fix
 - Root session must be as long as its longest subsession (#228, PLUM Sprint 230630)
 - Webauthn `user_name` can be either email address or phone number (#229, PLUM Sprint 230630)
 - Batman token uses native ASAB Storage encryption (#230, PLUM Sprint 230630)
+- Expiration removed from login query params (#233, PLUM Sprint 230630)
 
 ### Features
 - Added alternative POST endpoint for Batman introspection (#230, PLUM Sprint 230630)
