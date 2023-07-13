@@ -121,17 +121,6 @@ class CookieService(asab.Service):
 		return session
 
 
-	def get_cookie_domain(self, cookie_domain_id=None):
-		if cookie_domain_id is not None:
-			cookie_domain = self.ApplicationCookies.get(cookie_domain_id, {}).get("domain")
-			if cookie_domain is None:
-				L.error("Unknown cookie domain ID", struct_data={"domain_id": cookie_domain_id})
-				raise KeyError("Unknown domain_id: {}".format(cookie_domain_id))
-			return cookie_domain
-		else:
-			return self.RootCookieDomain
-
-
 	async def get_session_by_authorization_code(self, code):
 		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
 
