@@ -523,7 +523,7 @@ class OpenIdConnectService(asab.Service):
 		# FIXME: Not OIDC related. Refactor away.
 		payload = {
 			"iat": int(session.CreatedAt.timestamp()),
-			"exp": int(session.CreatedAt.timestamp()) + 60,  # FIXME: Get actual expiration from client settings.
+			"exp": int(session.CreatedAt.timestamp()) + self.SessionService.AnonymousExpiration,
 			"azp": session.OAuth2.ClientId,
 			"scope": session.OAuth2.Scope,
 			"track_id": uuid.UUID(bytes=session.Session.TrackId),
