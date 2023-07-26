@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.30-beta
 
 ### Breaking changes
 - Old Batman sessions are invalidated (#230, PLUM Sprint 230630)
