@@ -446,7 +446,7 @@ class OpenIdConnectService(asab.Service):
 		if session.Credentials.CreatedAt is not None:
 			userinfo["created_at"] = session.Credentials.CreatedAt
 
-		if session.Authentication.IsAnonymous:
+		if session.is_anonymous():
 			userinfo["anonymous"] = True
 
 		if session.TrackId is not None:

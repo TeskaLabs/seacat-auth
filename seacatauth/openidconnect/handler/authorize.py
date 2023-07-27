@@ -286,12 +286,12 @@ class AuthorizeHandler(object):
 			if root_session.Session.Type != "root":
 				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
-			elif root_session.Authentication.IsAnonymous and not client_dict.get("authorize_anonymous_users", False):
+			elif root_session.is_anonymous() and not client_dict.get("authorize_anonymous_users", False):
 				L.warning("Not allowed to authorize with anonymous session.", struct_data={
 					"sid": root_session.Id, "client_id": client_id})
 				root_session = None
 
-		authenticated = root_session is not None and not root_session.Authentication.IsAnonymous
+		authenticated = root_session is not None and not root_session.is_anonymous()
 		allow_anonymous = "anonymous" in scope
 		if allow_anonymous and not client_dict.get("authorize_anonymous_users", False):
 			raise OAuthAuthorizeError(
@@ -414,7 +414,7 @@ class AuthorizeHandler(object):
 
 			if root_session is not None:
 				# Open a new subsession under the current root session
-				assert root_session.Authentication.IsAnonymous
+				assert root_session.is_anonymous()
 
 				# Authorize access to tenants requested in scope
 				try:
