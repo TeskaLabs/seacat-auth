@@ -563,7 +563,7 @@ class SessionService(asab.Service):
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
 
-		elif not src_session.Authentication.IsAnonymous:
+		elif not src_session.is_anonymous():
 			L.info("Cannot transfer Track ID: Source session is not anonymous.", struct_data={
 				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
 			root_session_id = dst_session.Session.ParentSessionId
@@ -590,7 +590,7 @@ class SessionService(asab.Service):
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
 
-		elif not dst_session.Authentication.IsAnonymous:
+		elif not dst_session.is_anonymous():
 			# The destination session is authenticated while the source one is anonymous
 			# Transfer the track ID to the destination session and delete the source session
 			assert dst_session.Session.ParentSessionId is not None
