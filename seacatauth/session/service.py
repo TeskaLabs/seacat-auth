@@ -223,13 +223,12 @@ class SessionService(asab.Service):
 		return await self.get(session_id)
 
 
-	def build_algorithmic_anonymous_session(self, created_at, expires_at, track_id, client_dict, scope):
+	def build_algorithmic_anonymous_session(self, created_at, track_id, client_dict, scope):
 		session_dict = {
 			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
 			SessionAdapter.FN.CreatedAt: created_at,
 			SessionAdapter.FN.ModifiedAt: created_at,
-			SessionAdapter.FN.Session.Expiration: expires_at,
 			SessionAdapter.FN.Session.TrackId: track_id,
 			SessionAdapter.FN.OAuth2.ClientId: client_dict["_id"],
 			SessionAdapter.FN.OAuth2.Scope: scope,

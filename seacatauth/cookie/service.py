@@ -220,8 +220,6 @@ class CookieService(asab.Service):
 
 		session = session_svc.build_algorithmic_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
-			expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-				seconds=requested_expiration or session_svc.AnonymousExpiration),
 			track_id=track_id,
 			client_dict=client_dict,
 			scope=scope)
