@@ -443,14 +443,12 @@ class CookieHandler(object):
 			return None
 
 		# First try if the cookie is a JWToken
-		try:
-			session = await self.CookieService.OpenIdConnectService.build_algorithmic_session_from_token(cookie_value)
-		except asab.exceptions.NotAuthenticatedError:
-			# The JWToken is invalid or expired
-			return None
-
-		if session is not None:
-			return session
+		if "." in cookie_value:
+			try:
+				return await self.CookieService.OpenIdConnectService.build_algorithmic_session_from_token(cookie_value)
+			except asab.exceptions.NotAuthenticatedError:
+				# The JWToken is invalid or expired
+				return None
 
 		# Then try looking in the database
 		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
