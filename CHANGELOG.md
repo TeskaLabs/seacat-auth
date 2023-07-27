@@ -5,6 +5,9 @@
 ### Breaking changes
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
 
+### Fix
+- Validate client session expiration (#237, PLUM Sprint 230714)
+
 ### Features
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
 
