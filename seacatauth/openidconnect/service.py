@@ -409,10 +409,12 @@ class OpenIdConnectService(asab.Service):
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			"exp": session.Session.Expiration,
 			"iat": session.CreatedAt,
 			"sid": session.SessionId,
 		}
+
+		if session.Session.Expiration is not None:
+			userinfo["exp"] = session.Session.Expiration
 
 		if session.Session.ParentSessionId is not None:
 			userinfo["psid"] = session.Session.ParentSessionId
@@ -523,7 +525,6 @@ class OpenIdConnectService(asab.Service):
 		# FIXME: Not OIDC related. Refactor away.
 		payload = {
 			"iat": int(session.CreatedAt.timestamp()),
-			"exp": int(session.CreatedAt.timestamp()) + self.SessionService.AnonymousExpiration,
 			"azp": session.OAuth2.ClientId,
 			"scope": session.OAuth2.Scope,
 			"track_id": uuid.UUID(bytes=session.Session.TrackId),
@@ -558,7 +559,6 @@ class OpenIdConnectService(asab.Service):
 		try:
 			session = self.SessionService.build_algorithmic_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
-				expires_at=datetime.datetime.fromtimestamp(data_dict["exp"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
 				client_dict=client_dict,
 				scope=data_dict["scope"])
