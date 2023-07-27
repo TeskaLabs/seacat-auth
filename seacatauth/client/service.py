@@ -463,7 +463,11 @@ class ClientService(asab.Service):
 				upsertor.unset(k)
 			else:
 				if k == "session_expiration" and isinstance(v, str):
-					v = convert_to_seconds(v)
+					try:
+						v = convert_to_seconds(v)
+					except ValueError as e:
+						raise asab.exceptions.ValidationError(
+							"{!r} must be either a number or a duration string.".format(k)) from e
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
