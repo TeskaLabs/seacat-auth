@@ -80,6 +80,8 @@ class SessionAdapter:
 	Light object that represent a momentary view on the persisted session
 	"""
 
+	ALGORITHMIC_SESSION_ID = "<algorithmic>"
+
 	class FN:
 		"""
 		Database field names
