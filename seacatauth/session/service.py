@@ -225,7 +225,7 @@ class SessionService(asab.Service):
 
 	def build_algorithmic_anonymous_session(self, created_at, expires_at, track_id, client_dict, scope):
 		session_dict = {
-			SessionAdapter.FN.SessionId: None,  # FIXME: Should we use track ID as the session ID?
+			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
 			SessionAdapter.FN.CreatedAt: created_at,
 			SessionAdapter.FN.ModifiedAt: created_at,
