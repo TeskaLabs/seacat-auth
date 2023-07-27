@@ -269,6 +269,12 @@ class SessionAdapter:
 		session_dict = self.serialize()
 		return rest_get(session_dict)
 
+	def is_algorithmic(self):
+		return self.SessionId == self.ALGORITHMIC_SESSION_ID
+
+	def is_anonymous(self):
+		return self.Authentication is not None and self.Authentication.IsAnonymous
+
 	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields
 		for field in self.EncryptedIdentifierFields:

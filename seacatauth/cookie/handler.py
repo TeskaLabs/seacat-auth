@@ -155,7 +155,7 @@ class CookieHandler(object):
 		session = await self._authenticate_request(request, client_id)
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
-		elif session.Authentication.IsAnonymous:
+		elif session.is_anonymous():
 			L.warning("Regular cookie introspection does not allow anonymous user access.", struct_data={
 				"client_id": client_id, "cid": session.Credentials.Id})
 			response = aiohttp.web.HTTPUnauthorized()
