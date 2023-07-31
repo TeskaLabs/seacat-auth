@@ -31,13 +31,14 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 
 
 	def get_info(self) -> dict:
-		'''
+		"""
 		Get info about this provider.
-		'''
+		"""
 		return {
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
-			'_order': self.Order,
+			"_type": self.Type,
+			"_provider_id": self.ProviderID,
+			"_order": self.Order,
+			"editable": self.Editable,
 		}
 
 
