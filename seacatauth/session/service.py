@@ -1,6 +1,5 @@
 import datetime
 import logging
-import secrets
 import uuid
 
 import bson
@@ -16,7 +15,7 @@ import asab.storage
 import pymongo
 
 from .adapter import SessionAdapter, rest_get
-
+from .. import exceptions
 from ..events import EventTypes
 
 #
@@ -30,29 +29,31 @@ class SessionService(asab.Service):
 
 	SessionCollection = "s"
 
-	def __init__(self, app, service_name='seacatauth.SessionService'):
+	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
-		# TODO: SessionService should use the encryption provided by StorageService
-		aes_key = asab.Config.get("seacatauth:session", "aes_key")
-		if len(aes_key) == 0:
-			raise ValueError("""Session AES key must not be empty.
-				Please specify it in the [seacatauth:session] section of your Seacat Auth configuration file.
-				You may use the following randomly generated example:
-				```
-				[seacatauth:session]
-				aes_key={}
-				```
-			""".replace("\t", "").format(secrets.token_urlsafe(16)))
+		# SessionService does not use the encryption provided by StorageService.
+		# It needs to be able to search by encrypted values and thus requires
+		# a different way of handling AES CBC init vectors.
+		aes_key = asab.Config.get("asab:storage", "aes_key")
 		self.AESKey = hashlib.sha256(aes_key.encode("utf-8")).digest()
-		self.StorageService.AESKey = self.AESKey
+		if "aes_key" in asab.Config["seacatauth:session"]:
+			L.warning(
+				"The 'aes_key' config option has been moved into [asab:storage] section. "
+				"The key specified in [seacatauth:session] will be ignored.")
+
 		# Block size is used for determining the size of CBC initialization vector
 		self.AESBlockSize = cryptography.hazmat.primitives.ciphers.algorithms.AES.block_size // 8
 
 		self.Expiration = datetime.timedelta(
 			seconds=asab.Config.getseconds("seacatauth:session", "expiration")
 		)
+
+		if len(asab.Config.get("seacatauth:session", "anonymous_expiration")) > 0:
+			self.AnonymousExpiration = asab.Config.getseconds("seacatauth:session", "anonymous_expiration")
+		else:
+			self.AnonymousExpiration = asab.Config.getseconds("seacatauth:session", "expiration")
 
 		touch_extension = asab.Config.get("seacatauth:session", "touch_extension")
 		# Touch extension can be either
@@ -71,14 +72,14 @@ class SessionService(asab.Service):
 			seconds=asab.Config.getseconds("seacatauth:session", "maximum_age")
 		)
 
-		self.MinimalRefreshInterval = datetime.timedelta(seconds=60)
+		touch_cooldown = asab.Config.getseconds("seacatauth:session", "touch_cooldown")
+		self.TouchCooldown = datetime.timedelta(seconds=touch_cooldown)
 
-		app.PubSub.subscribe("Application.tick/60!", self._on_tick)
-		app.PubSub.subscribe("Application.run!", self._on_start)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 		# Metrics
-		self.MetricsService = app.get_service('asab.MetricsService')
-		self.TaskService = app.get_service('asab.TaskService')
+		self.MetricsService = app.get_service("asab.MetricsService")
+		self.TaskService = app.get_service("asab.TaskService")
 		self.SessionGauge = self.MetricsService.create_gauge(
 			"sessions", tags={"help": "Counts active sessions."}, init_values={"sessions": 0})
 		app.PubSub.subscribe("Application.tick/10!", self._on_tick_metric)
@@ -136,12 +137,8 @@ class SessionService(asab.Service):
 			L.error("Failed to create index (parent session ID): {}".format(e))
 
 
-	async def _on_start(self, event_name):
-		await self.delete_expired_sessions()
-
-
-	async def _on_tick(self, event_name):
-		await self.delete_expired_sessions()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_sessions()
 
 	def _on_tick_metric(self, event_name):
 		self.TaskService.schedule(self._metrics_task())
@@ -151,7 +148,7 @@ class SessionService(asab.Service):
 		self.SessionGauge.set("sessions", session_count)
 
 
-	async def delete_expired_sessions(self):
+	async def _delete_expired_sessions(self):
 		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
@@ -162,6 +159,9 @@ class SessionService(asab.Service):
 		for sid in expired:
 			# Use the delete method for proper session termination
 			await self.delete(session_id=sid)
+
+		if len(expired) > 0:
+			L.log(asab.LOG_NOTICE, "Expired sessions deleted.", struct_data={"count": len(expired)})
 
 
 	async def create_session(
@@ -205,9 +205,11 @@ class SessionService(asab.Service):
 			session_builders = list()
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				if key in SessionAdapter.SensitiveFields and value is not None:
+				if key in SessionAdapter.EncryptedIdentifierFields and value is not None:
 					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-				upsertor.set(key, value)
+					upsertor.set(key, value)
+				else:
+					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		session_id = await upsertor.execute(event_type=EventTypes.SESSION_CREATED)
 
@@ -234,34 +236,34 @@ class SessionService(asab.Service):
 
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				upsertor.set(key, value)
+				upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
 		return await self.get(session_id)
 
 
-	async def get_by(self, criteria: dict):
+	async def get_by(self, key: str, value):
 		# Encrypt sensitive fields
-		query_filter = {}
-		for key, value in criteria.items():
-			if key in SessionAdapter.SensitiveFields:
-				query_filter[key] = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
-			else:
-				query_filter[key] = value
+		if key in SessionAdapter.EncryptedIdentifierFields:
+			value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 
-		collection = self.StorageService.Database[self.SessionCollection]
-		session_dict = await collection.find_one(query_filter)
+		session_dict = await self.StorageService.get_by(
+			self.SessionCollection, key, value, decrypt=SessionAdapter.EncryptedAttributes)
 		if session_dict is None:
-			raise KeyError("Session not found")
+			raise exceptions.SessionNotFoundError("Session not found in database.", query={key: value})
+
+		# Do not return expired sessions
+		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.SessionNotFoundError("Session expired.", query={key: value})
 
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.error("Failed to create SessionAdapter from database object", struct_data={
+			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise KeyError("Session not found") from e
+			raise exceptions.SessionNotFoundError("Session deserialization failed.", query={key: value}) from e
 
 		return session
 
@@ -269,14 +271,20 @@ class SessionService(asab.Service):
 	async def get(self, session_id):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
-		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+		session_dict = await self.StorageService.get(
+			self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
+
+		# Do not return expired sessions
+		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.SessionNotFoundError("Session expired.", session_id=session_id)
+
 		try:
 			session = SessionAdapter(self, session_dict)
 		except Exception as e:
-			L.error("Failed to create SessionAdapter from database object", struct_data={
+			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
 			})
-			raise e
+			raise exceptions.SessionNotFoundError("Session deserialization failed.", session_id=session_id) from e
 		return session
 
 
@@ -299,11 +307,14 @@ class SessionService(asab.Service):
 			yield session_dict
 
 
-	async def list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
 		collection = self.StorageService.Database[self.SessionCollection]
 
 		if query_filter is None:
 			query_filter = {}
+
+		if not include_expired:
+			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		sessions = []
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
@@ -315,7 +326,7 @@ class SessionService(asab.Service):
 		}
 
 
-	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None):
+	async def recursive_list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
 		"""
 		List top-level sessions with all their children sessions inside the "children" attribute
 		"""
@@ -323,6 +334,9 @@ class SessionService(asab.Service):
 
 		if query_filter is None:
 			query_filter = {}
+
+		if not include_expired:
+			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		# Find only top-level sessions (with no parent)
 		query_filter.update({SessionAdapter.FN.Session.ParentSessionId: None})
@@ -347,7 +361,8 @@ class SessionService(asab.Service):
 				continue
 			# Include children sessions
 			children = await self.list(
-				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])}
+				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])},
+				include_expired=include_expired,
 			)
 			if children["count"] > 0:
 				session["children"] = children
@@ -368,38 +383,28 @@ class SessionService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def touch(self, session: SessionAdapter, expiration: int = None):
+	async def touch(self, session: SessionAdapter, expires: datetime.datetime = None):
 		"""
-		Extend the expiration of the session group if it hasn't been updated recently.
+		Update session modification time to record activity.
+		Also extend session expiration if possible.
 
 		Return the updated session object.
 		"""
-		# Extend parent session
+		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown:
+			# Session has been touched recently
+			return session
+
+		expires = self._calculate_extended_expiration(session, expires)
+
+		# Extend root session
 		if session.Session.ParentSessionId is not None:
-			await self.touch(await self.get(session.Session.ParentSessionId))
-
-		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.MinimalRefreshInterval:
-			# Session has been extended recently
-			return session
-		if session.Session.Expiration >= session.Session.MaxExpiration:
-			# Session expiration is already maxed out
-			return session
-
-		if expiration is not None:
-			expiration = datetime.timedelta(seconds=expiration)
-		elif session.Session.ExpirationExtension is not None:
-			expiration = datetime.timedelta(seconds=session.Session.ExpirationExtension)
-		else:
-			# May be a legacy "machine credentials session". Do not extend.
-			return session
-		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
-
-		if expires < session.Session.Expiration:
-			# Do not shorten the session!
-			return session
-		if expires > session.Session.MaxExpiration:
-			# Do not cross maximum expiration
-			expires = session.Session.MaxExpiration
+			try:
+				root_session = await self.get(session.Session.ParentSessionId)
+				await self.touch(root_session, expires)
+			except exceptions.SessionNotFoundError:
+				L.info("Will not extend subsession expiration: Root session not found.", struct_data={
+					"sid": session.Session.Id, "psid": session.Session.ParentSessionId})
+				expires = None
 
 		# Update session
 		version = session.Session.Version
@@ -408,15 +413,38 @@ class SessionService(asab.Service):
 			session.SessionId,
 			version=version
 		)
-		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+		if expires is not None:
+			upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+			L.info("Extending session expiration.", struct_data={
+				"sid": session.Session.Id, "exp": expires, "v": version})
 
 		try:
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
-			L.log(asab.LOG_NOTICE, "Session expiration extended", struct_data={"sid": session.Session.Id, "exp": expires})
 		except KeyError:
-			L.warning("Conflict: Session already extended", struct_data={"sid": session.Session.Id})
+			L.warning("Conflict: Session already touched.", struct_data={"sid": session.Session.Id, "v": version})
 
 		return await self.get(session.SessionId)
+
+
+	def _calculate_extended_expiration(self, session: SessionAdapter, expires: datetime.datetime = None):
+		if session.Session.Expiration >= session.Session.MaxExpiration:
+			return None
+
+		if expires is None:
+			if session.Session.ExpirationExtension is None:
+				# May be a legacy "machine credentials session". Do not extend.
+				return None
+			expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+				seconds=session.Session.ExpirationExtension)
+
+		if expires < session.Session.Expiration:
+			# Do not shorten the session!
+			return None
+		if session.Session.MaxExpiration is not None and expires > session.Session.MaxExpiration:
+			# Do not cross maximum expiration
+			expires = session.Session.MaxExpiration
+
+		return expires
 
 
 	async def delete(self, session_id):
@@ -573,7 +601,8 @@ class SessionService(asab.Service):
 					((SessionAdapter.FN.Credentials.Id, dst_session.Credentials.Id),),
 					((SessionAdapter.FN.Authentication.IsAnonymous, True),),
 				])
-				await self.create_session("root", session_builders=root_session_builders)
+				await self.create_session(
+					"root", session_builders=root_session_builders, expiration=self.AnonymousExpiration)
 			sub_session_builders = [
 				((SessionAdapter.FN.Session.ParentSessionId, root_session_id),),
 				((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),),

@@ -3,11 +3,56 @@
 ## Release candidate
 
 ### Breaking changes
+- Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
+
+### Fix
+- Validate client session expiration (#237, PLUM Sprint 230714)
+- Add `editable` field in provider info (#238, PLUM Sprint 230728)
+
+### Features
+- Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
+
+---
+
+
+## v23.30-beta
+
+### Breaking changes
+- Old Batman sessions are invalidated (#230, PLUM Sprint 230630)
+- Expiration removed from login query params (#233, PLUM Sprint 230630)
+
+### Fix
+- Root session must be as long as its longest subsession (#228, PLUM Sprint 230630)
+- Webauthn `user_name` can be either email address or phone number (#229, PLUM Sprint 230630)
+- Batman token uses native ASAB Storage encryption (#230, PLUM Sprint 230630)
+- Expiration removed from login query params (#233, PLUM Sprint 230630)
+
+### Features
+- Added alternative POST endpoint for Batman introspection (#230, PLUM Sprint 230630)
+
+---
+
+
+## v23.27-beta
+
+### Breaking changes
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
+- `aes_key` option has been moved to `[asab:storage]` section (#221, PLUM Sprint 230616)
+- Last login info is no longer included in userinfo and credentials detail (#219, PLUM Sprint 230616)
+
+### Fix
+- Fix broken webauthn dependency (#227, PLUM Sprint 230630)
+
+### Features
+- Configurable anonymous session expiration (#217, PLUM Sprint 230616)
+- Update modtime of active sessions (#226, PLUM Sprint 230616)
 
 ### Refactoring
 - ~~Bump Python version to 3.11 and Alpine to 3.18 (#215, PLUM Sprint 230602)~~(d415691)
 - Batman auth flow merged with cookie auth flow (#216, PLUM Sprint 230616)
+- Clear expired objects during housekeeping (#218, PLUM Sprint 230616)
+- `aes_key` option has been moved to `[asab:storage]` section (#221, PLUM Sprint 230616)
+- Reduce last login reads (#219, PLUM Sprint 230616)
 
 ---
 

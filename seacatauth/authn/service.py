@@ -111,10 +111,10 @@ class AuthenticationService(asab.Service):
 			init_values={"successful": 0, "failed": 0}
 		)
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
+	async def _on_housekeeping(self, event_name):
 		await self.delete_expired_login_sessions()
 
 
@@ -140,7 +140,6 @@ class AuthenticationService(asab.Service):
 		client_public_key,
 		ident,
 		login_descriptors=None,
-		requested_session_expiration=None,
 		data=None,
 	):
 		# Prepare the login session
@@ -151,7 +150,6 @@ class AuthenticationService(asab.Service):
 			login_descriptors=login_descriptors,
 			login_attempts=self.LoginAttempts,
 			timeout=self.LoginSessionExpiration,
-			requested_session_expiration=requested_session_expiration,
 			data=data,
 		)
 
@@ -332,7 +330,6 @@ class AuthenticationService(asab.Service):
 
 		session = await self.SessionService.create_session(
 			session_type="root",
-			expiration=login_session.RequestedSessionExpiration,
 			session_builders=session_builders,
 		)
 		L.log(

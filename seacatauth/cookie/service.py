@@ -108,7 +108,7 @@ class CookieService(asab.Service):
 		Get session by cookie value.
 		"""
 		try:
-			session = await self.SessionService.get_by({SessionAdapter.FN.Cookie.Id: cookie_value})
+			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, cookie_value)
 		except KeyError:
 			L.info("Session not found.", struct_data={"sci": cookie_value})
 			return None
@@ -270,7 +270,7 @@ class CookieService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="cookie",
 			parent_session_id=root_session_id,
-			expiration=requested_expiration,
+			expiration=self.SessionService.AnonymousExpiration,
 			session_builders=session_builders,
 		)
 

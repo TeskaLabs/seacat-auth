@@ -6,12 +6,24 @@ asab.Config.add_defaults({
 	"general": {
 		# Public API base URL lets the app know from what URL is its public API served.
 		# It is used by the OpenIDConnect authorize handler for generating loopback redirect URIs.
+		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
 		"public_api_base_url": "http://localhost/auth/api",
 
 		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
 		# It is used for building login and password reset URIs.
 		# The domain name is extracted for cookie and authentication purposes.
+		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
 		"auth_webui_base_url": "http://localhost/auth",
+	},
+
+	# Admin API (non-public)
+	"web": {
+		"listen": "8900",  # Well-known port
+	},
+
+	# Auth API (public)
+	"web:public": {
+		"listen": "3081",  # Well-known port
 	},
 
 	"openidconnect": {
@@ -123,8 +135,12 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:session": {
-		# Default session expiration in seconds
+		# Root session expiration, also works as the default value for client sessions
 		"expiration": "4 h",
+
+		# Anonymous session expiration
+		# By default it is the same as root session expiration
+		"anonymous_expiration": "",
 
 		# Touch extension specifies the timespan by which sessions are extended when session activity is detected
 		# It can be either
@@ -138,12 +154,11 @@ asab.Config.add_defaults({
 		#   Every time introspection happens, the expiration is postponed to CURRENT TIME + 20 minutes.
 		"touch_extension": "0.5",
 
+		# Specifies how often session can be touched to indicate their activity
+		"touch_cooldown": "60 s",
+
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
-
-		# Key used for sensitive field encryption
-		# MUST NOT BE EMPTY!
-		"aes_key": ""
 	},
 
 	"seacatauth:password": {

@@ -81,11 +81,11 @@ class OpenIdConnectService(asab.Service):
 
 		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
-		await self.delete_expired_authorization_codes()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_authorization_codes()
 
 
 	def _load_private_key(self):
@@ -166,7 +166,7 @@ class OpenIdConnectService(asab.Service):
 		return code
 
 
-	async def delete_expired_authorization_codes(self):
+	async def _delete_expired_authorization_codes(self):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
@@ -201,7 +201,7 @@ class OpenIdConnectService(asab.Service):
 
 		# Locate the session
 		try:
-			session = await self.SessionService.get_by({SessionAdapter.FN.OAuth2.AccessToken: access_token})
+			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
 		except KeyError:
 			L.info("Session not found by access token: {}".format(access_token))
 			return None
@@ -479,20 +479,6 @@ class OpenIdConnectService(asab.Service):
 			userinfo["tenants"] = session.Authorization.Tenants
 
 		# TODO: Last password change
-
-		# Get last successful and failed login times
-		# TODO: Store last login in session
-		try:
-			last_login = await self.AuditService.get_last_logins(session.Credentials.Id)
-		except Exception as e:
-			last_login = None
-			L.warning("Could not fetch last logins: {}".format(e))
-
-		if last_login is not None:
-			if "fat" in last_login:
-				userinfo["last_failed_login"] = last_login["fat"]
-			if "sat" in last_login:
-				userinfo["last_successful_login"] = last_login["sat"]
 
 		# RFC 7519 states that the exp and iat claim values must be NumericDate values
 		# Convert ALL datetimes to UTC timestamps for consistency

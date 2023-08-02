@@ -2,7 +2,7 @@
 title: ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
 ---
 
-# ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
+# ElasticSearch + Kibana and Seacat Batman
 
 This is a guide to configuring SeaCat Auth as a proxy to [Kibana](https://www.elastic.co/kibana/) users and roles.
 As Kibana is not OAuth-compatible and supports only Basic Authentication, 
@@ -20,21 +20,22 @@ Instead of the `PUT /cookie/nginx` endpoint (which exchanges Seacat client cooki
 Batman auth uses `PUT /batman/nginx` (which exchanges Seacat client cookie for Basic auth header).
 
 
-# Configuration example
+## Configuration example
 
-Let's say we want to Seacat Batman authorization for our Kibana app.
-We have [ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
+Let's set up Seacat Batman authorization for our Kibana app. We need to have 
+[ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
 up and running, as well as [a working instance of Seacat Auth with Nginx reverse proxy](../getting-started/quick-start). 
 We will need to configure these three components:
+
 - Update **Seacat Auth configuration** with `[batman:elk]` section to allow it to use ElasticSearch API to synchronize 
   users and manage their authorization.
 - Create and configure a **Kibana client**. This client object represents and identifies Kibana 
   in communication with Seacat Auth.
 - Prepare the necessary **server locations** in Nginx config.
 
-## Seacat Auth configuration
+### Seacat Auth configuration
 
-Create the respective Batman section for the type of your app and provide the app's base URL and API credentials, e.g.
+Create the ELK Batman section and provide ElasticSearch base URL and API credentials, e.g.
 
 ```ini
 [batman:elk]
@@ -43,9 +44,14 @@ username=admin
 password=elasticpassword
 ```
 
-## Client configuration
+### Client configuration
 
-Use Seacat Auth client API (or Seacat Admin UI) to register your app as a client. In our case, we can send the following request:
+Use Seacat Auth client API (or Seacat Admin UI) to register Kibana as a client. 
+The request body must include a human-readable `client_name`, `redirect_uris` array containing the URL of Kibana web UI 
+and `cookie_entry_uri` for your hostname (we define this location in the Nginx configuration below.).
+We also recommend to set `redirect_uri_validation_method` to `prefix_match` if you want to allow immediate redirections 
+to Kibana subpaths.
+In our case, we can send the following request (Remember to use your actual hostnames instead of `example.com`!):
 
 ```
 POST /client
@@ -54,7 +60,8 @@ POST /client
 	"redirect_uri_validation_method": "prefix_match",
 	"redirect_uris": [
 		"https://example.com/kibana"
-	]
+	],
+	"cookie_entry_uri": "https://example.com/seacat_auth/cookie"
 }
 ```
 
@@ -72,14 +79,16 @@ The server will respond with our client's assigned ID and other attributes:
 
 We will use the `client_id` and `client_cookie` in the next step.
 
-## Nginx configuration
+### Nginx configuration
 
 The minimal configuration requires the following three locations to be defined in nginx:
-- **Client site location:** Protected public location with client content (e.g. Kibana app) .
-- **Client introspection:** Internal endpoint used by the nginx `auth_request` directive.
-- **Client cookie entry point:** Public endpoint which dispenses the Seacat client cookie at the end of a successful authorization flow.
 
-### Client site location
+- **Client site location:** Protected public location with Kibana web app.
+- **Client introspection:** Internal endpoint used by the nginx `auth_request` directive.
+- **Client cookie entry point:** Public endpoint which dispenses the Seacat client cookie at the end of a successful 
+  authorization flow.
+
+#### Client site location
 
 ```nginx
 location /kibana/ {
@@ -94,7 +103,7 @@ location /kibana/ {
 	proxy_set_header Authorization $auth_header;
 
 	# In the case when introspection detects invalid authorization, redirect to OAuth authorize endpoint
-	# !! Use your client's actual client_id !!
+	# !! Use your client's actual client_id and your site's actual hostname !!
 	error_page 401 https://example.com/auth/api/openidconnect/authorize?response_type=code&scope=cookie%20batman&client_id=RZhlE-D4yuJxoKitYVL4dg&redirect_uri=https://example.com$request_uri;
 
 	# Headers required by Kibana
@@ -106,7 +115,7 @@ location /kibana/ {
 }
 ```
 
-### Client introspection
+#### Client introspection
 
 ```nginx
 location = /_kibana_introspection {
@@ -132,12 +141,13 @@ location = /_kibana_introspection {
 }
 ```
 
-### Client cookie entry point
+#### Cookie entry point
 
-Must be located on the same hostname as the protected client location.
+Must be located on the same hostname as the protected client location. 
+There should be one cookie entry point exposed per hostname, shared by all cookie-based clients on that hostname.
 
 ```nginx
-location = /auth/api/cookie/kibana {
+location = /seacat_auth/cookie {
 	# Seacat Auth cookie entry upstream
 	proxy_method          POST;
 	proxy_pass            http://seacat_auth_api/cookie/entry;
@@ -145,6 +155,6 @@ location = /auth/api/cookie/kibana {
 	# Transfer the OAuth authorization code from query to request body
 	# !! Use your client's actual client_id !!
 	proxy_set_header      Content-Type "application/x-www-form-urlencoded";
-	proxy_set_body        "client_id=RZhlE-D4yuJxoKitYVL4dg&grant_type=authorization_code&code=$arg_code";
+	proxy_set_body        $args;
 }
 ```

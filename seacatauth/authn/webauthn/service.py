@@ -49,11 +49,11 @@ class WebAuthnService(asab.Service):
 
 		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
 
-		self.App.PubSub.subscribe("Application.tick/10!", self._on_tick)
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def _on_tick(self, event_name):
-		await self.delete_expired_challenges()
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_challenges()
 
 
 	async def create_webauthn_credential(
@@ -240,7 +240,7 @@ class WebAuthnService(asab.Service):
 		})
 
 
-	async def delete_expired_challenges(self):
+	async def _delete_expired_challenges(self):
 		"""
 		Delete expired WebAuthn registration challenges
 		"""
@@ -249,7 +249,7 @@ class WebAuthnService(asab.Service):
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.info("Expired WebAuthn challenges deleted", struct_data={
+			L.log(asab.LOG_NOTICE, "Expired WebAuthn challenges deleted.", struct_data={
 				"count": result.deleted_count
 			})
 
@@ -268,12 +268,17 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialcreationoptions
 		"""
 		credentials = await self.CredentialsService.get(session.Credentials.Id)
+		# User_name should be a unique human-palatable identifier (typically email, phone)
+		user_name = credentials.get("email") or credentials.get("phone")
+		if not user_name:
+			raise Exception("Credentials have no email address nor phone number.")
+
 		challenge = await self.create_registration_challenge(session.Session.Id)
 		options = webauthn.generate_registration_options(
 			rp_id=self.RelyingPartyId,
 			rp_name=self.RelyingPartyName,
 			user_id=session.Credentials.Id,
-			user_name=credentials.get("email"),
+			user_name=user_name,
 			user_display_name=credentials.get("username"),
 			challenge=challenge,
 			timeout=self.RegistrationTimeout,
