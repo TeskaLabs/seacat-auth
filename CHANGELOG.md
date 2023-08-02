@@ -3,6 +3,21 @@
 ## Release candidate
 
 ### Breaking changes
+- Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
+
+### Fix
+- Validate client session expiration (#237, PLUM Sprint 230714)
+- Add `editable` field in provider info (#238, PLUM Sprint 230728)
+
+### Features
+- Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
+
+---
+
+
+## v23.30-beta
+
+### Breaking changes
 - Old Batman sessions are invalidated (#230, PLUM Sprint 230630)
 - Expiration removed from login query params (#233, PLUM Sprint 230630)
 
