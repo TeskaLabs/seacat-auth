@@ -216,9 +216,8 @@ class CookieService(asab.Service):
 		Create a new anonymous cookie-based session
 		"""
 		session_svc = self.App.get_service("seacatauth.SessionService")
-		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
 
-		session = session_svc.Algorithmic.build_algorithmic_anonymous_session(
+		session = session_svc.Algorithmic.create_algorithmic_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
