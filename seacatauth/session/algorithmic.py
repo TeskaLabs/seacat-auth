@@ -45,7 +45,7 @@ class AlgorithmicSessionProvider:
 		data_dict = json.loads(token.claims)
 		client_dict = await self.ClientService.get(data_dict["azp"])
 		try:
-			session = self.build_algorithmic_anonymous_session(
+			session = self.create_algorithmic_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
 				client_dict=client_dict,
@@ -56,7 +56,7 @@ class AlgorithmicSessionProvider:
 		return session
 
 
-	def build_algorithmic_anonymous_session(self, created_at, track_id, client_dict, scope):
+	def create_algorithmic_anonymous_session(self, created_at, track_id, client_dict, scope):
 		session_dict = {
 			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
