@@ -14,9 +14,10 @@ import asab
 import asab.storage
 import pymongo
 
-from .adapter import SessionAdapter, rest_get
 from .. import exceptions
 from ..events import EventTypes
+from .adapter import SessionAdapter, rest_get
+from .algorithmic import AlgorithmicSessionProvider
 
 #
 
@@ -32,6 +33,7 @@ class SessionService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.AlgorithmicSessionProvider = AlgorithmicSessionProvider(app)
 
 		# SessionService does not use the encryption provided by StorageService.
 		# It needs to be able to search by encrypted values and thus requires
