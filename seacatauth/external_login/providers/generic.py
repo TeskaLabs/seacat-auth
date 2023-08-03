@@ -16,7 +16,7 @@ L = logging.getLogger(__name__)
 #
 
 
-class GenericOAuth2Login(asab.ConfigObject):
+class GenericOAuth2Login(asab.Configurable):
 	"""
 	Generic OAuth2 login provider
 
