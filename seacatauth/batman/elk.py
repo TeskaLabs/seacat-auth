@@ -60,17 +60,19 @@ class ELKIntegration(asab.config.Configurable):
 
 		username = self.Config.get("username")
 		password = self.Config.get("password")
-		if username != "":
-			self.Authorization = aiohttp.BasicAuth(username, password)
-		else:
-			self.Authorization = None
-
 		api_key = self.Config.get("api_key")
-		self.Headers = None
-		if api_key != "":
+		if username != "" and api_key != "":
+			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
+		if username != "":
+			self.Headers = {
+				"Authorization": aiohttp.BasicAuth(username, password).encode()
+			}
+		elif api_key != "":
 			self.Headers = {
 				"Authorization": "ApiKey {}".format(api_key)
 			}
+		else:
+			self.Headers = None
 
 		# Prep for SSL
 		ca_cert = self.Config.get("ca_file")
@@ -110,7 +112,7 @@ class ELKIntegration(asab.config.Configurable):
 		# Fetch ELK roles
 		try:
 			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
-				async with aiohttp.ClientSession(connector=conn, auth=self.Authorization, headers=self.Headers) as session:
+				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
 					async with session.get("{}/_xpack/security/role".format(self.URL)) as resp:
 						if resp.status != 200:
 							text = await resp.text()
@@ -202,7 +204,7 @@ class ELKIntegration(asab.config.Configurable):
 
 		try:
 			async with aiohttp.TCPConnector(ssl=self.SSLContext) as conn:
-				async with aiohttp.ClientSession(connector=conn, auth=self.Authorization, headers=self.Headers) as session:
+				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
 					async with session.post("{}/_xpack/security/user/{}".format(self.URL, username), json=json) as resp:
 						if resp.status == 200:
 							# Everything is alright here
