@@ -33,7 +33,7 @@ class SessionService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
-		self.AlgorithmicSessionProvider = AlgorithmicSessionProvider(app)
+		self.Algorithmic = AlgorithmicSessionProvider(app)
 
 		# SessionService does not use the encryption provided by StorageService.
 		# It needs to be able to search by encrypted values and thus requires
@@ -223,23 +223,6 @@ class SessionService(asab.Service):
 			struct_data["parent_sid"] = parent_session_id
 		L.log(asab.LOG_NOTICE, "Session created", struct_data=struct_data)
 		return await self.get(session_id)
-
-
-	def build_algorithmic_anonymous_session(self, created_at, track_id, client_dict, scope):
-		session_dict = {
-			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
-			SessionAdapter.FN.Version: None,
-			SessionAdapter.FN.CreatedAt: created_at,
-			SessionAdapter.FN.ModifiedAt: created_at,
-			SessionAdapter.FN.Session.TrackId: track_id,
-			SessionAdapter.FN.OAuth2.ClientId: client_dict["_id"],
-			SessionAdapter.FN.OAuth2.Scope: scope,
-			SessionAdapter.FN.Credentials.Id: client_dict["anonymous_cid"],
-			SessionAdapter.FN.Authentication.IsAnonymous: True,
-			SessionAdapter.FN.Authorization.Tenants: ["default"],  # FIXME: Get tenants by scope
-			SessionAdapter.FN.Authorization.Authz: {"default": ["blabla"]},  # FIXME: Get resources by scope
-		}
-		return SessionAdapter(self, session_dict)
 
 
 	async def update_session(self, session_id: str, session_builders: list):

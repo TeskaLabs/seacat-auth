@@ -1,6 +1,5 @@
 import datetime
 import json
-import os.path
 import base64
 import secrets
 import logging
@@ -78,7 +77,8 @@ class OpenIdConnectService(asab.Service):
 		else:
 			self.PublicApiBaseUrl = public_api_base_url
 
-		self.PrivateKey = self._load_private_key()
+		# TODO: Derive the private key
+		self.PrivateKey = app.PrivateKey
 
 		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
@@ -87,72 +87,6 @@ class OpenIdConnectService(asab.Service):
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_authorization_codes()
-
-
-	def _load_private_key(self):
-		"""
-		Load private key from file.
-		If it does not exist, generate a new one and write to file.
-		"""
-		# TODO: Add encryption option
-		# TODO: Multiple key support
-		private_key_path = asab.Config.get("openidconnect", "private_key")
-		if len(private_key_path) == 0:
-			# Use config folder
-			private_key_path = os.path.join(
-				os.path.dirname(asab.Config.get("general", "config_file")),
-				"private-key.pem"
-			)
-			L.log(
-				asab.LOG_NOTICE,
-				"OpenIDConnect private key file not specified. Defaulting to '{}'.".format(private_key_path)
-			)
-
-		if os.path.isfile(private_key_path):
-			with open(private_key_path, "rb") as f:
-				private_key = jwcrypto.jwk.JWK.from_pem(f.read())
-		elif self.App.Provisioning:
-			# Generate a new private key
-			L.warning(
-				"OpenIDConnect private key file does not exist. Generating a new one."
-			)
-			private_key = self._generate_private_key(private_key_path)
-		else:
-			raise FileNotFoundError(
-				"Private key file '{}' does not exist. "
-				"Run the app in provisioning mode to generate a new private key.".format(private_key_path)
-			)
-
-		assert private_key.key_type == "EC"
-		assert private_key.key_curve == "P-256"
-		return private_key
-
-
-	def _generate_private_key(self, private_key_path):
-		assert not os.path.isfile(private_key_path)
-
-		import cryptography.hazmat.backends
-		import cryptography.hazmat.primitives.serialization
-		import cryptography.hazmat.primitives.asymmetric.ec
-		import cryptography.hazmat.primitives.ciphers.algorithms
-		_private_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
-			cryptography.hazmat.primitives.asymmetric.ec.SECP256R1(),
-			cryptography.hazmat.backends.default_backend()
-		)
-		# Serialize into PEM
-		private_pem = _private_key.private_bytes(
-			encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
-			format=cryptography.hazmat.primitives.serialization.PrivateFormat.PKCS8,
-			encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption()
-		)
-		with open(private_key_path, "wb") as f:
-			f.write(private_pem)
-		L.log(
-			asab.LOG_NOTICE,
-			"New private key written to '{}'.".format(private_key_path)
-		)
-		private_key = jwcrypto.jwk.JWK.from_pem(private_pem)
-		return private_key
 
 
 	async def generate_authorization_code(self, session_id):
@@ -519,53 +453,6 @@ class OpenIdConnectService(asab.Service):
 		id_token = token.serialize()
 
 		return id_token
-
-
-	def build_algorithmic_session_token(self, session):
-		# FIXME: Not OIDC related. Refactor away.
-		payload = {
-			"iat": int(session.CreatedAt.timestamp()),
-			"azp": session.OAuth2.ClientId,
-			"scope": session.OAuth2.Scope,
-			"track_id": uuid.UUID(bytes=session.Session.TrackId),
-		}
-		header = {
-			"alg": "ES256",
-			"typ": "JWT",
-			"kid": self.PrivateKey.key_id,
-		}
-		token = jwcrypto.jwt.JWT(
-			header=header,
-			claims=self.JSONDumper(payload)
-		)
-		token.make_signed_token(self.PrivateKey)
-		id_token = token.serialize()
-		return id_token
-
-
-	async def build_algorithmic_session_from_token(self, token_value):
-		# FIXME: Not OIDC related. Refactor away.
-		try:
-			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
-		except ValueError:
-			# This is not a JWToken
-			return None
-		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
-			# JWToken invalid
-			raise asab.exceptions.NotAuthenticatedError() from e
-
-		data_dict = json.loads(token.claims)
-		client_dict = await self.ClientService.get(data_dict["azp"])
-		try:
-			session = self.SessionService.build_algorithmic_anonymous_session(
-				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
-				track_id=uuid.UUID(data_dict["track_id"]).bytes,
-				client_dict=client_dict,
-				scope=data_dict["scope"])
-		except Exception as e:
-			raise asab.exceptions.NotAuthenticatedError() from e
-
-		return session
 
 
 	async def authorize_tenants_by_scope(self, scope, session, client_id):

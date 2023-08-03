@@ -1,6 +1,7 @@
 import os
 import logging
 import secrets
+import jwcrypto.jwk
 
 import asab
 import asab.web
@@ -25,6 +26,7 @@ class SeaCatAuthApplication(asab.Application):
 		super().__init__()
 		self.Provisioning = self._should_activate_provisioning()
 		self._check_encryption_config()
+		self.PrivateKey = self._load_private_key()
 
 		# Load modules
 		self.add_module(asab.web.Module)
@@ -195,6 +197,79 @@ class SeaCatAuthApplication(asab.Application):
 			return True
 
 		return False
+
+
+	def _load_private_key(self):
+		"""
+		Load private key from file.
+		If it does not exist, generate a new one and write to file.
+		"""
+		# TODO: Add encryption option
+		# TODO: Multiple key support
+		private_key_path = asab.Config.get("seacat_auth", "private_key", fallback="")
+		if len(private_key_path) == 0 and "private_key" in asab.Config["openidconnect"]:
+			asab.LogObsolete.warning(
+				"The 'private_key' option has been moved from the 'openidconnect' to the 'seacat_auth' section. "
+				"Please update your configuration file.",
+				struct_data={"eol": "2024-01-31"})
+			private_key_path = asab.Config.get("openidconnect", "private_key", fallback="")
+		if len(private_key_path) == 0:
+			# Use config folder
+			private_key_path = os.path.join(
+				os.path.dirname(asab.Config.get("general", "config_file")),
+				"private-key.pem"
+			)
+			L.log(
+				asab.LOG_NOTICE,
+				"Seacat Auth private key file not specified. Defaulting to '{}'.".format(private_key_path)
+			)
+
+		if os.path.isfile(private_key_path):
+			with open(private_key_path, "rb") as f:
+				private_key = jwcrypto.jwk.JWK.from_pem(f.read())
+		elif self.App.Provisioning:
+			# Generate a new private key
+			L.warning(
+				"Seacat Auth private key file does not exist. Generating a new one."
+			)
+			private_key = self._generate_private_key(private_key_path)
+		else:
+			raise FileNotFoundError(
+				"Private key file '{}' does not exist. "
+				"Run the app in provisioning mode to generate a new private key.".format(private_key_path)
+			)
+
+		assert private_key.key_type == "EC"
+		assert private_key.key_curve == "P-256"
+		return private_key
+
+
+	def _generate_private_key(self, private_key_path):
+		assert not os.path.isfile(private_key_path)
+
+		import cryptography.hazmat.backends
+		import cryptography.hazmat.primitives.serialization
+		import cryptography.hazmat.primitives.asymmetric.ec
+		import cryptography.hazmat.primitives.ciphers.algorithms
+		_private_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
+			cryptography.hazmat.primitives.asymmetric.ec.SECP256R1(),
+			cryptography.hazmat.backends.default_backend()
+		)
+		# Serialize into PEM
+		private_pem = _private_key.private_bytes(
+			encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+			format=cryptography.hazmat.primitives.serialization.PrivateFormat.PKCS8,
+			encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption()
+		)
+		with open(private_key_path, "wb") as f:
+			f.write(private_pem)
+		L.log(
+			asab.LOG_NOTICE,
+			"New private key written to '{}'.".format(private_key_path)
+		)
+		private_key = jwcrypto.jwk.JWK.from_pem(private_pem)
+		return private_key
+
 
 	def create_argument_parser(
 		self,
