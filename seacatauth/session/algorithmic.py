@@ -19,9 +19,12 @@ class AlgorithmicSessionProvider:
 
 
 	def __init__(self, app):
-		self.PrivateKey = app.PrivateKey
 		self.ClientService = None
 		self.CredentialsService = None
+		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
+
+		# TODO: Derive the private key
+		self.PrivateKey = app.PrivateKey
 
 
 	async def initialize(self, app):
@@ -68,3 +71,48 @@ class AlgorithmicSessionProvider:
 			SessionAdapter.FN.Authorization.Authz: {"default": ["blabla"]},  # FIXME: Get resources by scope
 		}
 		return SessionAdapter(self, session_dict)
+
+
+	def build_algorithmic_session_token(self, session):
+		payload = {
+			"iat": int(session.CreatedAt.timestamp()),
+			"azp": session.OAuth2.ClientId,
+			"scope": session.OAuth2.Scope,
+			"track_id": uuid.UUID(bytes=session.Session.TrackId),
+		}
+		header = {
+			"alg": "ES256",
+			"typ": "JWT",
+			"kid": self.PrivateKey.key_id,
+		}
+		token = jwcrypto.jwt.JWT(
+			header=header,
+			claims=self.JSONDumper(payload)
+		)
+		token.make_signed_token(self.PrivateKey)
+		id_token = token.serialize()
+		return id_token
+
+
+	async def build_algorithmic_session_from_token(self, token_value):
+		try:
+			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
+		except ValueError:
+			# This is not a JWToken
+			return None
+		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
+			# JWToken invalid
+			raise asab.exceptions.NotAuthenticatedError() from e
+
+		data_dict = json.loads(token.claims)
+		client_dict = await self.ClientService.get(data_dict["azp"])
+		try:
+			session = self.build_algorithmic_anonymous_session(
+				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
+				track_id=uuid.UUID(data_dict["track_id"]).bytes,
+				client_dict=client_dict,
+				scope=data_dict["scope"])
+		except Exception as e:
+			raise asab.exceptions.NotAuthenticatedError() from e
+
+		return session
