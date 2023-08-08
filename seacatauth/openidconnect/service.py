@@ -89,11 +89,18 @@ class OpenIdConnectService(asab.Service):
 		await self._delete_expired_authorization_codes()
 
 
-	async def generate_authorization_code(self, session_id):
+	async def generate_authorization_code(self, session):
 		code = secrets.token_urlsafe(36)
 		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
 
-		upsertor.set("sid", session_id)
+		if session.is_algorithmic():
+			algo_token = self.SessionService.Algorithmic.serialize(session)
+			upsertor.set("alt", algo_token.encode("ascii"), encrypt=True)
+			upsertor.set("client_id", session.OAuth2.ClientId)
+			upsertor.set("scope", session.OAuth2.Scope)
+		else:
+			upsertor.set("sid", session.SessionId)
+
 		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
 
 		await upsertor.execute(event_type=EventTypes.OPENID_AUTH_CODE_GENERATED)
@@ -124,8 +131,9 @@ class OpenIdConnectService(asab.Service):
 
 		if "sid" in data:
 			return await self.SessionService.get(data["sid"])
-		elif "token" in data:
-			return self.build_algorithmic_session_from_token(data["token"])
+		elif "alt" in data:
+			algo_token = self.StorageService.aes_decrypt(data["alt"])
+			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
 		else:
 			L.error("Unexpected authorization code object.", struct_data=data)
 			raise KeyError("Invalid authorization code.")
@@ -386,7 +394,14 @@ class OpenIdConnectService(asab.Service):
 			userinfo["anonymous"] = True
 
 		if session.TrackId is not None:
-			userinfo["track_id"] = uuid.UUID(bytes=session.TrackId)
+			track_id_hex = session.TrackId.hex()
+			track_id = "{}-{}-{}-{}-{}".format(
+				track_id_hex[:8],
+				track_id_hex[8:12],
+				track_id_hex[12:16],
+				track_id_hex[16:20],
+				track_id_hex[20:],)
+			userinfo["track_id"] = track_id
 
 		if session.Authentication.ImpersonatorSessionId:
 			userinfo["impersonator_sid"] = session.Authentication.ImpersonatorSessionId

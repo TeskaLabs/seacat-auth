@@ -7,6 +7,7 @@ import json
 import datetime
 
 import asab.exceptions
+import asab.web.rest
 
 from .adapter import SessionAdapter
 
@@ -15,8 +16,10 @@ L = logging.getLogger(__name__)
 
 
 class AlgorithmicSessionProvider:
+	"""
+	Provide algorithmic session serialization and deserialization.
+	"""
 	Type = "algorithmic"
-
 
 	def __init__(self, app):
 		self.ClientService = None
@@ -32,7 +35,10 @@ class AlgorithmicSessionProvider:
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 
-	async def get_session(self, token_value, client_dict, scope):
+	async def deserialize(self, token_value) -> SessionAdapter | None:
+		"""
+		Parse JWT token and build a SessionAdapter using the token data.
+		"""
 		try:
 			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
 		except ValueError:
@@ -45,7 +51,7 @@ class AlgorithmicSessionProvider:
 		data_dict = json.loads(token.claims)
 		client_dict = await self.ClientService.get(data_dict["azp"])
 		try:
-			session = self.create_algorithmic_anonymous_session(
+			session = self.create_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
 				client_dict=client_dict,
@@ -56,7 +62,7 @@ class AlgorithmicSessionProvider:
 		return session
 
 
-	def create_algorithmic_anonymous_session(self, created_at, track_id, client_dict, scope):
+	def create_anonymous_session(self, created_at, track_id, client_dict, scope):
 		session_dict = {
 			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
@@ -73,12 +79,17 @@ class AlgorithmicSessionProvider:
 		return SessionAdapter(self, session_dict)
 
 
-	def build_algorithmic_session_token(self, session):
+	def serialize(self, session: SessionAdapter) -> str:
+		"""
+		Serialize SessionAdapter into a minimal JWT token string.
+		"""
+		if not session.Session.TrackId:
+			session.Session.TrackId = uuid.uuid4().bytes
 		payload = {
 			"iat": int(session.CreatedAt.timestamp()),
 			"azp": session.OAuth2.ClientId,
 			"scope": session.OAuth2.Scope,
-			"track_id": uuid.UUID(bytes=session.Session.TrackId),
+			"track_id": session.Session.TrackId.hex(),
 		}
 		header = {
 			"alg": "ES256",
@@ -107,7 +118,7 @@ class AlgorithmicSessionProvider:
 		data_dict = json.loads(token.claims)
 		client_dict = await self.ClientService.get(data_dict["azp"])
 		try:
-			session = self.build_algorithmic_anonymous_session(
+			session = self.create_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
 				client_dict=client_dict,

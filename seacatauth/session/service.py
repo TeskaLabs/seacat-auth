@@ -9,7 +9,6 @@ import cryptography.hazmat.primitives.ciphers
 import cryptography.hazmat.primitives.ciphers.algorithms
 import cryptography.hazmat.primitives.ciphers.modes
 
-
 import asab
 import asab.storage
 import pymongo
@@ -88,6 +87,8 @@ class SessionService(asab.Service):
 
 
 	async def initialize(self, app):
+		await self.Algorithmic.initialize(app)
+
 		# Initialize indexes
 		collection = await self.StorageService.collection(self.SessionCollection)
 

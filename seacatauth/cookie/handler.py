@@ -421,7 +421,10 @@ class CookieHandler(object):
 
 		# TODO: Verify that the request came from the correct domain
 
-		set_cookie(self.App, response, session, cookie_domain)
+		if session.is_algorithmic():
+			pass
+		else:
+			set_cookie(self.App, response, session, cookie_domain)
 
 		# Trigger webhook and set custom client response headers
 		try:
@@ -445,7 +448,7 @@ class CookieHandler(object):
 		# First try if the cookie is a JWToken
 		if "." in cookie_value:
 			try:
-				return await self.SessionService.Algorithmic.build_algorithmic_session_from_token(cookie_value)
+				return await self.SessionService.Algorithmic.deserialize(cookie_value)
 			except asab.exceptions.NotAuthenticatedError:
 				# The JWToken is invalid or expired
 				return None

@@ -22,7 +22,7 @@ class SessionData:
 	Expiration: datetime.datetime
 	MaxExpiration: datetime.datetime
 	ExpirationExtension: int
-	TrackId: typing.Optional[str]
+	TrackId: typing.Optional[bytes]
 
 
 @dataclasses.dataclass
