@@ -162,6 +162,7 @@ class ResourceHandler(object):
 		if "description" in json_data:
 			await self.ResourceService.update(resource_id, json_data["description"])
 		if "name" in json_data and json_data["name"] != resource_id:
+			# TODO: Renaming should be on a separate endpoint
 			await self.ResourceService.rename(resource_id, json_data["name"])
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
