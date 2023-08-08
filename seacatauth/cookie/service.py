@@ -217,14 +217,14 @@ class CookieService(asab.Service):
 		"""
 		session_svc = self.App.get_service("seacatauth.SessionService")
 
-		session = session_svc.Algorithmic.create_algorithmic_anonymous_session(
+		session = session_svc.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
 			scope=scope)
 
 		session.Cookie = CookieData(
-			Id=session_svc.Algorithmic.build_algorithmic_session_token(session),
+			Id=session_svc.Algorithmic.serialize(session),
 			Domain=client_dict.get("cookie_domain") or None)
 
 		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={

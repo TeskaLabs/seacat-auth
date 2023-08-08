@@ -491,7 +491,6 @@ class AuthorizeHandler(object):
 						requested_expiration=self.SessionService.AnonymousExpiration,
 						from_info=from_info)
 				elif authorize_type == "cookie":
-					# FIXME: Not tested!!!
 					new_session = await self.CookieService.create_anonymous_cookie_client_session(
 						anonymous_cid, client_dict, scope,
 						tenants=tenants,
@@ -627,7 +626,7 @@ class AuthorizeHandler(object):
 			url_qs["state"] = state
 
 		# Add the Authorization Code into the response
-		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
+		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session)
 
 		# Success
 		url = urllib.parse.urlunparse((
