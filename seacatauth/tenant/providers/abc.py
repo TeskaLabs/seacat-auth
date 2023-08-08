@@ -4,7 +4,7 @@ from typing import Optional
 import asab
 
 
-class TenantsProviderABC(asab.ConfigObject, abc.ABC):
+class TenantsProviderABC(asab.Configurable, abc.ABC):
 
 
 	def __init__(self, provider_id, config_section_name, config=None):
