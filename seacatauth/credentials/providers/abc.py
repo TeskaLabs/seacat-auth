@@ -11,7 +11,7 @@ L = logging.getLogger(__name__)
 #
 
 
-class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
+class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 	Type = "abc"
 	Editable = False
