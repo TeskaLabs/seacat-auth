@@ -1,6 +1,14 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+
 ## v23.32-beta
+- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230728)
+
+---
+
 
 ### Breaking changes
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
