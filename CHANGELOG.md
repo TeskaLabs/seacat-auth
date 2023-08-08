@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.32-beta
 
 ### Breaking changes
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
