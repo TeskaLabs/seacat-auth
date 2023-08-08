@@ -411,95 +411,56 @@ class AuthorizeHandler(object):
 
 		else:  # Not authenticated, but it is allowed to open a new anonymous session
 			assert allow_anonymous
+			assert root_session is None
 
-			if root_session is not None:
-				# Open a new subsession under the current root session
-				assert root_session.is_anonymous()
+			# Create algorithmic anonymous session without root
 
-				# Authorize access to tenants requested in scope
-				try:
-					tenants = await self.authorize_tenants_by_scope(
-						scope, root_session.Authorization.Authz, root_session.Credentials.Id, client_id)
-				except exceptions.AccessDeniedError:
-					raise OAuthAuthorizeError(
-						AuthErrorResponseCode.AccessDenied, client_id,
-						redirect_uri=redirect_uri,
-						state=state,
-						struct_data={"reason": "tenant_not_found"})
+			# Validate the anonymous credentials
+			anonymous_cid = client_dict.get("anonymous_cid")
+			try:
+				await self.CredentialsService.get(anonymous_cid)
+			except KeyError:
+				L.error("Credentials for anonymous access not found.", struct_data={
+					"cid": anonymous_cid, "client_id": client_id})
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.AccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "credentials_not_found"})
 
-				if authorize_type == "openid":
-					new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-						root_session.Credentials.Id, client_id, scope,
-						tenants=tenants,
-						login_descriptor=root_session.Authentication.LoginDescriptor,
-						track_id=root_session.TrackId,
-						root_session_id=root_session.SessionId,
-						code_challenge=code_challenge,
-						code_challenge_method=code_challenge_method,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-				elif authorize_type == "cookie":
-					# FIXME: Not tested!!!
-					new_session = await self.CookieService.create_anonymous_cookie_client_session(
-						root_session.Credentials.Id, client_dict, scope,
-						root_session_id=root_session.SessionId,
-						track_id=root_session.TrackId,
-						tenants=tenants,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
-					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
-				else:
-					raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
+			# Get credentials' assigned tenants and resources
+			authz = await build_credentials_authz(
+				self.OpenIdConnectService.TenantService, self.OpenIdConnectService.RoleService, anonymous_cid)
+
+			# Authorize access to tenants requested in scope
+			try:
+				tenants = await self.authorize_tenants_by_scope(
+					scope, authz, anonymous_cid, client_id)
+			except exceptions.AccessDeniedError:
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.AccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "tenant_not_found"})
+
+			if authorize_type == "openid":
+				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
+					anonymous_cid, client_id, scope,
+					tenants=tenants,
+					code_challenge=code_challenge,
+					code_challenge_method=code_challenge_method,
+					requested_expiration=self.SessionService.AnonymousExpiration,
+					from_info=from_info)
+			elif authorize_type == "cookie":
+				new_session = await self.CookieService.create_anonymous_cookie_client_session(
+					anonymous_cid, client_dict, scope,
+					tenants=tenants,
+					requested_expiration=self.SessionService.AnonymousExpiration,
+					from_info=from_info)
+				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
+				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 			else:
-				# Create anonymous session without root
-
-				# Validate the anonymous credentials
-				anonymous_cid = client_dict.get("anonymous_cid")
-				try:
-					await self.CredentialsService.get(anonymous_cid)
-				except KeyError:
-					L.error("Credentials for anonymous access not found.", struct_data={
-						"cid": anonymous_cid, "client_id": client_id})
-					raise OAuthAuthorizeError(
-						AuthErrorResponseCode.AccessDenied, client_id,
-						redirect_uri=redirect_uri,
-						state=state,
-						struct_data={"reason": "credentials_not_found"})
-
-				# Get credentials' assigned tenants and resources
-				authz = await build_credentials_authz(
-					self.OpenIdConnectService.TenantService, self.OpenIdConnectService.RoleService, anonymous_cid)
-
-				# Authorize access to tenants requested in scope
-				try:
-					tenants = await self.authorize_tenants_by_scope(
-						scope, authz, anonymous_cid, client_id)
-				except exceptions.AccessDeniedError:
-					raise OAuthAuthorizeError(
-						AuthErrorResponseCode.AccessDenied, client_id,
-						redirect_uri=redirect_uri,
-						state=state,
-						struct_data={"reason": "tenant_not_found"})
-
-				if authorize_type == "openid":
-					new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-						anonymous_cid, client_id, scope,
-						tenants=tenants,
-						code_challenge=code_challenge,
-						code_challenge_method=code_challenge_method,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-				elif authorize_type == "cookie":
-					new_session = await self.CookieService.create_anonymous_cookie_client_session(
-						anonymous_cid, client_dict, scope,
-						tenants=tenants,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
-					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
-				else:
-					raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
+				raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
 
 			# Anonymous sessions need to be audited
 			await self.OpenIdConnectService.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
