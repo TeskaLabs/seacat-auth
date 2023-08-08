@@ -274,10 +274,15 @@ class ResourceService(asab.Service):
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
 
+		# Get existing resource details and roles
 		resource = await self.get(resource_id)
-		await self.create(new_resource_id, resource.get("description"))
-
 		roles = await role_svc.list(resource=resource_id)
+
+		# Delete existing resource
+		await self.StorageService.delete(self.ResourceCollection, resource_id)
+
+		# Create a new resource and assign it to the original one's roles
+		await self.create(new_resource_id, resource.get("description"))
 		if roles["count"] > 0:
 			for role in roles["data"]:
 				await role_svc.update(
@@ -285,7 +290,6 @@ class ResourceService(asab.Service):
 					resources_to_remove=[resource_id],
 					resources_to_add=[new_resource_id])
 
-		await self.StorageService.delete(self.ResourceCollection, resource_id)
 		L.log(asab.LOG_NOTICE, "Resource renamed", struct_data={
 			"old_resource": resource_id,
 			"new_resource": resource_id,
