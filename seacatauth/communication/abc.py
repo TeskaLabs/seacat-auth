@@ -10,7 +10,7 @@ L = logging.getLogger(__name__)
 #
 
 
-class CommunicationProviderABC(asab.ConfigObject, abc.ABC):
+class CommunicationProviderABC(asab.Configurable, abc.ABC):
 
 	Channel = None
 

@@ -12,7 +12,7 @@ L = logging.getLogger(__name__)
 #
 
 
-class MessageBuilderABC(asab.ConfigObject, abc.ABC):
+class MessageBuilderABC(asab.Configurable, abc.ABC):
 	"""
 	Constructs a message object (dictionary)
 	"""
