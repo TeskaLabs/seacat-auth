@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.32-beta
 
 ### Breaking changes
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
@@ -8,9 +8,11 @@
 ### Fix
 - Validate client session expiration (#237, PLUM Sprint 230714)
 - Add `editable` field in provider info (#238, PLUM Sprint 230728)
+- Fix resource rename flow (#239, PLUM Sprint 230728)
 
 ### Features
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
+- Add SSL and API key support in ELK batman (#241, GREY Sprint 230714)
 
 ---
 
