@@ -444,16 +444,6 @@ class CookieHandler(object):
 		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
 		if cookie_value is None:
 			return None
-
-		# First try if the cookie is a JWToken
-		if "." in cookie_value:
-			try:
-				return await self.SessionService.Algorithmic.deserialize(cookie_value)
-			except asab.exceptions.NotAuthenticatedError:
-				# The JWToken is invalid or expired
-				return None
-
-		# Then try looking in the database
 		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 
 
