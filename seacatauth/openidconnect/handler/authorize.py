@@ -411,7 +411,7 @@ class AuthorizeHandler(object):
 
 		else:  # Not authenticated, but it is allowed to open a new anonymous session
 			assert allow_anonymous
-			assert root_session is None
+			assert root_session is None  # There are no anonymous root sessions
 
 			# Create algorithmic anonymous session without root
 
@@ -445,7 +445,7 @@ class AuthorizeHandler(object):
 
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-					anonymous_cid, client_id, scope,
+					anonymous_cid, client_dict, scope,
 					tenants=tenants,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,

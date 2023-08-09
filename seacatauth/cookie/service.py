@@ -215,11 +215,9 @@ class CookieService(asab.Service):
 
 
 	async def create_anonymous_cookie_client_session(
-		self, anonymous_cid, client_dict, scope,
-		tenants=None,
-		track_id=None,
-		root_session_id=None,
-		requested_expiration=None,
+		self, anonymous_cid: str, client_dict: dict, scope: list,
+		track_id: bytes = None,
+		tenants: list = None,
 		from_info=None,
 	):
 		"""
