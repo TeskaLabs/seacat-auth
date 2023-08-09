@@ -123,26 +123,20 @@ class TokenHandler(object):
 
 		# Locate the session by authorization code
 		try:
-			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(authorization_code)
+			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(
+				authorization_code, qs_data.get("code_verifier"))
 		except KeyError:
 			L.warning("Session not found.", struct_data={"code": authorization_code})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-
-		if new_session.OAuth2.PKCE is not None:
-			try:
-				self.OpenIdConnectService.PKCE.evaluate_code_challenge(
-					new_session.OAuth2.PKCE["method"],
-					new_session.OAuth2.PKCE["challenge"],
-					qs_data.get("code_verifier"))
-			except CodeChallengeFailedError as e:
-				L.log(asab.LOG_NOTICE, "Code challenge failed.", struct_data={"reason": str(e)})
-				return asab.web.rest.json_response(
-					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-			except Exception as e:
-				L.error("Code challenge error: {}".format(e), exc_info=True)
-				return asab.web.rest.json_response(
-					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+		except CodeChallengeFailedError as e:
+			L.warning("Code challenge failed.", struct_data={"reason": str(e)})
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+		except Exception as e:
+			L.error("Code challenge error: {}".format(e), exc_info=True)
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
 		# TODO: Check if the redirect URL is the same as the one in the authorization request:
 		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):

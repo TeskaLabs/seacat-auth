@@ -447,15 +447,11 @@ class AuthorizeHandler(object):
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
 					anonymous_cid, client_dict, scope,
 					tenants=tenants,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					requested_expiration=self.SessionService.AnonymousExpiration,
 					from_info=from_info)
 			elif authorize_type == "cookie":
 				new_session = await self.CookieService.create_anonymous_cookie_client_session(
 					anonymous_cid, client_dict, scope,
 					tenants=tenants,
-					requested_expiration=self.SessionService.AnonymousExpiration,
 					from_info=from_info)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
@@ -469,7 +465,10 @@ class AuthorizeHandler(object):
 				"fi": from_info})
 
 		await self.audit_authorize_success(new_session)
-		return await self.reply_with_successful_response(new_session, scope, redirect_uri, state)
+		return await self.reply_with_successful_response(
+			new_session, scope, redirect_uri, state,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method)
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
 		cookie_entry_uri = client_dict.get("cookie_entry_uri")
@@ -566,6 +565,8 @@ class AuthorizeHandler(object):
 	async def reply_with_successful_response(
 		self, session, scope: list, redirect_uri: str,
 		state: str = None,
+		code_challenge: str = None,
+		code_challenge_method: str = None
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -587,7 +588,11 @@ class AuthorizeHandler(object):
 			url_qs["state"] = state
 
 		# Add the Authorization Code into the response
-		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session)
+		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(
+			session,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method
+		)
 
 		# Success
 		url = urllib.parse.urlunparse((

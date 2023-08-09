@@ -61,7 +61,6 @@ class OAuth2Data:
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
-	PKCE: typing.Optional[dict]
 
 
 @dataclasses.dataclass
@@ -135,7 +134,6 @@ class SessionAdapter:
 			RefreshToken = "oa_rt"
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
-			PKCE = "oa_pkce"
 
 		class Cookie:
 			_prefix = "ck"
@@ -255,7 +253,6 @@ class SessionAdapter:
 				self.FN.OAuth2.RefreshToken: self.OAuth2.RefreshToken,
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
-				self.FN.OAuth2.PKCE: self.OAuth2.PKCE,
 			})
 
 		if self.Batman is not None:
@@ -371,15 +368,12 @@ class SessionAdapter:
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 
-		pkce = session_dict.pop(cls.FN.OAuth2.PKCE, None)
-
 		return OAuth2Data(
 			IDToken=id_token,
 			AccessToken=access_token,
 			RefreshToken=refresh_token,
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
-			PKCE=pkce,
 		)
 
 	@classmethod
