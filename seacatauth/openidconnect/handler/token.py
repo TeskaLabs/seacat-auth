@@ -133,10 +133,6 @@ class TokenHandler(object):
 			L.warning("Code challenge failed.", struct_data={"reason": str(e)})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-		except Exception as e:
-			L.error("Code challenge error: {}".format(e), exc_info=True)
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
 		# TODO: Check if the redirect URL is the same as the one in the authorization request:
 		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
