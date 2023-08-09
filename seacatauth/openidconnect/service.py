@@ -224,9 +224,7 @@ class OpenIdConnectService(asab.Service):
 	async def create_oidc_session(
 		self, root_session, client_id, scope,
 		tenants=None,
-		requested_expiration=None,
-		code_challenge: str = None,
-		code_challenge_method: str = None
+		requested_expiration=None
 	):
 		# TODO: Choose builders based on scope
 		# Make sure dangerous resources are removed from impersonated sessions
@@ -245,11 +243,6 @@ class OpenIdConnectService(asab.Service):
 				exclude_resources=exclude_resources,
 			)
 		]
-
-		if code_challenge is not None:
-			session_builders.append((
-				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
-			))
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([

@@ -406,9 +406,7 @@ class AuthorizeHandler(object):
 				new_session = await self.OpenIdConnectService.create_oidc_session(
 					root_session, client_id, scope,
 					tenants=tenants,
-					requested_expiration=session_expiration,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method)
+					requested_expiration=session_expiration)
 			elif authorize_type == "cookie":
 				new_session = await self.CookieService.create_cookie_client_session(
 					root_session, client_id, scope, tenants,
