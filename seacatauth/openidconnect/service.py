@@ -89,7 +89,12 @@ class OpenIdConnectService(asab.Service):
 		await self._delete_expired_authorization_codes()
 
 
-	async def generate_authorization_code(self, session):
+	async def generate_authorization_code(
+		self,
+		session: SessionAdapter,
+		code_challenge: str = None,
+		code_challenge_method: str = None
+	):
 		"""
 		Generates a random authorization code and stores it as a temporary
 		session identifier until the session is retrieved.
@@ -105,6 +110,10 @@ class OpenIdConnectService(asab.Service):
 			upsertor.set("scope", session.OAuth2.Scope)
 		else:
 			upsertor.set("sid", session.SessionId)
+
+		if code_challenge:
+			upsertor.set("cc", code_challenge)
+			upsertor.set("ccm", code_challenge_method)
 
 		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
 
@@ -124,7 +133,7 @@ class OpenIdConnectService(asab.Service):
 			})
 
 
-	async def pop_session_by_authorization_code(self, code):
+	async def pop_session_by_authorization_code(self, code, code_verifier: None):
 		"""
 		Retrieves session by its temporary authorization code.
 		"""
@@ -136,6 +145,12 @@ class OpenIdConnectService(asab.Service):
 		exp = data["exp"]
 		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Authorization code expired.")
+
+		if "cc" in data:
+			self.PKCE.evaluate_code_challenge(
+				code_challenge_method=data["ccm"],
+				code_challenge=data["cc"],
+				code_verifier=code_verifier)
 
 		if "sid" in data:
 			return await self.SessionService.get(data["sid"])
@@ -284,8 +299,7 @@ class OpenIdConnectService(asab.Service):
 		self, anonymous_cid: str, client_dict: dict, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
-		from_info=None,
-		**kwargs
+		from_info=None
 	):
 		session = self.SessionService.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),

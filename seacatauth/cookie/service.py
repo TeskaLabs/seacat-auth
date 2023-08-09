@@ -7,6 +7,7 @@ import logging
 import asab
 import asab.storage
 import asab.exceptions
+import jwcrypto.jws
 
 from ..session import SessionAdapter
 from ..session.adapter import CookieData
@@ -112,6 +113,9 @@ class CookieService(asab.Service):
 			except asab.exceptions.NotAuthenticatedError:
 				# The JWToken is invalid or expired
 				return None
+			except jwcrypto.jws.InvalidJWSObject:
+				# Not a JWT token
+				pass
 
 		# Then try looking for the session in the database
 		try:
