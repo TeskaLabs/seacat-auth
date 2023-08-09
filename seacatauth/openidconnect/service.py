@@ -90,6 +90,11 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def generate_authorization_code(self, session):
+		"""
+		Generates a random authorization code and stores it as a temporary
+		session identifier until the session is retrieved.
+		"""
+		# TODO: Store PKCE challenge here, not in the session object
 		code = secrets.token_urlsafe(36)
 		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
 
@@ -120,6 +125,9 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def pop_session_by_authorization_code(self, code):
+		"""
+		Retrieves session by its temporary authorization code.
+		"""
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 		data = await collection.find_one_and_delete(filter={"_id": code})
 		if data is None:

@@ -43,8 +43,8 @@ class UserInfoHandler(object):
 		session = request.Session
 
 		if session is None:
-			L.warning("Request for invalid/expired session")
-			return self.error_response("invalid_session", "The access token is invalid/expired.")
+			L.log(asab.LOG_NOTICE, "Access token or cookie is invalid.")
+			return self.error_response("invalid_token", "Access token or cookie is invalid.")
 
 		# # if authorized get provider for this identity
 

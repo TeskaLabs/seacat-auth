@@ -6,6 +6,7 @@ import logging
 
 import asab
 import asab.storage
+import asab.exceptions
 
 from ..session import SessionAdapter
 from ..session.adapter import CookieData
@@ -104,6 +105,15 @@ class CookieService(asab.Service):
 		"""
 		Get session by cookie value.
 		"""
+		# First try interpreting the token as an algorithmic session
+		if "." in cookie_value:
+			try:
+				return await self.SessionService.Algorithmic.deserialize(cookie_value)
+			except asab.exceptions.NotAuthenticatedError:
+				# The JWToken is invalid or expired
+				return None
+
+		# Then try looking for the session in the database
 		try:
 			cookie_value = base64.urlsafe_b64decode(cookie_value.encode("ascii"))
 		except ValueError:
