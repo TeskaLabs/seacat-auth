@@ -252,26 +252,6 @@ class AuthorizeHandler(object):
 		if ff is not None:
 			from_info.extend(ff.split(", "))
 
-		try:
-			code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
-				client_dict, code_challenge, code_challenge_method)
-		except InvalidCodeChallengeMethodError:
-			L.error("Invalid code challenge method.", struct_data={
-				"client_id": client_id, "method": code_challenge_method})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "code_challenge_error"})
-		except InvalidCodeChallengeError:
-			L.error("Invalid code challenge request.", struct_data={
-				"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "code_challenge_error"})
-
 		# Decide whether this is an openid or cookie request
 		try:
 			authorize_type = await self._get_authorize_type(client_id, scope)
@@ -279,6 +259,35 @@ class AuthorizeHandler(object):
 			e.RedirectUri = redirect_uri
 			e.State = state
 			raise e
+
+		if authorize_type == "openid":
+			try:
+				code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
+					client_dict, code_challenge, code_challenge_method)
+			except InvalidCodeChallengeMethodError:
+				L.error("Invalid code challenge method.", struct_data={
+					"client_id": client_id, "method": code_challenge_method})
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.InvalidRequest, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "code_challenge_error"})
+			except InvalidCodeChallengeError:
+				L.error("Invalid code challenge request.", struct_data={
+					"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.InvalidRequest, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "code_challenge_error"})
+		elif code_challenge is not None:
+			L.error("Code challenge not supported for cookie authorization.", struct_data={
+				"client_id": client_id})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidRequest, client_id,
+				redirect_uri=redirect_uri,
+				state=state,
+				struct_data={"reason": "code_challenge_error"})
 
 		# Only root sessions can be used to authorize client sessions
 		root_session = request.Session
