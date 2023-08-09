@@ -175,21 +175,22 @@ class TokenHandler(object):
 			"Pragma": "no-cache",
 		}
 
-		expires_in = int((new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
-
 		id_token = await self.OpenIdConnectService.build_id_token(new_session)
 
 		# 3.1.3.3.  Successful Token Response
-		body = {
+		data = {
 			"token_type": "Bearer",
 			"scope": " ".join(new_session.OAuth2.Scope),
 			"access_token": new_session.OAuth2.AccessToken,
 			"refresh_token": new_session.OAuth2.RefreshToken,
 			"id_token": id_token,
-			"expires_in": expires_in,
 		}
 
-		return asab.web.rest.json_response(request, body, headers=headers)
+		if new_session.Session.Expiration:
+			data["expires_in"] = int(
+				(new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+
+		return asab.web.rest.json_response(request, data, headers=headers)
 
 
 	@asab.web.rest.json_schema_handler({

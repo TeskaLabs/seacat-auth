@@ -281,68 +281,30 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_anonymous_oidc_session(
-		self, anonymous_cid, client_id, scope,
-		login_descriptor=None,
-		track_id=None,
-		root_session_id=None,
-		tenants=None,
-		requested_expiration=None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
+		self, anonymous_cid: str, client_dict: dict, scope: list,
+		track_id: bytes = None,
+		tenants: list = None,
 		from_info=None,
+		**kwargs
 	):
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
-		session_builders = [
-			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
-			await credentials_session_builder(self.CredentialsService, anonymous_cid, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=anonymous_cid,
-				tenants=tenants,
-			)
-		]
+		session = self.SessionService.Algorithmic.create_anonymous_session(
+			created_at=datetime.datetime.now(datetime.timezone.utc),
+			track_id=track_id,
+			client_dict=client_dict,
+			scope=scope)
 
-		if code_challenge is not None:
-			session_builders.append((
-				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
-			))
-
-		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			authn_service = self.App.get_service("seacatauth.AuthenticationService")
-			session_builders.append(login_descriptor_session_builder(login_descriptor))
-			session_builders.append(await external_login_session_builder(ext_login_svc, anonymous_cid))
-			# TODO: Get factors from root_session?
-			session_builders.append(await available_factors_session_builder(authn_service, anonymous_cid))
-
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
-
-		# Obtain Track ID if there is any in the root session
-		if track_id is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
-
-		session = await self.SessionService.create_session(
-			session_type="openidconnect",
-			parent_session_id=root_session_id,
-			expiration=requested_expiration,
-			session_builders=session_builders,
-		)
+		session.OAuth2.AccessToken = self.SessionService.Algorithmic.serialize(session)
 
 		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
 			"cid": anonymous_cid,
-			"client_id": client_id,
-			"sid": str(session.Session.Id),
+			"client_id": client_dict["_id"],
+			"track_id": track_id,
 			"fi": from_info})
 
 		# Add an audit entry
 		await self.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
 			"cid": anonymous_cid,
-			"client_id": client_id,
+			"client_id": client_dict["_id"],
 			"sid": str(session.Session.Id),
 			"fi": from_info})
 
