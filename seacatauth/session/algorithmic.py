@@ -8,6 +8,7 @@ import datetime
 
 import asab.exceptions
 import asab.web.rest
+import asab.metrics
 
 from .adapter import SessionAdapter
 from ..authz import build_credentials_authz
@@ -22,6 +23,7 @@ class AlgorithmicSessionProvider:
 	Type = "algorithmic"
 
 	def __init__(self, app):
+		self.MetricsService = app.get_service("asab.MetricsService")
 		self.ClientService = None
 		self.CredentialsService = None
 		self.TenantService = None
@@ -31,6 +33,11 @@ class AlgorithmicSessionProvider:
 		# TODO: Derive the private key
 		self.PrivateKey = app.PrivateKey
 
+		self.AnonymousSessionCounter: asab.metrics.Counter = self.MetricsService.create_counter(
+			"anonymous_sessions",
+			tags={"help": "Number of anonymous sessions created."},
+			init_values={"sessions": 0})
+
 
 	async def initialize(self, app):
 		self.ClientService = app.get_service("seacatauth.ClientService")
@@ -39,34 +46,12 @@ class AlgorithmicSessionProvider:
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 
-	async def deserialize(self, token_value) -> SessionAdapter | None:
-		"""
-		Parse JWT token and build a SessionAdapter using the token data.
-		"""
-		try:
-			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
-		except ValueError:
-			# This is not a JWToken
-			return None
-		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
-			# JWToken invalid
-			raise asab.exceptions.NotAuthenticatedError() from e
-
-		data_dict = json.loads(token.claims)
-		client_dict = await self.ClientService.get(data_dict["azp"])
-		try:
-			session = await self.create_anonymous_session(
-				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
-				track_id=uuid.UUID(data_dict["track_id"]).bytes,
-				client_dict=client_dict,
-				scope=data_dict["scope"])
-		except Exception as e:
-			raise asab.exceptions.NotAuthenticatedError() from e
-
+	async def create_anonymous_session(self, created_at, track_id, client_dict, scope) -> SessionAdapter:
+		session = await self._build_anonymous_session(created_at, track_id, client_dict, scope)
+		self.AnonymousSessionCounter.add("sessions", 1)
 		return session
 
-
-	async def create_anonymous_session(self, created_at, track_id, client_dict, scope):
+	async def _build_anonymous_session(self, created_at, track_id, client_dict, scope) -> SessionAdapter:
 		tenants = await self.TenantService.get_tenants(client_dict["anonymous_cid"])
 		requested_tenants = await self.TenantService.get_tenants_by_scope(
 			scope, client_dict["anonymous_cid"])
@@ -86,6 +71,33 @@ class AlgorithmicSessionProvider:
 			SessionAdapter.FN.Authorization.Authz: authz,
 		}
 		return SessionAdapter(self, session_dict)
+
+
+	async def deserialize(self, token_value) -> SessionAdapter | None:
+		"""
+		Parse JWT token and build a SessionAdapter using the token data.
+		"""
+		try:
+			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
+		except ValueError:
+			# This is not a JWToken
+			return None
+		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
+			# JWToken invalid
+			raise asab.exceptions.NotAuthenticatedError() from e
+
+		data_dict = json.loads(token.claims)
+		client_dict = await self.ClientService.get(data_dict["azp"])
+		try:
+			session = await self._build_anonymous_session(
+				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
+				track_id=uuid.UUID(data_dict["track_id"]).bytes,
+				client_dict=client_dict,
+				scope=data_dict["scope"])
+		except Exception as e:
+			raise asab.exceptions.NotAuthenticatedError() from e
+
+		return session
 
 
 	def serialize(self, session: SessionAdapter) -> str:
@@ -112,27 +124,3 @@ class AlgorithmicSessionProvider:
 		token.make_signed_token(self.PrivateKey)
 		id_token = token.serialize()
 		return id_token
-
-
-	async def build_algorithmic_session_from_token(self, token_value):
-		try:
-			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
-		except ValueError:
-			# This is not a JWToken
-			return None
-		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
-			# JWToken invalid
-			raise asab.exceptions.NotAuthenticatedError() from e
-
-		data_dict = json.loads(token.claims)
-		client_dict = await self.ClientService.get(data_dict["azp"])
-		try:
-			session = await self.create_anonymous_session(
-				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
-				track_id=uuid.UUID(data_dict["track_id"]).bytes,
-				client_dict=client_dict,
-				scope=data_dict["scope"])
-		except Exception as e:
-			raise asab.exceptions.NotAuthenticatedError() from e
-
-		return session
