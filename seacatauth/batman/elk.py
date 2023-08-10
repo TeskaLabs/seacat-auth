@@ -95,7 +95,7 @@ class ELKIntegration(asab.config.Configurable):
 			print(self.SSLContext)
 		else:
 			self.SSLContext = None
-		
+
 
 	async def _on_tick(self, event_name):
 		await self._initialize_resources()
