@@ -129,7 +129,7 @@ class OpenIdConnectService(asab.Service):
 			})
 
 
-	async def pop_session_by_authorization_code(self, code, code_verifier: None):
+	async def pop_session_by_authorization_code(self, code, code_verifier: str = None):
 		"""
 		Retrieves session by its temporary authorization code.
 		"""
