@@ -10,7 +10,7 @@ import asab.exceptions
 import asab.web.rest
 
 from .adapter import SessionAdapter
-
+from ..authz import build_credentials_authz
 
 L = logging.getLogger(__name__)
 
@@ -24,6 +24,8 @@ class AlgorithmicSessionProvider:
 	def __init__(self, app):
 		self.ClientService = None
 		self.CredentialsService = None
+		self.TenantService = None
+		self.RoleService = None
 		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
 		# TODO: Derive the private key
@@ -32,6 +34,8 @@ class AlgorithmicSessionProvider:
 
 	async def initialize(self, app):
 		self.ClientService = app.get_service("seacatauth.ClientService")
+		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 
@@ -51,7 +55,7 @@ class AlgorithmicSessionProvider:
 		data_dict = json.loads(token.claims)
 		client_dict = await self.ClientService.get(data_dict["azp"])
 		try:
-			session = self.create_anonymous_session(
+			session = await self.create_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
 				client_dict=client_dict,
@@ -62,7 +66,12 @@ class AlgorithmicSessionProvider:
 		return session
 
 
-	def create_anonymous_session(self, created_at, track_id, client_dict, scope):
+	async def create_anonymous_session(self, created_at, track_id, client_dict, scope):
+		tenants = await self.TenantService.get_tenants(client_dict["anonymous_cid"])
+		requested_tenants = await self.TenantService.get_tenants_by_scope(
+			scope, client_dict["anonymous_cid"])
+		authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, client_dict["anonymous_cid"], requested_tenants)
 		session_dict = {
 			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
@@ -73,8 +82,8 @@ class AlgorithmicSessionProvider:
 			SessionAdapter.FN.OAuth2.Scope: scope,
 			SessionAdapter.FN.Credentials.Id: client_dict["anonymous_cid"],
 			SessionAdapter.FN.Authentication.IsAnonymous: True,
-			SessionAdapter.FN.Authorization.Tenants: ["default"],  # FIXME: Get tenants by scope
-			SessionAdapter.FN.Authorization.Authz: {"default": ["blabla"]},  # FIXME: Get resources by scope
+			SessionAdapter.FN.Authorization.Tenants: tenants,
+			SessionAdapter.FN.Authorization.Authz: authz,
 		}
 		return SessionAdapter(self, session_dict)
 
@@ -118,7 +127,7 @@ class AlgorithmicSessionProvider:
 		data_dict = json.loads(token.claims)
 		client_dict = await self.ClientService.get(data_dict["azp"])
 		try:
-			session = self.create_anonymous_session(
+			session = await self.create_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
 				client_dict=client_dict,
