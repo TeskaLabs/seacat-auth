@@ -3,7 +3,6 @@ import json
 import base64
 import secrets
 import logging
-import uuid
 
 import asab
 import asab.web.rest
@@ -20,9 +19,6 @@ from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
-	login_descriptor_session_builder,
-	external_login_session_builder,
-	available_factors_session_builder
 )
 from .session import oauth2_session_builder
 from ..audit import AuditCode
@@ -294,7 +290,7 @@ class OpenIdConnectService(asab.Service):
 		tenants: list = None,
 		from_info=None
 	):
-		session = self.SessionService.Algorithmic.create_anonymous_session(
+		session = await self.SessionService.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,

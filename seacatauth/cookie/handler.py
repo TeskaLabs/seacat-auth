@@ -236,10 +236,17 @@ class CookieHandler(object):
 			if forwarded_for is not None:
 				from_info.extend(forwarded_for.split(", "))
 			track_id = uuid.uuid4().bytes
-			session = await self.CookieService.create_anonymous_cookie_client_session(
-				anonymous_cid, client, scope,
-				track_id=track_id,
-				from_info=from_info)
+			try:
+				session = await self.CookieService.create_anonymous_cookie_client_session(
+					anonymous_cid, client, scope,
+					track_id=track_id,
+					from_info=from_info)
+			except exceptions.AccessDeniedError as e:
+				L.error(
+					"Failed to initialize anonymous session because of unauthorized access. "
+					"Please revise your introspection setup.",
+					struct_data={"reason": str(e)})
+				raise aiohttp.web.HTTPForbidden() from e
 			anonymous_session_created = True
 
 		if session is None:

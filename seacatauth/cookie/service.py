@@ -229,7 +229,7 @@ class CookieService(asab.Service):
 		"""
 		session_svc = self.App.get_service("seacatauth.SessionService")
 
-		session = session_svc.Algorithmic.create_anonymous_session(
+		session = await session_svc.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
