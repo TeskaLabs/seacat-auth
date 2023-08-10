@@ -92,7 +92,6 @@ class ELKIntegration(asab.config.Configurable):
 		self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 		if self.URL.startswith("https://"):
 			self.SSLContext = self.SSLContextBuilder.build(ssl.PROTOCOL_TLS_CLIENT)
-			print(self.SSLContext)
 		else:
 			self.SSLContext = None
 
