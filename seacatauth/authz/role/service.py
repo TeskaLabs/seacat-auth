@@ -45,7 +45,7 @@ class RoleService(asab.Service):
 
 
 	async def list(
-		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *,
+		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, filter: str = None, *,
 		resource: str = None,
 		active_only: bool = False,
 		exclude_global: bool = False,
@@ -57,6 +57,8 @@ class RoleService(asab.Service):
 				query_filter["tenant"] = {"$in": [tenant]}
 			else:
 				query_filter["tenant"] = {"$in": [tenant, None]}
+		if filter:
+			query_filter["_id"] = {"$regex": ".+/{}.+".format(filter)}
 		if resource is not None:
 			query_filter["resources"] = resource
 		if active_only is True:
