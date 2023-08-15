@@ -67,8 +67,17 @@ class SessionHandler(object):
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = int(request.query.get("i", 10))
+		filter = request.query.get("f")
+		if filter:
+			# It is only possible to search by the full ID. Partial match would not be efficient.
+			try:
+				query_filter = {"_id": bson.ObjectId(filter)}
+			except bson.errors.InvalidId:
+				return asab.web.rest.json_response(request, {"count": 0, "data": []})
+		else:
+			query_filter = None
 		include_expired = asab.config.utils.string_to_boolean(request.query.get("include_expired", "no"))
-		data = await self.SessionService.recursive_list(page, limit, include_expired=include_expired)
+		data = await self.SessionService.recursive_list(page, limit, query_filter, include_expired=include_expired)
 		return asab.web.rest.json_response(request, data)
 
 
