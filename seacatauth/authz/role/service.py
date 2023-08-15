@@ -58,7 +58,8 @@ class RoleService(asab.Service):
 			else:
 				query_filter["tenant"] = {"$in": [tenant, None]}
 		if filter:
-			query_filter["_id"] = {"$regex": ".+/{}.+".format(filter)}
+			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
+			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(filter)}
 		if resource is not None:
 			query_filter["resources"] = resource
 		if active_only is True:
