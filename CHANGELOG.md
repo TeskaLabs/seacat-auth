@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Upgrade to Alpine 3.18 and Python 3.11 (#245, PLUM Sprint 230728)
+
+---
+
+
 ## v23.32-beta
 
 ### Breaking changes
