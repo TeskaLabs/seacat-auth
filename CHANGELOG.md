@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Role list supports searching by name (#247, PLUM Sprint 230811)
+
+---
+
+
 ## v23.33-beta
 
 ### Features
