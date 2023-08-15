@@ -4,6 +4,7 @@
 
 ### Features
 - Upgrade to Alpine 3.18 and Python 3.11 (#245, PLUM Sprint 230728)
+- ELK Batman uses ASAB SSLContextBuilder (#244, PLUM Sprint 230728)
 
 ---
 
