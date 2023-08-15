@@ -96,10 +96,14 @@ class RoleHandler(object):
 		limit = request.query.get("i")
 		if limit is not None:
 			limit = int(limit)
+		filter_string = request.query.get("f")
 		resource = request.query.get("resource")
 		exclude_global = request.query.get("exclude_global", "false") == "true"
 
-		result = await self.RoleService.list(tenant, page, limit, resource=resource, exclude_global=exclude_global)
+		result = await self.RoleService.list(
+			tenant, page, limit, filter_string,
+			resource=resource,
+			exclude_global=exclude_global)
 		return asab.web.rest.json_response(request, result)
 
 
