@@ -2,7 +2,7 @@
 
 ## v23.18-beta1
 
-## Fix
+### Fix
 - Logging to syslog (TeskaLabs/asab/pull/478)
 
 ---
