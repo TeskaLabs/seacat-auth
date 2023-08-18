@@ -215,28 +215,15 @@ class TokenHandler(object):
 	})
 	async def token_revoke(self, request, *, json_data):
 		"""
-		OAuth 2.0 Access Token Revoke
-		"""
-		# TODO: this is not implemented
-
-		if not self.OpenIdConnectService.check_access_token(request.headers["Authorization"].split()[1]):
-			raise aiohttp.web.HTTPForbidden(reason="User is not authenticated")
-
-		"""
 		https://tools.ietf.org/html/rfc7009
 
 		2.1.  Revocation Request
 		"""
+		if request.Session is None:
+			raise aiohttp.web.HTTPUnauthorized()
 
 		token_type_hint = json_data.get("token_type_hint")  # Optional `access_token` or `refresh_token`
-		if token_type_hint:
-			if token_type_hint == "access_token":
-				self.OpenIdConnectService.invalidate_access_token(json_data["token"])
-			elif token_type_hint == "refresh_token":
-				self.OpenIdConnectService.invalidate_refresh_token(json_data["token"])
-			else:
-				return await self.token_error_response(request, "Unknown token_type_hint {}".format(token_type_hint))
-		self.OpenIdConnectService.invalidate_token(json_data["token"])
+		await self.OpenIdConnectService.revoke_token(json_data["token"], token_type_hint)
 		return aiohttp.web.HTTPOk()
 
 
