@@ -15,7 +15,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from ..generic import add_params_to_url_query
+from ..generic import add_params_to_url_query, urlparse, urlunparse
 from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
@@ -66,22 +66,27 @@ class OpenIdConnectService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
-		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
-		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
-		if self.Issuer is None:
-			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
-			L.warning("OAuth2 issuer not specified. Assuming '{}'".format(fragments.netloc))
-			self.Issuer = fragments.netloc
-
-		self.AuthorizationCodeTimeout = datetime.timedelta(
-			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
-		)
-
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		if public_api_base_url.endswith("/"):
 			self.PublicApiBaseUrl = public_api_base_url[:-1]
 		else:
 			self.PublicApiBaseUrl = public_api_base_url
+
+		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
+		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
+		if self.Issuer is not None:
+			parsed = urllib.parse.urlparse(self.Issuer)
+			if parsed.scheme != "https" or parsed.query != "" or parsed.fragment != "":
+				raise ValueError(
+					"OpenID Connect issuer must be a URL that uses the 'https' scheme "
+					"and has no query or fragment components.")
+		else:
+			self.Issuer = self.PublicApiBaseUrl
+			L.log(asab.LOG_NOTICE, "OAuth2 issuer not specified. Assuming '{}'.".format(self.Issuer))
+
+		self.AuthorizationCodeTimeout = datetime.timedelta(
+			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
+		)
 
 		self.PrivateKey = self._load_private_key()
 
