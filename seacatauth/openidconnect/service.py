@@ -428,12 +428,14 @@ class OpenIdConnectService(asab.Service):
 
 		if session.Credentials.Username is not None:
 			userinfo["preferred_username"] = session.Credentials.Username
+			userinfo["username"] = session.Credentials.Username  # BACK-COMPAT, remove after 2023-01-31
 
 		if session.Credentials.Email is not None:
 			userinfo["email"] = session.Credentials.Email
 
 		if session.Credentials.Phone is not None:
 			userinfo["phone_number"] = session.Credentials.Phone
+			userinfo["phone"] = session.Credentials.Phone  # BACK-COMPAT, remove after 2023-01-31
 
 		if session.Credentials.CustomData is not None:
 			userinfo["custom"] = session.Credentials.CustomData
