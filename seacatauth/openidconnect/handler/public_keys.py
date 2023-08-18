@@ -24,10 +24,12 @@ class PublicKeysHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/openidconnect/public_keys", self.public_keys)
+		web_app.router.add_get("/.well-known/jwks.json", self.public_keys)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get("/openidconnect/public_keys", self.public_keys)
+		web_app_public.router.add_get("/.well-known/jwks.json", self.public_keys)
 
 
 	async def public_keys(self, request):
