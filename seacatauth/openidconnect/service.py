@@ -47,6 +47,10 @@ class OpenIdConnectService(asab.Service):
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationCodeCollection = "ac"
 	AuthorizePath = "/openidconnect/authorize"
+	TokenPath = "/openidconnect/token"
+	UserInfoPath = "/openidconnect/userinfo"
+	JwksPath = "/openidconnect/public_keys"
+	EndSessionPath = "/openidconnect/logout"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
@@ -421,15 +425,13 @@ class OpenIdConnectService(asab.Service):
 			userinfo["scope"] = session.OAuth2.Scope
 
 		if session.Credentials.Username is not None:
-			userinfo["username"] = session.Credentials.Username
-			userinfo["preferred_username"] = session.Credentials.Username  # BACK COMPAT, remove after 2023-01-31
+			userinfo["preferred_username"] = session.Credentials.Username
 
 		if session.Credentials.Email is not None:
 			userinfo["email"] = session.Credentials.Email
 
 		if session.Credentials.Phone is not None:
-			userinfo["phone"] = session.Credentials.Phone
-			userinfo["phone_number"] = session.Credentials.Phone   # BACK COMPAT, remove after 2023-01-31
+			userinfo["phone_number"] = session.Credentials.Phone
 
 		if session.Credentials.CustomData is not None:
 			userinfo["custom"] = session.Credentials.CustomData
@@ -576,6 +578,7 @@ class OpenIdConnectService(asab.Service):
 		Check if the client has a registered OAuth Authorize URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
+		# TODO: This should be removed. There must be only one authorize endpoint.
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
