@@ -15,7 +15,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from ..generic import add_params_to_url_query, urlparse, urlunparse
+from ..generic import add_params_to_url_query
 from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
