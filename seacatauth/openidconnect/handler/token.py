@@ -1,5 +1,4 @@
 import logging
-import urllib.parse
 import datetime
 
 import aiohttp.web
