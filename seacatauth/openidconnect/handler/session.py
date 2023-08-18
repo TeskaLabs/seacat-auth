@@ -26,11 +26,11 @@ class SessionHandler(object):
 		self.SessionService = session_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get('/openidconnect/logout', self.session_logout)
+		web_app.router.add_get(self.OpenIdConnectService.EndSessionPath, self.session_logout)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get('/openidconnect/logout', self.session_logout)
+		web_app_public.router.add_get(self.OpenIdConnectService.EndSessionPath, self.session_logout)
 
 
 	async def session_logout(self, request):

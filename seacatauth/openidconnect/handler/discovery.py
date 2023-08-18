@@ -27,13 +27,15 @@ class DiscoveryHandler(object):
 		self.OpenIdConnectService: OpenIdConnectService = oidc_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/openidconnect/configuration", self.configuration)
+		# The well-known location is prescribed in
+		# https://www.rfc-editor.org/rfc/rfc8414#section-3
 		web_app.router.add_get("/.well-known/openid-configuration", self.configuration)
+		web_app.router.add_get("/openidconnect/configuration", self.configuration)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get("/openidconnect/configuration", self.configuration)
 		web_app_public.router.add_get("/.well-known/openid-configuration", self.configuration)
+		web_app_public.router.add_get("/openidconnect/configuration", self.configuration)
 
 
 	async def configuration(self, request):
@@ -60,7 +62,7 @@ class DiscoveryHandler(object):
 			# RECOMMENDED
 			"userinfo_endpoint": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.UserInfoPath),
-			# "registration_endpoint": "{}/public/client/register",  # TODO: Consider a PUBLIC client registration API
+			# "registration_endpoint": "{}/public/client/register",  # TODO: Implement a PUBLIC client registration API
 			"scopes_supported": [
 				"openid", "profile", "email", "phone",
 				"cookie", "batman", "anonymous", "impersonate:"],
@@ -73,12 +75,21 @@ class DiscoveryHandler(object):
 			# OPTIONAL
 			"end_session_endpoint": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.EndSessionPath),
+			"revocation_endpoint": "{}{}".format(
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenRevokePath),
 			"grant_types_supported": ["authorization_code"],
 			"token_endpoint_auth_methods_supported": ["none"],
 			"prompt_values_supported": ["none", "login", "select_account"],
 			"claim_types_supported": ["normal"],
 			"service_documentation": "https://docs.teskalabs.com/seacat-auth",
-			"ui_locales_supported": ["en-US", "cs-CZ"]
+			"ui_locales_supported": ["en-US", "cs-CZ"],
+
+			# PKCE
+			"code_challenge_methods_supported": ["plain", "S256"],
+
+			# NON-STANDARD
+			"nginx_introspection_endpoint": "{}{}".format(
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.NginxIntrospectionPath),
 		}
 
 		return asab.web.rest.json_response(request, data)

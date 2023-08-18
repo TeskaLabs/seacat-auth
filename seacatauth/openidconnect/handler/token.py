@@ -39,14 +39,14 @@ class TokenHandler(object):
 		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/openidconnect/token", self.token_request)
-		web_app.router.add_post("/openidconnect/token/revoke", self.token_revoke)
+		web_app.router.add_post(self.OpenIdConnectService.TokenPath, self.token_request)
+		web_app.router.add_post(self.OpenIdConnectService.TokenRevokePath, self.token_revoke)
 		web_app.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/openidconnect/token", self.token_request)
-		web_app_public.router.add_post("/openidconnect/token/revoke", self.token_revoke)
+		web_app_public.router.add_post(self.OpenIdConnectService.TokenPath, self.token_request)
+		web_app_public.router.add_post(self.OpenIdConnectService.TokenRevokePath, self.token_revoke)
 		web_app_public.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 
