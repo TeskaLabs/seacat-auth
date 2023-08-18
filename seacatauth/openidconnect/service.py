@@ -580,3 +580,12 @@ class OpenIdConnectService(asab.Service):
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
 		return add_params_to_url_query(authorize_uri, **query_params)
+
+
+	async def revoke_token(self, token, token_type_hint=None):
+		"""
+		Invalidate a valid token. Currently only access_token type is supported.
+		"""
+		session: SessionAdapter = await self.get_session_by_access_token(token)
+		if session is not None:
+			await self.SessionService.delete(session.SessionId)
