@@ -65,7 +65,7 @@ class DiscoveryHandler(object):
 			# "registration_endpoint": "{}/public/client/register",  # TODO: Implement a PUBLIC client registration API
 			"scopes_supported": [
 				"openid", "profile", "email", "phone",
-				"cookie", "batman", "anonymous", "impersonate:"],
+				"cookie", "batman", "anonymous", "impersonate:", "tenant:"],
 			"claims_supported": [
 				"sub", "iss", "exp", "iat", "aud", "azp",
 				"preferred_username", "email", "phone_number",
