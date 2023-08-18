@@ -41,14 +41,12 @@ class TokenHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/token", self.token_request)
 		web_app.router.add_post("/openidconnect/token/revoke", self.token_revoke)
-		web_app.router.add_post("/openidconnect/token/refresh", self.token_refresh)
 		web_app.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/openidconnect/token", self.token_request)
 		web_app_public.router.add_post("/openidconnect/token/revoke", self.token_revoke)
-		web_app_public.router.add_post("/openidconnect/token/refresh", self.token_refresh)
 		web_app_public.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 
@@ -90,14 +88,15 @@ class TokenHandler(object):
 						required:
 							- grant_type
 		"""
-		data = await request.text()
-		qs_data = dict(urllib.parse.parse_qsl(data))
+		data = await request.post()
 
 		# 3.1.3.2.  Token Request Validation
-		grant_type = qs_data.get("grant_type")
+		grant_type = data.get("grant_type")
 
 		if grant_type == "authorization_code":
-			return await self._token_request_authorization_code(request, qs_data)
+			return await self._token_request_authorization_code(request, data)
+
+		# TODO: elif grant_type == "refresh_token"
 
 		L.error("Unsupported grant type: {}".format(grant_type))
 		return aiohttp.web.HTTPBadRequest()
@@ -129,6 +128,11 @@ class TokenHandler(object):
 			L.warning("Authorization code not found", struct_data={"code": authorization_code})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+
+		# TODO: If an authorization code is used more than
+		#   once, the authorization server MUST deny the request and SHOULD
+		#   revoke (when possible) all tokens previously issued based on
+		#   that authorization code. (https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2)
 
 		# Locate the session using session id
 		try:
@@ -193,9 +197,9 @@ class TokenHandler(object):
 			"token_type": "Bearer",
 			"scope": " ".join(new_session.OAuth2.Scope),
 			"access_token": new_session.OAuth2.AccessToken,
-			"refresh_token": new_session.OAuth2.RefreshToken,
 			"id_token": id_token,
 			"expires_in": expires_in,
+			# TODO: Include refresh_token
 		}
 
 		return asab.web.rest.json_response(request, body, headers=headers)
@@ -234,48 +238,6 @@ class TokenHandler(object):
 				return await self.token_error_response(request, "Unknown token_type_hint {}".format(token_type_hint))
 		self.OpenIdConnectService.invalidate_token(json_data["token"])
 		return aiohttp.web.HTTPOk()
-
-
-	@asab.web.rest.json_schema_handler({
-		'type': 'object',
-		'required': ['grant_type', 'client_id', 'scope', 'client_secret', 'refresh_token'],
-		'properties': {
-			'grant_type': {'type': 'string'},
-			'client_id': {'type': 'string'},
-			'scope': {'type': 'string'},
-			'client_secret': {'type': 'string'},
-			'refresh_token': {'type': 'string'},
-		}
-	})
-	async def token_refresh(self, request, *, json_data):
-		"""
-		OAuth 2.0 Access Token Refresh
-		"""
-		# TODO: this is not implemented
-
-		# scope = json_data['scope']  # TODO validate `scope` is the same as original
-
-		token_id = self.OpenIdConnectService.RefreshToken(
-			json_data['refresh_token'],
-			json_data['client_id'],
-			json_data['client_secret'],
-			json_data['scope'])
-
-		if not token_id:
-			return await self.token_error_response(request, "Request didn't validate in Service.refresh_token")
-
-		response = {
-			"access_token": self.OpenIdConnectService.get_access_token(token_id),
-			"token_type": "Bearer",
-			"refresh_token": self.OpenIdConnectService.get_refresh_token(token_id),
-			"expires_in": 3600,  # TODO: get this from session object
-			"token_id": token_id,
-		}
-
-		return asab.web.rest.json_response(request, response, headers={
-			'Cache-Control': 'no-store',
-			'Pragma': 'no-cache',
-		})
 
 
 	async def token_error_response(self, request, error_description):
