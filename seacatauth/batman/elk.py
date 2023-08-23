@@ -4,6 +4,7 @@ import logging
 import typing
 import aiohttp
 import asab.config
+import asab.tls
 
 from ..authz import build_credentials_authz
 
@@ -32,8 +33,7 @@ class ELKIntegration(asab.config.Configurable):
 		"password": "",
 		"api_key": "",
 
-		# Certs
-		"ca_file": "",
+		# For SSL options such as `cafile`, please refer to asab SSLContextBuilder
 
 		# List of elasticsearch system users
 		# If Seacat Auth has users with one of these usernames, it will not sync them
@@ -74,14 +74,6 @@ class ELKIntegration(asab.config.Configurable):
 		else:
 			self.Headers = None
 
-		# Prep for SSL
-		ca_cert = self.Config.get("ca_file")
-		self.SSLContext = None
-		if ca_cert != "":
-			self.SSLContext = ssl.create_default_context(cafile=ca_cert)
-			self.SSLContext.check_hostname = True
-			self.SSLContext.verify_mode = ssl.CERT_REQUIRED
-
 		self.URL = self.Config.get("url").rstrip("/")
 		self.ResourcePrefix = self.Config.get("resource_prefix")
 		self.ELKResourceRegex = re.compile("^{}".format(
@@ -95,6 +87,14 @@ class ELKIntegration(asab.config.Configurable):
 		self.LocalUsers = frozenset(lu)
 
 		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+
+		# Prep for SSL
+		self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
+		if self.URL.startswith("https://"):
+			self.SSLContext = self.SSLContextBuilder.build(ssl.PROTOCOL_TLS_CLIENT)
+		else:
+			self.SSLContext = None
+
 
 	async def _on_tick(self, event_name):
 		await self._initialize_resources()
