@@ -140,7 +140,7 @@ class CredentialsService(asab.Service):
 		ident = ident.strip()
 		credentials_ids = []
 		pending = [
-			provider.locate(ident, self.IdentFields, login_dict)
+			asyncio.create_task(provider.locate(ident, self.IdentFields, login_dict))
 			for provider in self.CredentialProviders.values()]
 		while len(pending) > 0:
 			done, pending = await asyncio.wait(pending)

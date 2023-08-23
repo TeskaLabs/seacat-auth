@@ -3,12 +3,23 @@
 ## Release candidate
 
 ### Features
-
-## v23.32-beta
-- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230728)
+- Role list supports searching by name (#247, PLUM Sprint 230811)
 
 ---
 
+
+## v23.33-beta
+
+### Features
+- Upgrade to Alpine 3.18 and Python 3.11 (#245, PLUM Sprint 230728)
+
+### Refactoring
+- ELK Batman uses ASAB SSLContextBuilder (#244, PLUM Sprint 230728)
+
+---
+
+
+## v23.32-beta
 
 ### Breaking changes
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
