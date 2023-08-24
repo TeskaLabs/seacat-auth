@@ -4,6 +4,7 @@
 
 ### Features
 - Role list supports searching by name (#247, PLUM Sprint 230811)
+- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230728)
 
 ---
 
