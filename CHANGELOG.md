@@ -2,8 +2,14 @@
 
 ## Release candidate
 
+### Fix
+- Default OIDC Issuer name set to the value of PUBLIC_AUTH_API (#249, PLUM Sprint 230811)
+
 ### Features
 - Role list supports searching by name (#247, PLUM Sprint 230811)
+- OIDC/OAuth discovery endpoint (#249, PLUM Sprint 230811)
+- Token revocation endpoint (#249, PLUM Sprint 230811)
+- Added /.well-known/jwks.json endpoint (#249, PLUM Sprint 230811)
 
 ---
 
