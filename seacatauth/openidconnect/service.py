@@ -73,6 +73,10 @@ class OpenIdConnectService(asab.Service):
 			self.PublicApiBaseUrl = public_api_base_url
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
+
+		# The Issuer value must be an URL, such that when "/.well-known/openid-configuration" is appended to it,
+		# we obtain a valid URL containing the issuer's OpenID configuration metadata.
+		# (https://www.rfc-editor.org/rfc/rfc8414#section-3)
 		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
 		if self.Issuer is not None:
 			parsed = urllib.parse.urlparse(self.Issuer)
