@@ -43,6 +43,12 @@ class OpenIdConnectService(asab.Service):
 	# Chapter 2.1. Authorization Request Header Field
 	AuthorizationCodeCollection = "ac"
 	AuthorizePath = "/openidconnect/authorize"
+	TokenPath = "/openidconnect/token"
+	TokenRevokePath = "/openidconnect/token/revoke"
+	UserInfoPath = "/openidconnect/userinfo"
+	JwksPath = "/openidconnect/public_keys"
+	EndSessionPath = "/openidconnect/logout"
+	NginxIntrospectionPath = "/openidconnect/introspect/nginx"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
@@ -56,22 +62,31 @@ class OpenIdConnectService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
-		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
-		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
-		if self.Issuer is None:
-			fragments = urllib.parse.urlparse(asab.Config.get("general", "auth_webui_base_url"))
-			L.warning("OAuth2 issuer not specified. Assuming '{}'".format(fragments.netloc))
-			self.Issuer = fragments.netloc
-
-		self.AuthorizationCodeTimeout = datetime.timedelta(
-			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
-		)
-
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		if public_api_base_url.endswith("/"):
 			self.PublicApiBaseUrl = public_api_base_url[:-1]
 		else:
 			self.PublicApiBaseUrl = public_api_base_url
+
+		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
+
+		# The Issuer value must be an URL, such that when "/.well-known/openid-configuration" is appended to it,
+		# we obtain a valid URL containing the issuer's OpenID configuration metadata.
+		# (https://www.rfc-editor.org/rfc/rfc8414#section-3)
+		self.Issuer = asab.Config.get("openidconnect", "issuer", fallback=None)
+		if self.Issuer is not None:
+			parsed = urllib.parse.urlparse(self.Issuer)
+			if parsed.scheme != "https" or parsed.query != "" or parsed.fragment != "":
+				raise ValueError(
+					"OpenID Connect issuer must be a URL that uses the 'https' scheme "
+					"and has no query or fragment components.")
+		else:
+			self.Issuer = self.PublicApiBaseUrl
+			L.log(asab.LOG_NOTICE, "OAuth2 issuer not specified. Assuming '{}'.".format(self.Issuer))
+
+		self.AuthorizationCodeTimeout = datetime.timedelta(
+			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
+		)
 
 		# TODO: Derive the private key
 		self.PrivateKey = app.PrivateKey
@@ -344,15 +359,15 @@ class OpenIdConnectService(asab.Service):
 			userinfo["scope"] = session.OAuth2.Scope
 
 		if session.Credentials.Username is not None:
-			userinfo["username"] = session.Credentials.Username
-			userinfo["preferred_username"] = session.Credentials.Username  # BACK COMPAT, remove after 2023-01-31
+			userinfo["preferred_username"] = session.Credentials.Username
+			userinfo["username"] = session.Credentials.Username  # BACK-COMPAT, remove after 2023-01-31
 
 		if session.Credentials.Email is not None:
 			userinfo["email"] = session.Credentials.Email
 
 		if session.Credentials.Phone is not None:
-			userinfo["phone"] = session.Credentials.Phone
-			userinfo["phone_number"] = session.Credentials.Phone   # BACK COMPAT, remove after 2023-01-31
+			userinfo["phone_number"] = session.Credentials.Phone
+			userinfo["phone"] = session.Credentials.Phone  # BACK-COMPAT, remove after 2023-01-31
 
 		if session.Credentials.CustomData is not None:
 			userinfo["custom"] = session.Credentials.CustomData
@@ -506,7 +521,17 @@ class OpenIdConnectService(asab.Service):
 		Check if the client has a registered OAuth Authorize URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
+		# TODO: This should be removed. There must be only one authorize endpoint.
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
 		return add_params_to_url_query(authorize_uri, **query_params)
+
+
+	async def revoke_token(self, token, token_type_hint=None):
+		"""
+		Invalidate a valid token. Currently only access_token type is supported.
+		"""
+		session: SessionAdapter = await self.get_session_by_access_token(token)
+		if session is not None:
+			await self.SessionService.delete(session.SessionId)

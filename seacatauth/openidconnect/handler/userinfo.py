@@ -24,13 +24,13 @@ class UserInfoHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		# The Client sends the UserInfo Request using either HTTP GET or HTTP POST.
-		web_app.router.add_get("/openidconnect/userinfo", self.userinfo)
-		web_app.router.add_post("/openidconnect/userinfo", self.userinfo)
+		web_app.router.add_get(self.OpenIdConnectService.UserInfoPath, self.userinfo)
+		web_app.router.add_post(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get("/openidconnect/userinfo", self.userinfo)
-		web_app_public.router.add_post("/openidconnect/userinfo", self.userinfo)
+		web_app_public.router.add_get(self.OpenIdConnectService.UserInfoPath, self.userinfo)
+		web_app_public.router.add_post(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 
 
 	async def userinfo(self, request):
