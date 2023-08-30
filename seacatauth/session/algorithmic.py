@@ -1,4 +1,6 @@
 import logging
+import typing
+
 import jwcrypto.jwt
 import jwcrypto.jws
 import jwcrypto.jwk
@@ -33,6 +35,12 @@ class AlgorithmicSessionProvider:
 		# TODO: Derive the private key
 		self.PrivateKey = app.PrivateKey
 
+		# Database request optimization.
+		# Maps (credentials_id, scope) to available_tenants and authz.
+		self.AuthzCache: typing.Dict[typing.Tuple[str, frozenset], dict] = {}
+		self.AuthzCacheExpiration = datetime.timedelta(
+			seconds=asab.Config.getseconds("seacatauth:session", "algo_cache_expiration"))
+
 		self.AnonymousSessionCounter: asab.metrics.Counter = self.MetricsService.create_counter(
 			"anonymous_sessions",
 			tags={"help": "Number of anonymous sessions created."},
@@ -52,11 +60,6 @@ class AlgorithmicSessionProvider:
 		return session
 
 	async def _build_anonymous_session(self, created_at, track_id, client_dict, scope) -> SessionAdapter:
-		tenants = await self.TenantService.get_tenants(client_dict["anonymous_cid"])
-		requested_tenants = await self.TenantService.get_tenants_by_scope(
-			scope, client_dict["anonymous_cid"])
-		authz = await build_credentials_authz(
-			self.TenantService, self.RoleService, client_dict["anonymous_cid"], requested_tenants)
 		session_dict = {
 			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
@@ -67,10 +70,33 @@ class AlgorithmicSessionProvider:
 			SessionAdapter.FN.OAuth2.Scope: scope,
 			SessionAdapter.FN.Credentials.Id: client_dict["anonymous_cid"],
 			SessionAdapter.FN.Authentication.IsAnonymous: True,
-			SessionAdapter.FN.Authorization.Tenants: tenants,
-			SessionAdapter.FN.Authorization.Authz: authz,
 		}
+		await self._add_session_authz(session_dict, client_dict["anonymous_cid"], scope)
 		return SessionAdapter(self, session_dict)
+
+
+	async def _add_session_authz(self, session_dict: dict, credentials_id: str, scope: set):
+		"""
+		Updates the session dict with tenant and resource authorization based on scope.
+		"""
+		data = self.AuthzCache.get((credentials_id, frozenset(scope)))
+		if data and datetime.datetime.now(datetime.timezone.utc) < data["exp"]:
+			available_tenants = data["available_tenants"]
+			authz = data["authz"]
+		else:
+			available_tenants = await self.TenantService.get_tenants(credentials_id)
+			requested_tenants = await self.TenantService.get_tenants_by_scope(
+				scope, credentials_id)
+			authz = await build_credentials_authz(
+				self.TenantService, self.RoleService, credentials_id, requested_tenants)
+			self.AuthzCache[(credentials_id, frozenset(scope))] = {
+				"exp": datetime.datetime.now(datetime.timezone.utc) + self.AuthzCacheExpiration,
+				"available_tenants": available_tenants,
+				"authz": authz
+			}
+
+		session_dict[SessionAdapter.FN.Authorization.Tenants] = available_tenants
+		session_dict[SessionAdapter.FN.Authorization.Authz] = authz
 
 
 	async def deserialize(self, token_value) -> SessionAdapter | None:
