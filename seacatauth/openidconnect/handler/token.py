@@ -119,20 +119,6 @@ class TokenHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
-		# Translate authorization code into session id
-		# Verify that the Authorization Code has not been previously used (using `pop` operation)
-		try:
-			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
-		except KeyError:
-			L.warning("Authorization code not found", struct_data={"code": authorization_code})
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-
-		# TODO: If an authorization code is used more than
-		#   once, the authorization server MUST deny the request and SHOULD
-		#   revoke (when possible) all tokens previously issued based on
-		#   that authorization code. (https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2)
-
 		# Locate the session by authorization code
 		try:
 			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(
@@ -145,6 +131,11 @@ class TokenHandler(object):
 			L.warning("Code challenge failed.", struct_data={"reason": str(e)})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+
+		# TODO: If an authorization code is used more than
+		#   once, the authorization server MUST deny the request and SHOULD
+		#   revoke (when possible) all tokens previously issued based on
+		#   that authorization code. (https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2)
 
 		# TODO: Check if the redirect URL is the same as the one in the authorization request:
 		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
