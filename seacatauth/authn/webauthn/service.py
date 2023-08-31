@@ -110,6 +110,7 @@ class WebAuthnService(asab.Service):
 		aaguid = int(verified_registration.aaguid.replace("-", ""), 16)
 		if aaguid == 0:
 			# FIXME: Identify using attestationCertificateKeyIdentifiers
+			#   https://fidoalliance.org/fido-technotes-the-truth-about-attestation/
 			metadata = None
 		else:
 			metadata = self.FidoMetadata.get(aaguid)
