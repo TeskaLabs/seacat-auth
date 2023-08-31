@@ -3,13 +3,19 @@ import datetime
 import json
 import logging
 import secrets
+import typing
 import urllib.parse
 import re
 
+import aiohttp
 import asab.storage
+import jwcrypto.jwt
+import jwcrypto.jwk
 import webauthn
 import webauthn.registration
 import webauthn.helpers.structs
+import cryptography.hazmat.primitives.serialization
+import cryptography.x509
 
 from ...events import EventTypes
 #
@@ -22,6 +28,7 @@ L = logging.getLogger(__name__)
 class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
+	FidoMetadataServiceUrl = "https://mds3.fidoalliance.org"
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
@@ -49,11 +56,45 @@ class WebAuthnService(asab.Service):
 
 		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
 
+		self.FidoMetadata: typing.Dict[str, dict] | None = None
+
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	async def initialize(self, app):
+		await self._load_fido_metadata()
 
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
+
+
+	async def _load_fido_metadata(self, speculative=True):
+		if speculative and self.FidoMetadata is not None:
+			return
+		# FIXME: try/except
+		async with aiohttp.ClientSession() as session:
+			async with session.get(self.FidoMetadataServiceUrl) as resp:
+				if resp.status != 200:
+					text = await resp.text()
+					L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
+					return
+				jwt = await resp.text()
+		jwt = jwcrypto.jwt.JWT(jwt=jwt)
+		cert_chain = jwt.token.jose_header.get("x5c", [])
+		leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
+		public_key = leaf_cert.public_key()
+		public_key = public_key.public_bytes(
+			cryptography.hazmat.primitives.serialization.Encoding.PEM,
+			cryptography.hazmat.primitives.serialization.PublicFormat.PKCS1)
+		public_key = jwcrypto.jwk.JWK.from_pem(public_key)
+		jwt.validate(public_key)
+		entries = json.loads(jwt.claims)["entries"]
+		# FIDO2 authenticators are identified with AAGUID
+		self.FidoMetadata = {
+			int(entry["aaguid"].replace("-", ""), 16): entry["metadataStatement"]
+			for entry in entries
+			if "aaguid" in entry}
 
 
 	async def create_webauthn_credential(
@@ -65,8 +106,19 @@ class WebAuthnService(asab.Service):
 		"""
 		Create database entry for a verified WebAuthn credential
 		"""
+		await self._load_fido_metadata()
+		aaguid = int(verified_registration.aaguid.replace("-", ""), 16)
+		if aaguid == 0:
+			# FIXME: Identify using attestationCertificateKeyIdentifiers
+			metadata = None
+		else:
+			metadata = self.FidoMetadata.get(aaguid)
+
 		if name is None:
-			name = "key-{}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
+			if metadata is not None:
+				name = metadata["description"]
+			else:
+				name = "key-{}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
 		else:
 			if self.KeyNameRegex.fullmatch(name) is None:
 				raise ValueError("Invalid WebAuthn credential name", {"name": name})
@@ -86,9 +138,12 @@ class WebAuthnService(asab.Service):
 		upsertor.set("ao", verified_registration.attestation_object)
 		upsertor.set("rpid", self.RelyingPartyId)
 		upsertor.set("name", name)
+		if metadata:
+			# FIXME: Do we need to store all the metadata?
+			upsertor.set("md", metadata)
 
 		wacid = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid})
+		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid.hex()})
 
 
 	async def get_webauthn_credential(self, webauthn_credential_id):
@@ -159,7 +214,7 @@ class WebAuthnService(asab.Service):
 
 		await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_UPDATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
-			"wacid": webauthn_credential_id,
+			"wacid": webauthn_credential_id.hex(),
 		})
 
 
@@ -179,7 +234,7 @@ class WebAuthnService(asab.Service):
 				})
 
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id})
+		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id.hex()})
 
 
 	async def delete_all_webauthn_credentials(self, credentials_id: str):
@@ -190,7 +245,7 @@ class WebAuthnService(asab.Service):
 
 		query_filter = {"cid": credentials_id}
 		result = await collection.delete_many(query_filter)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={
+		L.log(asab.LOG_NOTICE, "WebAuthn credentials deleted", struct_data={
 			"cid": credentials_id,
 			"count": result.deleted_count
 		})
