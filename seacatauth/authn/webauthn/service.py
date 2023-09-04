@@ -56,7 +56,7 @@ class WebAuthnService(asab.Service):
 
 		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
 
-		self.FidoMetadata: typing.Dict[str, dict] | None = None
+		self.FidoMetadata: typing.Dict[int, dict] | None = None
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
@@ -70,6 +70,7 @@ class WebAuthnService(asab.Service):
 
 
 	async def _load_fido_metadata(self, speculative=True):
+		# TODO: Consider persistent local cache
 		if speculative and self.FidoMetadata is not None:
 			return
 		# FIXME: try/except
