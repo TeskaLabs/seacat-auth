@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v22.36-beta
+## v23.36-beta
 
 ### Fix
 - Default OIDC Issuer name set to the value of PUBLIC_AUTH_API (#249, PLUM Sprint 230811)
