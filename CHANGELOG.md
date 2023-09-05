@@ -4,6 +4,7 @@
 
 ### Fix
 - Default OIDC Issuer name set to the value of PUBLIC_AUTH_API (#249, PLUM Sprint 230811)
+- Re-lock webauthn package version (#258, PLUM Sprint 230811)
 
 ### Features
 - Role list supports searching by name (#247, PLUM Sprint 230811)
