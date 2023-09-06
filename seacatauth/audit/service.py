@@ -14,9 +14,7 @@ L = logging.getLogger(__name__)
 
 class AuditService(asab.Service):
 
-
-	AuditCollection = 'a'
-
+	AuditCollection = "a"
 
 	def __init__(self, app, service_name="seacatauth.AuditService"):
 		super().__init__(app, service_name)
@@ -39,6 +37,16 @@ class AuditService(asab.Service):
 
 		coll = await self.StorageService.collection(self.AuditCollection)
 		await coll.insert_one(attributes)
+
+
+	async def delete_old_entries(self, before_datetime: datetime.datetime):
+		coll = await self.StorageService.collection(self.AuditCollection)
+		result = await coll.delete_many({"_c": {"$lt": before_datetime}})
+		if result.deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Old audit entries deleted.", struct_data={
+				"count": result.deleted_count
+			})
+		return result.deleted_count
 
 
 	async def _get_latest_entry(self, field_name, **kwargs) -> dict:
