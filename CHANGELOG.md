@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Endpoint for pruning old audit entries (#259, PLUM Sprint 230825)
+
+---
+
+
 ## v23.36-beta
 
 ### Fix
