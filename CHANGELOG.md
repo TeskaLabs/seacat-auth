@@ -5,6 +5,9 @@
 ### Fix
 - Add id_token_signing_alg_values_supported in OIDC discovery (#260)
 
+### Features
+- Unified SMTP config (#257, PLUM Sprint 230825)
+
 ---
 
 
