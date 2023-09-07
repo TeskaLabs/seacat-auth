@@ -4,6 +4,7 @@ import logging
 import asab.storage.exceptions
 
 from .codes import AuditCode
+from ..events import EventTypes
 
 #
 
@@ -15,28 +16,64 @@ L = logging.getLogger(__name__)
 class AuditService(asab.Service):
 
 	AuditCollection = "a"
+	LastCredentialsEventCollection = "lce"
+	LastCredentialsEventCodes = frozenset([
+		AuditCode.LOGIN_SUCCESS,
+		AuditCode.LOGIN_FAILED,
+		AuditCode.PASSWORD_CHANGE_SUCCESS,
+		AuditCode.PASSWORD_CHANGE_FAILED,
+		AuditCode.AUTHORIZE_SUCCESS])
 
 	def __init__(self, app, service_name="seacatauth.AuditService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 
 
-	async def append(self, code: AuditCode, attributes: dict = None):
+	async def append(
+		self, code: AuditCode, *,
+		credentials_id: str = None,
+		client_id: str = None,
+		session_id: str = None,
+		tenant: str = None,
+		**kwargs
+	):
+		"""
+		Records a new audit entry.
+		"""
 		assert (isinstance(code, AuditCode))
 
+		upsertor = self.StorageService.upsertor(
+			self.AuditCollection, version=0)
+		upsertor.set("c", code.name)
+		if credentials_id is not None:
+			upsertor.set("cid", credentials_id)
+		if client_id is not None:
+			upsertor.set("clid", client_id)
+		if session_id is not None:
+			upsertor.set("sid", session_id)
+		if tenant is not None:
+			upsertor.set("t", tenant)
+		for k, v in kwargs:
+			upsertor.set(k, v)
 
-		if attributes is None:
-			attributes = {}
-		else:
-			attributes = attributes.copy()
+		await upsertor.execute(event_type=EventTypes.AUDIT_ENTRY_CREATED)
 
-		now = datetime.datetime.now(datetime.timezone.utc)
-		attributes['_c'] = now
-		attributes['_m'] = now
-		attributes['c'] = code.name
+		if code in self.LastCredentialsEventCodes:
+			await self._upsert_last_credentials_event(code, credentials_id, **kwargs)
 
-		coll = await self.StorageService.collection(self.AuditCollection)
-		await coll.insert_one(attributes)
+
+	async def _upsert_last_credentials_event(self, code: AuditCode, credentials_id: str, **kwargs):
+		try:
+			last_events = await self.StorageService.get(self.LastCredentialsEventCollection, credentials_id)
+			version = last_events["_v"]
+		except KeyError:
+			version = 0
+
+		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
+		upsertor = self.StorageService.upsertor(
+			self.LastCredentialsEventCollection, obj_id=credentials_id, version=version)
+		upsertor.set(code.name, kwargs)
+		await upsertor.execute(event_type=EventTypes.LAST_CREDENTIALS_EVENT_UPDATED)
 
 
 	async def delete_old_entries(self, before_datetime: datetime.datetime):
@@ -49,61 +86,62 @@ class AuditService(asab.Service):
 		return result.deleted_count
 
 
-	async def _get_latest_entry(self, field_name, **kwargs) -> dict:
-		coll = await self.StorageService.collection(self.AuditCollection)
-		entry = await coll.find_one(
-			filter={
-				'c': field_name,
-				**kwargs
-			},
-			sort=[
-				('_c', -1)
-			]
-		)
-		return entry
-
-
 	async def get_last_logins(self, credentials_id: str) -> dict:
+		try:
+			last_events = await self.StorageService.get(self.LastCredentialsEventCollection, credentials_id)
+		except KeyError:
+			return {}
+
 		result = {}
-
-		ls = await self._get_latest_entry(AuditCode.LOGIN_SUCCESS.name, cid=credentials_id)
-		if ls is not None:
-			result['sat'] = ls['_c']
-			v = ls.get('fi')
+		successful_login = last_events.get(AuditCode.LOGIN_SUCCESS.name)
+		if successful_login:
+			result["sat"] = successful_login["_c"]
+			v = successful_login.get("fi")
 			if v is not None:
-				result['sfi'] = v
+				result["sfi"] = v
 
-		lf = await self._get_latest_entry(AuditCode.LOGIN_FAILED.name, cid=credentials_id)
-		if lf is not None:
-			result['fat'] = lf['_c']
-			v = lf.get('fi')
+		failed_login = last_events.get(AuditCode.LOGIN_FAILED.name)
+		if failed_login:
+			result["fat"] = failed_login["_c"]
+			v = failed_login.get("fi")
 			if v is not None:
-				result['ffi'] = v
+				result["ffi"] = v
 
 		return result
 
 
 	async def get_last_password_change(self, credentials_id: str) -> dict:
+		try:
+			last_events = await self.StorageService.get(self.LastCredentialsEventCollection, credentials_id)
+		except KeyError:
+			return {}
+
 		result = {}
+		successful_change = last_events.get(AuditCode.PASSWORD_CHANGE_SUCCESS.name)
+		if successful_change:
+			result["spct"] = successful_change["_c"]
+			v = successful_change.get("fi")
+			if v is not None:
+				result["spcfi"] = v
 
-		entry = await self._get_latest_entry(AuditCode.PASSWORD_CHANGE_SUCCESS.name, cid=credentials_id)
-		if entry is not None:
-			result['spct'] = entry['_c']
-
-		entry = await self._get_latest_entry(AuditCode.PASSWORD_CHANGE_FAILED.name, cid=credentials_id)
-		if entry is not None:
-			result['fpct'] = entry['_c']
+		failed_change = last_events.get(AuditCode.PASSWORD_CHANGE_FAILED.name)
+		if failed_change:
+			result["fpct"] = failed_change["_c"]
+			v = failed_change.get("fi")
+			if v is not None:
+				result["fpcfi"] = v
 
 		return result
 
 
 	async def get_last_authorized_tenants(self, credentials_id: str):
-		entry = await self._get_latest_entry(
-			AuditCode.AUTHORIZE_SUCCESS.name,
-			cid=credentials_id,
-			tenants={"$ne": None}
-		)
-		if entry is not None:
-			return entry["tenants"]
+		try:
+			last_events = await self.StorageService.get(self.LastCredentialsEventCollection, credentials_id)
+		except KeyError:
+			return None
+
+		last_authorization = last_events.get(AuditCode.AUTHORIZE_SUCCESS.name)
+		if last_authorization:
+			return last_authorization.get("tenants")
 		else:
 			return None
