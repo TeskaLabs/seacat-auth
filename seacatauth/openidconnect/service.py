@@ -320,11 +320,12 @@ class OpenIdConnectService(asab.Service):
 			"fi": from_info})
 
 		# Add an audit entry
-		await self.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
-			"cid": anonymous_cid,
-			"client_id": client_dict["_id"],
-			"sid": str(session.Session.Id),
-			"fi": from_info})
+		await self.AuditService.append(
+			AuditCode.ANONYMOUS_SESSION_CREATED,
+			credentials_id=anonymous_cid,
+			client_id=client_dict["_id"],
+			session_id=str(session.Session.Id),
+			fi=from_info)
 
 		return session
 
@@ -496,24 +497,13 @@ class OpenIdConnectService(asab.Service):
 		return tenants
 
 
-	async def audit_authorize_success(self, session):
-		await self.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
-			"cid": session.Credentials.Id,
-			"tenants": [t for t in session.Authorization.Authz if t != "*"],
-			"client_id": session.OAuth2.ClientId,
-			"scope": session.OAuth2.Scope,
-		})
-
-
-	async def audit_authorize_error(self, client_id, error, credential_id=None, **kwargs):
-		d = {
-			"client_id": client_id,
-			"error": error,
-			**kwargs
-		}
-		if credential_id is not None:
-			d["cid"] = credential_id
-		await self.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+	async def audit_authorize_error(self, client_id: str, error_message: str, credential_id: str = None, **kwargs):
+		await self.AuditService.append(
+			AuditCode.AUTHORIZE_ERROR,
+			credentials_id=credential_id,
+			client_id=client_id,
+			errmsg=error_message,
+			**kwargs)
 
 
 	def build_authorize_uri(self, client_dict, **query_params):
