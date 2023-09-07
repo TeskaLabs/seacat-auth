@@ -53,7 +53,7 @@ class AuditService(asab.Service):
 			upsertor.set("sid", session_id)
 		if tenant is not None:
 			upsertor.set("t", tenant)
-		for k, v in kwargs:
+		for k, v in kwargs.items():
 			upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.AUDIT_ENTRY_CREATED)
