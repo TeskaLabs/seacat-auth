@@ -345,12 +345,9 @@ class AuthenticationService(asab.Service):
 		# Add an audit entry
 		await self.AuditService.append(
 			AuditCode.LOGIN_SUCCESS,
-			{
-				"cid": login_session.CredentialsId,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
-			}
-		)
+			credentials_id=login_session.CredentialsId,
+			session_id=str(session.Session.Id),
+			fi=from_info)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
@@ -406,11 +403,9 @@ class AuthenticationService(asab.Service):
 		# Add an audit entry
 		await self.AuditService.append(
 			AuditCode.M2M_AUTHENTICATION_SUCCESSFUL,
-			{
-				'cid': credentials_id,
-				'sid': str(session.Session.Id),
-				'fi': from_info,
-			}
+			credentials_id=credentials_id,
+			session_id=str(session.Session.Id),
+			fi=from_info
 		)
 
 		return session
