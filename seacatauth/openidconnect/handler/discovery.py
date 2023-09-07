@@ -54,6 +54,7 @@ class DiscoveryHandler(object):
 			"token_endpoint": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenPath),
 			"token_endpoint_auth_signing_alg_values_supported": ["ES256"],
+			"id_token_signing_alg_values_supported": ["ES256"],
 			"jwks_uri": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath),
 			"response_types_supported": ["code"],
