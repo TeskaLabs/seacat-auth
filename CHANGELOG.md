@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Add id_token_signing_alg_values_supported in OIDC discovery (#260)
+
+---
+
+
 ## v23.36-beta
 
 ### Fix
