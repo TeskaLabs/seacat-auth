@@ -567,7 +567,7 @@ class OpenIdConnectService(asab.Service):
 		return tenants
 
 
-	async def audit_authorize_error(self, client_id: str, error_message: str, credential_id:str = None, **kwargs):
+	async def audit_authorize_error(self, client_id: str, error_message: str, credential_id: str = None, **kwargs):
 		await self.AuditService.append(
 			AuditCode.AUTHORIZE_ERROR,
 			credentials_id=credential_id,
