@@ -2,7 +2,7 @@
 
 ## Release candidate
 
-## Breaking changes
+### Breaking changes
 - Config option `sender_email_address` is now called `from` (#257, PLUM Sprint 230825)
 
 ### Fix
@@ -10,6 +10,10 @@
 
 ### Features
 - Unified SMTP config (#257, PLUM Sprint 230825)
+- Endpoint for pruning old audit entries (#259, PLUM Sprint 230825)
+
+### Refactoring
+- Last login info moved to a dedicated collection (#259, PLUM Sprint 230825)
 
 ---
 

@@ -216,13 +216,10 @@ class AuthenticationHandler(object):
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			# TODO: Log also the IP address
 			await self.AuditService.append(
 				AuditCode.LOGIN_FAILED,
-				{
-					'cid': login_session.CredentialsId,
-					'ips': access_ips,
-				}
+				credentials_id=login_session.CredentialsId,
+				ips=access_ips
 			)
 
 			L.warning("Login failed: authentication failed", struct_data={
@@ -508,23 +505,19 @@ class AuthenticationHandler(object):
 		except seacatauth.exceptions.AccessDeniedError as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": impersonator_from_info,
-				}
+				credentials_id=impersonator_cid,
+				session_id=impersonator_root_session.SessionId,
+				target_cid=target_cid,
+				fi=impersonator_from_info
 			)
 			raise aiohttp.web.HTTPForbidden() from e
 		except Exception as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": impersonator_from_info,
-				}
+				credentials_id=impersonator_cid,
+				session_id=impersonator_root_session.SessionId,
+				target_cid=target_cid,
+				fi=impersonator_from_info
 			)
 			raise e
 		else:
@@ -541,12 +534,10 @@ class AuthenticationHandler(object):
 			)
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_SUCCESSFUL,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": session.Session.Id,
-					"fi": impersonator_from_info,
-				}
+				credentials_id=impersonator_cid,
+				session_id=impersonator_root_session.SessionId,
+				target_cid=target_cid,
+				target_sid=session.Session.Id,
+				fi=impersonator_from_info
 			)
 		return session
