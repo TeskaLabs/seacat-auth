@@ -53,7 +53,8 @@ class DiscoveryHandler(object):
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath),
 			"token_endpoint": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenPath),
-			"token_endpoint_auth_signing_alg_values_supported": ["ES256"],
+			# TODO: The algorithm RS256 MUST be included.
+			#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
 			"id_token_signing_alg_values_supported": ["ES256"],
 			"jwks_uri": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath),
