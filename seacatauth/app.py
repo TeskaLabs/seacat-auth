@@ -55,8 +55,9 @@ class SeaCatAuthApplication(asab.Application):
 		self.ApiService = ApiService(self)
 		self.ApiService.initialize_web(self.WebContainer)
 
-		from .audit import AuditService
+		from .audit import AuditService, AuditHandler
 		self.AuditService = AuditService(self)
+		self.AuditHandler = AuditHandler(self, self.AuditService)
 
 		# Load Resource service
 		from .authz import ResourceService, ResourceHandler

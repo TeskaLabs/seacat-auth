@@ -246,10 +246,12 @@ class CookieService(asab.Service):
 			"fi": from_info})
 
 		# Add an audit entry
-		await self.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
-			"cid": anonymous_cid,
-			"client_id": client_dict["_id"],
-			"track_id": track_id,
-			"fi": from_info})
+		await self.AuditService.append(
+			AuditCode.ANONYMOUS_SESSION_CREATED,
+			credentials_id=anonymous_cid,
+			client_id=client_dict["_id"],
+			session_id=str(session.Session.Id),
+			track_id=track_id,
+			fi=from_info)
 
 		return session

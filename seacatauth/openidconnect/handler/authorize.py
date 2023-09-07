@@ -466,12 +466,15 @@ class AuthorizeHandler(object):
 				raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
 
 			# Anonymous sessions need to be audited
-			await self.OpenIdConnectService.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
-				"cid": new_session.Credentials.Id,
-				"sid": str(new_session.SessionId),
-				"fi": from_info})
+			await self.OpenIdConnectService.AuditService.append(
+				AuditCode.ANONYMOUS_SESSION_CREATED,
+				credentials_id=new_session.Credentials.Id,
+				client_id=client_id,
+				scope=scope,
+				session_id=str(new_session.SessionId),
+				fi=from_info)
 
-		await self.audit_authorize_success(new_session)
+		await self.audit_authorize_success(new_session, from_info)
 		return await self.reply_with_successful_response(
 			new_session, scope, redirect_uri, state,
 			code_challenge=code_challenge,
@@ -789,25 +792,23 @@ class AuthorizeHandler(object):
 			)
 		return aiohttp.web.HTTPFound(redirect)
 
-
-	async def audit_authorize_success(self, session):
-		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
-			"cid": session.Credentials.Id,
-			"tenants": [t for t in session.Authorization.Authz if t != "*"],
-			"client_id": session.OAuth2.ClientId,
-			"scope": session.OAuth2.Scope,
-		})
+	async def audit_authorize_success(self, session, from_info):
+		await self.OpenIdConnectService.AuditService.append(
+			AuditCode.AUTHORIZE_SUCCESS,
+			credentials_id=session.Credentials.Id,
+			client_id=session.OAuth2.ClientId,
+			session_id=str(session.Session.Id),
+			scope=session.OAuth2.Scope,
+			tenants=[t for t in session.Authorization.Authz if t != "*"],
+			fi=from_info)
 
 
 	async def audit_authorize_error(self, error: OAuthAuthorizeError):
-		d = {
-			"client_id": error.ClientId,
-			"error": error.Error,
-			**error.StructData
-		}
-		if error.CredentialsId is not None:
-			d["cid"] = error.CredentialsId
-		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+		await self.OpenIdConnectService.AuditService.append(
+			AuditCode.AUTHORIZE_ERROR,
+			credentials_id=error.CredentialsId,
+			client_id=error.ClientId,
+			**error.StructData)
 
 
 	async def authorize_tenants_by_scope(self, scope, authz, credentials_id, client_id):

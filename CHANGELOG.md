@@ -2,8 +2,27 @@
 
 ## Release candidate
 
+### Breaking changes
+- Config option `sender_email_address` is now called `from` (#257, PLUM Sprint 230825)
+
+### Fix
+- Add `id_token_signing_alg_values_supported` in OIDC discovery (#260)
+
+### Features
+- Unified SMTP config (#257, PLUM Sprint 230825)
+- Endpoint for pruning old audit entries (#259, PLUM Sprint 230825)
+
+### Refactoring
+- Last login info moved to a dedicated collection (#259, PLUM Sprint 230825)
+
+---
+
+
+## v23.36-beta
+
 ### Fix
 - Default OIDC Issuer name set to the value of PUBLIC_AUTH_API (#249, PLUM Sprint 230811)
+- Re-lock webauthn package version (#258, PLUM Sprint 230811)
 
 ### Features
 - Role list supports searching by name (#247, PLUM Sprint 230811)
