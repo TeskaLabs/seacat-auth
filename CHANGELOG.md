@@ -11,6 +11,7 @@
 ### Features
 - Unified SMTP config (#257, PLUM Sprint 230825)
 - Endpoint for pruning old audit entries (#259, PLUM Sprint 230825)
+- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230825)
 
 ### Refactoring
 - Last login info moved to a dedicated collection (#259, PLUM Sprint 230825)

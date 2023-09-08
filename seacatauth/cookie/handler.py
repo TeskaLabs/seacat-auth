@@ -4,6 +4,7 @@ import uuid
 import aiohttp
 import aiohttp.web
 import asab.web.rest
+import asab.exceptions
 
 from .. import exceptions
 from ..generic import nginx_introspection, get_bearer_token_value
@@ -154,7 +155,7 @@ class CookieHandler(object):
 		session = await self._authenticate_request(request, client_id)
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
-		elif session.Authentication.IsAnonymous:
+		elif session.is_anonymous():
 			L.warning("Regular cookie introspection does not allow anonymous user access.", struct_data={
 				"client_id": client_id, "cid": session.Credentials.Id})
 			response = aiohttp.web.HTTPUnauthorized()
@@ -235,10 +236,17 @@ class CookieHandler(object):
 			if forwarded_for is not None:
 				from_info.extend(forwarded_for.split(", "))
 			track_id = uuid.uuid4().bytes
-			session = await self.CookieService.create_anonymous_cookie_client_session(
-				anonymous_cid, client_id, scope,
-				track_id=track_id,
-				from_info=from_info)
+			try:
+				session = await self.CookieService.create_anonymous_cookie_client_session(
+					anonymous_cid, client, scope,
+					track_id=track_id,
+					from_info=from_info)
+			except exceptions.AccessDeniedError as e:
+				L.error(
+					"Failed to initialize anonymous session because of unauthorized access. "
+					"Please revise your introspection setup.",
+					struct_data={"reason": str(e)})
+				raise aiohttp.web.HTTPForbidden() from e
 			anonymous_session_created = True
 
 		if session is None:
@@ -367,8 +375,9 @@ class CookieHandler(object):
 			L.warning("Empty or missing 'code' parameter in query.", struct_data={"client_id": client_id})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
-		session = await self.CookieService.get_session_by_authorization_code(code)
-		if session is None:
+		try:
+			session = await self.CookieService.get_session_by_authorization_code(code)
+		except KeyError:
 			L.warning("Session not found: Authorization code invalid or expired.", struct_data={"client_id": client_id})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
@@ -419,7 +428,10 @@ class CookieHandler(object):
 
 		# TODO: Verify that the request came from the correct domain
 
-		set_cookie(self.App, response, session, cookie_domain)
+		if session.is_algorithmic():
+			pass
+		else:
+			set_cookie(self.App, response, session, cookie_domain)
 
 		# Trigger webhook and set custom client response headers
 		try:
@@ -436,7 +448,10 @@ class CookieHandler(object):
 
 
 	async def _authenticate_request(self, request, client_id=None):
-		return await self.CookieService.get_session_by_request_cookie(request, client_id)
+		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
+		if cookie_value is None:
+			return None
+		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 
 
 	async def _fetch_webhook_data(self, client, session):
