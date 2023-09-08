@@ -161,9 +161,7 @@ class ChangePasswordService(asab.Service):
 		# Record the change in audit
 		await self.AuditService.append(
 			AuditCode.PASSWORD_CHANGE_SUCCESS,
-			{
-				'cid': credentials_id
-			}
+			credentials_id=credentials_id
 		)
 
 		return "OK"
@@ -190,9 +188,7 @@ class ChangePasswordService(asab.Service):
 		if result != "OK":
 			await self.AuditService.append(
 				AuditCode.PASSWORD_CHANGE_FAILED,
-				{
-					"cid": credentials_id
-				}
+				credentials_id=credentials_id
 			)
 
 		# Delete ALL pwdreset requests with this credentials id
@@ -222,9 +218,7 @@ class ChangePasswordService(asab.Service):
 		if result != "OK":
 			await self.AuditService.append(
 				AuditCode.PASSWORD_CHANGE_FAILED,
-				{
-					"cid": session.Credentials.Id
-				}
+				credentials_id=session.Credentials.Id
 			)
 		return result
 

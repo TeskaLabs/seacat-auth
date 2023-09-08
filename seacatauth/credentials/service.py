@@ -336,7 +336,10 @@ class CredentialsService(asab.Service):
 			"cid": credentials_id,
 			"by": agent_cid,
 		})
-		await self.AuditService.append(AuditCode.CREDENTIALS_CREATED, {"cid": credentials_id, "by": agent_cid})
+		await self.AuditService.append(
+			AuditCode.CREDENTIALS_CREATED,
+			credentials_id=credentials_id,
+			by_cid=agent_cid)
 
 		return {
 			"status": "OK",
@@ -448,8 +451,11 @@ class CredentialsService(asab.Service):
 			"cid": credentials_id,
 			"by": agent_cid,
 		})
-		await self.AuditService.append(AuditCode.CREDENTIALS_UPDATED, {
-			"cid": credentials_id, "by": agent_cid, "fields": list(validated_data.keys())})
+		await self.AuditService.append(
+			AuditCode.CREDENTIALS_UPDATED,
+			credentials_id=credentials_id,
+			by_cid=agent_cid,
+			attributes=list(validated_data.keys()))
 
 		return {"status": "OK"}
 
@@ -495,7 +501,10 @@ class CredentialsService(asab.Service):
 			"cid": credentials_id,
 			"by": agent_cid,
 		})
-		await self.AuditService.append(AuditCode.CREDENTIALS_DELETED, {"cid": credentials_id, "by": agent_cid})
+		await self.AuditService.append(
+			AuditCode.CREDENTIALS_DELETED,
+			credentials_id=credentials_id,
+			by_cid=agent_cid)
 
 		return {
 			"status": result,
