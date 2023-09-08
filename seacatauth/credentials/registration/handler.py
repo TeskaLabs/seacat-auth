@@ -158,10 +158,10 @@ class RegistrationHandler(object):
 		return invited_credentials_id
 
 
-	@access_control("seacat:tenant:assign")
+	@access_control("seacat:tenant:invite")
 	async def resend_invitation(self, request):
 		"""
-		Resend invitation to an already invited user
+		Resend invitation to an already invited user and extend the expiration of the invitation.
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
@@ -170,6 +170,16 @@ class RegistrationHandler(object):
 			raise asab.exceptions.ValidationError("Credentials already registered.")
 		assert "email" in credentials
 
+		# Extend the expiration
+		expiration = (
+			datetime.datetime.now(datetime.timezone.utc)
+			+ datetime.timedelta(seconds=self.RegistrationService.RegistrationExpiration))
+		if credentials["__registration"]["exp"] < expiration:
+			await self.RegistrationService.CredentialProvider.update(
+				credentials["_id"], {"__registration.exp": expiration})
+		else:
+			expiration = credentials["__registration"]["exp"]
+
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
 
 		await self.RegistrationService.CommunicationService.invitation(
@@ -177,7 +187,7 @@ class RegistrationHandler(object):
 			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			username=credentials.get("username"),
 			tenants=tenants,
-			expires_at=credentials["__registration"]["exp"],
+			expires_at=expiration,
 		)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
