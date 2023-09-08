@@ -11,6 +11,7 @@
 ### Features
 - Unified SMTP config (#257, PLUM Sprint 230825)
 - Endpoint for pruning old audit entries (#259, PLUM Sprint 230825)
+- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230825)
 
 ### Refactoring
 - Last login info moved to a dedicated collection (#259, PLUM Sprint 230825)
@@ -29,7 +30,6 @@
 - OIDC/OAuth discovery endpoint (#249, PLUM Sprint 230811)
 - Token revocation endpoint (#249, PLUM Sprint 230811)
 - Added /.well-known/jwks.json endpoint (#249, PLUM Sprint 230811)
-- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230728)
 
 ---
 
