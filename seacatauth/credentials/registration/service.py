@@ -113,8 +113,10 @@ class RegistrationService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict()
 
-		await self.AuditService.append(AuditCode.CREDENTIALS_CREATED, {
-			"cid": credential_id, "by": invited_by_cid})
+		await self.AuditService.append(
+			AuditCode.CREDENTIALS_CREATED,
+			credentials_id=credential_id,
+			by_cid=invited_by_cid)
 
 		return credential_id, registration_code
 
@@ -233,7 +235,9 @@ class RegistrationService(asab.Service):
 			update_dict["invited_by"] = credentials["__registration"]["invited_by"]
 
 		await self.CredentialProvider.update(credentials["_id"], update_dict)
-		await self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_NEW, {"cid": credentials["_id"]})
+		await self.AuditService.append(
+			AuditCode.CREDENTIALS_REGISTERED_NEW,
+			credentials_id=credentials["_id"])
 
 
 	async def complete_registration_with_existing_credentials(self, registration_code: str, credentials_id: str):
@@ -261,8 +265,11 @@ class RegistrationService(asab.Service):
 			"tenants": ", ".join(reg_tenants),
 			"roles": ", ".join(reg_roles),
 		})
-		await self.AuditService.append(AuditCode.CREDENTIALS_REGISTERED_EXISTING, {
-			"cid": credentials_id, "tenants": reg_tenants, "roles": reg_roles})
+		await self.AuditService.append(
+			AuditCode.CREDENTIALS_REGISTERED_EXISTING,
+			credentials_id=credentials_id,
+			tenants=reg_tenants,
+			roles=reg_roles)
 
 
 	def _get_provider(self, provider_id: str = None):
