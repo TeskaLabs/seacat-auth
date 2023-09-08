@@ -159,6 +159,10 @@ asab.Config.add_defaults({
 
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
+
+		# Algorithmic sessions cache data about tenant and resource authorization.
+		# This option sets the validity period of that data.
+		"algo_cache_expiration": "3 m",
 	},
 
 	"seacatauth:password": {

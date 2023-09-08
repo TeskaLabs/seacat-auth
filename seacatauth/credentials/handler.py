@@ -120,7 +120,7 @@ class CredentialsHandler(object):
 		"""
 		Get the current user's last successful/failed login data.
 		"""
-		if request.Session.Authentication.IsAnonymous:
+		if request.Session.is_anonymous():
 			raise asab.exceptions.AccessDeniedError()
 		data = await self.AuditService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)

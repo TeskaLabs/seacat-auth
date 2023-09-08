@@ -112,7 +112,9 @@ async def nginx_introspection(
 			return aiohttp.web.HTTPForbidden()
 
 	# Extend session expiration
-	session = await session_service.touch(session)
+	# (Do not extend algorithmic sessions)
+	if not session.is_algorithmic():
+		session = await session_service.touch(session)
 
 	id_token = await oidc_service.build_id_token(session)
 
