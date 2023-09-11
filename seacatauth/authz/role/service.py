@@ -168,8 +168,8 @@ class RoleService(asab.Service):
 			# Global-only resources cannot be assigned to a tenant role
 			for resource in resources_to_assign:
 				if self.ResourceService.is_global_only_resource(resource):
-					message = "Cannot assign global-only resources to tenant roles"
-					L.warning(message, struct_data={"resource": resource, "role": role_id})
+					message = "Cannot assign global-only resources to tenant roles."
+					L.error(message, struct_data={"resource": resource, "role": role_id})
 					raise asab.exceptions.ValidationError(message)
 
 		if resources_to_set is None:

@@ -134,7 +134,7 @@ class TokenIntrospectionHandler(object):
 			try:
 				response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
 			except Exception as e:
-				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				L.exception("Request authorization failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 		else:
 			response = aiohttp.web.HTTPUnauthorized()

@@ -357,7 +357,7 @@ class SessionAdapter:
 				id_token = id_token.decode("ascii")
 			except UnicodeDecodeError:
 				# Probably old ID token, encoded differently
-				L.warning("Cannot deserialize ID token", struct_data={"id_token": id_token})
+				L.error("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
 		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:

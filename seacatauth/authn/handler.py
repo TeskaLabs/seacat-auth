@@ -134,7 +134,6 @@ class AuthenticationHandler(object):
 		if login_descriptors is None:
 			# Prepare fallback login descriptors for fake login session
 			credentials_id = ""
-			L.log(asab.LOG_NOTICE, "Creating fake login session.", struct_data={"ident": ident})
 			login_descriptors = await self.AuthenticationService.prepare_fallback_login_descriptors(
 				credentials_id=credentials_id,
 				request_headers=request.headers
@@ -146,6 +145,10 @@ class AuthenticationHandler(object):
 			login_descriptors=login_descriptors,
 			ident=ident,
 		)
+
+		if login_session.CredentialsId == "":
+			L.log(asab.LOG_NOTICE, "Fake login session created.", struct_data={
+				"ident": ident, "lsid": login_session.Id})
 
 		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 
