@@ -359,6 +359,9 @@ class OpenIdConnectService(asab.Service):
 		if session.OAuth2.Scope is not None:
 			userinfo["scope"] = session.OAuth2.Scope
 
+		if session.OAuth2.Nonce is not None:
+			userinfo["nonce"] = session.OAuth2.Nonce
+
 		if session.Credentials.Username is not None:
 			userinfo["preferred_username"] = session.Credentials.Username
 			userinfo["username"] = session.Credentials.Username  # BACK-COMPAT, remove after 2023-01-31
