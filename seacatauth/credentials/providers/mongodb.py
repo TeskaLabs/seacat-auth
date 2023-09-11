@@ -418,5 +418,5 @@ def authn_password(dbcred, credentials):
 		else:
 			return False
 	else:
-		L.warning("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
+		L.error("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
 		return False

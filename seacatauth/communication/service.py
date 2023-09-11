@@ -68,10 +68,10 @@ class CommunicationService(asab.Service):
 
 			# Assuming there can be only one provider per channel (only one email provider, one sms provider)
 			if channel not in self.CHANNELS:
-				L.warning("Unsupported channel: '{}'".format(channel))
+				L.error("Unsupported channel: '{}'".format(channel))
 				continue
 			if channel in self.CommunicationProviders:
-				L.warning("There is already a '{}' provider".format(channel))
+				L.error("There is already a '{}' provider".format(channel))
 				continue
 			if provider_id == "seacatauth.communication.email.smtp":
 				from . import SMTPProvider
@@ -84,10 +84,10 @@ class CommunicationService(asab.Service):
 				self.CommunicationProviders[channel] = SMSBranaCZProvider(provider_id, section)
 				self.MessageBuilders[channel] = SMSMessageBuilder(section)
 			else:
-				L.warning("Unsupported communication provider: '{}'".format(provider_id))
+				L.error("Unsupported communication provider: '{}'".format(provider_id))
 
 		if len(self.CommunicationProviders) == 0:
-			L.warning("No communication provider configured.")
+			L.error("No communication provider configured.")
 
 	def get_communication_provider(self, channel):
 		provider = self.CommunicationProviders.get(channel)
@@ -138,7 +138,7 @@ class CommunicationService(asab.Service):
 				provider = self.get_communication_provider(channel)
 				message_builder = self.get_message_builder(channel)
 			except KeyError as e:
-				L.warning("Cannot send {} message: {}".format(channel, e))
+				L.error("Cannot send {} message: {}".format(channel, e))
 				continue
 
 			# Template provider produces a message object with "message_body"
@@ -189,7 +189,7 @@ class CommunicationService(asab.Service):
 			provider = self.get_communication_provider(channel)
 			message_builder = self.get_message_builder(channel)
 		except KeyError as e:
-			L.warning("Cannot send {} message: {}".format(channel, e))
+			L.error("Cannot send {} message: {}".format(channel, e))
 			return False
 
 		# Template provider produces a message object with "message_body"
@@ -233,7 +233,7 @@ class CommunicationService(asab.Service):
 				provider = self.get_communication_provider(channel)
 				message_builder = self.get_message_builder(channel)
 			except KeyError as e:
-				L.warning("Cannot send {} message: {}".format(channel, e))
+				L.error("Cannot send {} message: {}".format(channel, e))
 				continue
 
 			try:

@@ -198,23 +198,23 @@ class OpenIdConnectService(asab.Service):
 			L.warning("ID token expired")
 			return None
 		except jwcrypto.jws.InvalidJWSSignature:
-			L.warning("Invalid ID token signature")
+			L.error("Invalid ID token signature")
 			return None
 
 		try:
 			data_dict = json.loads(token.claims)
 			session_id = data_dict["sid"]
 		except ValueError:
-			L.warning("Cannot read ID token claims")
+			L.error("Cannot read ID token claims")
 			return None
 		except KeyError:
-			L.warning("ID token claims do not contain 'sid'")
+			L.error("ID token claims do not contain 'sid'")
 			return None
 
 		try:
 			session = await self.SessionService.get(session_id)
 		except ValueError:
-			L.warning("Session not found")
+			L.error("Session not found")
 			return None
 
 		return session
