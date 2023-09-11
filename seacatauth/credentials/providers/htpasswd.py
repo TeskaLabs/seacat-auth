@@ -141,8 +141,3 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 				'_provider_id': self.ProviderID,
 				'username': username,
 			}
-
-
-	async def update(self, credentials_id, credentials: dict) -> Optional[str]:
-		L.warning("Update not supported", struct_data={'cid': credentials_id})
-		raise RuntimeError("Not supported")
