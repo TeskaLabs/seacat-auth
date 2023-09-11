@@ -62,14 +62,6 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 		return []
 
 
-	async def detail(self, credentials_id) -> Optional[dict]:
-		'''
-		Obsolete, use get()
-		'''
-		L.warning("Obsolete method used -> CredentialsProvider.detail :-(")
-		return await self.get(credentials_id)
-
-
 	@abc.abstractmethod
 	async def get(self, credentials_id, include=None) -> Optional[dict]:
 		raise NotImplementedError('in {}'.format(self.Type))
