@@ -234,6 +234,7 @@ class OpenIdConnectService(asab.Service):
 
 	async def create_oidc_session(
 		self, root_session, client_id, scope,
+		nonce=None,
 		tenants=None,
 		requested_expiration=None
 	):
@@ -265,12 +266,7 @@ class OpenIdConnectService(asab.Service):
 				),
 			])
 
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
