@@ -303,7 +303,7 @@ class AuthorizeHandler(object):
 		root_session = request.Session
 		if root_session is not None:
 			if root_session.Session.Type != "root":
-				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
+				L.error("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
 			elif root_session.is_anonymous() and not client_dict.get("authorize_anonymous_users", False):
 				L.warning("Not allowed to authorize with anonymous session.", struct_data={
@@ -547,7 +547,7 @@ class AuthorizeHandler(object):
 			# OpenID Connect requests MUST contain the openid scope value.
 			# Otherwise, the request is not considered OpenID and its behavior is unspecified
 			if "cookie" in scope:
-				L.warning("Scope cannot contain 'openid' and 'cookie' at the same time.", struct_data={
+				L.error("Scope cannot contain 'openid' and 'cookie' at the same time.", struct_data={
 					"scope": " ".join(scope)})
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidScope, client_id,
@@ -559,7 +559,7 @@ class AuthorizeHandler(object):
 			return "cookie"
 
 		else:
-			L.warning("Scope must contain 'openid' or 'cookie'.", struct_data={"scope": " ".join(scope)})
+			L.error("Scope must contain 'openid' or 'cookie'.", struct_data={"scope": " ".join(scope)})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidScope, client_id,
 				error_description="Scope must contain 'openid' or 'cookie'.",
@@ -877,7 +877,7 @@ class AuthorizeHandler(object):
 		# Check for required parameters
 		client_id = request_parameters.get("client_id") or None
 		if client_id is None:
-			L.warning("Missing or empty required parameter: {}.".format("client_id"), struct_data=request_parameters)
+			L.error("Missing or empty required parameter: {}.".format("client_id"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=request_parameters.get("redirect_uri"),
@@ -888,7 +888,7 @@ class AuthorizeHandler(object):
 		# NOTE: "redirect_uri" is required only by OIDC, not generic OAuth
 		redirect_uri = request_parameters.get("redirect_uri") or None
 		if redirect_uri is None:
-			L.warning("Missing or empty required parameter: {}.".format("redirect_uri"), struct_data=request_parameters)
+			L.error("Missing or empty required parameter: {}.".format("redirect_uri"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=redirect_uri,
@@ -898,7 +898,7 @@ class AuthorizeHandler(object):
 
 		response_type = request_parameters.get("response_type") or None
 		if response_type is None:
-			L.warning(
+			L.error(
 				"Missing or empty required parameter: {}.".format("response_type"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
@@ -907,7 +907,7 @@ class AuthorizeHandler(object):
 				state=state,
 				struct_data={"reason": "missing_query_parameter"})
 		elif response_type != "code":
-			L.warning("Unsupported response type.", struct_data=request_parameters)
+			L.error("Unsupported response type.", struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.UnsupportedResponseType, client_id,
 				redirect_uri=redirect_uri,
@@ -916,7 +916,7 @@ class AuthorizeHandler(object):
 		# NOTE: "scope" is required only by OIDC, not generic OAuth
 		scope = request_parameters.get("scope") or None
 		if scope is None:
-			L.warning("Missing or empty required parameter: {}.".format("scope"), struct_data=request_parameters)
+			L.error("Missing or empty required parameter: {}.".format("scope"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=redirect_uri,
@@ -928,7 +928,7 @@ class AuthorizeHandler(object):
 		if prompt is not None:
 			# TODO: Prompt can be a list of multiple values (e.g. "prompt=select_account,consent")
 			if prompt not in frozenset(["none", "login", "select_account"]):
-				L.warning("Unsupported prompt.", struct_data={"prompt": prompt})
+				L.error("Unsupported prompt.", struct_data={"prompt": prompt})
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidRequest, client_id,
 					error_description="Invalid prompt value: {}".format(prompt),
