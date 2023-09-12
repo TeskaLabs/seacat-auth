@@ -121,7 +121,7 @@ class CookieService(asab.Service):
 		try:
 			cookie_value = base64.urlsafe_b64decode(cookie_value.encode("ascii"))
 		except ValueError:
-			L.warning("Cookie value is not base64", struct_data={"sci": cookie_value})
+			L.error("Cookie value is not base64", struct_data={"sci": cookie_value})
 			return None
 
 		try:
@@ -130,7 +130,7 @@ class CookieService(asab.Service):
 			L.info("Session not found.", struct_data={"sci": cookie_value})
 			return None
 		except ValueError:
-			L.warning("Error retrieving session.", exc_info=True, struct_data={"sci": cookie_value})
+			L.exception("Error retrieving session.", struct_data={"sci": cookie_value})
 			return None
 
 		return session
