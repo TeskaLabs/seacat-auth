@@ -8,6 +8,7 @@
 ### Fix
 - Add `id_token_signing_alg_values_supported` in OIDC discovery (#260)
 - Add support for `nonce` authorize parameter (#263, PLUM Sprint 230908)
+- Handle special characters in login ident (#264, PLUM Sprint 230908)
 
 ### Features
 - Unified SMTP config (#257, PLUM Sprint 230825)
