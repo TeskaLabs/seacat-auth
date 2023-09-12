@@ -61,6 +61,7 @@ class OAuth2Data:
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
+	Nonce: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -134,6 +135,7 @@ class SessionAdapter:
 			RefreshToken = "oa_rt"
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
+			Nonce = "oa_no"
 
 		class Cookie:
 			_prefix = "ck"
@@ -374,6 +376,7 @@ class SessionAdapter:
 			RefreshToken=refresh_token,
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
+			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
 		)
 
 	@classmethod
