@@ -140,7 +140,12 @@ class CookieService(asab.Service):
 		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
 
 
-	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
+	async def create_cookie_client_session(
+		self, root_session, client_id, scope,
+		nonce=None,
+		tenants=None,
+		requested_expiration=None
+	):
 		"""
 		Create a new cookie-based session
 		"""
@@ -202,11 +207,7 @@ class CookieService(asab.Service):
 				),
 			))
 
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",

@@ -138,6 +138,14 @@ class AuthorizeHandler(object):
 				The Authorization Server will include this value when redirecting the user back to the client.
 			schema:
 				type: string
+		-	name: nonce
+			in: query
+			required: false
+			description:
+				String value used to associate a Client session with an ID Token, and to mitigate replay attacks.
+				The value is passed through unmodified from the Authentication Request to the ID Token.
+			schema:
+				type: string
 		-	name: prompt
 			in: query
 			required: false
@@ -213,6 +221,7 @@ class AuthorizeHandler(object):
 			redirect_uri=request_parameters["redirect_uri"],
 			client_secret=request_parameters.get("client_secret"),
 			state=request_parameters.get("state"),
+			nonce=request_parameters.get("nonce"),
 			prompt=request_parameters.get("prompt"),
 			code_challenge=request_parameters.get("code_challenge"),
 			code_challenge_method=request_parameters.get("code_challenge_method", "none"),
@@ -228,6 +237,7 @@ class AuthorizeHandler(object):
 		redirect_uri: str,
 		client_secret: str = None,
 		state: str = None,
+		nonce: str = None,
 		prompt: str = None,
 		code_challenge: str = None,
 		code_challenge_method: str = None,
@@ -405,11 +415,14 @@ class AuthorizeHandler(object):
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
 					root_session, client_id, scope,
+					nonce=nonce,
 					tenants=tenants,
 					requested_expiration=session_expiration)
 			elif authorize_type == "cookie":
 				new_session = await self.CookieService.create_cookie_client_session(
-					root_session, client_id, scope, tenants,
+					root_session, client_id, scope,
+					nonce=nonce,
+					tenants=tenants,
 					requested_expiration=session_expiration)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
