@@ -58,9 +58,7 @@ class SeaCatAuthApplication(asab.Application):
 		if "zookeeper" in asab.Config:
 			from asab.zookeeper import Module
 			self.add_module(Module)
-			self.ZooKeeperService = self.get_service("asab.ZooKeeperService")
-			self.ZooKeeperContainer = asab.zookeeper.ZooKeeperContainer(self.ZooKeeperService, "zookeeper")
-			self.ApiService.initialize_zookeeper(self.ZooKeeperContainer)
+			self.ApiService.initialize_zookeeper()
 
 		from .audit import AuditService, AuditHandler
 		self.AuditService = AuditService(self)
