@@ -182,6 +182,14 @@ def add_params_to_url_query(url, **params):
 	return urlunparse(**parsed)
 
 
+def get_request_access_ips(request) -> list:
+	access_ips = [request.remote]
+	ff = request.headers.get("X-Forwarded-For")
+	if ff is not None:
+		access_ips.extend(ff.split(", "))
+	return access_ips
+
+
 def generate_ergonomic_token(length: int):
 	'''
 	This function generates random string that is "ergonomic".
