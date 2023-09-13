@@ -55,7 +55,7 @@ class SeaCatAuthApplication(asab.Application):
 		self.ApiService = ApiService(self)
 		self.ApiService.initialize_web(self.WebContainer)
 
-		if asab.Config.getboolean("sentry", "enabled"):
+		if "sentry" in asab.Config:
 			from asab.sentry import SentryService
 			self.SentryService = SentryService(self)
 
