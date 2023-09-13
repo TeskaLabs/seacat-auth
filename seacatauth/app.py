@@ -55,6 +55,10 @@ class SeaCatAuthApplication(asab.Application):
 		self.ApiService = ApiService(self)
 		self.ApiService.initialize_web(self.WebContainer)
 
+		if "sentry" in asab.Config:
+			from asab.sentry import SentryService
+			self.SentryService = SentryService(self)
+
 		if "zookeeper" in asab.Config:
 			from asab.zookeeper import Module
 			self.add_module(Module)
