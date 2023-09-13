@@ -198,23 +198,23 @@ class OpenIdConnectService(asab.Service):
 			L.warning("ID token expired")
 			return None
 		except jwcrypto.jws.InvalidJWSSignature:
-			L.warning("Invalid ID token signature")
+			L.error("Invalid ID token signature")
 			return None
 
 		try:
 			data_dict = json.loads(token.claims)
 			session_id = data_dict["sid"]
 		except ValueError:
-			L.warning("Cannot read ID token claims")
+			L.error("Cannot read ID token claims")
 			return None
 		except KeyError:
-			L.warning("ID token claims do not contain 'sid'")
+			L.error("ID token claims do not contain 'sid'")
 			return None
 
 		try:
 			session = await self.SessionService.get(session_id)
 		except ValueError:
-			L.warning("Session not found")
+			L.error("Session not found")
 			return None
 
 		return session
@@ -234,6 +234,7 @@ class OpenIdConnectService(asab.Service):
 
 	async def create_oidc_session(
 		self, root_session, client_id, scope,
+		nonce=None,
 		tenants=None,
 		requested_expiration=None
 	):
@@ -265,12 +266,7 @@ class OpenIdConnectService(asab.Service):
 				),
 			])
 
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
@@ -358,6 +354,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.OAuth2.Scope is not None:
 			userinfo["scope"] = session.OAuth2.Scope
+
+		if session.OAuth2.Nonce is not None:
+			userinfo["nonce"] = session.OAuth2.Nonce
 
 		if session.Credentials.Username is not None:
 			userinfo["preferred_username"] = session.Credentials.Username

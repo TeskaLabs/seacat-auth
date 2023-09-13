@@ -222,7 +222,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			if mode is None:
 				fields.append({field: ident})
 			if mode == "ignorecase":
-				fields.append({field: re.compile("^{}$".format(ident), re.IGNORECASE)})
+				fields.append({field: re.compile("^{}$".format(re.escape(ident)), re.IGNORECASE)})
 
 		query = {"$or": fields}
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
@@ -418,5 +418,5 @@ def authn_password(dbcred, credentials):
 		else:
 			return False
 	else:
-		L.warning("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
+		L.error("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
 		return False

@@ -59,6 +59,11 @@ class SeaCatAuthApplication(asab.Application):
 			from asab.sentry import SentryService
 			self.SentryService = SentryService(self)
 
+		if "zookeeper" in asab.Config:
+			from asab.zookeeper import Module
+			self.add_module(Module)
+			self.ApiService.initialize_zookeeper()
+
 		from .audit import AuditService, AuditHandler
 		self.AuditService = AuditService(self)
 		self.AuditHandler = AuditHandler(self, self.AuditService)

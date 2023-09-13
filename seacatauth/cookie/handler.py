@@ -163,7 +163,7 @@ class CookieHandler(object):
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				L.error("Request authorization failed: {}".format(e), exc_info=True)
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
@@ -255,7 +255,7 @@ class CookieHandler(object):
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				L.error("Request authorization failed: {}".format(e), exc_info=True)
 				response = aiohttp.web.HTTPUnauthorized()
 
 		cookie_domain = client.get("cookie_domain") or None
