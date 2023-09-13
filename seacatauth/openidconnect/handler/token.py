@@ -115,7 +115,7 @@ class TokenHandler(object):
 		# Ensure the Authorization Code was issued to the authenticated Client
 		authorization_code = qs_data.get("code", "")
 		if len(authorization_code) == 0:
-			L.warning("Authorization Code not provided")
+			L.error("Authorization Code not provided")
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
@@ -124,11 +124,11 @@ class TokenHandler(object):
 			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(
 				authorization_code, qs_data.get("code_verifier"))
 		except KeyError:
-			L.warning("Session not found.", struct_data={"code": authorization_code})
+			L.error("Session not found.", struct_data={"code": authorization_code})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 		except CodeChallengeFailedError as e:
-			L.warning("Code challenge failed.", struct_data={"reason": str(e)})
+			L.error("Code challenge failed.", struct_data={"reason": str(e)})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 

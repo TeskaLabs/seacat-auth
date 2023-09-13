@@ -61,6 +61,7 @@ class OAuth2Data:
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
+	Nonce: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -134,6 +135,7 @@ class SessionAdapter:
 			RefreshToken = "oa_rt"
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
+			Nonce = "oa_no"
 
 		class Cookie:
 			_prefix = "ck"
@@ -357,7 +359,7 @@ class SessionAdapter:
 				id_token = id_token.decode("ascii")
 			except UnicodeDecodeError:
 				# Probably old ID token, encoded differently
-				L.warning("Cannot deserialize ID token", struct_data={"id_token": id_token})
+				L.error("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
 		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:
@@ -374,6 +376,7 @@ class SessionAdapter:
 			RefreshToken=refresh_token,
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
+			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
 		)
 
 	@classmethod

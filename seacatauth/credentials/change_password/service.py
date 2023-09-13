@@ -105,7 +105,7 @@ class ChangePasswordService(asab.Service):
 		# Verify if credentials exists
 		creds = await self.CredentialsService.get(credentials_id)
 		if creds is None:
-			L.warning("Cannot find credentials", struct_data={"cid": credentials_id})
+			L.error("Cannot find credentials", struct_data={"cid": credentials_id})
 			return False
 
 		if expiration is None:
@@ -135,7 +135,7 @@ class ChangePasswordService(asab.Service):
 		try:
 			provider = self.CredentialsService.get_provider(credentials_id)
 		except KeyError:
-			L.warning("Provider not found", struct_data={'cid': credentials_id})
+			L.error("Provider not found", struct_data={'cid': credentials_id})
 			return "FAILED"
 
 		assert (provider is not None)
@@ -195,7 +195,7 @@ class ChangePasswordService(asab.Service):
 		try:
 			await self.delete_pwdreset_tokens_by_cid(cid=credentials_id)
 		except Exception as e:
-			L.warning(
+			L.error(
 				"Unable to remove old password change requests: {} ({})".format(type(e), e),
 				struct_data={'cid': credentials_id}
 			)
@@ -227,5 +227,5 @@ class ChangePasswordService(asab.Service):
 		if credentials_id is not None:
 			await self.init_password_change(credentials_id)
 		else:
-			L.warning("No credentials matching '{}'".format(ident))
+			L.log(asab.LOG_NOTICE, "Ident matched no credentials.", struct_data={"ident": ident})
 		return True  # Since this is public, don't disclose the true result

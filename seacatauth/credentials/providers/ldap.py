@@ -148,7 +148,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		elif self.Config["tls_require_cert"] == "hard":
 			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_HARD)
 		else:
-			L.warning("Invalid 'tls_require_cert' value: {!r}. Defaulting to 'demand'.".format(
+			L.error("Invalid 'tls_require_cert' value: {!r}. Defaulting to 'demand'.".format(
 				self.Config["tls_require_cert"]
 			))
 			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
