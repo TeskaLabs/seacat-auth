@@ -4,6 +4,7 @@
 
 ### Breaking changes
 - Config option `sender_email_address` is now called `from` (#257, PLUM Sprint 230825)
+- Invalid redirect URI or client ID in Authorize request results in an error response without redirect (#266, PLUM Sprint 230908)
 
 ### Fix
 - Add `id_token_signing_alg_values_supported` in OIDC discovery (#260)
