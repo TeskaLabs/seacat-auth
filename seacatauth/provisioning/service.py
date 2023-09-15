@@ -138,6 +138,7 @@ class ProvisioningService(asab.Service):
 		if admin_ui_url is None:
 			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
 			url = urllib.parse.urlparse(auth_webui_base_url)
+			# Use the base URL without path by default, to fit all common deployments
 			admin_ui_url = url._replace(path="", fragment="", query="", params="").geturl()
 			L.log(
 				asab.LOG_NOTICE,
@@ -156,7 +157,6 @@ class ProvisioningService(asab.Service):
 			if client is None or client.get(k) != v}
 
 		# Check if the client has the correct redirect URI
-		# Use default URI if none is specified and the client doesn't exist yet
 		if client is None:
 			redirect_uris = set()
 		else:
