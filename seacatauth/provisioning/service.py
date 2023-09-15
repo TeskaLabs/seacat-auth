@@ -133,6 +133,9 @@ class ProvisioningService(asab.Service):
 
 
 	async def _initialize_admin_ui_client(self):
+		"""
+		Registers/updates the ASAB web UI client.
+		"""
 		admin_ui_client_id = self.Config["admin_ui_client_id"]
 		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
 		if admin_ui_url is None:
