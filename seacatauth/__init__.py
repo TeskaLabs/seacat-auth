@@ -26,10 +26,13 @@ asab.Config.add_defaults({
 		"listen": "3081",  # Well-known port
 	},
 
+	"seacatauth": {
+		"private_key": "",
+	},
+
 	"openidconnect": {
 		"bearer_realm": "asab",
 		"auth_code_timeout": "60 s",
-		"private_key": "",
 	},
 
 	"seacatauth:client": {

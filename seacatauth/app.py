@@ -216,10 +216,10 @@ class SeaCatAuthApplication(asab.Application):
 		"""
 		# TODO: Add encryption option
 		# TODO: Multiple key support
-		private_key_path = asab.Config.get("seacat_auth", "private_key", fallback="")
+		private_key_path = asab.Config.get("seacatauth", "private_key", fallback="")
 		if len(private_key_path) == 0 and "private_key" in asab.Config["openidconnect"]:
 			asab.LogObsolete.warning(
-				"The 'private_key' option has been moved from the 'openidconnect' to the 'seacat_auth' section. "
+				"The 'private_key' option has been moved from the 'openidconnect' to the 'seacatauth' section. "
 				"Please update your configuration file.",
 				struct_data={"eol": "2024-01-31"})
 			private_key_path = asab.Config.get("openidconnect", "private_key", fallback="")
