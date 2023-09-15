@@ -216,6 +216,12 @@ class SeaCatAuthApplication(asab.Application):
 		"""
 		# TODO: Add encryption option
 		# TODO: Multiple key support
+		if "seacat_auth" in asab.Config:
+			asab.LogObsolete.warning(
+				"Config section '[seacat_auth]' has been renamed to '[seacatauth]'. "
+				"Please update your configuration file.",
+				struct_data={"eol": "2024-01-31"})
+			asab.Config["seacatauth"].update(asab.Config["seacat_auth"])
 		private_key_path = asab.Config.get("seacatauth", "private_key", fallback="")
 		if len(private_key_path) == 0 and "private_key" in asab.Config["openidconnect"]:
 			asab.LogObsolete.warning(
