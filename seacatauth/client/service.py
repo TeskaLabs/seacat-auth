@@ -500,7 +500,7 @@ class ClientService(asab.Service):
 		if client_secret != client.get("__client_secret", ""):
 			raise exceptions.InvalidClientSecret(client["_id"])
 
-		if not validate_redirect_uri(
+		if not self.OIDCService.DisableRedirectUriValidation and not validate_redirect_uri(
 			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
 			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
 
