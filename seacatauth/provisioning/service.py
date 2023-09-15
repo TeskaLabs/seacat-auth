@@ -133,8 +133,16 @@ class ProvisioningService(asab.Service):
 
 
 	async def _initialize_admin_ui_client(self):
-		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
 		admin_ui_client_id = self.Config["admin_ui_client_id"]
+		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
+		if admin_ui_url is None:
+			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			url = urllib.parse.urlparse(auth_webui_base_url)
+			admin_ui_url = url._replace(path="", fragment="", query="", params="").geturl()
+			L.log(
+				asab.LOG_NOTICE,
+				"'admin_ui_url' not specified in provisioning config. Defaulting to '{}'.".format(admin_ui_url)
+			)
 
 		try:
 			client = await self.ClientService.get(admin_ui_client_id)
@@ -147,30 +155,20 @@ class ProvisioningService(asab.Service):
 			for k, v in CLIENT_TEMPLATES["Public web application"].items()
 			if client is None or client.get(k) != v}
 
-		redirect_uri_validation_method = self.Config["redirect_uri_validation_method"]
-		if client is None or client.get("redirect_uri_validation_method") != redirect_uri_validation_method:
-			update["redirect_uri_validation_method"] = redirect_uri_validation_method
-
 		# Check if the client has the correct redirect URI
 		# Use default URI if none is specified and the client doesn't exist yet
 		if client is None:
-			existing_redirect_uris = []
-			if admin_ui_url is None:
-				auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
-				url = urllib.parse.urlparse(auth_webui_base_url)
-				admin_ui_url = url._replace(path="/seacat", fragment="", query="", params="").geturl()
-				L.log(
-					asab.LOG_NOTICE,
-					"admin_ui_url not specified in provisioning config. Defaulting to '{}'.".format(admin_ui_url)
-				)
+			redirect_uris = set()
 		else:
-			existing_redirect_uris = client.get("redirect_uris", [])
+			redirect_uris = set(client.get("redirect_uris", []))
 
-		if admin_ui_url is not None and admin_ui_url not in existing_redirect_uris:
-			update["redirect_uris"] = [admin_ui_url]
+		if admin_ui_url not in redirect_uris:
+			redirect_uris.add(admin_ui_url)
+			update["redirect_uris"] = list(redirect_uris)
 
-		if client is None or "client_name" not in client:
-			update["client_name"] = self.Config["admin_ui_client_name"]
+		update["client_uri"] = admin_ui_url
+		update["redirect_uri_validation_method"] = self.Config["redirect_uri_validation_method"]
+		update["client_name"] = self.Config["admin_ui_client_name"]
 
 		if client is None:
 			await self.ClientService.register(_custom_client_id=admin_ui_client_id, **update)
