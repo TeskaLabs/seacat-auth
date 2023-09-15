@@ -88,6 +88,12 @@ class OpenIdConnectService(asab.Service):
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
 
+		self.DisableRedirectUriValidation = asab.Config.getboolean(
+			"openidconnect", "_disable_redirect_uri_validation", fallback=False)
+		if self.DisableRedirectUriValidation:
+			# This is a dev-only option
+			L.warning("Redirect URI validation in OpenID Authorize requests is disabled.")
+
 		# TODO: Derive the private key
 		self.PrivateKey = app.PrivateKey
 
