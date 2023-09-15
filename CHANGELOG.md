@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.37-beta
 
 ### Breaking changes
 - Config option `sender_email_address` is now called `from` (#257, PLUM Sprint 230825)
