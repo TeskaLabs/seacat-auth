@@ -9,7 +9,7 @@ import asab
 from ...audit import AuditCode
 from ...authz import build_credentials_authz
 from ...cookie.utils import delete_cookie
-from ... import client
+from ... import client, generic
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
@@ -38,6 +38,23 @@ class OAuthAuthorizeError(Exception):
 		self.StructData = struct_data or {}
 		self.CredentialsId = credentials_id
 		self.State = state
+
+
+class ClientIdError(OAuthAuthorizeError):
+	def __init__(self, client_id, credentials_id=None):
+		super().__init__(
+			"client_id_error",
+			client_id=client_id,
+			credentials_id=credentials_id)
+
+
+class RedirectUriError(OAuthAuthorizeError):
+	def __init__(self, redirect_uri, client_id=None, credentials_id=None):
+		super().__init__(
+			"redirect_uri_error",
+			client_id=client_id,
+			credentials_id=credentials_id,
+			redirect_uri=redirect_uri)
 
 
 class AuthorizeHandler(object):
@@ -172,10 +189,23 @@ class AuthorizeHandler(object):
 				type: string
 				enum: ["S256", "plain"]
 		"""
+		access_ips = generic.get_request_access_ips(request)
 		try:
 			return await self.authorize(request, request.query)
+		# If the request fails due to a missing, invalid, or mismatching redirection URI, or if the client identifier
+		#   is missing or invalid, the authorization server SHOULD inform the resource owner of the error and MUST NOT
+		#   automatically redirect the user-agent to the invalid redirection URI. (rfc6749#section-4.1.2.1)
+		except ClientIdError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return aiohttp.web.HTTPBadRequest()
+		except RedirectUriError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return aiohttp.web.HTTPBadRequest()
+		#  If the resource owner denies the access request or if the request fails for reasons other than a missing or
+		#    invalid redirection URI, the authorization server informs the client by adding the following parameters to
+		#    the query component of the redirection URI. (rfc6749#section-4.1.2.1)
 		except OAuthAuthorizeError as e:
-			await self.audit_authorize_error(e)
+			await self.audit_authorize_error(e, access_ips=access_ips)
 			return self.reply_with_authentication_error(
 				e.Error, e.RedirectUri,
 				error_description=e.ErrorDescription,
@@ -255,6 +285,12 @@ class AuthorizeHandler(object):
 			e.State = state
 			e.RedirectUri = redirect_uri
 			raise e
+		except client.exceptions.ClientNotFoundError as e:
+			L.error("Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			raise ClientIdError(client_id) from e
+		except client.exceptions.InvalidRedirectURI as e:
+			L.error("Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			raise RedirectUriError(redirect_uri, client_id) from e
 
 		# Extract request source
 		from_info = [request.remote]
@@ -514,11 +550,9 @@ class AuthorizeHandler(object):
 	async def _authorize_client(self, client_id, redirect_uri, client_secret=None):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-		except KeyError:
-			L.error("Client ID not found.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				struct_data={"reason": "client_id_not_found"})
+		except KeyError as e:
+			raise client.exceptions.ClientNotFoundError(client_id) from e
+
 		try:
 			await self.OpenIdConnectService.ClientService.authorize_client(
 				client=client_dict,
@@ -530,11 +564,8 @@ class AuthorizeHandler(object):
 			L.error("Invalid client secret.", struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.UnauthorizedClient, client_id)
-		except client.exceptions.InvalidRedirectURI:
-			L.error("Invalid client secret.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				struct_data={"reason": "invalid_redirect_uri"})
+		except client.exceptions.InvalidRedirectURI as e:
+			raise e
 		except client.exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
@@ -816,11 +847,13 @@ class AuthorizeHandler(object):
 			fi=from_info)
 
 
-	async def audit_authorize_error(self, error: OAuthAuthorizeError):
+	async def audit_authorize_error(self, error: OAuthAuthorizeError, access_ips: list = None):
 		await self.OpenIdConnectService.AuditService.append(
 			AuditCode.AUTHORIZE_ERROR,
+			error=error.Error,
 			credentials_id=error.CredentialsId,
 			client_id=error.ClientId,
+			access_ips=access_ips,
 			**error.StructData)
 
 
