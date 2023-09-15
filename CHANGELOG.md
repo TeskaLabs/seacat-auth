@@ -4,6 +4,8 @@
 
 ### Breaking changes
 - Config option `sender_email_address` is now called `from` (#257, PLUM Sprint 230825)
+- Invalid redirect URI or client ID in Authorize request results in an error response without redirect (#266, PLUM Sprint 230908)
+- Config section `[seacat_auth]` renamed to `[seacatauth]` (#266, PLUM Sprint 230908)
 
 ### Fix
 - Add `id_token_signing_alg_values_supported` in OIDC discovery (#260)
@@ -16,6 +18,7 @@
 - Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230825)
 - Initialize Zookeeper service (#265, PLUM Sprint 230908)
 - Initialize Sentry service (#262, PLUM Sprint 230908)
+- Config option to disable all redirect URI validations (#266, PLUM Sprint 230908)
 
 ### Refactoring
 - Last login info moved to a dedicated collection (#259, PLUM Sprint 230825)
