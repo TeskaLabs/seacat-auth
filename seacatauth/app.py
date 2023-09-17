@@ -235,8 +235,7 @@ class SeaCatAuthApplication(asab.Application):
 				os.path.dirname(asab.Config.get("general", "config_file")),
 				"private-key.pem"
 			)
-			L.log(
-				asab.LOG_NOTICE,
+			L.warning(
 				"Seacat Auth private key file not specified. Defaulting to '{}'.".format(private_key_path)
 			)
 
