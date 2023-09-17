@@ -81,8 +81,8 @@ class OpenIdConnectService(asab.Service):
 					"OpenID Connect issuer must be a URL that uses the 'https' scheme "
 					"and has no query or fragment components.")
 		else:
+			# Default fallback option
 			self.Issuer = self.PublicApiBaseUrl
-			L.log(asab.LOG_NOTICE, "OAuth2 issuer not specified. Assuming '{}'.".format(self.Issuer))
 
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
