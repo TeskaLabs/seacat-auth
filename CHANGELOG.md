@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Fix
+- Fix private key provisioning (#267, @vosmol)
+
+---
+
+
 ## v23.37-beta
 
 ### Breaking changes
