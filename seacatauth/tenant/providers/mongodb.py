@@ -1,4 +1,3 @@
-import collections
 import logging
 from typing import Optional
 
@@ -56,14 +55,14 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 				#  -1 if tenant does not contain substring
 				#   0 if tenant starts with substring
 				#   1 if tenant contains substring but not at the start
-				{"$set": {"_match": {"$min": [
+				{"$addFields": {"_match": {"$min": [
 					{"$indexOfCP": [{"$toLower": "$_id"}, filter.lower()]}, 1
 				]}}},
 				# Exclude tenants that do not contain substring at all
 				{"$match": {"$expr": {"$gte": ["$_match", 0]}}},
 				# Sort matches so that tenants that start with substring come first
 				# Secondary sort is alphabetical
-				{"$sort": collections.OrderedDict({"_match": 1, "_id": 1})},
+				{"$sort": {"_match": 1, "_id": 1}},
 			]
 			if limit is not None:
 				pipeline.append({"$skip": limit * page})
