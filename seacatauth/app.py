@@ -235,16 +235,18 @@ class SeaCatAuthApplication(asab.Application):
 				os.path.dirname(asab.Config.get("general", "config_file")),
 				"private-key.pem"
 			)
-			L.warning(
+			L.log(
+				asab.LOG_NOTICE,
 				"Seacat Auth private key file not specified. Defaulting to '{}'.".format(private_key_path)
 			)
 
 		if os.path.isfile(private_key_path):
 			with open(private_key_path, "rb") as f:
 				private_key = jwcrypto.jwk.JWK.from_pem(f.read())
-		elif self.App.Provisioning:
+		elif self.Provisioning:
 			# Generate a new private key
-			L.warning(
+			L.log(
+				asab.LOG_NOTICE,
 				"Seacat Auth private key file does not exist. Generating a new one."
 			)
 			private_key = self._generate_private_key(private_key_path)
