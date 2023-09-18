@@ -49,14 +49,21 @@ class WebAuthnService(asab.Service):
 		if self.RelyingPartyId is None:
 			self.RelyingPartyId = str(urllib.parse.urlparse(self.Origin).hostname)
 
+		self.AttestationPreference = asab.Config.get("seacatauth:webauthn", "attestation", fallback="none")
+		if self.AttestationPreference == "none":
+			self.AttestationPreference = webauthn.helpers.structs.AttestationConveyancePreference.NONE
+		elif self.AttestationPreference == "direct":
+			# Required to obtain
+			self.AttestationPreference = webauthn.helpers.structs.AttestationConveyancePreference.DIRECT
+		else:
+			raise ValueError("Unsupported WebAuthn 'attestation' value: {!r}".format(self.AttestationPreference))
+
 		self.RegistrationTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
 			webauthn.helpers.structs.COSEAlgorithmIdentifier(-7)  # Es256
 		]
 
-		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
-
-		self.FidoMetadata: typing.Dict[int, dict] | None = None
+		self._FidoMetadataByAAGUID: typing.Dict[int, dict] | None = None
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
@@ -70,8 +77,11 @@ class WebAuthnService(asab.Service):
 
 
 	async def _load_fido_metadata(self, speculative=True):
+		"""
+		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
+		"""
 		# TODO: Consider persistent local cache
-		if speculative and self.FidoMetadata is not None:
+		if speculative and self._FidoMetadataByAAGUID is not None:
 			return
 		# FIXME: try/except
 		async with aiohttp.ClientSession() as session:
@@ -92,10 +102,11 @@ class WebAuthnService(asab.Service):
 		jwt.validate(public_key)
 		entries = json.loads(jwt.claims)["entries"]
 		# FIDO2 authenticators are identified with AAGUID
-		self.FidoMetadata = {
+		self._FidoMetadataByAAGUID = {
 			int(entry["aaguid"].replace("-", ""), 16): entry["metadataStatement"]
 			for entry in entries
 			if "aaguid" in entry}
+		# TODO: U2F authenticators are identified with Attestation Key Identifier (AKI)
 
 
 	async def create_webauthn_credential(
@@ -107,23 +118,12 @@ class WebAuthnService(asab.Service):
 		"""
 		Create database entry for a verified WebAuthn credential
 		"""
-		await self._load_fido_metadata()
-		aaguid = int(verified_registration.aaguid.replace("-", ""), 16)
-		if aaguid == 0:
-			# FIXME: Identify using attestationCertificateKeyIdentifiers
-			#   https://fidoalliance.org/fido-technotes-the-truth-about-attestation/
-			metadata = None
-		else:
-			metadata = self.FidoMetadata.get(aaguid)
-
+		metadata = await self._get_authenticator_metadata(verified_registration)
 		if name is None:
 			if metadata is not None:
 				name = metadata["description"]
 			else:
-				name = "key-{}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
-		else:
-			if self.KeyNameRegex.fullmatch(name) is None:
-				raise ValueError("Invalid WebAuthn credential name", {"name": name})
+				name = "Authenticator {}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
 
 		upsertor = self.StorageService.upsertor(
 			self.WebAuthnCredentialCollection,
@@ -140,13 +140,22 @@ class WebAuthnService(asab.Service):
 		upsertor.set("ao", verified_registration.attestation_object)
 		upsertor.set("rpid", self.RelyingPartyId)
 		upsertor.set("name", name)
-		if metadata:
-			# FIXME: Do we need to store all the metadata?
-			upsertor.set("md", metadata)
 
 		wacid = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid.hex()})
 
+	async def _get_authenticator_metadata(self, verified_registration):
+		await self._load_fido_metadata()
+		aaguid = int(verified_registration.aaguid.replace("-", ""), 16)
+		if aaguid == 0:
+			# TODO: Identify using Attestation Key Identifier (AKI)
+			#   https://fidoalliance.org/fido-technotes-the-truth-about-attestation/
+			#   This may be harder to implement since the AKI is only provided to trusted websites,
+			#   see https://www.chromium.org/security-keys/
+			metadata = None
+		else:
+			metadata = self._FidoMetadataByAAGUID.get(aaguid)
+		return metadata
 
 	async def get_webauthn_credential(self, webauthn_credential_id):
 		"""
@@ -342,6 +351,7 @@ class WebAuthnService(asab.Service):
 			# authenticator_selection=...,  # Optional
 			# exclude_credentials=...,  # Optional
 			supported_pub_key_algs=self.SupportedAlgorithms,
+			attestation=self.AttestationPreference
 		)
 		options = webauthn.options_to_json(options)
 		return options
