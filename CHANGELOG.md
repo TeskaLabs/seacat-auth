@@ -5,6 +5,9 @@
 ### Fix
 - Fix private key provisioning (#267, @vosmol)
 
+### Features
+- Fix tenant search for old MongoDB versions (#268, PLUM Sprint 230908)
+
 ---
 
 
