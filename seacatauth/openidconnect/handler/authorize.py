@@ -9,7 +9,7 @@ import asab
 from ...audit import AuditCode
 from ...authz import build_credentials_authz
 from ...cookie.utils import delete_cookie
-from ... import client
+from ... import client, generic
 from ... import exceptions
 from ..utils import AuthErrorResponseCode
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
@@ -38,6 +38,23 @@ class OAuthAuthorizeError(Exception):
 		self.StructData = struct_data or {}
 		self.CredentialsId = credentials_id
 		self.State = state
+
+
+class ClientIdError(OAuthAuthorizeError):
+	def __init__(self, client_id, credentials_id=None):
+		super().__init__(
+			"client_id_error",
+			client_id=client_id,
+			credentials_id=credentials_id)
+
+
+class RedirectUriError(OAuthAuthorizeError):
+	def __init__(self, redirect_uri, client_id=None, credentials_id=None):
+		super().__init__(
+			"redirect_uri_error",
+			client_id=client_id,
+			credentials_id=credentials_id,
+			redirect_uri=redirect_uri)
 
 
 class AuthorizeHandler(object):
@@ -138,6 +155,14 @@ class AuthorizeHandler(object):
 				The Authorization Server will include this value when redirecting the user back to the client.
 			schema:
 				type: string
+		-	name: nonce
+			in: query
+			required: false
+			description:
+				String value used to associate a Client session with an ID Token, and to mitigate replay attacks.
+				The value is passed through unmodified from the Authentication Request to the ID Token.
+			schema:
+				type: string
 		-	name: prompt
 			in: query
 			required: false
@@ -164,10 +189,23 @@ class AuthorizeHandler(object):
 				type: string
 				enum: ["S256", "plain"]
 		"""
+		access_ips = generic.get_request_access_ips(request)
 		try:
 			return await self.authorize(request, request.query)
+		# If the request fails due to a missing, invalid, or mismatching redirection URI, or if the client identifier
+		#   is missing or invalid, the authorization server SHOULD inform the resource owner of the error and MUST NOT
+		#   automatically redirect the user-agent to the invalid redirection URI. (rfc6749#section-4.1.2.1)
+		except ClientIdError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return aiohttp.web.HTTPBadRequest()
+		except RedirectUriError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return aiohttp.web.HTTPBadRequest()
+		#  If the resource owner denies the access request or if the request fails for reasons other than a missing or
+		#    invalid redirection URI, the authorization server informs the client by adding the following parameters to
+		#    the query component of the redirection URI. (rfc6749#section-4.1.2.1)
 		except OAuthAuthorizeError as e:
-			await self.audit_authorize_error(e)
+			await self.audit_authorize_error(e, access_ips=access_ips)
 			return self.reply_with_authentication_error(
 				e.Error, e.RedirectUri,
 				error_description=e.ErrorDescription,
@@ -213,6 +251,7 @@ class AuthorizeHandler(object):
 			redirect_uri=request_parameters["redirect_uri"],
 			client_secret=request_parameters.get("client_secret"),
 			state=request_parameters.get("state"),
+			nonce=request_parameters.get("nonce"),
 			prompt=request_parameters.get("prompt"),
 			code_challenge=request_parameters.get("code_challenge"),
 			code_challenge_method=request_parameters.get("code_challenge_method", "none"),
@@ -228,6 +267,7 @@ class AuthorizeHandler(object):
 		redirect_uri: str,
 		client_secret: str = None,
 		state: str = None,
+		nonce: str = None,
 		prompt: str = None,
 		code_challenge: str = None,
 		code_challenge_method: str = None,
@@ -245,32 +285,18 @@ class AuthorizeHandler(object):
 			e.State = state
 			e.RedirectUri = redirect_uri
 			raise e
+		except client.exceptions.ClientNotFoundError as e:
+			L.error("Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			raise ClientIdError(client_id) from e
+		except client.exceptions.InvalidRedirectURI as e:
+			L.error("Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			raise RedirectUriError(redirect_uri, client_id) from e
 
 		# Extract request source
 		from_info = [request.remote]
 		ff = request.headers.get("X-Forwarded-For")
 		if ff is not None:
 			from_info.extend(ff.split(", "))
-
-		try:
-			code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
-				client_dict, code_challenge, code_challenge_method)
-		except InvalidCodeChallengeMethodError:
-			L.error("Invalid code challenge method.", struct_data={
-				"client_id": client_id, "method": code_challenge_method})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "code_challenge_error"})
-		except InvalidCodeChallengeError:
-			L.error("Invalid code challenge request.", struct_data={
-				"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "code_challenge_error"})
 
 		# Decide whether this is an openid or cookie request
 		try:
@@ -280,18 +306,47 @@ class AuthorizeHandler(object):
 			e.State = state
 			raise e
 
+		if authorize_type == "openid":
+			try:
+				code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
+					client_dict, code_challenge, code_challenge_method)
+			except InvalidCodeChallengeMethodError:
+				L.error("Invalid code challenge method.", struct_data={
+					"client_id": client_id, "method": code_challenge_method})
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.InvalidRequest, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "code_challenge_error"})
+			except InvalidCodeChallengeError:
+				L.error("Invalid code challenge request.", struct_data={
+					"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.InvalidRequest, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "code_challenge_error"})
+		elif code_challenge is not None:
+			L.error("Code challenge not supported for cookie authorization.", struct_data={
+				"client_id": client_id})
+			raise OAuthAuthorizeError(
+				AuthErrorResponseCode.InvalidRequest, client_id,
+				redirect_uri=redirect_uri,
+				state=state,
+				struct_data={"reason": "code_challenge_error"})
+
 		# Only root sessions can be used to authorize client sessions
 		root_session = request.Session
 		if root_session is not None:
 			if root_session.Session.Type != "root":
-				L.warning("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
+				L.error("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
-			elif root_session.Authentication.IsAnonymous and not client_dict.get("authorize_anonymous_users", False):
+			elif root_session.is_anonymous() and not client_dict.get("authorize_anonymous_users", False):
 				L.warning("Not allowed to authorize with anonymous session.", struct_data={
 					"sid": root_session.Id, "client_id": client_id})
 				root_session = None
 
-		authenticated = root_session is not None and not root_session.Authentication.IsAnonymous
+		authenticated = root_session is not None and not root_session.is_anonymous()
 		allow_anonymous = "anonymous" in scope
 		if allow_anonymous and not client_dict.get("authorize_anonymous_users", False):
 			raise OAuthAuthorizeError(
@@ -396,13 +451,14 @@ class AuthorizeHandler(object):
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
 					root_session, client_id, scope,
+					nonce=nonce,
 					tenants=tenants,
-					requested_expiration=session_expiration,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method)
+					requested_expiration=session_expiration)
 			elif authorize_type == "cookie":
 				new_session = await self.CookieService.create_cookie_client_session(
-					root_session, client_id, scope, tenants,
+					root_session, client_id, scope,
+					nonce=nonce,
+					tenants=tenants,
 					requested_expiration=session_expiration)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
@@ -411,103 +467,67 @@ class AuthorizeHandler(object):
 
 		else:  # Not authenticated, but it is allowed to open a new anonymous session
 			assert allow_anonymous
+			assert root_session is None  # There are no anonymous root sessions
 
-			if root_session is not None:
-				# Open a new subsession under the current root session
-				assert root_session.Authentication.IsAnonymous
+			# Create algorithmic anonymous session without root
 
-				# Authorize access to tenants requested in scope
-				try:
-					tenants = await self.authorize_tenants_by_scope(
-						scope, root_session.Authorization.Authz, root_session.Credentials.Id, client_id)
-				except exceptions.AccessDeniedError:
-					raise OAuthAuthorizeError(
-						AuthErrorResponseCode.AccessDenied, client_id,
-						redirect_uri=redirect_uri,
-						state=state,
-						struct_data={"reason": "tenant_not_found"})
+			# Validate the anonymous credentials
+			anonymous_cid = client_dict.get("anonymous_cid")
+			try:
+				await self.CredentialsService.get(anonymous_cid)
+			except KeyError:
+				L.error("Credentials for anonymous access not found.", struct_data={
+					"cid": anonymous_cid, "client_id": client_id})
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.AccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "credentials_not_found"})
 
-				if authorize_type == "openid":
-					new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-						root_session.Credentials.Id, client_id, scope,
-						tenants=tenants,
-						login_descriptor=root_session.Authentication.LoginDescriptor,
-						track_id=root_session.TrackId,
-						root_session_id=root_session.SessionId,
-						code_challenge=code_challenge,
-						code_challenge_method=code_challenge_method,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-				elif authorize_type == "cookie":
-					new_session = await self.CookieService.create_anonymous_cookie_client_session(
-						root_session.Credentials.Id, client_id, scope,
-						root_session_id=root_session.SessionId,
-						track_id=root_session.TrackId,
-						tenants=tenants,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
-					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
-				else:
-					raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
+			# Get credentials' assigned tenants and resources
+			authz = await build_credentials_authz(
+				self.OpenIdConnectService.TenantService, self.OpenIdConnectService.RoleService, anonymous_cid)
+
+			# Authorize access to tenants requested in scope
+			try:
+				tenants = await self.authorize_tenants_by_scope(
+					scope, authz, anonymous_cid, client_id)
+			except exceptions.AccessDeniedError:
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.AccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "tenant_not_found"})
+
+			if authorize_type == "openid":
+				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
+					anonymous_cid, client_dict, scope,
+					tenants=tenants,
+					from_info=from_info)
+			elif authorize_type == "cookie":
+				new_session = await self.CookieService.create_anonymous_cookie_client_session(
+					anonymous_cid, client_dict, scope,
+					tenants=tenants,
+					from_info=from_info)
+				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
+				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 			else:
-				# Create anonymous session without root
-
-				# Validate the anonymous credentials
-				anonymous_cid = client_dict.get("anonymous_cid")
-				try:
-					await self.CredentialsService.get(anonymous_cid)
-				except KeyError:
-					L.error("Credentials for anonymous access not found.", struct_data={
-						"cid": anonymous_cid, "client_id": client_id})
-					raise OAuthAuthorizeError(
-						AuthErrorResponseCode.AccessDenied, client_id,
-						redirect_uri=redirect_uri,
-						state=state,
-						struct_data={"reason": "credentials_not_found"})
-
-				# Get credentials' assigned tenants and resources
-				authz = await build_credentials_authz(
-					self.OpenIdConnectService.TenantService, self.OpenIdConnectService.RoleService, anonymous_cid)
-
-				# Authorize access to tenants requested in scope
-				try:
-					tenants = await self.authorize_tenants_by_scope(
-						scope, authz, anonymous_cid, client_id)
-				except exceptions.AccessDeniedError:
-					raise OAuthAuthorizeError(
-						AuthErrorResponseCode.AccessDenied, client_id,
-						redirect_uri=redirect_uri,
-						state=state,
-						struct_data={"reason": "tenant_not_found"})
-
-				if authorize_type == "openid":
-					new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-						anonymous_cid, client_id, scope,
-						tenants=tenants,
-						code_challenge=code_challenge,
-						code_challenge_method=code_challenge_method,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-				elif authorize_type == "cookie":
-					new_session = await self.CookieService.create_anonymous_cookie_client_session(
-						anonymous_cid, client_id, scope,
-						tenants=tenants,
-						requested_expiration=self.SessionService.AnonymousExpiration,
-						from_info=from_info)
-					# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
-					redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
-				else:
-					raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
+				raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
 
 			# Anonymous sessions need to be audited
-			await self.OpenIdConnectService.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
-				"cid": new_session.Credentials.Id,
-				"sid": str(new_session.SessionId),
-				"fi": from_info})
+			await self.OpenIdConnectService.AuditService.append(
+				AuditCode.ANONYMOUS_SESSION_CREATED,
+				credentials_id=new_session.Credentials.Id,
+				client_id=client_id,
+				scope=scope,
+				session_id=str(new_session.SessionId),
+				fi=from_info)
 
-		await self.audit_authorize_success(new_session)
-		return await self.reply_with_successful_response(new_session, scope, redirect_uri, state)
+		await self.audit_authorize_success(new_session, from_info)
+		return await self.reply_with_successful_response(
+			new_session, scope, redirect_uri, state,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method)
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
 		cookie_entry_uri = client_dict.get("cookie_entry_uri")
@@ -530,11 +550,9 @@ class AuthorizeHandler(object):
 	async def _authorize_client(self, client_id, redirect_uri, client_secret=None):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-		except KeyError:
-			L.error("Client ID not found.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				struct_data={"reason": "client_id_not_found"})
+		except KeyError as e:
+			raise client.exceptions.ClientNotFoundError(client_id) from e
+
 		try:
 			await self.OpenIdConnectService.ClientService.authorize_client(
 				client=client_dict,
@@ -546,11 +564,8 @@ class AuthorizeHandler(object):
 			L.error("Invalid client secret.", struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.UnauthorizedClient, client_id)
-		except client.exceptions.InvalidRedirectURI:
-			L.error("Invalid client secret.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_id,
-				struct_data={"reason": "invalid_redirect_uri"})
+		except client.exceptions.InvalidRedirectURI as e:
+			raise e
 		except client.exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
@@ -563,7 +578,7 @@ class AuthorizeHandler(object):
 			# OpenID Connect requests MUST contain the openid scope value.
 			# Otherwise, the request is not considered OpenID and its behavior is unspecified
 			if "cookie" in scope:
-				L.warning("Scope cannot contain 'openid' and 'cookie' at the same time.", struct_data={
+				L.error("Scope cannot contain 'openid' and 'cookie' at the same time.", struct_data={
 					"scope": " ".join(scope)})
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidScope, client_id,
@@ -575,7 +590,7 @@ class AuthorizeHandler(object):
 			return "cookie"
 
 		else:
-			L.warning("Scope must contain 'openid' or 'cookie'.", struct_data={"scope": " ".join(scope)})
+			L.error("Scope must contain 'openid' or 'cookie'.", struct_data={"scope": " ".join(scope)})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidScope, client_id,
 				error_description="Scope must contain 'openid' or 'cookie'.",
@@ -604,6 +619,8 @@ class AuthorizeHandler(object):
 	async def reply_with_successful_response(
 		self, session, scope: list, redirect_uri: str,
 		state: str = None,
+		code_challenge: str = None,
+		code_challenge_method: str = None
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -625,7 +642,11 @@ class AuthorizeHandler(object):
 			url_qs["state"] = state
 
 		# Add the Authorization Code into the response
-		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(session.SessionId)
+		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(
+			session,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method
+		)
 
 		# Success
 		url = urllib.parse.urlunparse((
@@ -815,25 +836,25 @@ class AuthorizeHandler(object):
 			)
 		return aiohttp.web.HTTPFound(redirect)
 
+	async def audit_authorize_success(self, session, from_info):
+		await self.OpenIdConnectService.AuditService.append(
+			AuditCode.AUTHORIZE_SUCCESS,
+			credentials_id=session.Credentials.Id,
+			client_id=session.OAuth2.ClientId,
+			session_id=str(session.Session.Id),
+			scope=session.OAuth2.Scope,
+			tenants=[t for t in session.Authorization.Authz if t != "*"],
+			fi=from_info)
 
-	async def audit_authorize_success(self, session):
-		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_SUCCESS, {
-			"cid": session.Credentials.Id,
-			"tenants": [t for t in session.Authorization.Authz if t != "*"],
-			"client_id": session.OAuth2.ClientId,
-			"scope": session.OAuth2.Scope,
-		})
 
-
-	async def audit_authorize_error(self, error: OAuthAuthorizeError):
-		d = {
-			"client_id": error.ClientId,
-			"error": error.Error,
-			**error.StructData
-		}
-		if error.CredentialsId is not None:
-			d["cid"] = error.CredentialsId
-		await self.OpenIdConnectService.AuditService.append(AuditCode.AUTHORIZE_ERROR, d)
+	async def audit_authorize_error(self, error: OAuthAuthorizeError, access_ips: list = None):
+		await self.OpenIdConnectService.AuditService.append(
+			AuditCode.AUTHORIZE_ERROR,
+			error=error.Error,
+			credentials_id=error.CredentialsId,
+			client_id=error.ClientId,
+			access_ips=access_ips,
+			**error.StructData)
 
 
 	async def authorize_tenants_by_scope(self, scope, authz, credentials_id, client_id):
@@ -889,7 +910,7 @@ class AuthorizeHandler(object):
 		# Check for required parameters
 		client_id = request_parameters.get("client_id") or None
 		if client_id is None:
-			L.warning("Missing or empty required parameter: {}.".format("client_id"), struct_data=request_parameters)
+			L.error("Missing or empty required parameter: {}.".format("client_id"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=request_parameters.get("redirect_uri"),
@@ -900,7 +921,7 @@ class AuthorizeHandler(object):
 		# NOTE: "redirect_uri" is required only by OIDC, not generic OAuth
 		redirect_uri = request_parameters.get("redirect_uri") or None
 		if redirect_uri is None:
-			L.warning("Missing or empty required parameter: {}.".format("redirect_uri"), struct_data=request_parameters)
+			L.error("Missing or empty required parameter: {}.".format("redirect_uri"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=redirect_uri,
@@ -910,7 +931,7 @@ class AuthorizeHandler(object):
 
 		response_type = request_parameters.get("response_type") or None
 		if response_type is None:
-			L.warning(
+			L.error(
 				"Missing or empty required parameter: {}.".format("response_type"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
@@ -919,7 +940,7 @@ class AuthorizeHandler(object):
 				state=state,
 				struct_data={"reason": "missing_query_parameter"})
 		elif response_type != "code":
-			L.warning("Unsupported response type.", struct_data=request_parameters)
+			L.error("Unsupported response type.", struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.UnsupportedResponseType, client_id,
 				redirect_uri=redirect_uri,
@@ -928,7 +949,7 @@ class AuthorizeHandler(object):
 		# NOTE: "scope" is required only by OIDC, not generic OAuth
 		scope = request_parameters.get("scope") or None
 		if scope is None:
-			L.warning("Missing or empty required parameter: {}.".format("scope"), struct_data=request_parameters)
+			L.error("Missing or empty required parameter: {}.".format("scope"), struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=redirect_uri,
@@ -940,7 +961,7 @@ class AuthorizeHandler(object):
 		if prompt is not None:
 			# TODO: Prompt can be a list of multiple values (e.g. "prompt=select_account,consent")
 			if prompt not in frozenset(["none", "login", "select_account"]):
-				L.warning("Unsupported prompt.", struct_data={"prompt": prompt})
+				L.error("Unsupported prompt.", struct_data={"prompt": prompt})
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidRequest, client_id,
 					error_description="Invalid prompt value: {}".format(prompt),

@@ -30,6 +30,8 @@ class SMTPProvider(CommunicationProviderABC):
 	def __init__(self, provider_id, config_section_name):
 		super().__init__(provider_id, config_section_name)
 
+		if "smtp" in asab.Config:
+			self.Config.update(asab.Config["smtp"])
 		self.SSL = self.Config.getboolean("ssl")
 		self.StartTLS = self.Config.getboolean("starttls")
 		self.Host = self.Config.get("host")

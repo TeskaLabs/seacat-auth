@@ -22,7 +22,7 @@ class SessionData:
 	Expiration: datetime.datetime
 	MaxExpiration: datetime.datetime
 	ExpirationExtension: int
-	TrackId: typing.Optional[str]
+	TrackId: typing.Optional[bytes]
 
 
 @dataclasses.dataclass
@@ -61,7 +61,7 @@ class OAuth2Data:
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
-	PKCE: typing.Optional[dict]
+	Nonce: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -79,6 +79,8 @@ class SessionAdapter:
 	"""
 	Light object that represent a momentary view on the persisted session
 	"""
+
+	ALGORITHMIC_SESSION_ID = "<algorithmic>"
 
 	class FN:
 		"""
@@ -133,7 +135,7 @@ class SessionAdapter:
 			RefreshToken = "oa_rt"
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
-			PKCE = "oa_pkce"
+			Nonce = "oa_no"
 
 		class Cookie:
 			_prefix = "ck"
@@ -253,7 +255,6 @@ class SessionAdapter:
 				self.FN.OAuth2.RefreshToken: self.OAuth2.RefreshToken,
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
-				self.FN.OAuth2.PKCE: self.OAuth2.PKCE,
 			})
 
 		if self.Batman is not None:
@@ -268,6 +269,12 @@ class SessionAdapter:
 	def rest_get(self):
 		session_dict = self.serialize()
 		return rest_get(session_dict)
+
+	def is_algorithmic(self):
+		return self.SessionId == self.ALGORITHMIC_SESSION_ID
+
+	def is_anonymous(self):
+		return self.Authentication is not None and self.Authentication.IsAnonymous
 
 	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields
@@ -352,7 +359,7 @@ class SessionAdapter:
 				id_token = id_token.decode("ascii")
 			except UnicodeDecodeError:
 				# Probably old ID token, encoded differently
-				L.warning("Cannot deserialize ID token", struct_data={"id_token": id_token})
+				L.error("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
 		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
 		if access_token is not None:
@@ -363,15 +370,13 @@ class SessionAdapter:
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 
-		pkce = session_dict.pop(cls.FN.OAuth2.PKCE, None)
-
 		return OAuth2Data(
 			IDToken=id_token,
 			AccessToken=access_token,
 			RefreshToken=refresh_token,
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
-			PKCE=pkce,
+			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
 		)
 
 	@classmethod
