@@ -110,7 +110,7 @@ class AuthenticationHandler(object):
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
 		if credentials_id is None or credentials_id == []:
-			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
+			L.log(asab.LOG_NOTICE, "Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session
 			credentials_id = ""
 
@@ -134,15 +134,10 @@ class AuthenticationHandler(object):
 		if login_descriptors is None:
 			# Prepare fallback login descriptors for fake login session
 			credentials_id = ""
-			L.warning("Creating fake login session.", struct_data={"ident": ident})
 			login_descriptors = await self.AuthenticationService.prepare_fallback_login_descriptors(
 				credentials_id=credentials_id,
 				request_headers=request.headers
 			)
-
-		if login_descriptors is None:
-			L.error("Fatal error: Failed to prepare fallback login descriptors.", struct_data={"ident": ident})
-			raise aiohttp.web.HTTPInternalServerError()
 
 		login_session = await self.AuthenticationService.create_login_session(
 			credentials_id=credentials_id,
@@ -150,6 +145,10 @@ class AuthenticationHandler(object):
 			login_descriptors=login_descriptors,
 			ident=ident,
 		)
+
+		if login_session.CredentialsId == "":
+			L.log(asab.LOG_NOTICE, "Fake login session created.", struct_data={
+				"ident": ident, "lsid": login_session.Id})
 
 		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 
@@ -216,13 +215,10 @@ class AuthenticationHandler(object):
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			# TODO: Log also the IP address
 			await self.AuditService.append(
 				AuditCode.LOGIN_FAILED,
-				{
-					'cid': login_session.CredentialsId,
-					'ips': access_ips,
-				}
+				credentials_id=login_session.CredentialsId,
+				ips=access_ips
 			)
 
 			L.warning("Login failed: authentication failed", struct_data={
@@ -508,23 +504,19 @@ class AuthenticationHandler(object):
 		except seacatauth.exceptions.AccessDeniedError as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": impersonator_from_info,
-				}
+				credentials_id=impersonator_cid,
+				session_id=impersonator_root_session.SessionId,
+				target_cid=target_cid,
+				fi=impersonator_from_info
 			)
 			raise aiohttp.web.HTTPForbidden() from e
 		except Exception as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": impersonator_from_info,
-				}
+				credentials_id=impersonator_cid,
+				session_id=impersonator_root_session.SessionId,
+				target_cid=target_cid,
+				fi=impersonator_from_info
 			)
 			raise e
 		else:
@@ -541,12 +533,10 @@ class AuthenticationHandler(object):
 			)
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_SUCCESSFUL,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": session.Session.Id,
-					"fi": impersonator_from_info,
-				}
+				credentials_id=impersonator_cid,
+				session_id=impersonator_root_session.SessionId,
+				target_cid=target_cid,
+				target_sid=session.Session.Id,
+				fi=impersonator_from_info
 			)
 		return session

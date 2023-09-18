@@ -115,16 +115,20 @@ class TokenHandler(object):
 		# Ensure the Authorization Code was issued to the authenticated Client
 		authorization_code = qs_data.get("code", "")
 		if len(authorization_code) == 0:
-			L.warning("Authorization Code not provided")
+			L.error("Authorization Code not provided")
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
-		# Translate authorization code into session id
-		# Verify that the Authorization Code has not been previously used (using `pop` operation)
+		# Locate the session by authorization code
 		try:
-			session_id = await self.OpenIdConnectService.pop_session_id_by_authorization_code(authorization_code)
+			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(
+				authorization_code, qs_data.get("code_verifier"))
 		except KeyError:
-			L.warning("Authorization code not found", struct_data={"code": authorization_code})
+			L.error("Session not found.", struct_data={"code": authorization_code})
+			return asab.web.rest.json_response(
+				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+		except CodeChallengeFailedError as e:
+			L.error("Code challenge failed.", struct_data={"reason": str(e)})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
@@ -132,29 +136,6 @@ class TokenHandler(object):
 		#   once, the authorization server MUST deny the request and SHOULD
 		#   revoke (when possible) all tokens previously issued based on
 		#   that authorization code. (https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2)
-
-		# Locate the session using session id
-		try:
-			new_session = await self.SessionService.get(session_id)
-		except KeyError:
-			L.error("Session not found", struct_data={"sid": session_id})
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-
-		if new_session.OAuth2.PKCE is not None:
-			try:
-				self.OpenIdConnectService.PKCE.evaluate_code_challenge(
-					new_session.OAuth2.PKCE["method"],
-					new_session.OAuth2.PKCE["challenge"],
-					qs_data.get("code_verifier"))
-			except CodeChallengeFailedError as e:
-				L.log(asab.LOG_NOTICE, "Code challenge failed.", struct_data={"reason": str(e)})
-				return asab.web.rest.json_response(
-					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-			except Exception as e:
-				L.error("Code challenge error: {}".format(e), exc_info=True)
-				return asab.web.rest.json_response(
-					request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
 		# TODO: Check if the redirect URL is the same as the one in the authorization request:
 		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
@@ -187,21 +168,22 @@ class TokenHandler(object):
 			"Pragma": "no-cache",
 		}
 
-		expires_in = int((new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
-
 		id_token = await self.OpenIdConnectService.build_id_token(new_session)
 
 		# 3.1.3.3.  Successful Token Response
-		body = {
+		data = {
 			"token_type": "Bearer",
 			"scope": " ".join(new_session.OAuth2.Scope),
 			"access_token": new_session.OAuth2.AccessToken,
 			"id_token": id_token,
-			"expires_in": expires_in,
 			# TODO: Include refresh_token
 		}
 
-		return asab.web.rest.json_response(request, body, headers=headers)
+		if new_session.Session.Expiration:
+			data["expires_in"] = int(
+				(new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+
+		return asab.web.rest.json_response(request, data, headers=headers)
 
 
 	@asab.web.rest.json_schema_handler({
