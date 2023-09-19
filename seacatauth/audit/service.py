@@ -42,38 +42,35 @@ class AuditService(asab.Service):
 		"""
 		assert (isinstance(code, AuditCode))
 
-		upsertor = self.StorageService.upsertor(
-			self.AuditCollection, version=0)
-		upsertor.set("c", code.name)
+		# Do not use upsertor because it can trigger webhook
+		now = datetime.datetime.now(datetime.timezone.utc)
+		entry = {
+			"_c": now,
+			"c": code.name
+		}
 		if credentials_id is not None:
-			upsertor.set("cid", credentials_id)
+			entry["cid"] = credentials_id
 		if client_id is not None:
-			upsertor.set("clid", client_id)
+			entry["clid"] = client_id
 		if session_id is not None:
-			upsertor.set("sid", session_id)
+			entry["sid"] = session_id
 		if tenant is not None:
-			upsertor.set("t", tenant)
-		for k, v in kwargs.items():
-			upsertor.set(k, v)
+			entry["t"] = tenant
+		entry.update(kwargs)
 
-		await upsertor.execute(event_type=EventTypes.AUDIT_ENTRY_CREATED)
+		coll = await self.StorageService.collection(self.AuditCollection)
+		await coll.insert_one(entry)
 
 		if code in self.LastCredentialsEventCodes:
 			await self._upsert_last_credentials_event(code, credentials_id, **kwargs)
 
 
 	async def _upsert_last_credentials_event(self, code: AuditCode, credentials_id: str, **kwargs):
-		try:
-			last_events = await self.StorageService.get(self.LastCredentialsEventCollection, credentials_id)
-			version = last_events["_v"]
-		except KeyError:
-			version = 0
-
 		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
-		upsertor = self.StorageService.upsertor(
-			self.LastCredentialsEventCollection, obj_id=credentials_id, version=version)
-		upsertor.set(code.name, kwargs)
-		await upsertor.execute(event_type=EventTypes.LAST_CREDENTIALS_EVENT_UPDATED)
+
+		# Do not use upsertor because it can trigger webhook
+		coll = await self.StorageService.collection(self.LastCredentialsEventCollection)
+		await coll.update_one({"_id": credentials_id}, {"$set": {code.name: kwargs}}, upsert=True)
 
 
 	async def delete_old_entries(self, before_datetime: datetime.datetime):
