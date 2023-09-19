@@ -4,7 +4,6 @@ import logging
 import asab.storage.exceptions
 
 from .codes import AuditCode
-from ..events import EventTypes
 
 #
 
