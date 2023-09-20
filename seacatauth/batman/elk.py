@@ -53,10 +53,11 @@ class ELKIntegration(asab.config.Configurable):
 	def __init__(self, batman_svc, config_section_name="batman:elk", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
 		self.BatmanService = batman_svc
-		self.CredentialsService = self.BatmanService.App.get_service("seacatauth.CredentialsService")
-		self.TenantService = self.BatmanService.App.get_service("seacatauth.TenantService")
-		self.RoleService = self.BatmanService.App.get_service("seacatauth.RoleService")
-		self.ResourceService = self.BatmanService.App.get_service("seacatauth.ResourceService")
+		self.App = self.BatmanService.App
+		self.CredentialsService = self.App.get_service("seacatauth.CredentialsService")
+		self.TenantService = self.App.get_service("seacatauth.TenantService")
+		self.RoleService = self.App.get_service("seacatauth.RoleService")
+		self.ResourceService = self.App.get_service("seacatauth.ResourceService")
 
 		username = self.Config.get("username")
 		password = self.Config.get("password")
@@ -74,23 +75,24 @@ class ELKIntegration(asab.config.Configurable):
 		else:
 			self.Headers = None
 
-		self.URL = self.Config.get("url").rstrip("/")
+		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
 		self.ResourcePrefix = self.Config.get("resource_prefix")
 		self.ELKResourceRegex = re.compile("^{}".format(
 			re.escape(self.Config.get("resource_prefix"))
 		))
 		self.ELKSeacatFlagRole = self.Config.get("seacat_user_flag")
 
-		lu = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
-		lu.append(username)
+		local_users = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
+		local_users.append(username)
+		self.LocalUsers = frozenset(local_users)
 
-		self.LocalUsers = frozenset(lu)
+		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 		# Prep for SSL
 		self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
-		if self.URL.startswith("https://"):
+		if self.ElasticSearchUrl.startswith("https://"):
 			self.SSLContext = self.SSLContextBuilder.build(ssl.PROTOCOL_TLS_CLIENT)
 		else:
 			self.SSLContext = None
@@ -113,7 +115,7 @@ class ELKIntegration(asab.config.Configurable):
 		try:
 			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
 				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.get("{}/_xpack/security/role".format(self.URL)) as resp:
+					async with session.get("{}/_xpack/security/role".format(self.ElasticSearchUrl)) as resp:
 						if resp.status != 200:
 							text = await resp.text()
 							L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
@@ -205,7 +207,10 @@ class ELKIntegration(asab.config.Configurable):
 		try:
 			async with aiohttp.TCPConnector(ssl=self.SSLContext) as conn:
 				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.post("{}/_xpack/security/user/{}".format(self.URL, username), json=json) as resp:
+					async with session.post(
+						"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
+						json=json
+					) as resp:
 						if resp.status == 200:
 							# Everything is alright here
 							pass
