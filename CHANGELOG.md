@@ -7,6 +7,7 @@
 
 ### Features
 - Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
+- Webauthn authenticator metadata (#256, PLUM Sprint 230908)
 
 ---
 
