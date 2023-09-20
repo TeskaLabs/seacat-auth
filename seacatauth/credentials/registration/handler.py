@@ -66,6 +66,7 @@ class RegistrationHandler(object):
 		Common user request to invite a new user to join specified tenant and create an account
 		if they don't have one yet. The invited user gets a registration link in their email.
 		"""
+		# TODO: Limit the number of requests
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
 		forwarded_for = request.headers.get("X-Forwarded-For")
