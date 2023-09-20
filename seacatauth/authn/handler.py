@@ -110,7 +110,7 @@ class AuthenticationHandler(object):
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
 		if credentials_id is None or credentials_id == []:
-			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
+			L.log(asab.LOG_NOTICE, "Cannot locate credentials.", struct_data={"ident": ident})
 			# Empty credentials is used for creating a fake login session
 			credentials_id = ""
 
@@ -134,15 +134,10 @@ class AuthenticationHandler(object):
 		if login_descriptors is None:
 			# Prepare fallback login descriptors for fake login session
 			credentials_id = ""
-			L.warning("Creating fake login session.", struct_data={"ident": ident})
 			login_descriptors = await self.AuthenticationService.prepare_fallback_login_descriptors(
 				credentials_id=credentials_id,
 				request_headers=request.headers
 			)
-
-		if login_descriptors is None:
-			L.error("Fatal error: Failed to prepare fallback login descriptors.", struct_data={"ident": ident})
-			raise aiohttp.web.HTTPInternalServerError()
 
 		login_session = await self.AuthenticationService.create_login_session(
 			credentials_id=credentials_id,
@@ -150,6 +145,10 @@ class AuthenticationHandler(object):
 			login_descriptors=login_descriptors,
 			ident=ident,
 		)
+
+		if login_session.CredentialsId == "":
+			L.log(asab.LOG_NOTICE, "Fake login session created.", struct_data={
+				"ident": ident, "lsid": login_session.Id})
 
 		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 

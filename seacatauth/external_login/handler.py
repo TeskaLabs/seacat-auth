@@ -50,7 +50,7 @@ class ExternalLoginHandler(object):
 
 		state = request.query.get("state")
 		if state is None:
-			L.warning("State parameter not provided in external login response")
+			L.error("State parameter not provided in external login response")
 
 		code = request.query.get("code")
 		if code is None:

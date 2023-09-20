@@ -1,13 +1,12 @@
 import datetime
 import json
-import os.path
 import base64
 import secrets
 import logging
-import uuid
 
 import asab
 import asab.web.rest
+import asab.exceptions
 
 import aiohttp.web
 import urllib.parse
@@ -20,9 +19,6 @@ from ..session import SessionAdapter
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
-	login_descriptor_session_builder,
-	external_login_session_builder,
-	available_factors_session_builder
 )
 from .session import oauth2_session_builder
 from ..audit import AuditCode
@@ -85,14 +81,21 @@ class OpenIdConnectService(asab.Service):
 					"OpenID Connect issuer must be a URL that uses the 'https' scheme "
 					"and has no query or fragment components.")
 		else:
+			# Default fallback option
 			self.Issuer = self.PublicApiBaseUrl
-			L.log(asab.LOG_NOTICE, "OAuth2 issuer not specified. Assuming '{}'.".format(self.Issuer))
 
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
 		)
 
-		self.PrivateKey = self._load_private_key()
+		self.DisableRedirectUriValidation = asab.Config.getboolean(
+			"openidconnect", "_disable_redirect_uri_validation", fallback=False)
+		if self.DisableRedirectUriValidation:
+			# This is a dev-only option
+			L.warning("Redirect URI validation in OpenID Authorize requests is disabled.")
+
+		# TODO: Derive the private key
+		self.PrivateKey = app.PrivateKey
 
 		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
@@ -103,77 +106,32 @@ class OpenIdConnectService(asab.Service):
 		await self._delete_expired_authorization_codes()
 
 
-	def _load_private_key(self):
+	async def generate_authorization_code(
+		self,
+		session: SessionAdapter,
+		code_challenge: str = None,
+		code_challenge_method: str = None
+	):
 		"""
-		Load private key from file.
-		If it does not exist, generate a new one and write to file.
+		Generates a random authorization code and stores it as a temporary
+		session identifier until the session is retrieved.
 		"""
-		# TODO: Add encryption option
-		# TODO: Multiple key support
-		private_key_path = asab.Config.get("openidconnect", "private_key")
-		if len(private_key_path) == 0:
-			# Use config folder
-			private_key_path = os.path.join(
-				os.path.dirname(asab.Config.get("general", "config_file")),
-				"private-key.pem"
-			)
-			L.log(
-				asab.LOG_NOTICE,
-				"OpenIDConnect private key file not specified. Defaulting to '{}'.".format(private_key_path)
-			)
-
-		if os.path.isfile(private_key_path):
-			with open(private_key_path, "rb") as f:
-				private_key = jwcrypto.jwk.JWK.from_pem(f.read())
-		elif self.App.Provisioning:
-			# Generate a new private key
-			L.warning(
-				"OpenIDConnect private key file does not exist. Generating a new one."
-			)
-			private_key = self._generate_private_key(private_key_path)
-		else:
-			raise FileNotFoundError(
-				"Private key file '{}' does not exist. "
-				"Run the app in provisioning mode to generate a new private key.".format(private_key_path)
-			)
-
-		assert private_key.key_type == "EC"
-		assert private_key.key_curve == "P-256"
-		return private_key
-
-
-	def _generate_private_key(self, private_key_path):
-		assert not os.path.isfile(private_key_path)
-
-		import cryptography.hazmat.backends
-		import cryptography.hazmat.primitives.serialization
-		import cryptography.hazmat.primitives.asymmetric.ec
-		import cryptography.hazmat.primitives.ciphers.algorithms
-		_private_key = cryptography.hazmat.primitives.asymmetric.ec.generate_private_key(
-			cryptography.hazmat.primitives.asymmetric.ec.SECP256R1(),
-			cryptography.hazmat.backends.default_backend()
-		)
-		# Serialize into PEM
-		private_pem = _private_key.private_bytes(
-			encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
-			format=cryptography.hazmat.primitives.serialization.PrivateFormat.PKCS8,
-			encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption()
-		)
-		with open(private_key_path, "wb") as f:
-			f.write(private_pem)
-		L.log(
-			asab.LOG_NOTICE,
-			"New private key written to '{}'.".format(private_key_path)
-		)
-		private_key = jwcrypto.jwk.JWK.from_pem(private_pem)
-		return private_key
-
-
-	async def generate_authorization_code(self, session_id):
+		# TODO: Store PKCE challenge here, not in the session object
 		code = secrets.token_urlsafe(36)
 		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
 
-		upsertor.set("sid", session_id)
+		if session.is_algorithmic():
+			algo_token = self.SessionService.Algorithmic.serialize(session)
+			upsertor.set("alt", algo_token.encode("ascii"), encrypt=True)
+			upsertor.set("client_id", session.OAuth2.ClientId)
+			upsertor.set("scope", session.OAuth2.Scope)
+		else:
+			upsertor.set("sid", session.SessionId)
+
+		if code_challenge:
+			upsertor.set("cc", code_challenge)
+			upsertor.set("ccm", code_challenge_method)
+
 		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
 
 		await upsertor.execute(event_type=EventTypes.OPENID_AUTH_CODE_GENERATED)
@@ -192,18 +150,33 @@ class OpenIdConnectService(asab.Service):
 			})
 
 
-	async def pop_session_id_by_authorization_code(self, code):
+	async def pop_session_by_authorization_code(self, code, code_verifier: str = None):
+		"""
+		Retrieves session by its temporary authorization code.
+		"""
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 		data = await collection.find_one_and_delete(filter={"_id": code})
 		if data is None:
-			raise KeyError("Authorization code not found")
+			raise KeyError("Authorization code not found.")
 
-		session_id = data["sid"]
 		exp = data["exp"]
 		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Authorization code expired")
+			raise KeyError("Authorization code expired.")
 
-		return session_id
+		if "cc" in data:
+			self.PKCE.evaluate_code_challenge(
+				code_challenge_method=data["ccm"],
+				code_challenge=data["cc"],
+				code_verifier=code_verifier)
+
+		if "sid" in data:
+			return await self.SessionService.get(data["sid"])
+		elif "alt" in data:
+			algo_token = self.StorageService.aes_decrypt(data["alt"])
+			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
+		else:
+			L.error("Unexpected authorization code object.", struct_data=data)
+			raise KeyError("Invalid authorization code.")
 
 
 	async def get_session_by_access_token(self, token_value):
@@ -231,23 +204,23 @@ class OpenIdConnectService(asab.Service):
 			L.warning("ID token expired")
 			return None
 		except jwcrypto.jws.InvalidJWSSignature:
-			L.warning("Invalid ID token signature")
+			L.error("Invalid ID token signature")
 			return None
 
 		try:
 			data_dict = json.loads(token.claims)
 			session_id = data_dict["sid"]
 		except ValueError:
-			L.warning("Cannot read ID token claims")
+			L.error("Cannot read ID token claims")
 			return None
 		except KeyError:
-			L.warning("ID token claims do not contain 'sid'")
+			L.error("ID token claims do not contain 'sid'")
 			return None
 
 		try:
 			session = await self.SessionService.get(session_id)
 		except ValueError:
-			L.warning("Session not found")
+			L.error("Session not found")
 			return None
 
 		return session
@@ -267,10 +240,9 @@ class OpenIdConnectService(asab.Service):
 
 	async def create_oidc_session(
 		self, root_session, client_id, scope,
+		nonce=None,
 		tenants=None,
-		requested_expiration=None,
-		code_challenge: str = None,
-		code_challenge_method: str = None
+		requested_expiration=None
 	):
 		# TODO: Choose builders based on scope
 		# Make sure dangerous resources are removed from impersonated sessions
@@ -290,11 +262,6 @@ class OpenIdConnectService(asab.Service):
 			)
 		]
 
-		if code_challenge is not None:
-			session_builders.append((
-				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
-			))
-
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
@@ -305,12 +272,7 @@ class OpenIdConnectService(asab.Service):
 				),
 			])
 
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
@@ -340,69 +302,30 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_anonymous_oidc_session(
-		self, anonymous_cid, client_id, scope,
-		login_descriptor=None,
-		track_id=None,
-		root_session_id=None,
-		tenants=None,
-		requested_expiration=None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
-		from_info=None,
+		self, anonymous_cid: str, client_dict: dict, scope: list,
+		track_id: bytes = None,
+		tenants: list = None,
+		from_info=None
 	):
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
-		session_builders = [
-			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
-			await credentials_session_builder(self.CredentialsService, anonymous_cid, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=anonymous_cid,
-				tenants=tenants,
-			)
-		]
+		session = await self.SessionService.Algorithmic.create_anonymous_session(
+			created_at=datetime.datetime.now(datetime.timezone.utc),
+			track_id=track_id,
+			client_dict=client_dict,
+			scope=scope)
 
-		if code_challenge is not None:
-			session_builders.append((
-				(SessionAdapter.FN.OAuth2.PKCE, {"challenge": code_challenge, "method": code_challenge_method}),
-			))
-
-		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			authn_service = self.App.get_service("seacatauth.AuthenticationService")
-			session_builders.append(login_descriptor_session_builder(login_descriptor))
-			session_builders.append(await external_login_session_builder(ext_login_svc, anonymous_cid))
-			# TODO: Get factors from root_session?
-			session_builders.append(await available_factors_session_builder(authn_service, anonymous_cid))
-
-		# TODO: if 'openid' in scope
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
-
-		# Obtain Track ID if there is any in the root session
-		if track_id is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
-
-		session = await self.SessionService.create_session(
-			session_type="openidconnect",
-			parent_session_id=root_session_id,
-			expiration=requested_expiration,
-			session_builders=session_builders,
-		)
+		session.OAuth2.AccessToken = self.SessionService.Algorithmic.serialize(session)
 
 		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
 			"cid": anonymous_cid,
-			"client_id": client_id,
-			"sid": str(session.Session.Id),
+			"client_id": client_dict["_id"],
+			"track_id": track_id,
 			"fi": from_info})
 
 		# Add an audit entry
 		await self.AuditService.append(
 			AuditCode.ANONYMOUS_SESSION_CREATED,
 			credentials_id=anonymous_cid,
-			client_id=client_id,
+			client_id=client_dict["_id"],
 			session_id=str(session.Session.Id),
 			fi=from_info)
 
@@ -419,10 +342,12 @@ class OpenIdConnectService(asab.Service):
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			"exp": session.Session.Expiration,
-			"iat": datetime.datetime.now(datetime.timezone.utc),
+			"iat": session.CreatedAt,
 			"sid": session.SessionId,
 		}
+
+		if session.Session.Expiration is not None:
+			userinfo["exp"] = session.Session.Expiration
 
 		if session.Session.ParentSessionId is not None:
 			userinfo["psid"] = session.Session.ParentSessionId
@@ -435,6 +360,9 @@ class OpenIdConnectService(asab.Service):
 
 		if session.OAuth2.Scope is not None:
 			userinfo["scope"] = session.OAuth2.Scope
+
+		if session.OAuth2.Nonce is not None:
+			userinfo["nonce"] = session.OAuth2.Nonce
 
 		if session.Credentials.Username is not None:
 			userinfo["preferred_username"] = session.Credentials.Username
@@ -456,11 +384,18 @@ class OpenIdConnectService(asab.Service):
 		if session.Credentials.CreatedAt is not None:
 			userinfo["created_at"] = session.Credentials.CreatedAt
 
-		if session.Authentication.IsAnonymous:
+		if session.is_anonymous():
 			userinfo["anonymous"] = True
 
 		if session.TrackId is not None:
-			userinfo["track_id"] = uuid.UUID(bytes=session.TrackId)
+			track_id_hex = session.TrackId.hex()
+			track_id = "{}-{}-{}-{}-{}".format(
+				track_id_hex[:8],
+				track_id_hex[8:12],
+				track_id_hex[12:16],
+				track_id_hex[16:20],
+				track_id_hex[20:],)
+			userinfo["track_id"] = track_id
 
 		if session.Authentication.ImpersonatorSessionId:
 			userinfo["impersonator_sid"] = session.Authentication.ImpersonatorSessionId

@@ -26,10 +26,13 @@ asab.Config.add_defaults({
 		"listen": "3081",  # Well-known port
 	},
 
+	"seacatauth": {
+		"private_key": "",
+	},
+
 	"openidconnect": {
 		"bearer_realm": "asab",
 		"auth_code_timeout": "60 s",
-		"private_key": "",
 	},
 
 	"seacatauth:client": {
@@ -159,6 +162,10 @@ asab.Config.add_defaults({
 
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
+
+		# Algorithmic sessions cache data about tenant and resource authorization.
+		# This option sets the validity period of that data.
+		"algo_cache_expiration": "3 m",
 	},
 
 	"seacatauth:password": {
