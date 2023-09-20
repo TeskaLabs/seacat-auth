@@ -59,6 +59,9 @@ class ELKIntegration(asab.config.Configurable):
 		self.RoleService = self.App.get_service("seacatauth.RoleService")
 		self.ResourceService = self.App.get_service("seacatauth.ResourceService")
 
+		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
+		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
+
 		username = self.Config.get("username")
 		password = self.Config.get("password")
 		api_key = self.Config.get("api_key")
@@ -75,27 +78,25 @@ class ELKIntegration(asab.config.Configurable):
 		else:
 			self.Headers = None
 
-		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
 		self.ResourcePrefix = self.Config.get("resource_prefix")
 		self.ELKResourceRegex = re.compile("^{}".format(
 			re.escape(self.Config.get("resource_prefix"))
 		))
 		self.ELKSeacatFlagRole = self.Config.get("seacat_user_flag")
 
-		local_users = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
-		local_users.append(username)
-		self.LocalUsers = frozenset(local_users)
+		# Users that will not be synchronized to avoid conflicts with ELK system users
+		ignore_usernames = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
+		ignore_usernames.append(username)
+		self.IgnoreUsernames = frozenset(ignore_usernames)
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
-
-		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
-
-		# Prep for SSL
 		self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 		if self.ElasticSearchUrl.startswith("https://"):
 			self.SSLContext = self.SSLContextBuilder.build(ssl.PROTOCOL_TLS_CLIENT)
 		else:
 			self.SSLContext = None
+
+		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 
 
 	async def _on_tick(self, event_name):
@@ -158,8 +159,7 @@ class ELKIntegration(asab.config.Configurable):
 			L.info("Cannot create user: No username", struct_data={"cid": cred["_id"]})
 			return
 
-		if username in self.LocalUsers:
-			# Ignore users that are specified as local
+		if username in self.IgnoreUsernames:
 			return
 
 		json = {
