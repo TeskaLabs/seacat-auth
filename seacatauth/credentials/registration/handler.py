@@ -60,7 +60,7 @@ class RegistrationHandler(object):
 			"email": {"type": "string"},
 		}
 	})
-	@access_control("seacat:tenant:invite")
+	@access_control("seacat:tenant:assign")
 	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Common user request to invite a new user to join specified tenant and create an account
@@ -107,7 +107,7 @@ class RegistrationHandler(object):
 				"examples": ["6 h", "3d", "1w", 7200]},
 		},
 	})
-	@access_control("seacat:tenant:invite")
+	@access_control("seacat:tenant:assign")
 	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
