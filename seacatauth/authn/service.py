@@ -220,12 +220,15 @@ class AuthenticationService(asab.Service):
 		)
 
 	async def prepare_fallback_login_descriptors(self, credentials_id, request_headers):
-		return await self._prepare_login_descriptors(
+		login_descriptors = await self._prepare_login_descriptors(
 			self.LoginDescriptorFallback,
 			credentials_id,
 			request_headers,
 			login_preferences=None
 		)
+		if login_descriptors is None:
+			raise Exception("Failed to prepare fallback login descriptors.")
+		return login_descriptors
 
 	async def _prepare_login_descriptors(self, login_descriptors, credentials_id, request_headers, login_preferences=None):
 		ready_login_descriptors = []
@@ -279,7 +282,7 @@ class AuthenticationService(asab.Service):
 		"""
 		# Fail if we have a fake login session
 		if login_session.CredentialsId == "":
-			L.warning("Login failed: Fake login session")
+			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login_session.Id})
 			return False
 
 		# First make sure that the user is not suspended

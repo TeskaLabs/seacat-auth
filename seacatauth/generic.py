@@ -112,7 +112,9 @@ async def nginx_introspection(
 			return aiohttp.web.HTTPForbidden()
 
 	# Extend session expiration
-	session = await session_service.touch(session)
+	# (Do not extend algorithmic sessions)
+	if not session.is_algorithmic():
+		session = await session_service.touch(session)
 
 	id_token = await oidc_service.build_id_token(session)
 
@@ -178,6 +180,14 @@ def add_params_to_url_query(url, **params):
 	query.update(params)
 	parsed["query"] = urllib.parse.urlencode(query)
 	return urlunparse(**parsed)
+
+
+def get_request_access_ips(request) -> list:
+	access_ips = [request.remote]
+	ff = request.headers.get("X-Forwarded-For")
+	if ff is not None:
+		access_ips.extend(ff.split(", "))
+	return access_ips
 
 
 def generate_ergonomic_token(length: int):
