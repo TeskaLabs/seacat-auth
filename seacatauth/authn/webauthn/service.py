@@ -79,14 +79,19 @@ class WebAuthnService(asab.Service):
 		# TODO: Consider persistent local cache
 		if speculative and self._FidoMetadataByAAGUID is not None:
 			return
-		# FIXME: try/except
-		async with aiohttp.ClientSession() as session:
-			async with session.get(self.FidoMetadataServiceUrl) as resp:
-				if resp.status != 200:
-					text = await resp.text()
-					L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
-					return
-				jwt = await resp.text()
+
+		try:
+			async with aiohttp.ClientSession() as session:
+				async with session.get(self.FidoMetadataServiceUrl) as resp:
+					if resp.status != 200:
+						text = await resp.text()
+						L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
+						return
+					jwt = await resp.text()
+		except ConnectionError:
+			L.error("Cannot connect to FIDO Alliance Metadata Service.")
+			return
+
 		jwt = jwcrypto.jwt.JWT(jwt=jwt)
 		cert_chain = jwt.token.jose_header.get("x5c", [])
 		leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
@@ -97,12 +102,13 @@ class WebAuthnService(asab.Service):
 		public_key = jwcrypto.jwk.JWK.from_pem(public_key)
 		jwt.validate(public_key)
 		entries = json.loads(jwt.claims)["entries"]
+
 		# FIDO2 authenticators are identified with AAGUID
+		# Other identifiers (AAID, AKI) are not supported at the moment.
 		self._FidoMetadataByAAGUID = {
-			int(entry["aaguid"].replace("-", ""), 16): entry["metadataStatement"]
+			int(entry["aaguid"].replace("-", ""), 16): entry.get("metadataStatement")
 			for entry in entries
 			if "aaguid" in entry}
-		# TODO: U2F authenticators are identified with Attestation Key Identifier (AKI)
 
 
 	async def create_webauthn_credential(
@@ -145,10 +151,6 @@ class WebAuthnService(asab.Service):
 		await self._load_fido_metadata()
 		aaguid = int(verified_registration.aaguid.replace("-", ""), 16)
 		if aaguid == 0:
-			# TODO: Identify using Attestation Key Identifier (AKI)
-			#   https://fidoalliance.org/fido-technotes-the-truth-about-attestation/
-			#   This may be harder to implement since the AKI is only provided to trusted websites,
-			#   see https://www.chromium.org/security-keys/
 			metadata = None
 		else:
 			metadata = self._FidoMetadataByAAGUID.get(aaguid)
