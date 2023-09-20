@@ -341,6 +341,8 @@ class CredentialsService(asab.Service):
 			credentials_id=credentials_id,
 			by_cid=agent_cid)
 
+		self.App.PubSub.publish("Credentials.created!", credentials_id=credentials_id)
+
 		return {
 			"status": "OK",
 			"credentials_id": credentials_id,
@@ -457,6 +459,8 @@ class CredentialsService(asab.Service):
 			by_cid=agent_cid,
 			attributes=list(validated_data.keys()))
 
+		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials_id)
+
 		return {"status": "OK"}
 
 
@@ -505,6 +509,8 @@ class CredentialsService(asab.Service):
 			AuditCode.CREDENTIALS_DELETED,
 			credentials_id=credentials_id,
 			by_cid=agent_cid)
+
+		self.App.PubSub.publish("Credentials.deleted!", credentials_id=credentials_id)
 
 		return {
 			"status": result,

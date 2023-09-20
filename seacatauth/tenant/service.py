@@ -54,11 +54,16 @@ class TenantService(asab.Service):
 			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
 			raise asab.exceptions.Conflict(value=tenant_id)
 
+		self.App.PubSub.publish("Tenant.created!", tenant_id=tenant_id)
+
 		return tenant_id
 
 
 	async def update_tenant(self, tenant_id: str, **kwargs):
 		result = await self.TenantsProvider.update(tenant_id, **kwargs)
+
+		self.App.PubSub.publish("Tenant.updated!", tenant_id=tenant_id)
+
 		return {"result": result}
 
 
@@ -84,6 +89,8 @@ class TenantService(asab.Service):
 
 		# Delete tenant from provider
 		await self.TenantsProvider.delete(tenant_id)
+
+		self.App.PubSub.publish("Tenant.deleted!", tenant_id=tenant_id)
 
 		# Delete sessions that have the tenant in scope
 		await session_service.delete_sessions_by_tenant_in_scope(tenant_id)
