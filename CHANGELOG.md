@@ -7,6 +7,7 @@
 
 ### Features
 - Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
+- Public invitations to tenant (#261, PLUM Sprint 230908)
 
 ---
 
