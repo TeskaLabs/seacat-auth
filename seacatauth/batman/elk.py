@@ -61,6 +61,7 @@ class ELKIntegration(asab.config.Configurable):
 
 		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
 		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
+		self.Headers = {"kbn-xsrf": "kibana"}
 
 		username = self.Config.get("username")
 		password = self.Config.get("password")
@@ -68,15 +69,9 @@ class ELKIntegration(asab.config.Configurable):
 		if username != "" and api_key != "":
 			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
 		if username != "":
-			self.Headers = {
-				"Authorization": aiohttp.BasicAuth(username, password).encode()
-			}
+			self.Headers["Authorization"] = aiohttp.BasicAuth(username, password).encode()
 		elif api_key != "":
-			self.Headers = {
-				"Authorization": "ApiKey {}".format(api_key)
-			}
-		else:
-			self.Headers = None
+			self.Headers["Authorization"] = "ApiKey {}".format(api_key)
 
 		self.ResourcePrefix = self.Config.get("resource_prefix")
 		self.ELKResourceRegex = re.compile("^{}".format(
@@ -103,6 +98,73 @@ class ELKIntegration(asab.config.Configurable):
 		await self._initialize_resources()
 		await self.sync_all()
 
+
+	async def _on_tenant_created(self, event_name, tenant_id):
+		space_id = await self._create_kibana_space(tenant_id)
+		await self._create_kibana_role(tenant_id, space_id)
+
+
+	async def _create_kibana_space(self, tenant_id):
+		tenant = await self.TenantService.get_tenant(tenant_id)
+		space_id = tenant_id
+		space = {
+			"id": tenant_id,  # TODO: Space ID cannot contain "." while tenant_id can!
+			"name": tenant.get("label", tenant_id)
+		}
+		if "description" in tenant:
+			space["description"] = tenant["description"]
+
+		try:
+			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
+				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
+					async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space) as resp:
+						if resp.status // 100 != 2:
+							text = await resp.text()
+							L.error("Failed to create Kibana space {!r}:\n{}".format(space_id, text[:1000]))
+							return
+		except Exception as e:
+			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
+			return
+		L.log(asab.LOG_NOTICE, "Kibana space created.", struct_data={"id": space_id})
+
+
+	async def _create_kibana_role(self, tenant_id, space_id):
+		role_name = "tenant_{}".format(tenant_id)
+		role = {
+			# Add read-only privileges for the new space (for now)
+			"kibana": [{"spaces": [space_id], "base": ["read"]}]
+		}
+
+		try:
+			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
+				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
+					async with session.put("{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role) as resp:
+						if resp.status // 100 != 2:
+							text = await resp.text()
+							L.error("Failed to create Kibana role {!r}:\n{}".format(role_name, text[:1000]))
+							return
+		except Exception as e:
+			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
+			return
+		L.log(asab.LOG_NOTICE, "Kibana role created.", struct_data={"name": role_name})
+
+
+	async def _get_kibana_spaces(self):
+		try:
+			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
+				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
+					async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
+						if resp.status // 100 != 2:
+							text = await resp.text()
+							L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
+							return
+						spaces = await resp.json()
+		except Exception as e:
+			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
+			return
+		return spaces
+
+
 	async def initialize(self):
 		await self._initialize_resources()
 		await self.sync_all()
@@ -117,7 +179,7 @@ class ELKIntegration(asab.config.Configurable):
 			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
 				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
 					async with session.get("{}/_xpack/security/role".format(self.ElasticSearchUrl)) as resp:
-						if resp.status != 200:
+						if resp.status // 100 != 2:
 							text = await resp.text()
 							L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
 							return
@@ -184,6 +246,7 @@ class ELKIntegration(asab.config.Configurable):
 			json["full_name"] = v
 
 		elk_roles = {self.ELKSeacatFlagRole}  # Add a role that marks users managed by Seacat Auth
+		# TODO: Add roles derived from Seacat tenants
 
 		# Get authz dict
 		authz = await build_credentials_authz(self.TenantService, self.RoleService, cred["_id"])
@@ -211,7 +274,7 @@ class ELKIntegration(asab.config.Configurable):
 						"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
 						json=json
 					) as resp:
-						if resp.status == 200:
+						if resp.status // 100 == 2:
 							# Everything is alright here
 							pass
 						else:
