@@ -225,6 +225,7 @@ class TenantService(asab.Service):
 			"cid": credentials_id,
 			"tenant": tenant,
 		})
+		self.App.PubSub.publish("Credentials.tenant_assigned!", credentials_id=credentials_id, tenant_id=tenant)
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
@@ -243,6 +244,7 @@ class TenantService(asab.Service):
 		)
 
 		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
+		self.App.PubSub.publish("Credentials.tenant_unassigned!", credentials_id=credentials_id, tenant_id=tenant)
 
 
 	def is_enabled(self):
