@@ -1,4 +1,6 @@
 import logging
+from typing import Optional
+
 import aiohttp
 
 from .generic import GenericOAuth2Login
@@ -38,12 +40,13 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		self.Fields = self.Config.get("fields")
 		assert self.UserInfoURI not in (None, "")
 
-	async def _get_user_info(self, code, redirect_uri):
+	async def _get_user_info(self, auth_provider_response: dict, redirect_uri: str) -> Optional[dict]:
 		"""
-		Info is not contained in access_token,
-		call to https://graph.facebook.com/me is needed.
+		User info is not contained in auth_provider_response, thus call to https://graph.facebook.com/me is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
 		"""
+		code = auth_provider_response.get("code")
+
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
 			access_token_dict = await resp.json()
 

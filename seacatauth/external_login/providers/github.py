@@ -1,5 +1,7 @@
 import logging
 import urllib.parse
+from typing import Optional
+
 import aiohttp
 
 from .generic import GenericOAuth2Login
@@ -34,11 +36,12 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		self.UserInfoURI = self.Config.get("userinfo_uri")
 		assert self.UserInfoURI not in (None, "")
 
-	async def _get_user_info(self, code, redirect_uri):
+	async def _get_user_info(self, auth_provider_response: dict, redirect_uri: str) -> Optional[dict]:
 		"""
-		Info is not contained in access_token,
-		call to https://api.github.com/user is needed.
+		User info is not contained in auth_provider_response, thus call to https://api.github.com/user is needed.
 		"""
+		code = auth_provider_response.get("code")
+
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
 			response_text = await resp.text()
 
