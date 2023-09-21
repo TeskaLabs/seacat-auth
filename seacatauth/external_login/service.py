@@ -1,13 +1,14 @@
 import logging
-
-import asab
+import aiohttp
 import typing
-
 import pymongo
 
-from .providers import create_provider, GenericOAuth2Login
+import asab
+import asab.web.rest
 
+from .providers import create_provider, GenericOAuth2Login
 from ..events import EventTypes
+from .. import exceptions
 
 #
 
@@ -28,6 +29,7 @@ class ExternalLoginService(asab.Service):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
+		self.WebhookUrl = asab.Config.get("seacatauth:external_login", "webhook_url").rstrip("/")
 		self.AuthUiBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 		self.HomeUiFragmentPath = "/"
 		self.LoginUiFragmentPath = "/login"
@@ -125,3 +127,40 @@ class ExternalLoginService(asab.Service):
 			"type": provider_type,
 			"sub": sub,
 		})
+
+
+	async def get_credentials_id_from_webhook(self, provider_type: str, user_info: dict) -> str | None:
+		"""
+		Inquire about unknown external login credentials from a remote webhook endpoint.
+		If the response status is 200 and the JSON body contains 'cid', return its value.
+		Otherwise, return None.
+		"""
+		if self.WebhookUrl is None:
+			return None
+
+		request_data = {
+			"provider_type": provider_type,
+			"user_info": user_info
+		}
+
+		async with aiohttp.ClientSession() as session:
+			async with session.post(self.WebhookUrl, json=request_data) as resp:
+				if resp.status // 100 != 2:
+					text = await resp.text()
+					L.error("Webhook responded with error.", struct_data={
+						"status": resp.status, "text": text})
+					return None
+				response_data = await resp.json()
+
+		credentials_id = response_data.get("cid")
+		if not credentials_id:
+			L.error("Webhook response does not contain valid 'cid'.", struct_data={"response_data": response_data})
+			return None
+
+		await self.create(
+			credentials_id=credentials_id,
+			provider_type=provider_type,
+			sub=user_info.get("sub"),
+			email=user_info.get("email"))
+
+		return credentials_id
