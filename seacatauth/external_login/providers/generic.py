@@ -3,6 +3,7 @@ import re
 import urllib.parse
 import logging
 import contextlib
+from typing import Optional
 
 import asab
 import aiohttp
@@ -164,8 +165,14 @@ class GenericOAuth2Login(asab.Configurable):
 		return self._get_authorize_uri(self.AddExternalLoginURI, state)
 
 	# TODO: These two methods do the exact same thing. Refactor.
-	async def do_external_login(self, code):
-		return await self._get_user_info(code, redirect_uri=self.LoginURI)
+	async def do_external_login(self, auth_provider_response: dict) -> Optional[dict]:
+		return await self._get_user_info(
+			auth_provider_response=auth_provider_response,
+			redirect_uri=self.LoginURI
+		)
 
-	async def add_external_login(self, code):
-		return await self._get_user_info(code, redirect_uri=self.AddExternalLoginURI)
+	async def add_external_login(self, auth_provider_response: dict) -> Optional[dict]:
+		return await self._get_user_info(
+			auth_provider_response=auth_provider_response,
+			redirect_uri=self.AddExternalLoginURI
+		)
