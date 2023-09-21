@@ -1,7 +1,8 @@
 _EDITABLE_TENANT_PROPERTIES = {
 	"label": {
 		"type": "string",
-		"description": "Human-palatable tenant name."},
+		"description": "Human-palatable tenant name.",
+		"maxLength": 48},
 	"description": {
 		"type": "string",
 		"description": "Extended tenant details."},
