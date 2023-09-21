@@ -48,11 +48,13 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		state = request.query.get("state")
+		auth_provider_response: dict = request.query
+
+		state = auth_provider_response.get("state")
 		if state is None:
 			L.error("State parameter not provided in external login response")
 
-		code = request.query.get("code")
+		code = auth_provider_response.get("code")
 		if code is None:
 			L.error("Authentication code not provided in external login response")
 			response = self._login_redirect_response(state=state, error="external_login_failed")
@@ -144,11 +146,13 @@ class ExternalLoginHandler(object):
 		"""
 		Register a new external login provider account
 		"""
-		state = request.query.get("state")
+		auth_provider_response: dict = request.query
+
+		state = auth_provider_response.get("state")
 		# if state is None:
 		# 	L.warning("State parameter not provided in external login response")
 
-		code = request.query.get("code")
+		code = auth_provider_response.get("code")
 		if code is None:
 			L.error("Authentication code not provided in query")
 			raise aiohttp.web.HTTPBadRequest()
