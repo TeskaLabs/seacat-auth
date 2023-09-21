@@ -8,7 +8,6 @@ import asab.web.rest
 
 from .providers import create_provider, GenericOAuth2Login
 from ..events import EventTypes
-from .. import exceptions
 
 #
 
