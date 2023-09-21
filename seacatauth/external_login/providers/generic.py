@@ -83,7 +83,7 @@ class GenericOAuth2Login(asab.Configurable):
 			external_login_svc.AddExternalLoginPath.format(ext_login_provider=self.Type)
 		)
 
-	def _get_authorize_uri(self, redirect_uri, state=None):
+	def _get_authorize_uri(self, redirect_uri: str, state: Optional[str] = None, nonce: Optional[str] = None) -> str:
 		query_params = [
 			("response_type", "code"),
 			("client_id", self.ClientId),
@@ -93,6 +93,8 @@ class GenericOAuth2Login(asab.Configurable):
 		]
 		if state is not None:
 			query_params.append(("state", state))
+		if nonce is not None:
+			query_params.append(("nonce", nonce))
 		return "{authorize_uri}?{query_string}".format(
 			authorize_uri=self.AuthorizeURI,
 			query_string=urllib.parse.urlencode(query_params)
@@ -160,11 +162,11 @@ class GenericOAuth2Login(asab.Configurable):
 			user_info["ident"] = data_dict[self.Ident]
 		return user_info
 
-	def get_login_authorize_uri(self, state=None):
-		return self._get_authorize_uri(self.LoginURI, state)
+	def get_login_authorize_uri(self, state: Optional[str] = None, nonce: Optional[str] = None) -> str:
+		return self._get_authorize_uri(redirect_uri=self.LoginURI, state=state, nonce=nonce)
 
-	def get_addlogin_authorize_uri(self, state=None):
-		return self._get_authorize_uri(self.AddExternalLoginURI, state)
+	def get_addlogin_authorize_uri(self, state: Optional[str] = None, nonce: Optional[str] = None) -> str:
+		return self._get_authorize_uri(redirect_uri=self.AddExternalLoginURI, state=state, nonce=nonce)
 
 	# TODO: These two methods do the exact same thing. Refactor.
 	async def do_external_login(self, auth_provider_response: dict) -> Optional[dict]:
