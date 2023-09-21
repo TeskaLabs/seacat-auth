@@ -1,3 +1,4 @@
+import contextlib
 import re
 import ssl
 import logging
@@ -96,6 +97,13 @@ class ELKIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 
 
+	@contextlib.asynccontextmanager
+	async def _elasticsearch_session(self):
+		async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
+			async with aiohttp.ClientSession(connector=connector, headers=self.Headers) as session:
+				yield session
+
+
 	async def _on_tick(self, event_name):
 		await self._initialize_resources()
 		await self.sync_all()
@@ -117,13 +125,12 @@ class ELKIntegration(asab.config.Configurable):
 			space["description"] = tenant["description"]
 
 		try:
-			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
-				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space) as resp:
-						if resp.status // 100 != 2:
-							text = await resp.text()
-							L.error("Failed to create Kibana space {!r}:\n{}".format(space_id, text[:1000]))
-							return
+			async with self._elasticsearch_session() as session:
+				async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space) as resp:
+					if resp.status // 100 != 2:
+						text = await resp.text()
+						L.error("Failed to create Kibana space {!r}:\n{}".format(space_id, text[:1000]))
+						return
 		except Exception as e:
 			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
 			return
@@ -138,13 +145,14 @@ class ELKIntegration(asab.config.Configurable):
 		}
 
 		try:
-			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
-				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.put("{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role) as resp:
-						if resp.status // 100 != 2:
-							text = await resp.text()
-							L.error("Failed to create Kibana role {!r}:\n{}".format(role_name, text[:1000]))
-							return
+			async with self._elasticsearch_session() as session:
+				async with session.put(
+					"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
+				) as resp:
+					if resp.status // 100 != 2:
+						text = await resp.text()
+						L.error("Failed to create Kibana role {!r}:\n{}".format(role_name, text[:1000]))
+						return
 		except Exception as e:
 			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
 			return
@@ -153,14 +161,13 @@ class ELKIntegration(asab.config.Configurable):
 
 	async def _get_kibana_spaces(self):
 		try:
-			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
-				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
-						if resp.status // 100 != 2:
-							text = await resp.text()
-							L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
-							return
-						spaces = await resp.json()
+			async with self._elasticsearch_session() as session:
+				async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
+					if resp.status // 100 != 2:
+						text = await resp.text()
+						L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
+						return
+					spaces = await resp.json()
 		except Exception as e:
 			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
 			return
@@ -178,14 +185,13 @@ class ELKIntegration(asab.config.Configurable):
 		"""
 		# Fetch ELK roles
 		try:
-			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as conn:
-				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.get("{}/_xpack/security/role".format(self.ElasticSearchUrl)) as resp:
-						if resp.status // 100 != 2:
-							text = await resp.text()
-							L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
-							return
-						elk_roles_data = await resp.json()
+			async with self._elasticsearch_session() as session:
+				async with session.get("{}/_xpack/security/role".format(self.ElasticSearchUrl)) as resp:
+					if resp.status // 100 != 2:
+						text = await resp.text()
+						L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
+						return
+					elk_roles_data = await resp.json()
 		except Exception as e:
 			L.error("Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)))
 			return
@@ -270,21 +276,20 @@ class ELKIntegration(asab.config.Configurable):
 		json["roles"] = list(elk_roles)
 
 		try:
-			async with aiohttp.TCPConnector(ssl=self.SSLContext) as conn:
-				async with aiohttp.ClientSession(connector=conn, headers=self.Headers) as session:
-					async with session.post(
-						"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
-						json=json
-					) as resp:
-						if resp.status // 100 == 2:
-							# Everything is alright here
-							pass
-						else:
-							text = await resp.text()
-							L.warning(
-								"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
-								struct_data={"cid": cred["_id"]}
-							)
+			async with self._elasticsearch_session() as session:
+				async with session.post(
+					"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
+					json=json
+				) as resp:
+					if resp.status // 100 == 2:
+						# Everything is alright here
+						pass
+					else:
+						text = await resp.text()
+						L.warning(
+							"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
+							struct_data={"cid": cred["_id"]}
+						)
 		except Exception as e:
 			L.error(
 				"Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)),
