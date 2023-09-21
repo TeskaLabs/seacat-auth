@@ -4,6 +4,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ..decorators import access_control
+from . import schemas
 
 ###
 
@@ -136,17 +137,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["id"],
-		"additionalProperties": False,
-		"properties": {
-			"id": {
-				"type": "string",
-				"description": "Unique tenant ID. Can't be changed once the tenant has been created."}},
-		"example": {
-			"id": "acme-corp"}
-	})
+	@asab.web.rest.json_schema_handler(schemas.CREATE_TENANT)
 	@access_control("authz:superuser")  # TODO: "seacat:tenant:create"
 	async def create(self, request, *, credentials_id, json_data):
 		"""
@@ -190,31 +181,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(
 			request, data={"result": "OK", "id": tenant_id})
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"description": {
-				"type": "string",
-				"description": "Human readable description."},
-			"data": {
-				"type": "object",
-				"description":
-					"Custom tenant data. Shallow JSON object that maps string keys "
-					"to non-structured values.",
-				"patternProperties": {
-					"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-						{"type": "string"},
-						{"type": "number"},
-						{"type": "boolean"},
-						{"type": "null"}]}}}},
-		"example": {
-			"description": "ACME Corp Inc.",
-			"data": {
-				"email": "support@acmecorp.test",
-				"very_corporate": True,
-				"schema": "ECS"}}
-	})
+	@asab.web.rest.json_schema_handler(schemas.UPDATE_TENANT)
 	@access_control("seacat:tenant:edit")
 	async def update_tenant(self, request, *, json_data, tenant):
 		"""
@@ -242,17 +209,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["tenants"],
-		"properties": {
-			"tenants": {
-				"type": "array",
-				"description": "List of the IDs of tenants to be set",
-				"items": {"type": "string"}}},
-		"example": {
-			"tenants": ["acme-corp", "my-eshop"]}
-	})
+	@asab.web.rest.json_schema_handler(schemas.SET_TENANTS)
 	@access_control("seacat:tenant:assign")
 	async def set_tenants(self, request, *, json_data):
 		"""
@@ -324,12 +281,7 @@ class TenantHandler(object):
 		)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"description": "List of credential IDs",
-		"items": {"type": "string"},
-		"example": ["mongodb:default:abc123def456", "htpasswd:local:zdenek"],
-	})
+	@asab.web.rest.json_schema_handler(schemas.GET_TENANTS_BATCH)
 	@access_control("seacat:tenant:access")
 	async def get_tenants_batch(self, request, *, json_data):
 		"""
@@ -352,36 +304,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, {"tenant_id": proposed_tenant})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["credential_ids", "tenants"],
-		"properties": {
-			"credential_ids": {
-				"type": "array",
-				"description": "List of the IDs of credentials to manage.",
-				"items": {"type": "string"}},
-			"tenants": {
-				"type": "object",
-				"description":
-					"Tenants and roles to be assigned. \n\n"
-					"The keys are the IDs of tenants to be granted access to. The values are arrays of the respective "
-					"tenant's roles to be assigned. \n\n"
-					"To grant tenant access without assigning any roles, "
-					"leave the role array empty. \n\n"
-					"To assign global roles, list them under the `'*'` key.",
-				"patternProperties": {
-					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
-						"type": "array",
-						"description": "List of the tenant's roles to be assigned",
-						"items": {"type": "string"}}}}},
-		"example": {
-			"credential_ids": [
-				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
-			"tenants": {
-				"*": ["*/global-editor"],
-				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
-				"my-eshop": []}},
-	})
+	@asab.web.rest.json_schema_handler(schemas.BULK_ASSIGN_TENANTS)
 	@access_control("authz:superuser")
 	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
 	async def bulk_assign_tenants(self, request, *, json_data):
@@ -462,37 +385,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=data)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["credential_ids", "tenants"],
-		"properties": {
-			"credential_ids": {
-				"type": "array",
-				"description": "List of the IDs of credentials to manage.",
-				"items": {"type": "string"}},
-			"tenants": {
-				"type": "object",
-				"description":
-					"Tenants and roles to be unassigned. \n\n"
-					"The keys are the IDs of tenants to be revoked access to. The values are arrays of the respective "
-					"tenant's roles to be unassigned. \n\n"
-					"To completely revoke credentials' access to the tenant, provide `\"UNASSIGN-TENANT\"` as the "
-					"tenant value, instead of the array of roles. \n\n"
-					"To unassign global roles, list them under the `\"*\"` key.",
-				"patternProperties": {
-					r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
-						"anyOf": [
-							{"type": "array", "items": {"type": "string"}},
-							{"type": "string", "enum": ["UNASSIGN-TENANT"]}
-						]}}}},
-		"example": {
-			"credential_ids": [
-				"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
-			"tenants": {
-				"*": ["*/global-editor"],
-				"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
-				"my-eshop": "UNASSIGN-TENANT"}},
-	})
+	@asab.web.rest.json_schema_handler(schemas.BULK_UNASSIGN_TENANTS)
 	@access_control("authz:superuser")
 	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
 	async def bulk_unassign_tenants(self, request, *, json_data):
