@@ -126,7 +126,9 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def _get_user_info(self, code, redirect_uri):
+	async def _get_user_info(self, auth_provider_response: dict, redirect_uri: str) -> Optional[dict]:
+		code = auth_provider_response.get("code")
+
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
 			if resp is None:
 				return None
