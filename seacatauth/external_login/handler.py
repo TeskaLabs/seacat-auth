@@ -63,7 +63,7 @@ class ExternalLoginHandler(object):
 
 		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.do_external_login(code)
+		user_info = await provider.do_external_login(auth_provider_response=auth_provider_response)
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
@@ -177,7 +177,7 @@ class ExternalLoginHandler(object):
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await login_provider.add_external_login(code)
+		user_info = await login_provider.add_external_login(auth_provider_response=auth_provider_response)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
 			return self._my_account_redirect_response(state=state, error="external_login_failed")
