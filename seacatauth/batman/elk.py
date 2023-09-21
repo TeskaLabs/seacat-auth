@@ -27,13 +27,15 @@ class ELKIntegration(asab.config.Configurable):
 	"""
 
 	ConfigDefaults = {
-		"url": "http://localhost:9200/",
-		# Credentials/api key (mutualy exclusive)
+		"url": "http://localhost:9200",
+		"kibana_url": "http://localhost:5601",
+
+		# Basic credentials / API key (mutually exclusive)
 		"username": "",
 		"password": "",
 		"api_key": "",
 
-		# For SSL options such as `cafile`, please refer to asab SSLContextBuilder
+		# For SSL options such as `cafile`, please refer to the config of asab.tls.SSLContextBuilder
 
 		# List of elasticsearch system users
 		# If Seacat Auth has users with one of these usernames, it will not sync them
@@ -131,8 +133,8 @@ class ELKIntegration(asab.config.Configurable):
 	async def _create_kibana_role(self, tenant_id, space_id):
 		role_name = "tenant_{}".format(tenant_id)
 		role = {
-			# Add read-only privileges for the new space (for now)
-			"kibana": [{"spaces": [space_id], "base": ["read"]}]
+			# Add all privileges for the new space
+			"kibana": [{"spaces": [space_id], "base": ["all"]}]
 		}
 
 		try:
