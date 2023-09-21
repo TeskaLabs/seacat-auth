@@ -2,7 +2,7 @@ _EDITABLE_TENANT_PROPERTIES = {
 	"label": {
 		"type": "string",
 		"description": "Human-palatable tenant name.",
-		"maxLength": 48},
+		"pattern": "^.{,64}$"},  # no newlines allowed
 	"description": {
 		"type": "string",
 		"description": "Extended tenant details."},
