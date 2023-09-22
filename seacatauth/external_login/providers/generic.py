@@ -27,6 +27,7 @@ class GenericOAuth2Login(asab.Configurable):
 	client_id=308u2fXEBUTolb.provider.auth
 	client_secret=5TfIjab8EZtixx3XkmFLfdXiHxkU2KlU
 
+	discovery_uri=https://provider.auth/.well-known/openid-configuration
 	authorize_uri=https://provider.auth/login/oauth/authorize
 	access_token_uri=https://provider.auth/login/oauth/access_token
 
