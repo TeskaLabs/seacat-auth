@@ -85,8 +85,8 @@ class ExternalLoginHandler(object):
 			# Credentials do not exist in Seacat Auth
 			L.log(asab.LOG_NOTICE, "Unknown external login sub.", struct_data={
 				"provider_type": provider.Type, "sub": sub})
-			if self.ExternalLoginService.WebhookUrl:
-				credentials_id = await self.ExternalLoginService.get_credentials_id_from_webhook(
+			if self.ExternalLoginService.RegistrationWebhookUri:
+				credentials_id = await self.ExternalLoginService.register_credentials_via_webhook(
 					login_provider_type, user_info)
 		if credentials_id is None:
 			response = self._login_redirect_response(state=state, error="external_login_failed")

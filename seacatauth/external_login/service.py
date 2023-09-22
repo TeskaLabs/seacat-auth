@@ -16,6 +16,12 @@ L = logging.getLogger(__name__)
 #
 
 
+asab.Config.add_defaults({
+	"seacatauth:external_login": {
+		# URI for the external registration of unknown accounts from external identity providers.
+		"registration_webhook_uri": "",
+	}})
+
 class ExternalLoginService(asab.Service):
 
 	ExternalLoginCollection = "el"
@@ -28,7 +34,8 @@ class ExternalLoginService(asab.Service):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
-		self.WebhookUrl = asab.Config.get("seacatauth:external_login", "webhook_url").rstrip("/")
+		self.RegistrationWebhookUri = asab.Config.get(
+			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
 		self.AuthUiBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 		self.HomeUiFragmentPath = "/"
 		self.LoginUiFragmentPath = "/login"
@@ -65,6 +72,7 @@ class ExternalLoginService(asab.Service):
 
 
 	async def create(self, credentials_id: str, provider_type: str, sub: str, email: str = None, ident: str = None):
+		sub = str(sub)
 		upsertor = self.StorageService.upsertor(
 			self.ExternalLoginCollection,
 			obj_id=self._make_id(provider_type, sub)
@@ -128,13 +136,14 @@ class ExternalLoginService(asab.Service):
 		})
 
 
-	async def get_credentials_id_from_webhook(self, provider_type: str, user_info: dict) -> str | None:
+	async def register_credentials_via_webhook(self, provider_type: str, user_info: dict) -> str | None:
 		"""
-		Inquire about unknown external login credentials from a remote webhook endpoint.
-		If the response status is 200 and the JSON body contains 'cid', return its value.
+		Send external login user_info to webhook for registration.
+		If the server responds with 200 and the JSON body contains 'cid' of the registered credentials,
+		create an entry in the external login collection and return the credential ID.
 		Otherwise, return None.
 		"""
-		if self.WebhookUrl is None:
+		if self.RegistrationWebhookUri is None:
 			return None
 
 		request_data = {
@@ -143,11 +152,11 @@ class ExternalLoginService(asab.Service):
 		}
 
 		async with aiohttp.ClientSession() as session:
-			async with session.post(self.WebhookUrl, json=request_data) as resp:
+			async with session.post(self.RegistrationWebhookUri, json=request_data) as resp:
 				if resp.status // 100 != 2:
 					text = await resp.text()
 					L.error("Webhook responded with error.", struct_data={
-						"status": resp.status, "text": text})
+						"status": resp.status, "text": text, "url": self.RegistrationWebhookUri})
 					return None
 				response_data = await resp.json()
 
@@ -159,7 +168,7 @@ class ExternalLoginService(asab.Service):
 		await self.create(
 			credentials_id=credentials_id,
 			provider_type=provider_type,
-			sub=user_info.get("sub"),
+			sub=user_info["sub"],
 			email=user_info.get("email"))
 
 		return credentials_id
