@@ -31,6 +31,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 
 	Type = "appleid"
 	ConfigDefaults = {
+		"discovery_uri": "https://appleid.apple.com/.well-known/openid-configuration",
 		# Apple returns e-mail and username in the response right after OAuth2 /authorize call,
 		# so we do not need client_secret at all, but seacat has it as a required parameter, so we intentionally
 		# set it to dummy value here.
