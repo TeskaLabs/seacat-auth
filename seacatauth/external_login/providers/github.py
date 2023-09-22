@@ -21,6 +21,8 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "github"
 	ConfigDefaults = {
+		"discovery_uri": "https://token.actions.githubusercontent.com/.well-known/openid-configuration",
+		# TODO: Update the rest of the config to the new Github OpenID configuration
 		"authorize_uri": "https://github.com/login/oauth/authorize",
 		"access_token_uri": "https://github.com/login/oauth/access_token",
 		"userinfo_uri": "https://api.github.com/user",
