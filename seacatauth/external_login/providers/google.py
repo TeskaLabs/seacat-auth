@@ -12,6 +12,7 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "google"
 	ConfigDefaults = {
+		"discovery_uri": "https://accounts.google.com/.well-known/openid-configuration",
 		"authorize_uri": "https://accounts.google.com/o/oauth2/auth",
 		"access_token_uri": "https://accounts.google.com/o/oauth2/token",
 		"scope": "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
