@@ -128,6 +128,8 @@ class GenericOAuth2Login(asab.Configurable):
 					yield resp
 
 	async def _get_user_info(self, code, redirect_uri):
+		# TODO: This needs to be a public method and return the full ID token claims.
+		#   The normalization should be done separately.
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
 			if resp is None:
 				return None
