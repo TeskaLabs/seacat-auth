@@ -12,6 +12,8 @@ class Office365OAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "office365"
 	ConfigDefaults = {
+		"discovery_uri": "https://sts.windows.net/{tenant_id}/.well-known/openid-configuration",
+		# also available at "https://login.microsoftonline.com/{tenant_id}/.well-known/openid-configuration",
 		"authorize_uri": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize",
 		"access_token_uri": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
 		"tenant_id": "",
