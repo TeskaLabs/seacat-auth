@@ -9,6 +9,7 @@ import aiohttp
 import aiohttp.web
 import jwcrypto.jwt
 import jwcrypto.jwk
+import jwcrypto.jws
 
 #
 
@@ -99,7 +100,7 @@ class GenericOAuth2Login(asab.Configurable):
 			# Fallback to general public_api_base_url
 			public_api_base_url = asab.Config.get("general", "public_api_base_url")
 
-		self.Jwks = None
+		self.JwkSet = None
 
 		self.LoginURI = "{}{}".format(
 			public_api_base_url.rstrip("/"),
@@ -116,7 +117,7 @@ class GenericOAuth2Login(asab.Configurable):
 	async def _prepare_jwks(self, speculative=True):
 		if not self.JwksUri:
 			return
-		if self.Jwks and speculative:
+		if self.JwkSet and speculative:
 			return
 		async with aiohttp.ClientSession() as session:
 			async with session.get(self.JwksUri) as resp:
@@ -129,9 +130,9 @@ class GenericOAuth2Login(asab.Configurable):
 							"url": resp.url,
 							"text": text})
 					return
-				jwks = await resp.json()
-		keys = jwks.get("keys")
-		self.Jwks = jwcrypto.jwk.JWKSet(keys)
+				jwks = await resp.text()
+		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
+		L.log(asab.LOG_NOTICE, "Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
 	def _get_authorize_uri(self, redirect_uri, state=None):
 		query_params = [
@@ -192,8 +193,8 @@ class GenericOAuth2Login(asab.Configurable):
 		await self._prepare_jwks()
 
 		try:
-			id_info = jwcrypto.jwt.JWT(jwt=id_token, key=self.Jwks)
-			claims = id_info.token.objects.get("payload")
+			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet)
+			claims = id_token.token.objects.get("payload")
 			claims = json.loads(claims)
 		except Exception as e:
 			L.error("Error reading id_token claims.", struct_data={

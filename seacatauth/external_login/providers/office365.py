@@ -15,11 +15,11 @@ class Office365OAuth2Login(GenericOAuth2Login):
 		"issuer": "https://sts.windows.net/{tenant_id}",
 		"discovery_uri": "https://sts.windows.net/{tenant_id}/.well-known/openid-configuration",
 		# also available at "https://login.microsoftonline.com/{tenant_id}/.well-known/openid-configuration",
+		"jwks_uri": "https://login.microsoftonline.com/common/discovery/keys",
 		"authorization_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize",
 		"token_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
 		"tenant_id": "",
 		"scope": "openid",
-		"jwt_public_keys": "",  # For id_token validation
 		"label": "Sign in with Office365",
 	}
 

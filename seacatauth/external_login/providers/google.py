@@ -14,9 +14,9 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 	ConfigDefaults = {
 		"issuer": "https://accounts.google.com",
 		"discovery_uri": "https://accounts.google.com/.well-known/openid-configuration",
+		"jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
 		"authorization_endpoint": "https://accounts.google.com/o/oauth2/auth",
 		"token_endpoint": "https://accounts.google.com/o/oauth2/token",
 		"scope": "openid profile email",
-		"jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
 		"label": "Sign in with Google",
 	}
