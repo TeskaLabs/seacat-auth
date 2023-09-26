@@ -22,8 +22,8 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 	Type = "github"
 	ConfigDefaults = {
 		# Github does not implement OpenID Connect, only OAuth. There is no OpenID discovery_uri.
-		"authorize_uri": "https://github.com/login/oauth/authorize",
-		"access_token_uri": "https://github.com/login/oauth/access_token",
+		"authorization_endpoint": "https://github.com/login/oauth/authorize",
+		"token_endpoint": "https://github.com/login/oauth/access_token",
 		"userinfo_uri": "https://api.github.com/user",
 		"scope": "",  # Scope is not required
 		"label": "Sign in with Github",
