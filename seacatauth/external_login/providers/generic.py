@@ -19,7 +19,7 @@ L = logging.getLogger(__name__)
 
 class GenericOAuth2Login(asab.Configurable):
 	"""
-	Generic OAuth2 login provider
+	Generic OAuth2 (OpenID) login provider
 
 	Example config:
 	```conf
@@ -28,10 +28,11 @@ class GenericOAuth2Login(asab.Configurable):
 	client_id=308u2fXEBUTolb.provider.auth
 	client_secret=5TfIjab8EZtixx3XkmFLfdXiHxkU2KlU
 
+	discovery_uri=https://provider.auth/.well-known/openid-configuration
 	authorize_uri=https://provider.auth/login/oauth/authorize
 	access_token_uri=https://provider.auth/login/oauth/access_token
 
-	scope=openidconnect
+	scope=openid name email
 	label=Login via provider.auth
 	```
 	"""
@@ -39,6 +40,7 @@ class GenericOAuth2Login(asab.Configurable):
 	Type = None
 
 	def __init__(self, external_login_svc, config_section_name, config=None):
+		# TODO: Get the URLs automatically from the discovery_uri (or issuer name)
 		super().__init__(config_section_name, config)
 		if self.Type is None:
 			match = re.match("seacatauth:oauth2:([_a-zA-Z0-9]+)", config_section_name)
@@ -144,6 +146,7 @@ class GenericOAuth2Login(asab.Configurable):
 
 		try:
 			id_info = jwcrypto.jwt.JWT(jwt=id_token)
+			# TODO: Validate the token using the keys from jwks_uri
 			payload = id_info.token.objects.get("payload")
 			data_dict = json.loads(payload)
 		except Exception as e:
