@@ -14,6 +14,7 @@ class MojeIDOAuth2Login(GenericOAuth2Login):
 	ConfigDefaults = {
 		"issuer": "https://mojeid.cz",
 		"discovery_uri": "https://mojeid.cz/.well-known/openid-configuration",
+		"jwks_uri": "https://mojeid.cz/oidc/key.jwk",
 		"authorization_endpoint": "https://mojeid.cz/oidc/authorization/",
 		"token_endpoint": "https://mojeid.cz/oidc/token/",
 		"scope": "openid email phone",
