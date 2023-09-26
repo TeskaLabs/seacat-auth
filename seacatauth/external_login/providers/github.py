@@ -24,7 +24,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		# Github does not implement OpenID Connect, only OAuth. There is no OpenID discovery_uri.
 		"authorization_endpoint": "https://github.com/login/oauth/authorize",
 		"token_endpoint": "https://github.com/login/oauth/access_token",
-		"userinfo_uri": "https://api.github.com/user",
+		"userinfo_endpoint": "https://api.github.com/user",
 		"scope": "",  # Scope is not required
 		"label": "Sign in with Github",
 		"ident": "login",
@@ -32,8 +32,8 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 
 	def __init__(self, external_login_svc, config_section_name):
 		super().__init__(external_login_svc, config_section_name)
-		self.UserInfoURI = self.Config.get("userinfo_uri")
-		assert self.UserInfoURI not in (None, "")
+		self.UserInfoEndpoint = self.Config.get("userinfo_endpoint")
+		assert self.UserInfoEndpoint not in (None, "")
 
 	async def _get_user_info(self, code, redirect_uri):
 		"""
@@ -56,7 +56,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		}
 
 		async with aiohttp.ClientSession() as session:
-			async with session.get(self.UserInfoURI, headers=headers) as resp:
+			async with session.get(self.UserInfoEndpoint, headers=headers) as resp:
 				data = await resp.json()
 				if resp.status != 200:
 					L.error("Error response from external auth provider", struct_data={
