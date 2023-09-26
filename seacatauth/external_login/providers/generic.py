@@ -8,6 +8,7 @@ import asab
 import aiohttp
 import aiohttp.web
 import jwcrypto.jwt
+import jwcrypto.jwk
 
 #
 
@@ -98,6 +99,8 @@ class GenericOAuth2Login(asab.Configurable):
 			# Fallback to general public_api_base_url
 			public_api_base_url = asab.Config.get("general", "public_api_base_url")
 
+		self.Jwks = None
+
 		self.LoginURI = "{}{}".format(
 			public_api_base_url.rstrip("/"),
 			external_login_svc.ExternalLoginPath.format(ext_login_provider=self.Type)
@@ -106,6 +109,29 @@ class GenericOAuth2Login(asab.Configurable):
 			public_api_base_url.rstrip("/"),
 			external_login_svc.AddExternalLoginPath.format(ext_login_provider=self.Type)
 		)
+
+	async def initialize(self, app):
+		await self._prepare_jwks()
+
+	async def _prepare_jwks(self, speculative=True):
+		if not self.JwksUri:
+			return
+		if self.Jwks and speculative:
+			return
+		async with aiohttp.ClientSession() as session:
+			async with session.get(self.JwksUri) as resp:
+				if resp.status != 200:
+					text = await resp.text()
+					L.error(
+						"Failed to fetch server JWKS: External identity provider responded with error.",
+						struct_data={
+							"status": resp.status,
+							"url": resp.url,
+							"text": text})
+					return
+				jwks = await resp.json()
+		keys = jwks.get("keys")
+		self.Jwks = jwcrypto.jwk.JWKSet(keys)
 
 	def _get_authorize_uri(self, redirect_uri, state=None):
 		query_params = [
