@@ -79,13 +79,6 @@ class GenericOAuth2Login(asab.Configurable):
 		assert self.ClientId is not None
 
 		self.ClientSecret = self.Config.get("client_secret")
-		assert self.ClientSecret is not None
-
-		self.AuthorizeURI = self.Config.get("authorize_uri")
-		assert self.AuthorizeURI is not None
-
-		self.AccessTokenURI = self.Config.get("access_token_uri")
-		assert self.AccessTokenURI is not None
 
 		self.Scope = self.Config.get("scope")
 		assert self.Scope is not None
@@ -134,13 +127,15 @@ class GenericOAuth2Login(asab.Configurable):
 		"""
 		Send auth code to token request endpoint and return access token
 		"""
-		query_string = urllib.parse.urlencode([
+		request_params = [
 			("grant_type", "authorization_code"),
 			("code", code),
 			("client_id", self.ClientId),
-			("client_secret", self.ClientSecret),
-			("redirect_uri", redirect_uri)
-		])
+			("redirect_uri", redirect_uri)]
+		if self.ClientSecret:
+			request_params.append(("client_secret", self.ClientSecret))
+		query_string = urllib.parse.urlencode(request_params)
+
 		headers = {
 			"content-type": "application/x-www-form-urlencoded"
 		}
