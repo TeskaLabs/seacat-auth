@@ -4,10 +4,13 @@
 
 ### Fix
 - Fix private key provisioning (#267, @vosmol)
+- Handle missing fields in credential creation (#290, PLUM Sprint 230908)
+- Remove upsertor from audit service (#269, PLUM Sprint 230908)
 
 ### Features
 - Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
 - Public invitations to tenant (#261, PLUM Sprint 230908)
+- Human-readable tenant label (#285, PLUM Sprint 230908)
 
 ---
 

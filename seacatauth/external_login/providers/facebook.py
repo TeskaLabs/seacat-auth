@@ -23,6 +23,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "facebook"
 	ConfigDefaults = {
+		"discovery_uri": "https://www.facebook.com/.well-known/openid-configuration",
 		"authorize_uri": "https://www.facebook.com/v15.0/dialog/oauth",
 		"access_token_uri": "https://graph.facebook.com/v15.0/oauth/access_token",
 		"userinfo_uri": "https://graph.facebook.com/me",

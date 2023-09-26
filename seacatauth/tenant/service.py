@@ -41,7 +41,13 @@ class TenantService(asab.Service):
 		return await self.TenantsProvider.get(tenant_id)
 
 
-	async def create_tenant(self, tenant_id: str, creator_id: str = None):
+	async def create_tenant(
+		self, tenant_id: str, *,
+		label: str = None,
+		description: str = None,
+		data: dict = None,
+		creator_id: str = None
+	):
 		if not self.TenantNameRegex.match(tenant_id):
 			raise asab.exceptions.ValidationError(
 				"Invalid tenant ID {!r}. "
@@ -49,7 +55,8 @@ class TenantService(asab.Service):
 				"start with a letter, and be between 3 and 32 characters long.".format(tenant_id))
 
 		try:
-			tenant_id = await self.TenantsProvider.create(tenant_id, creator_id)
+			tenant_id = await self.TenantsProvider.create(
+				tenant_id, label=label, description=description, data=data, creator_id=creator_id)
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
 			raise asab.exceptions.Conflict(value=tenant_id)
