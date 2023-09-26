@@ -21,10 +21,11 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "facebook"
 	ConfigDefaults = {
+		"issuer": "https://www.facebook.com",
 		"discovery_uri": "https://www.facebook.com/.well-known/openid-configuration",
-		"authorize_uri": "https://www.facebook.com/v15.0/dialog/oauth",
-		"access_token_uri": "https://graph.facebook.com/v15.0/oauth/access_token",
-		"userinfo_uri": "https://graph.facebook.com/me",
+		"authorization_endpoint": "https://www.facebook.com/v15.0/dialog/oauth",
+		"token_endpoint": "https://graph.facebook.com/v15.0/oauth/access_token",
+		"userinfo_endpoint": "https://graph.facebook.com/me",
 		"login_redirect_uri": "https://facebook.com/connect/login_success.html",
 		"scope": "email,public_profile",
 		"fields": "id,name,email",
@@ -33,16 +34,15 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 
 	def __init__(self, external_login_svc, config_section_name):
 		super().__init__(external_login_svc, config_section_name)
-		self.UserInfoURI = self.Config.get("userinfo_uri")
+		self.UserInfoEndpoint = self.Config.get("userinfo_endpoint")
 		self.LoginRedirectURI = self.Config.get("login_redirect_uri")
 		self.Scope = self.Config.get("scope")
 		self.Fields = self.Config.get("fields")
-		assert self.UserInfoURI not in (None, "")
+		assert self.UserInfoEndpoint not in (None, "")
 
 	async def _get_user_info(self, code, redirect_uri):
 		"""
-		Info is not contained in access_token,
-		call to https://graph.facebook.com/me is needed.
+		Info is not contained in token response, call to userinfo_endpoint is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
 		"""
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
@@ -56,7 +56,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 
 		qparams = {'fields': self.Fields, 'access_token': access_token}
 		async with aiohttp.ClientSession() as session:
-			async with session.get(self.UserInfoURI, params=qparams) as resp:
+			async with session.get(self.UserInfoEndpoint, params=qparams) as resp:
 				data = await resp.json()
 				if resp.status != 200:
 					L.error("Error response from external auth provider", struct_data={

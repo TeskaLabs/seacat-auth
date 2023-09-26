@@ -12,11 +12,10 @@ class MojeIDOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "mojeid"
 	ConfigDefaults = {
+		"issuer": "https://mojeid.cz",
 		"discovery_uri": "https://mojeid.cz/.well-known/openid-configuration",
-		"authorize_uri": "https://mojeid.cz/oidc/authorization/",
-		# "authorize_uri": "https://mojeid.cz/oidc/authorization/",  # test environment
-		"access_token_uri": "https://mojeid.cz/oidc/token/",
-		# "access_token_uri": "https://mojeid.cz/oidc/token/",       # test environment
+		"authorization_endpoint": "https://mojeid.cz/oidc/authorization/",
+		"token_endpoint": "https://mojeid.cz/oidc/token/",
 		"scope": "openid email phone",
 		"label": "Sign in with MojeID",
 	}
