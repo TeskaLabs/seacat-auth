@@ -26,6 +26,7 @@ class AuditService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.AuditService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.IsAnonymousLoggingEnabled = False
 
 
 	async def append(
@@ -40,6 +41,10 @@ class AuditService(asab.Service):
 		Records a new audit entry.
 		"""
 		assert (isinstance(code, AuditCode))
+
+		# skip anon audit if is necessary
+		if self.IsAnonymousLoggingEnabled is False and AuditCode.ANONYMOUS_SESSION_CREATED == code:
+			return None
 
 		# Do not use upsertor because it can trigger webhook
 		now = datetime.datetime.now(datetime.timezone.utc)
