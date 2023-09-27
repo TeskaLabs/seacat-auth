@@ -57,16 +57,16 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_callback, redirect_uri):
+	async def _get_user_info(self, authorize_data, redirect_uri):
 		"""
 		Info is not contained in token response, call to userinfo_endpoint is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
 		"""
-		code = authorize_callback.query.get("code")
+		code = authorize_data.get("code")
 		if code is None:
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
-				"query": dict(authorize_callback.query)})
+				"query": dict(authorize_data)})
 			return None
 
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:

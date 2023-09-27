@@ -48,15 +48,17 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
+		authorize_data = request.query
+
 		# TODO: Implement state parameter for XSRF prevention
-		# state = request.query.get("state")
+		# state = authorize_data.get("state")
 		# if state is None:
 		# 	L.error("State parameter not provided in external login response")
 		state = None
 
 		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.do_external_login(request)
+		user_info = await provider.do_external_login(authorize_data)
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
@@ -141,8 +143,10 @@ class ExternalLoginHandler(object):
 		"""
 		Register a new external login provider account
 		"""
+		authorize_data = request.query
+
 		# TODO: Implement state parameter for XSRF prevention
-		# state = request.query.get("state")
+		# state = authorize_data.get("state")
 		# if state is None:
 		# 	L.error("State parameter not provided in external login response")
 		state = None
@@ -167,7 +171,7 @@ class ExternalLoginHandler(object):
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await login_provider.add_external_login(request)
+		user_info = await login_provider.add_external_login(authorize_data)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
 			return self._my_account_redirect_response(state=state, error="external_login_failed")

@@ -1,5 +1,6 @@
 import json
 import re
+import typing
 import urllib.parse
 import logging
 import contextlib
@@ -180,12 +181,12 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def _get_user_info(self, authorize_callback: aiohttp.web.Request, redirect_uri):
-		code = authorize_callback.query.get("code")
+	async def _get_user_info(self, authorize_data: typing.Mapping, redirect_uri):
+		code = authorize_data.get("code")
 		if code is None:
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
-				"query": dict(authorize_callback.query)})
+				"query": dict(authorize_data)})
 			return None
 
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
@@ -228,8 +229,8 @@ class GenericOAuth2Login(asab.Configurable):
 		return self._get_authorize_uri(self.AddExternalLoginURI, state)
 
 	# TODO: These two methods do the exact same thing. Refactor.
-	async def do_external_login(self, authorize_callback: aiohttp.web.Request):
-		return await self._get_user_info(authorize_callback, redirect_uri=self.LoginURI)
+	async def do_external_login(self, authorize_data: typing.Mapping):
+		return await self._get_user_info(authorize_data, redirect_uri=self.LoginURI)
 
-	async def add_external_login(self, authorize_callback: aiohttp.web.Request):
-		return await self._get_user_info(authorize_callback, redirect_uri=self.AddExternalLoginURI)
+	async def add_external_login(self, authorize_data: typing.Mapping):
+		return await self._get_user_info(authorize_data, redirect_uri=self.AddExternalLoginURI)
