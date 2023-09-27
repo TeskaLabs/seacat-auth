@@ -54,28 +54,25 @@ class ExternalLoginHandler(object):
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
 		if request.method == "POST":
-			auth_provider_response: typing.Mapping = await request.post()
+			authorize_data: typing.Mapping = await request.post()
 		else:
-			auth_provider_response = request.query
+			authorize_data = request.query
 
-		state = auth_provider_response.get("state")
+		# TODO: Implement state parameter for XSRF prevention
+		# state = authorize_data.get("state")
 		# if state is None:
 		# 	L.error("State parameter not provided in external login response")
-		#
-		code = auth_provider_response.get("code")
-		# if code is None:
-		# 	L.error("Authentication code not provided in external login response")
-		# 	response = self._login_redirect_response(state=state, error="external_login_failed")
-		# 	delete_cookie(self.App, response)
-		# 	return response
+		state = None
 
 		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.do_external_login(auth_provider_response=auth_provider_response)
+		user_info = await provider.do_external_login(authorize_data)
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
-			return self._my_account_redirect_response(state=state, error="external_login_failed")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
+			delete_cookie(self.App, response)
+			return response
 
 		sub = user_info.get("sub")
 		if sub is None:
@@ -155,18 +152,14 @@ class ExternalLoginHandler(object):
 		Register a new external login provider account
 		"""
 		if request.method == "POST":
-			auth_provider_response: typing.Mapping = await request.post()
+			authorize_data: typing.Mapping = await request.post()
 		else:
-			auth_provider_response = request.query
+			authorize_data = request.query
 
-		state = auth_provider_response.get("state")
+		# TODO: Implement state parameter for XSRF prevention
 		# if state is None:
-		# 	L.warning("State parameter not provided in external login response")
-
-		code = auth_provider_response.get("code")
-		# if code is None:
-		# 	L.error("Authentication code not provided in query")
-		# 	raise aiohttp.web.HTTPBadRequest()
+		# 	L.error("State parameter not provided in external login response")
+		state = authorize_data.get("state")
 
 		login_provider_type = request.match_info["ext_login_provider"]
 
@@ -188,7 +181,7 @@ class ExternalLoginHandler(object):
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await login_provider.add_external_login(auth_provider_response=auth_provider_response)
+		user_info = await login_provider.add_external_login(authorize_data)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
 			return self._my_account_redirect_response(state=state, error="external_login_failed")

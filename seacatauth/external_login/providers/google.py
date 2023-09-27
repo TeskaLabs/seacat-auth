@@ -12,10 +12,11 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "google"
 	ConfigDefaults = {
+		"issuer": "https://accounts.google.com",
 		"discovery_uri": "https://accounts.google.com/.well-known/openid-configuration",
-		"authorize_uri": "https://accounts.google.com/o/oauth2/auth",
-		"access_token_uri": "https://accounts.google.com/o/oauth2/token",
-		"scope": "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
-		"jwt_public_keys": "",  # For id_token validation
+		"jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+		"authorization_endpoint": "https://accounts.google.com/o/oauth2/auth",
+		"token_endpoint": "https://accounts.google.com/o/oauth2/token",
+		"scope": "openid profile email",
 		"label": "Sign in with Google",
 	}
