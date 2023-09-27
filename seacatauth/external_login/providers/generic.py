@@ -136,7 +136,11 @@ class GenericOAuth2Login(asab.Configurable):
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
 		L.log(asab.LOG_NOTICE, "Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
-	def _get_authorize_uri(self, redirect_uri: str, state: str | None = None, nonce: str | None = None):
+	def _get_authorize_uri(
+		self, redirect_uri: str,
+		state: typing.Optional[str] = None,
+		nonce: typing.Optional[str] = None
+	):
 		query_params = [
 			("response_type", "code"),
 			("client_id", self.ClientId),
@@ -154,7 +158,7 @@ class GenericOAuth2Login(asab.Configurable):
 		)
 
 	@contextlib.asynccontextmanager
-	async def token_request(self, code, redirect_uri):
+	async def token_request(self, code: str, redirect_uri: str):
 		"""
 		Send auth code to token request endpoint and return access token
 		"""
@@ -183,7 +187,7 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def _get_user_info(self, authorize_data: typing.Mapping, redirect_uri):
+	async def _get_user_info(self, authorize_data: dict, redirect_uri: str):
 		code = authorize_data.get("code")
 		if code is None:
 			L.error("Code parameter not provided in authorize response.", struct_data={
@@ -224,15 +228,15 @@ class GenericOAuth2Login(asab.Configurable):
 			user_info["ident"] = claims[self.Ident]
 		return user_info
 
-	def get_login_authorize_uri(self, state: str | None = None):
+	def get_login_authorize_uri(self, state: typing.Optional[str] = None):
 		return self._get_authorize_uri(self.LoginURI, state)
 
-	def get_addlogin_authorize_uri(self, state: str | None = None):
+	def get_addlogin_authorize_uri(self, state: typing.Optional[str] = None):
 		return self._get_authorize_uri(self.AddExternalLoginURI, state)
 
 	# TODO: These two methods do the exact same thing. Refactor.
-	async def do_external_login(self, authorize_data: typing.Mapping):
+	async def do_external_login(self, authorize_data: dict):
 		return await self._get_user_info(authorize_data, redirect_uri=self.LoginURI)
 
-	async def add_external_login(self, authorize_data: typing.Mapping):
+	async def add_external_login(self, authorize_data: dict):
 		return await self._get_user_info(authorize_data, redirect_uri=self.AddExternalLoginURI)

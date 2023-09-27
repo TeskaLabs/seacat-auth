@@ -1,5 +1,4 @@
 import logging
-import typing
 import urllib.parse
 
 import aiohttp.web
@@ -54,9 +53,9 @@ class ExternalLoginHandler(object):
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
 		if request.method == "POST":
-			authorize_data: typing.Mapping = await request.post()
+			authorize_data: dict = dict(await request.post())
 		else:
-			authorize_data = request.query
+			authorize_data = dict(request.query)
 
 		# TODO: Implement state parameter for XSRF prevention
 		# state = authorize_data.get("state")
@@ -152,9 +151,9 @@ class ExternalLoginHandler(object):
 		Register a new external login provider account
 		"""
 		if request.method == "POST":
-			authorize_data: typing.Mapping = await request.post()
+			authorize_data: dict = dict(await request.post())
 		else:
-			authorize_data = request.query
+			authorize_data = dict(request.query)
 
 		# TODO: Implement state parameter for XSRF prevention
 		# if state is None:
