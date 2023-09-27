@@ -124,8 +124,9 @@ class GenericOAuth2Login(asab.Configurable):
 				if resp.status != 200:
 					text = await resp.text()
 					L.error(
-						"Failed to fetch server JWKS: External identity provider responded with error.",
+						"Failed to fetch server JWK set: External identity provider responded with error.",
 						struct_data={
+							"provider": self.Type,
 							"status": resp.status,
 							"url": resp.url,
 							"text": text})
