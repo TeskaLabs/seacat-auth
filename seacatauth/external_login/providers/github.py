@@ -25,7 +25,8 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		"authorization_endpoint": "https://github.com/login/oauth/authorize",
 		"token_endpoint": "https://github.com/login/oauth/access_token",
 		"userinfo_endpoint": "https://api.github.com/user",
-		"scope": "",  # Scope is not used
+		"user_emails_endpoint": "https://api.github.com/user/emails",
+		"scope": "user:email",  # Scope is not used
 		"label": "Sign in with Github",
 		"ident": "login",
 	}
@@ -34,6 +35,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		super().__init__(external_login_svc, config_section_name)
 		self.UserInfoEndpoint = self.Config.get("userinfo_endpoint")
 		assert self.UserInfoEndpoint not in (None, "")
+		self.UserEmailsURI = self.Config.get("user_emails_endpoint")
 
 	async def _get_user_info(self, authorize_callback, redirect_uri):
 		"""
@@ -58,28 +60,45 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 				"provider": self.Type, "response": params})
 
 		access_token = access_token[0]
-
-		headers = {
-			"Authorization": "bearer {}".format(access_token)
-		}
+		authorization = "bearer {}".format(access_token)
 
 		async with aiohttp.ClientSession() as session:
-			async with session.get(self.UserInfoEndpoint, headers=headers) as resp:
-				data = await resp.json()
+			async with session.get(self.UserInfoEndpoint, headers={"Authorization": authorization}) as resp:
+				user_data = await resp.json()
 				if resp.status != 200:
 					L.error("Error response from external auth provider.", struct_data={
 						"provider": self.Type,
 						"status": resp.status,
-						"data": data
-					})
+						"data": user_data})
 					return None
 
+		email = user_data.get("email")
+		if not email:
+			email = await self._get_user_email(authorization)
+
 		user_info = {}
-		if "id" in data:
-			user_info["sub"] = data["id"]
-		if "email" in data:
-			user_info["email"] = data["email"]
-		if self.Ident in data:
-			user_info["ident"] = data[self.Ident]
+		if "id" in user_data:
+			user_info["sub"] = user_data["id"]
+		if self.Ident in user_data:
+			user_info["ident"] = user_data[self.Ident]
+		if email:
+			user_info["email"] = email
 
 		return user_info
+
+	async def _get_user_email(self, authorization):
+		"""
+		Get Github user's primary email address.
+		"""
+		async with aiohttp.ClientSession() as session:
+			async with session.get(self.UserEmailsURI, headers={"Authorization": authorization}) as resp:
+				emails = await resp.json()
+				if resp.status != 200:
+					L.error("Error response from external auth provider", struct_data={
+						"status": resp.status,
+						"data": emails})
+					return None
+
+		for email_data in emails:
+			if email_data.get("primary"):
+				return email_data.get("email")

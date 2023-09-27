@@ -4,6 +4,7 @@ import datetime
 
 import asab
 
+from ... import exceptions
 from ...generic import generate_ergonomic_token
 from ...audit import AuditCode
 
@@ -123,13 +124,17 @@ class ChangePasswordService(asab.Service):
 		username = creds.get("username")
 		phone = creds.get("phone")
 		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, pwd_change_id)
-		await self.CommunicationService.password_reset(
+		successful = await self.CommunicationService.password_reset(
 			email=email, username=username, phone=phone, reset_url=reset_url, welcome=is_new_user
 		)
 
-		L.log(asab.LOG_NOTICE, "Password change initiated", struct_data={'cid': credentials_id})
-
-		return True
+		if successful:
+			L.log(asab.LOG_NOTICE, "Password change initiated", struct_data={"cid": credentials_id})
+			return True
+		else:
+			await self.delete_pwdreset_token(pwd_change_id)
+			raise exceptions.CommunicationError(
+				"Failed to send password reset link.", credentials_id=credentials_id)
 
 	async def _do_change_password(self, credentials_id, new_password: str):
 		try:
@@ -221,11 +226,3 @@ class ChangePasswordService(asab.Service):
 				credentials_id=session.Credentials.Id
 			)
 		return result
-
-	async def lost_password(self, ident):
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True)
-		if credentials_id is not None:
-			await self.init_password_change(credentials_id)
-		else:
-			L.log(asab.LOG_NOTICE, "Ident matched no credentials.", struct_data={"ident": ident})
-		return True  # Since this is public, don't disclose the true result
