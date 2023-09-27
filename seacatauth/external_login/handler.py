@@ -45,6 +45,7 @@ class ExternalLoginHandler(object):
 		"""
 		Log in with a registered external provider account
 		"""
+		print(dict(request.query))
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
@@ -144,6 +145,7 @@ class ExternalLoginHandler(object):
 		"""
 		Register a new external login provider account
 		"""
+		print(dict(request.query))
 		state = request.query.get("state")
 		# if state is None:
 		# 	L.warning("State parameter not provided in external login response")
