@@ -35,11 +35,18 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		self.UserInfoEndpoint = self.Config.get("userinfo_endpoint")
 		assert self.UserInfoEndpoint not in (None, "")
 
-	async def _get_user_info(self, code, redirect_uri):
+	async def _get_user_info(self, authorize_callback, redirect_uri):
 		"""
 		Info is not contained in access_token,
 		call to https://api.github.com/user is needed.
 		"""
+		code = authorize_callback.query.get("code")
+		if code is None:
+			L.error("Code parameter not provided in authorize response.", struct_data={
+				"provider": self.Type,
+				"query": dict(authorize_callback.query)})
+			return None
+
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
 			response_text = await resp.text()
 
@@ -47,7 +54,8 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		access_token = params.get("access_token")
 
 		if access_token is None:
-			L.error("Token response does not contain access token", struct_data={"response": params})
+			L.error("Token response does not contain access token.", struct_data={
+				"provider": self.Type, "response": params})
 
 		access_token = access_token[0]
 
@@ -59,7 +67,8 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 			async with session.get(self.UserInfoEndpoint, headers=headers) as resp:
 				data = await resp.json()
 				if resp.status != 200:
-					L.error("Error response from external auth provider", struct_data={
+					L.error("Error response from external auth provider.", struct_data={
+						"provider": self.Type,
 						"status": resp.status,
 						"data": data
 					})

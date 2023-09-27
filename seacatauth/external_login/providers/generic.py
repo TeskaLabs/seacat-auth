@@ -180,14 +180,22 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def _get_user_info(self, code, redirect_uri):
+	async def _get_user_info(self, authorize_callback: aiohttp.web.Request, redirect_uri):
+		code = authorize_callback.query.get("code")
+		if code is None:
+			L.error("Code parameter not provided in authorize response.", struct_data={
+				"provider": self.Type,
+				"query": dict(authorize_callback.query)})
+			return None
+
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
 			if resp is None:
 				return None
 			token_data = await resp.json()
 
 		if "id_token" not in token_data:
-			L.error("Token response does not contain 'id_token'", struct_data={"resp": token_data})
+			L.error("Token response does not contain 'id_token'", struct_data={
+				"provider": self.Type, "resp": token_data})
 			return None
 
 		id_token = token_data["id_token"]
@@ -199,6 +207,7 @@ class GenericOAuth2Login(asab.Configurable):
 			claims = json.loads(claims)
 		except Exception as e:
 			L.error("Error reading id_token claims.", struct_data={
+				"provider": self.Type,
 				"err": str(e),
 				"resp": token_data})
 			return None
@@ -219,8 +228,8 @@ class GenericOAuth2Login(asab.Configurable):
 		return self._get_authorize_uri(self.AddExternalLoginURI, state)
 
 	# TODO: These two methods do the exact same thing. Refactor.
-	async def do_external_login(self, code):
-		return await self._get_user_info(code, redirect_uri=self.LoginURI)
+	async def do_external_login(self, authorize_callback: aiohttp.web.Request):
+		return await self._get_user_info(authorize_callback, redirect_uri=self.LoginURI)
 
-	async def add_external_login(self, code):
-		return await self._get_user_info(code, redirect_uri=self.AddExternalLoginURI)
+	async def add_external_login(self, authorize_callback: aiohttp.web.Request):
+		return await self._get_user_info(authorize_callback, redirect_uri=self.AddExternalLoginURI)

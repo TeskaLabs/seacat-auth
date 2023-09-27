@@ -48,24 +48,21 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		state = request.query.get("state")
-		if state is None:
-			L.error("State parameter not provided in external login response")
-
-		code = request.query.get("code")
-		if code is None:
-			L.error("Authentication code not provided in external login response")
-			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
-			return response
+		# TODO: Implement state parameter for XSRF prevention
+		# state = request.query.get("state")
+		# if state is None:
+		# 	L.error("State parameter not provided in external login response")
+		state = None
 
 		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.do_external_login(code)
+		user_info = await provider.do_external_login(request)
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
-			return self._my_account_redirect_response(state=state, error="external_login_failed")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
+			delete_cookie(self.App, response)
+			return response
 
 		sub = user_info.get("sub")
 		if sub is None:
@@ -144,14 +141,11 @@ class ExternalLoginHandler(object):
 		"""
 		Register a new external login provider account
 		"""
-		state = request.query.get("state")
+		# TODO: Implement state parameter for XSRF prevention
+		# state = request.query.get("state")
 		# if state is None:
-		# 	L.warning("State parameter not provided in external login response")
-
-		code = request.query.get("code")
-		if code is None:
-			L.error("Authentication code not provided in query")
-			raise aiohttp.web.HTTPBadRequest()
+		# 	L.error("State parameter not provided in external login response")
+		state = None
 
 		login_provider_type = request.match_info["ext_login_provider"]
 
@@ -173,7 +167,7 @@ class ExternalLoginHandler(object):
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await login_provider.add_external_login(code)
+		user_info = await login_provider.add_external_login(request)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
 			return self._my_account_redirect_response(state=state, error="external_login_failed")
