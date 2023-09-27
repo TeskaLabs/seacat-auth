@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 import aiohttp
 
 from .generic import GenericOAuth2Login
@@ -21,13 +22,12 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "facebook"
 	ConfigDefaults = {
-		"issuer": "https://www.facebook.com",
-		"discovery_uri": "https://www.facebook.com/.well-known/openid-configuration",
-		"authorization_endpoint": "https://www.facebook.com/v15.0/dialog/oauth",
-		"token_endpoint": "https://graph.facebook.com/v15.0/oauth/access_token",
+		# Facebook uses a custom OAuth implementation. There is no OpenID discovery_uri.
+		"authorization_endpoint": "https://www.facebook.com/v18.0/dialog/oauth",
+		"token_endpoint": "https://graph.facebook.com/v18.0/oauth/access_token",
 		"userinfo_endpoint": "https://graph.facebook.com/me",
-		"login_redirect_uri": "https://facebook.com/connect/login_success.html",
-		"scope": "email,public_profile",
+		"response_type": "code granted_scopes",
+		"scope": "public_profile",
 		"fields": "id,name,email",
 		"label": "Sign in with Facebook",
 	}
@@ -35,10 +35,24 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	def __init__(self, external_login_svc, config_section_name):
 		super().__init__(external_login_svc, config_section_name)
 		self.UserInfoEndpoint = self.Config.get("userinfo_endpoint")
-		self.LoginRedirectURI = self.Config.get("login_redirect_uri")
+		self.ResponseType = self.Config.get("response_type")
 		self.Scope = self.Config.get("scope")
 		self.Fields = self.Config.get("fields")
 		assert self.UserInfoEndpoint not in (None, "")
+
+	def _get_authorize_uri(self, redirect_uri, state=None):
+		query_params = [
+			("client_id", self.ClientId),
+			("response_type", self.ResponseType),
+			("scope", self.Scope),
+			("redirect_uri", redirect_uri),
+		]
+		if state is not None:
+			query_params.append(("state", state))
+		return "{authorize_uri}?{query_string}".format(
+			authorize_uri=self.AuthorizationEndpoint,
+			query_string=urllib.parse.urlencode(query_params)
+		)
 
 	async def _get_user_info(self, code, redirect_uri):
 		"""
@@ -46,15 +60,15 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
 		"""
 		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
-			access_token_dict = await resp.json()
+			token_data = await resp.json()
 
-		if "access_token" not in access_token_dict:
-			L.error("Token response does not contain 'access token'", struct_data={"resp": access_token_dict})
+		if "access_token" not in token_data:
+			L.error("Token response does not contain 'access_token'", struct_data={"resp": token_data})
 			return None
 
-		access_token = access_token_dict["access_token"]
+		access_token = token_data["access_token"]
 
-		qparams = {'fields': self.Fields, 'access_token': access_token}
+		qparams = {"fields": self.Fields, "access_token": access_token}
 		async with aiohttp.ClientSession() as session:
 			async with session.get(self.UserInfoEndpoint, params=qparams) as resp:
 				data = await resp.json()
