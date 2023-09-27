@@ -1,4 +1,5 @@
 import logging
+import typing
 import urllib.parse
 
 import aiohttp.web
@@ -31,13 +32,17 @@ class ExternalLoginHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
+		web_app.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
 		web_app.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
 		web_app.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
+		web_app_public.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
 		web_app_public.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app_public.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
 		web_app_public.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 
@@ -48,18 +53,21 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		auth_provider_response: dict = request.query
+		if request.method == "POST":
+			auth_provider_response: typing.Mapping = await request.post()
+		else:
+			auth_provider_response = request.query
 
 		state = auth_provider_response.get("state")
-		if state is None:
-			L.error("State parameter not provided in external login response")
-
+		# if state is None:
+		# 	L.error("State parameter not provided in external login response")
+		#
 		code = auth_provider_response.get("code")
-		if code is None:
-			L.error("Authentication code not provided in external login response")
-			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
-			return response
+		# if code is None:
+		# 	L.error("Authentication code not provided in external login response")
+		# 	response = self._login_redirect_response(state=state, error="external_login_failed")
+		# 	delete_cookie(self.App, response)
+		# 	return response
 
 		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
@@ -142,20 +150,23 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def register_external_login(self, request, *, credentials_id):
+	async def register_external_login(self, request: aiohttp.web.Request, *, credentials_id):
 		"""
 		Register a new external login provider account
 		"""
-		auth_provider_response: dict = request.query
+		if request.method == "POST":
+			auth_provider_response: typing.Mapping = await request.post()
+		else:
+			auth_provider_response = request.query
 
 		state = auth_provider_response.get("state")
 		# if state is None:
 		# 	L.warning("State parameter not provided in external login response")
 
 		code = auth_provider_response.get("code")
-		if code is None:
-			L.error("Authentication code not provided in query")
-			raise aiohttp.web.HTTPBadRequest()
+		# if code is None:
+		# 	L.error("Authentication code not provided in query")
+		# 	raise aiohttp.web.HTTPBadRequest()
 
 		login_provider_type = request.match_info["ext_login_provider"]
 
