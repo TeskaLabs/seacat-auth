@@ -55,6 +55,8 @@ class ExternalLoginService(asab.Service):
 
 
 	async def initialize(self, app):
+		for provider in self.Providers.values():
+			await provider.initialize(app)
 		coll = await self.StorageService.collection(self.ExternalLoginCollection)
 		await coll.create_index(
 			[
