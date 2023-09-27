@@ -16,18 +16,21 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	This app must be registered at Facebook:
 	https://developers.facebook.com/docs/facebook-login/web
 
+	# Facebook uses a custom OAuth implementation. The flow is described here:
+	https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow
+
 	Redirect URI should be set to the following:
-	https://{my_domain}/seacat_auth/public/ext-login/facebook
-	https://{my_domain}/seacat_auth/public/ext-login-add/facebook
+	https://{my_domain}/seacat-auth/public/ext-login/facebook
+	https://{my_domain}/seacat-auth/public/ext-login-add/facebook
 	"""
 	Type = "facebook"
 	ConfigDefaults = {
 		# Facebook uses a custom OAuth implementation. There is no OpenID discovery_uri.
-		"authorization_endpoint": "https://www.facebook.com/v18.0/dialog/oauth",
-		"token_endpoint": "https://graph.facebook.com/v18.0/oauth/access_token",
+		"authorization_endpoint": "https://www.facebook.com/v15.0/dialog/oauth",
+		"token_endpoint": "https://graph.facebook.com/v15.0/oauth/access_token",
 		"userinfo_endpoint": "https://graph.facebook.com/me",
 		"response_type": "code",
-		"scope": "public_profile,email",
+		"scope": "public_profile",
 		"fields": "id,name,email",
 		"label": "Sign in with Facebook",
 	}
