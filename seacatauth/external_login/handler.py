@@ -52,10 +52,16 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
+		login_provider_type = request.match_info["ext_login_provider"]
+
 		if request.method == "POST":
 			authorize_data: dict = dict(await request.post())
 		else:
 			authorize_data = dict(request.query)
+
+		if not authorize_data:
+			L.error("External login provider returned no data in authorize callback.", struct_data={
+				"provider": login_provider_type})
 
 		# TODO: Implement state parameter for XSRF prevention
 		# state = authorize_data.get("state")
@@ -63,7 +69,6 @@ class ExternalLoginHandler(object):
 		# 	L.error("State parameter not provided in external login response")
 		state = None
 
-		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
 		user_info = await provider.do_external_login(authorize_data)
 
@@ -150,17 +155,21 @@ class ExternalLoginHandler(object):
 		"""
 		Register a new external login provider account
 		"""
+		login_provider_type = request.match_info["ext_login_provider"]
+
 		if request.method == "POST":
 			authorize_data: dict = dict(await request.post())
 		else:
 			authorize_data = dict(request.query)
 
+		if not authorize_data:
+			L.error("External login provider returned no data in authorize callback.", struct_data={
+				"provider": login_provider_type})
+
 		# TODO: Implement state parameter for XSRF prevention
 		# if state is None:
 		# 	L.error("State parameter not provided in external login response")
 		state = authorize_data.get("state")
-
-		login_provider_type = request.match_info["ext_login_provider"]
 
 		# Check if the credentials don't have this login type enabled already
 		login_exists = False
