@@ -101,3 +101,9 @@ class SessionNotFoundError(KeyError):
 		self.SessionId = session_id
 		self.Query = query
 		super().__init__(message, *args)
+
+
+class CommunicationError(Exception):
+	def __init__(self, message, credentials_id=None, *args):
+		self.CredentialsId = credentials_id
+		super().__init__(message, *args)

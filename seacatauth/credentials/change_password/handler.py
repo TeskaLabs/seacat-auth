@@ -5,6 +5,7 @@ import asab
 import asab.web.rest
 import asab.web.webcrypto
 
+from ... import exceptions, generic
 from ...decorators import access_control
 
 #
@@ -26,7 +27,7 @@ class ChangePasswordHandler(object):
 		self.ChangePasswordService = change_password_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/password", self.init_password_change)
+		web_app.router.add_put("/password", self.admin_request_password_change)
 		web_app.router.add_put("/public/password-change", self.change_password)
 		web_app.router.add_put("/public/password-reset", self.reset_password)
 		web_app.router.add_put("/public/lost-password", self.lost_password)
@@ -98,15 +99,21 @@ class ChangePasswordHandler(object):
 		}
 	})
 	@access_control("seacat:credentials:edit")
-	async def init_password_change(self, request, *, json_data):
+	async def admin_request_password_change(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
 		"""
-		result = await self.ChangePasswordService.init_password_change(
-			json_data.get("credentials_id"),
-			expiration=json_data.get("expiration")
-		)
-		return asab.web.rest.json_response(request, {"result": result})
+		credentials_id = json_data.get("credentials_id")
+		try:
+			await self.ChangePasswordService.init_password_change(
+				credentials_id,
+				expiration=json_data.get("expiration")
+			)
+		except exceptions.CommunicationError:
+			L.error("Failed to send password change link.", struct_data={"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -118,9 +125,26 @@ class ChangePasswordHandler(object):
 	async def lost_password(self, request, *, json_data):
 		"""
 		Request a password reset link
+
+		NOTE: This must always return a positive response as a measure to avoid
+		sensitive information disclosure on public API.
 		"""
 		await asyncio.sleep(5)  # Safety time cooldown
+		access_ips = generic.get_request_access_ips(request)
 		ident = json_data["ident"]
-		await self.ChangePasswordService.lost_password(ident)
-		response = {"result": "OK"}  # Since this is public, do not disclose the true result
-		return asab.web.rest.json_response(request, response)
+		credentials_id = await self.ChangePasswordService.CredentialsService.locate(ident, stop_at_first=True)
+		if credentials_id is None:
+			L.log(asab.LOG_NOTICE, "Ident matched no credentials.", struct_data={
+				"ident": ident, "from": access_ips})
+			# Avoid information disclosure
+			return asab.web.rest.json_response(request, {"result": "OK"})
+
+		try:
+			await self.ChangePasswordService.init_password_change(credentials_id)
+		except exceptions.CommunicationError:
+			L.error("Failed to send password change link.", struct_data={
+				"cid": credentials_id, "from": access_ips})
+			# Avoid information disclosure
+			return asab.web.rest.json_response(request, {"result": "OK"})
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
