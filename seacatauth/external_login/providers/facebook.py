@@ -26,8 +26,8 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		"authorization_endpoint": "https://www.facebook.com/v18.0/dialog/oauth",
 		"token_endpoint": "https://graph.facebook.com/v18.0/oauth/access_token",
 		"userinfo_endpoint": "https://graph.facebook.com/me",
-		"response_type": "code granted_scopes",
-		"scope": "public_profile",
+		"response_type": "code",
+		"scope": "public_profile,email",
 		"fields": "id,name,email",
 		"label": "Sign in with Facebook",
 	}
