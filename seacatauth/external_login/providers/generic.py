@@ -89,6 +89,11 @@ class GenericOAuth2Login(asab.Configurable):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
+		self.IDClaimsToVerify = {
+			"iss": self.Issuer,
+			"aud": self.ClientId
+		}
+
 		# Label for "Sign up with {ext_login_provider}" button
 		# TODO: Make this i18n-compatible (like login descriptors)
 		# TODO: Separate label for "Add external login" button
@@ -208,15 +213,8 @@ class GenericOAuth2Login(asab.Configurable):
 		id_token = token_data["id_token"]
 		await self._prepare_jwks()
 
-		try:
-			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet)
-			claims = id_token.token.objects.get("payload")
-			claims = json.loads(claims)
-		except Exception as e:
-			L.error("Error reading id_token claims.", struct_data={
-				"provider": self.Type,
-				"err": str(e),
-				"resp": token_data})
+		claims = self._get_verified_claims(id_token)
+		if not claims:
 			return None
 
 		user_info = {}
@@ -228,13 +226,28 @@ class GenericOAuth2Login(asab.Configurable):
 			user_info["ident"] = claims[self.Ident]
 		return user_info
 
+	def _get_verified_claims(self, id_token):
+		try:
+			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=self.IDClaimsToVerify)
+			claims = json.loads(id_token.claims)
+		except jwcrypto.jws.InvalidJWSSignature:
+			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
+			return None
+		except jwcrypto.jwt.JWTExpired:
+			L.error("Expired ID token.", struct_data={"provider": self.Type})
+			return None
+		except Exception as e:
+			L.error("Error reading ID token claims.", struct_data={
+				"provider": self.Type, "error": str(e)})
+			return None
+		return claims
+
 	def get_login_authorize_uri(self, state: typing.Optional[str] = None):
 		return self._get_authorize_uri(self.LoginURI, state)
 
 	def get_addlogin_authorize_uri(self, state: typing.Optional[str] = None):
 		return self._get_authorize_uri(self.AddExternalLoginURI, state)
 
-	# TODO: These two methods do the exact same thing. Refactor.
 	async def do_external_login(self, authorize_data: dict):
 		return await self._get_user_info(authorize_data, redirect_uri=self.LoginURI)
 
