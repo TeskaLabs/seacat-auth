@@ -38,7 +38,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		"client_secret": "notasecret",
 		"authorize_uri": "https://appleid.apple.com/auth/authorize",
 		"access_token_uri": "https://appleid.apple.com/auth/token",
-		"scope": "name,email",
+		"scope": "name email",
 		"label": "Sign in with Apple",
 	}
 
