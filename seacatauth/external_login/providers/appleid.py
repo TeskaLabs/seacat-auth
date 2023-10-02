@@ -1,11 +1,7 @@
-import base64
 import json
 import logging
 import typing
 import urllib.parse
-import jwcrypto.jwt
-import jwcrypto.jwk
-import jwcrypto.jws
 
 from typing import Optional
 from .generic import GenericOAuth2Login
@@ -83,14 +79,6 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 				)
 				return None
 
-		# 'user' is available only after the first successful authorization with Apple identity provider. Any
-		#  subsequent authorizations will not have this property. To get it again, user must de-authorize the app
-		#  from his Apple ID account and then authorize again using Sign with Apple.
-		#  Moreover, user's firstName and lastName are contained only in this 'user' property. They are not included
-		#  in the id_token at all.
-		# 'user' contains the following: # firstName, lastName, email
-		user_name = self._parse_user_name(authorize_data.get("user"))
-
 		id_token = authorize_data.get("id_token")
 		verified_claims = self._get_verified_claims(id_token)
 		if not verified_claims:
@@ -103,12 +91,21 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			"nonce": verified_claims.get("nonce"),
 		}
 
-		if user_name is not None:
-			user_info.update(user_name)
+		# Add optional user data
+		user_data = self._parse_user_data(authorize_data.get("user"))
+		if user_data is not None:
+			user_info.update(user_data)
 
 		return user_info
 
-	def _parse_user_name(self, user_json: Optional[str]) -> Optional[dict]:
+	def _parse_user_data(self, user_json: Optional[str]) -> Optional[dict]:
+		"""
+		The 'user' data is only available in the request after the first successful authorization with
+		Apple identity provider. Any subsequent authorizations will not have this property. To get it again, the user
+		must de-authorize the app from his Apple ID account and then authorize again using Sign with Apple.
+		Moreover, user's firstName and lastName are contained only in this 'user' property. They are not included
+		in the id_token at all. 'user' contains the following attributes: firstName, lastName, email
+		"""
 		if user_json is None:
 			return None
 		user_json = json.loads(user_json)
