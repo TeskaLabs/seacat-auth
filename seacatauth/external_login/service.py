@@ -155,7 +155,7 @@ class ExternalLoginService(asab.Service):
 
 		async with aiohttp.ClientSession() as session:
 			async with session.post(self.RegistrationWebhookUri, json=request_data) as resp:
-				if resp.status // 100 != 2:
+				if resp.status not in frozenset([200, 201]):
 					text = await resp.text()
 					L.error("Webhook responded with error.", struct_data={
 						"status": resp.status, "text": text, "url": self.RegistrationWebhookUri})
@@ -167,6 +167,14 @@ class ExternalLoginService(asab.Service):
 			L.error("Webhook response does not contain valid 'cid'.", struct_data={"response_data": response_data})
 			return None
 
+		# Test if the ID is reachable
+		try:
+			await self.CredentialsService.get(credentials_id)
+		except KeyError:
+			L.error("Returned credentials ID not found.", struct_data={"response_data": response_data})
+			return None
+
+		# Link the credentials ID to the external identity provider subject ID
 		await self.create(
 			credentials_id=credentials_id,
 			provider_type=provider_type,
