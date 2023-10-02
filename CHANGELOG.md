@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
+
+---
+
+
 ## v23.39-beta
 
 ### Fix
