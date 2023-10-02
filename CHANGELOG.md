@@ -3,7 +3,7 @@
 ## Release candidate
 
 ### Features
-- Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
+- Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
 
 ---
 
