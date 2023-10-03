@@ -368,6 +368,7 @@ class AuthorizeHandler(object):
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
+					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
 					login_parameters=login_parameters)
@@ -379,6 +380,7 @@ class AuthorizeHandler(object):
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
+					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
 					login_parameters=login_parameters)
@@ -392,6 +394,7 @@ class AuthorizeHandler(object):
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
+					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
 					login_parameters=login_parameters)
@@ -409,6 +412,7 @@ class AuthorizeHandler(object):
 				client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
+				nonce=nonce,
 				code_challenge=code_challenge,
 				code_challenge_method=code_challenge_method,
 				login_parameters=login_parameters)
@@ -675,6 +679,7 @@ class AuthorizeHandler(object):
 	async def reply_with_redirect_to_login(
 		self, response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
+		nonce: str = None,
 		code_challenge: str = None,
 		code_challenge_method: str = None,
 		login_parameters: dict = None
@@ -696,10 +701,10 @@ class AuthorizeHandler(object):
 			"client_id": client_id,
 			"redirect_uri": redirect_uri,
 		}
-
 		if state is not None:
 			authorize_query_params["state"] = state
-
+		if nonce is not None:
+			authorize_query_params["nonce"] = nonce
 		if code_challenge is not None:
 			authorize_query_params["code_challenge"] = code_challenge
 			if code_challenge_method not in (None, "none"):
