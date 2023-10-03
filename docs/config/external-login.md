@@ -13,6 +13,8 @@ SeaCat Auth currently supports these login providers:
 - Office 365
 - Github
 - MojeID
+- Facebook
+- AppleID
 
 
 ## Usage
@@ -136,4 +138,20 @@ to obtain client ID and secret.
 [seacatauth:mojeid]
 client_id=a2c4e6...
 client_secret=1b3d5f...
+```
+
+### AppleID
+
+Provider ID: `appleid`
+
+Register your app in [Apple Developer program Service ID settings](https://developer.apple.com/account/resources/identifiers/list/serviceId)
+to obtain client ID. 
+Apple returns e-mail and username in the response right after OAuth2 /authorize call, so we do not need client_secret,
+because we do not need to hit the /token endpoint at all.
+
+Sign in with Apple [documentation](https://developer.apple.com/documentation/sign_in_with_apple/) 
+
+```ini
+[seacatauth:appleid]
+client_id=a2c4e6...
 ```
