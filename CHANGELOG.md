@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
+
+---
+
+
 ## v23.39-beta
 
 ### Fix

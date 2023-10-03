@@ -39,7 +39,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 
 	async def _get_user_info(self, authorize_data, redirect_uri):
 		"""
-		Info is not contained in access_token,
+		User info is not contained in token response,
 		call to https://api.github.com/user is needed.
 		"""
 		code = authorize_data.get("code")
