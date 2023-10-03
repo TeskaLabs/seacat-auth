@@ -700,12 +700,11 @@ class AuthorizeHandler(object):
 			"scope": " ".join(scope),
 			"client_id": client_id,
 			"redirect_uri": redirect_uri,
-			"nonce": nonce
 		}
-
 		if state is not None:
 			authorize_query_params["state"] = state
-
+		if nonce is not None:
+			authorize_query_params["nonce"] = nonce
 		if code_challenge is not None:
 			authorize_query_params["code_challenge"] = code_challenge
 			if code_challenge_method not in (None, "none"):
