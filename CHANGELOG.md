@@ -3,7 +3,7 @@
 ## Release candidate
 
 ### Fix
-- Preserve nonce when redirecting to login (#267, PLUM Sprint 230908, @elpablos)
+- Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
 
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
