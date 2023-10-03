@@ -4,6 +4,7 @@ import aiohttp.web
 
 import asab
 import asab.web.rest
+import asab.exceptions
 
 from ...generic import nginx_introspection, get_bearer_token_value
 
@@ -31,12 +32,12 @@ class TokenIntrospectionHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/openidconnect/introspect", self.introspect)
+		web_app.router.add_post(self.OpenIdConnectService.IntrospectionPath, self.introspect)
 		web_app.router.add_post(self.OpenIdConnectService.NginxIntrospectionPath, self.introspect_nginx)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/openidconnect/introspect", self.introspect)
+		web_app_public.router.add_post(self.OpenIdConnectService.IntrospectionPath, self.introspect)
 		web_app_public.router.add_post(self.OpenIdConnectService.NginxIntrospectionPath, self.introspect_nginx)
 
 
@@ -53,24 +54,35 @@ class TokenIntrospectionHandler(object):
 		token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
 		"""
 
-		data = await request.text()
-		qs_data = dict(urllib.parse.parse_qsl(data))
+		# TODO: To prevent token scanning attacks, the endpoint MUST also require
+		#    some form of authorization to access this endpoint, such as client
+		#    authentication as described in OAuth 2.0 [RFC6749] or a separate
+		#    OAuth 2.0 access token such as the bearer token described in OAuth
+		#    2.0 Bearer Token Usage [RFC6750].
 
-		if qs_data.get('token_type_hint', 'access_token') != 'access_token':
-			raise RuntimeError("Token type is not 'access_token' but '{}'".format(
-				qs_data.get('token_type_hint', '<not provided>'))
-			)
+		params = await request.post()
 
-		token = qs_data.get('token')
-		if token is None:
-			raise KeyError("Token not found")
+		token = params.get("token")
+		if not token:
+			raise asab.exceptions.ValidationError("Missing 'token' parameter.")
 
-		# TODO: Implement a token validation
+		# If the server is unable to locate the token using the given hint, it MUST extend its search across
+		# all of its supported token types.
+		token_type_hint = params.get("token_type_hint")
+		if token_type_hint != "access_token":
+			# No other types are supported at the moment.
+			raise asab.exceptions.ValidationError("Unsupported token_type_hint {!r}.".format(token_type_hint))
 
-		response = {
-			"active": True,
-		}
-		return asab.web.rest.json_response(request, response)
+		session = await self.OpenIdConnectService.get_session_by_access_token(token)
+		if session is None:
+			return aiohttp.web.HTTPUnauthorized()
+
+		response_data = {"active": True}
+
+		# Add OPTIONAL user info data
+		response_data.update(**await self.OpenIdConnectService.build_userinfo(session))
+
+		return asab.web.rest.json_response(request, response_data)
 
 
 	async def authenticate_request(self, request):

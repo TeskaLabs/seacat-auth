@@ -48,6 +48,7 @@ class OpenIdConnectService(asab.Service):
 	UserInfoPath = "/openidconnect/userinfo"
 	JwksPath = "/openidconnect/public_keys"
 	EndSessionPath = "/openidconnect/logout"
+	IntrospectionPath = "/openidconnect/introspect"
 	NginxIntrospectionPath = "/openidconnect/introspect/nginx"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
@@ -60,7 +61,7 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
-		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
+		self.PKCE = pkce.PKCE()
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		if public_api_base_url.endswith("/"):
