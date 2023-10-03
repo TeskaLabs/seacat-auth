@@ -12,7 +12,7 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "google"
 	ConfigDefaults = {
-		"issuer": "https://accounts.google.com",
+		"issuer": "accounts.google.com",  # !! Google's issuer does not exactly match the one stated in discovery data
 		"discovery_uri": "https://accounts.google.com/.well-known/openid-configuration",
 		"jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
 		"authorization_endpoint": "https://accounts.google.com/o/oauth2/auth",

@@ -1,4 +1,5 @@
 import logging
+import typing
 import urllib.parse
 import aiohttp
 
@@ -43,7 +44,11 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		self.Fields = self.Config.get("fields")
 		assert self.UserInfoEndpoint not in (None, "")
 
-	def _get_authorize_uri(self, redirect_uri, state=None):
+	def _get_authorize_uri(
+		self, redirect_uri: str,
+		state: typing.Optional[str] = None,
+		nonce: typing.Optional[str] = None
+	):
 		query_params = [
 			("client_id", self.ClientId),
 			("response_type", self.ResponseType),
