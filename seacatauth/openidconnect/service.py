@@ -511,7 +511,7 @@ class OpenIdConnectService(asab.Service):
 			**kwargs)
 
 
-	def build_authorize_uri(self, client_dict, **query_params):
+	def build_authorize_uri(self, client_dict: dict, **query_params):
 		"""
 		Check if the client has a registered OAuth Authorize URI. If not, use the default.
 		Extend the URI with query parameters.

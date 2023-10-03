@@ -431,14 +431,12 @@ class AuthorizeHandler(object):
 				L.log(asab.LOG_NOTICE, "Auth factor setup required. Redirecting to setup.", struct_data={
 					"missing_factors": " ".join(factors_to_setup), "cid": root_session.Credentials.Id})
 				return await self.reply_with_factor_setup_redirect(
-					session=root_session,
 					missing_factors=factors_to_setup,
 					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					login_parameters=login_parameters
 				)
 
 			# Authorize access to tenants requested in scope
@@ -694,27 +692,21 @@ class AuthorizeHandler(object):
 		if login_parameters is not None:
 			login_query_params = list(login_parameters.items())
 
-		# Gather params which will be passed to the after-login oidc/authorize call
-		authorize_query_params = {
-			"response_type": response_type,
-			"scope": " ".join(scope),
-			"client_id": client_id,
-			"redirect_uri": redirect_uri,
-		}
-		if state is not None:
-			authorize_query_params["state"] = state
-		if nonce is not None:
-			authorize_query_params["nonce"] = nonce
-		if code_challenge is not None:
-			authorize_query_params["code_challenge"] = code_challenge
-			if code_challenge_method not in (None, "none"):
-				authorize_query_params["code_challenge_method"] = code_challenge_method
-
 		# Get client collection
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
 		# Build redirect uri
-		callback_uri = self.OpenIdConnectService.build_authorize_uri(client_dict, **authorize_query_params)
+		callback_uri = await self.OpenIdConnectService.build_authorize_uri(
+			client_dict=client_dict,
+			client_id=client_id,
+			response_type=response_type,
+			scope=scope,
+			state=state,
+			nonce=nonce,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method,
+			redirect_uri=redirect_uri,
+		)
 
 		login_query_params.append(("redirect_uri", callback_uri))
 		login_query_params.append(("client_id", client_id))
@@ -733,10 +725,11 @@ class AuthorizeHandler(object):
 		return response
 
 	async def reply_with_factor_setup_redirect(
-		self, session, missing_factors: list,
-		response_type: str, scope: list, client_id: str, redirect_uri: str,
+		self, missing_factors: list, response_type: str, scope: list, client_id: str, redirect_uri: str,
 		state: str = None,
-		login_parameters: dict = None
+		nonce: str = None,
+		code_challenge: str = None,
+		code_challenge_method: str = None,
 	):
 		"""
 		Redirect to home screen and force factor (re)configuration
@@ -748,28 +741,24 @@ class AuthorizeHandler(object):
 		))
 
 		# Gather params which will be passed to the oidc/authorize request called after the OTP setup
-		authorize_query_params = [
-			("prompt", "login"),
-			("response_type", response_type),
-			("scope", " ".join(scope)),
-			("client_id", client_id),
-			("redirect_uri", redirect_uri),
-		]
-		if state is not None:
-			authorize_query_params.append(("state", state))
-
-		# Build the redirect URI back to this endpoint and add it to auth URL params
-		authorize_redirect_uri = "{}{}?{}".format(
-			self.PublicApiBaseUrl,
-			self.AuthorizePath,
-			urllib.parse.urlencode(authorize_query_params)
+		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+		callback_uri = await self.OpenIdConnectService.build_authorize_uri(
+			client_dict=client_dict,
+			client_id=client_id,
+			response_type=response_type,
+			scope=scope,
+			state=state,
+			nonce=nonce,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method,
+			redirect_uri=redirect_uri,
 		)
 
 		auth_url_params = [
 			("setup", " ".join(missing_factors)),
 			# Redirect URI needs an extra layer of percent-encoding when placed in fragment
 			# because browsers automatically do one layer of decoding
-			("redirect_uri", urllib.parse.quote(authorize_redirect_uri))
+			("redirect_uri", urllib.parse.quote(callback_uri))
 		]
 		# Add the query params to the #fragment part
 		# TODO: There should be no fragment in redirect URI. Move to regular query.
