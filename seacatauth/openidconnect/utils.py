@@ -37,3 +37,26 @@ class InvalidGrantError(Exception):
 	def __init__(self, *args, client_id=None):
 		self.ClientId = client_id
 		super().__init__("Invalid grant.", *args)
+
+
+AUTHORIZE_PARAMETERS = frozenset([
+	# OAuth 2.0 parameters
+	"client_id",
+	"scope",
+	"response_type",
+	"redirect_uri",
+	"state",
+	"response_mode",
+	# OpenID Connect parameters
+	"nonce",
+	"display",
+	"prompt",
+	"max_age",
+	"ui_locales",
+	"id_token_hint",
+	"login_hint",
+	"acr_values",
+	# PKCE parameters
+	"code_challenge",
+	"code_challenge_method"
+])
