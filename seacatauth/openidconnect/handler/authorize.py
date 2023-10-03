@@ -675,12 +675,13 @@ class AuthorizeHandler(object):
 
 
 	async def reply_with_redirect_to_login(
-		self, response_type: str, scope: list, client_id: str, redirect_uri: str,
-		state: str = None,
-		nonce: str = None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
-		login_parameters: dict = None
+		self,
+		client_id: str,
+		response_type: str,
+		scope: list,
+		redirect_uri: str,
+		login_parameters: dict = None,
+		**authorize_params
 	):
 		"""
 		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
@@ -701,11 +702,8 @@ class AuthorizeHandler(object):
 			client_id=client_id,
 			response_type=response_type,
 			scope=scope,
-			state=state,
-			nonce=nonce,
-			code_challenge=code_challenge,
-			code_challenge_method=code_challenge_method,
 			redirect_uri=redirect_uri,
+			**authorize_params
 		)
 
 		login_query_params.append(("redirect_uri", callback_uri))
@@ -725,11 +723,13 @@ class AuthorizeHandler(object):
 		return response
 
 	async def reply_with_factor_setup_redirect(
-		self, missing_factors: list, response_type: str, scope: list, client_id: str, redirect_uri: str,
-		state: str = None,
-		nonce: str = None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
+		self,
+		missing_factors: list,
+		client_id: str,
+		response_type: str,
+		scope: list,
+		redirect_uri: str,
+		**authorize_params
 	):
 		"""
 		Redirect to home screen and force factor (re)configuration
@@ -747,11 +747,8 @@ class AuthorizeHandler(object):
 			client_id=client_id,
 			response_type=response_type,
 			scope=scope,
-			state=state,
-			nonce=nonce,
-			code_challenge=code_challenge,
-			code_challenge_method=code_challenge_method,
 			redirect_uri=redirect_uri,
+			**authorize_params
 		)
 
 		auth_url_params = [
