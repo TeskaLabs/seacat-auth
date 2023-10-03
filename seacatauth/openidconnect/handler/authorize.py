@@ -249,7 +249,6 @@ class AuthorizeHandler(object):
 			scope=request_parameters["scope"].split(" "),
 			client_id=request_parameters["client_id"],
 			redirect_uri=request_parameters["redirect_uri"],
-			client_secret=request_parameters.get("client_secret"),
 			state=request_parameters.get("state"),
 			nonce=request_parameters.get("nonce"),
 			prompt=request_parameters.get("prompt"),
@@ -265,7 +264,6 @@ class AuthorizeHandler(object):
 		scope: list,
 		client_id: str,
 		redirect_uri: str,
-		client_secret: str = None,
 		state: str = None,
 		nonce: str = None,
 		prompt: str = None,
@@ -280,7 +278,7 @@ class AuthorizeHandler(object):
 		"""
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			client_dict = await self._authorize_client(client_id, redirect_uri, client_secret)
+			client_dict = await self._validate_client_options(client_id, redirect_uri, response_type="code")
 		except OAuthAuthorizeError as e:
 			e.State = state
 			e.RedirectUri = redirect_uri
@@ -549,23 +547,18 @@ class AuthorizeHandler(object):
 					("redirect_uri", redirect_uri)]))
 
 
-	async def _authorize_client(self, client_id, redirect_uri, client_secret=None):
+	async def _validate_client_options(self, client_id, redirect_uri, response_type):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError as e:
 			raise client.exceptions.ClientNotFoundError(client_id) from e
 
 		try:
-			await self.OpenIdConnectService.ClientService.authorize_client(
+			await self.OpenIdConnectService.ClientService.validate_client_authorize_options(
 				client=client_dict,
-				client_secret=client_secret,
 				redirect_uri=redirect_uri,
-				response_type="code",
+				response_type=response_type,
 			)
-		except client.exceptions.InvalidClientSecret:
-			L.error("Invalid client secret.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.UnauthorizedClient, client_id)
 		except client.exceptions.InvalidRedirectURI as e:
 			raise e
 		except client.exceptions.ClientError as e:
