@@ -1,5 +1,6 @@
-import urllib
 import logging
+import typing
+
 import aiohttp.web
 
 import asab
@@ -7,6 +8,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ...generic import nginx_introspection, get_bearer_token_value
+from ... import exceptions
 
 #
 
@@ -64,18 +66,21 @@ class TokenIntrospectionHandler(object):
 
 		token = params.get("token")
 		if not token:
-			raise asab.exceptions.ValidationError("Missing 'token' parameter.")
+			L.error("Missing 'token' parameter.")
+			return asab.web.rest.json_response(request, {"active": False})
 
 		# If the server is unable to locate the token using the given hint, it MUST extend its search across
 		# all of its supported token types.
 		token_type_hint = params.get("token_type_hint")
 		if token_type_hint != "access_token":
 			# No other types are supported at the moment.
-			raise asab.exceptions.ValidationError("Unsupported token_type_hint {!r}.".format(token_type_hint))
+			L.error("Unsupported token_type_hint {!r}.".format(token_type_hint))
+			return asab.web.rest.json_response(request, {"active": False})
 
 		session = await self.OpenIdConnectService.get_session_by_access_token(token)
 		if session is None:
-			return aiohttp.web.HTTPUnauthorized()
+			L.log(asab.LOG_NOTICE, "Access token matched no active session.")
+			return asab.web.rest.json_response(request, {"active": False})
 
 		response_data = {"active": True}
 
