@@ -71,7 +71,7 @@ class ResourceService(asab.Service):
 			"description": "Delete tenant.",
 		},
 		"seacat:tenant:assign": {
-			"description": "Assign and unassign tenant members.",
+			"description": "Assign and unassign tenant members, invite new users to tenant.",
 		},
 		"seacat:role:access": {
 			"description": "Search tenant roles, view role detail and list role bearers.",
