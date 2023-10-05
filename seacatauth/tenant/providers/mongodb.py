@@ -84,8 +84,20 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		return await coll.count_documents(filter=filter)
 
 
-	async def create(self, tenant_id: str, creator_id: str = None) -> Optional[str]:
+	async def create(
+		self, tenant_id: str, *,
+		label: str = None,
+		description: str = None,
+		data: dict = None,
+		creator_id: str = None
+	) -> Optional[str]:
 		u = self.MongoDBStorageService.upsertor(self.TenantsCollection, obj_id=tenant_id, version=0)
+		if label is not None:
+			u.set("label", label)
+		if description is not None:
+			u.set("description", description)
+		if data is not None:
+			u.set("data", data)
 		if creator_id is not None:
 			u.set("created_by", creator_id)
 		tenant_id = await u.execute()
@@ -93,13 +105,20 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		return tenant_id
 
 
-	async def update(self, tenant_id: str, *, description: str = None, data: dict = None) -> Optional[str]:
+	async def update(
+		self, tenant_id: str, *,
+		label: str = None,
+		description: str = None,
+		data: dict = None
+	) -> Optional[str]:
 		tenant = await self.get(tenant_id)
 		u = self.MongoDBStorageService.upsertor(
 			self.TenantsCollection,
 			obj_id=tenant_id,
 			version=tenant["_v"]
 		)
+		if label is not None:
+			u.set("label", label)
 		if description is not None:
 			u.set("description", description)
 		if data is not None:

@@ -39,6 +39,3 @@ class EventTypes:
 	TENANT_ASSIGNED = "tenant_assigned"
 
 	BOUNCER_URI_STORED = "bouncer_uri_stored"
-
-	AUDIT_ENTRY_CREATED = "audit_entry_created"
-	LAST_CREDENTIALS_EVENT_UPDATED = "last_credentials_event_updated"
