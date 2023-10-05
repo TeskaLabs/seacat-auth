@@ -11,6 +11,7 @@ import webauthn
 import webauthn.registration
 import webauthn.helpers.structs
 
+from ... import exceptions
 from ...events import EventTypes
 #
 
@@ -268,10 +269,13 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialcreationoptions
 		"""
 		credentials = await self.CredentialsService.get(session.Credentials.Id)
-		# User_name should be a unique human-palatable identifier (typically email, phone)
-		user_name = credentials.get("email") or credentials.get("phone")
-		if not user_name:
-			raise Exception("Credentials have no email address nor phone number.")
+		# User_name should be a unique human-palatable identifier
+		user_name = credentials.get("username") or credentials.get("email") or credentials.get("phone")
+		if user_name is None:
+			L.error(
+				"Cannot register WebAuthn credential for credentials with no username, email, nor phone.",
+				struct_data={"cid": session.Credentials.Id})
+			raise exceptions.AccessDeniedError("Credentials have no username, email, nor phone.")
 
 		challenge = await self.create_registration_challenge(session.Session.Id)
 		options = webauthn.generate_registration_options(
