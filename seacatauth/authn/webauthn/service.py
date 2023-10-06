@@ -26,6 +26,12 @@ L = logging.getLogger(__name__)
 #
 
 
+asab.Config.add_defaults({
+	"seacatauth:webauthn": {
+		"attestation": "direct"
+	}
+})
+
 class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
@@ -51,10 +57,10 @@ class WebAuthnService(asab.Service):
 		if self.RelyingPartyId is None:
 			self.RelyingPartyId = str(urllib.parse.urlparse(self.Origin).hostname)
 
-		self.AttestationPreference = asab.Config.get("seacatauth:webauthn", "attestation", fallback="none")
+		self.AttestationPreference = asab.Config.get("seacatauth:webauthn", "attestation")
 		# Use "indirect" or "direct" attestation to get metadata about registered authenticators.
 		# Doing so may however impose higher trust requirements on your environment though.
-		if self.AttestationPreference not in frozenset(["none", "direct", "indirect", "enterprise"]):
+		if self.AttestationPreference not in {"none", "direct", "indirect", "enterprise"}:
 			raise ValueError("Unsupported WebAuthn 'attestation' value: {!r}".format(self.AttestationPreference))
 
 		self.RegistrationTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
@@ -112,7 +118,7 @@ class WebAuthnService(asab.Service):
 		# Other identifiers (AAID, AKI) are not supported at the moment.
 		bulk = []
 		for entry in entries:
-			if not "aaguid" in entry:
+			if "aaguid" not in entry:
 				continue
 			aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
 			metadata = entry.get("metadataStatement")
