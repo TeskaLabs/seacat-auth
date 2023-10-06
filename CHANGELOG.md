@@ -8,6 +8,7 @@
 
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
+- Webauthn authenticator metadata (#256, PLUM Sprint 230908)
 
 ---
 
