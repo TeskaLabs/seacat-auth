@@ -5,7 +5,6 @@ import logging
 import secrets
 import typing
 import urllib.parse
-import pymongo
 
 import aiohttp
 import asab.storage
@@ -31,6 +30,7 @@ asab.Config.add_defaults({
 		"attestation": "direct"
 	}
 })
+
 
 class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
@@ -74,18 +74,19 @@ class WebAuthnService(asab.Service):
 
 
 	async def initialize(self, app):
-		await self._load_fido_metadata(speculative=False)
+		await self._load_fido_metadata()
 
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
+		await self._load_fido_metadata(only_if_empty=False)
 
 
-	async def _load_fido_metadata(self, speculative=True):
+	async def _load_fido_metadata(self, only_if_empty=True):
 		"""
 		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
 		"""
-		if speculative:
+		if only_if_empty:
 			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
 			count = await coll.estimated_document_count()
 			if count > 0:
@@ -116,19 +117,29 @@ class WebAuthnService(asab.Service):
 
 		# FIDO2 authenticators are identified with AAGUID
 		# Other identifiers (AAID, AKI) are not supported at the moment.
-		bulk = []
 		for entry in entries:
 			if "aaguid" not in entry:
 				continue
 			aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
 			metadata = entry.get("metadataStatement")
 			metadata["_id"] = aaguid
-			bulk.append(pymongo.InsertOne(metadata))
 
-		coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
-		await coll.drop()
-		result = await coll.bulk_write(bulk)
-		L.log(asab.LOG_NOTICE, "FIDO metadata fetched and stored.", struct_data={"inserted": result.inserted_count})
+		collection = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+		client = self.StorageService.Client
+		n_inserted = 0
+		async with await client.start_session() as session:
+			async with session.start_transaction():
+				await collection.delete_many({})
+				for entry in entries:
+					if "aaguid" not in entry:
+						continue
+					aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
+					metadata = entry.get("metadataStatement")
+					metadata["_id"] = aaguid
+					await collection.insert_one(metadata)
+					n_inserted += 1
+
+		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
 
 
 	async def create_webauthn_credential(
