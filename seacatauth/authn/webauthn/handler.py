@@ -5,6 +5,7 @@ import aiohttp.web
 import asab.web
 import asab.web.rest
 
+from ... import exceptions
 from ...decorators import access_control
 
 #
@@ -47,7 +48,10 @@ class WebAuthnHandler(object):
 		"""
 		Get WebAuthn registration options
 		"""
-		options = await self.WebAuthnService.get_registration_options(request.Session)
+		try:
+			options = await self.WebAuthnService.get_registration_options(request.Session)
+		except exceptions.AccessDeniedError:
+			return asab.web.rest.json_response(request, data={"status": "FAILED"}, status=400)
 		return aiohttp.web.Response(body=options, content_type="application/json")
 		# return asab.web.rest.json_response(request, options)
 
