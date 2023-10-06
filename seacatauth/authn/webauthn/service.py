@@ -5,6 +5,7 @@ import logging
 import secrets
 import typing
 import urllib.parse
+import pymongo
 
 import aiohttp
 import asab.storage
@@ -17,6 +18,7 @@ import cryptography.hazmat.primitives.serialization
 import cryptography.x509
 
 from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ L = logging.getLogger(__name__)
 class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
+	FidoMetadataServiceCollection = "fms"
 	FidoMetadataServiceUrl = "https://mds3.fidoalliance.org"
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
@@ -65,7 +68,7 @@ class WebAuthnService(asab.Service):
 
 
 	async def initialize(self, app):
-		await self._load_fido_metadata()
+		await self._load_fido_metadata(speculative=False)
 
 
 	async def _on_housekeeping(self, event_name):
@@ -76,9 +79,11 @@ class WebAuthnService(asab.Service):
 		"""
 		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
 		"""
-		# TODO: Consider persistent local cache
-		if speculative and self._FidoMetadataByAAGUID is not None:
-			return
+		if speculative:
+			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+			count = await coll.estimated_document_count()
+			if count > 0:
+				return
 
 		try:
 			async with aiohttp.ClientSession() as session:
@@ -105,10 +110,19 @@ class WebAuthnService(asab.Service):
 
 		# FIDO2 authenticators are identified with AAGUID
 		# Other identifiers (AAID, AKI) are not supported at the moment.
-		self._FidoMetadataByAAGUID = {
-			int(entry["aaguid"].replace("-", ""), 16): entry.get("metadataStatement")
-			for entry in entries
-			if "aaguid" in entry}
+		bulk = []
+		for entry in entries:
+			if not "aaguid" in entry:
+				continue
+			aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
+			metadata = entry.get("metadataStatement")
+			metadata["_id"] = aaguid
+			bulk.append(pymongo.InsertOne(metadata))
+
+		coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+		await coll.drop()
+		result = await coll.bulk_write(bulk)
+		L.log(asab.LOG_NOTICE, "FIDO metadata fetched and stored.", struct_data={"inserted": result.inserted_count})
 
 
 	async def create_webauthn_credential(
@@ -120,7 +134,6 @@ class WebAuthnService(asab.Service):
 		"""
 		Create database entry for a verified WebAuthn credential
 		"""
-		print(verified_registration)
 		metadata = await self._get_authenticator_metadata(verified_registration)
 		if name is None:
 			if metadata is not None:
@@ -149,11 +162,13 @@ class WebAuthnService(asab.Service):
 
 	async def _get_authenticator_metadata(self, verified_registration):
 		await self._load_fido_metadata()
-		aaguid = int(verified_registration.aaguid.replace("-", ""), 16)
+		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
 		if aaguid == 0:
+			# Authenticators with other identifiers than AAGUID are not supported
 			metadata = None
 		else:
-			metadata = self._FidoMetadataByAAGUID.get(aaguid)
+			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+			metadata = await coll.find_one(aaguid)
 		return metadata
 
 	async def get_webauthn_credential(self, webauthn_credential_id):
