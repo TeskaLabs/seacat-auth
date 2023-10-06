@@ -4,6 +4,7 @@
 
 ### Fix
 - Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
+- Allow username for WebAuthn credentials username (#297, PLUM Sprint 230908)
 
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
