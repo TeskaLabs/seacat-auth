@@ -1,6 +1,8 @@
 import base64
+import binascii
 import logging
 import aiohttp.web
+import asab
 
 from ..generic import nginx_introspection
 from ..session import SessionAdapter
@@ -31,30 +33,40 @@ class M2MIntrospectHandler(object):
 		web_app_public.router.add_post('/m2m/nginx', self.nginx)
 
 
-	async def authenticate_request(self, request, client_id):
+	async def _authenticate_request(self, request, client_id):
 		# Get credentials from request
 		authorization_bytes = await request.read()
 
 		# Get Basic auth credentials
-		if authorization_bytes.startswith(b'Basic '):
+		if not authorization_bytes.startswith(b'Basic '):
+			L.log(asab.LOG_NOTICE, "Basic auth token not provided in request")
+			return None
+
+		try:
 			username_password = base64.urlsafe_b64decode(authorization_bytes[len(b'Basic '):]).decode("ascii")
+		except binascii.Error:
+			L.log(asab.LOG_NOTICE, "Basic auth token must be base64-encoded")
+			return None
+
+		try:
 			username, password = username_password.split(":", 1)
-		else:
-			L.warning("Basic auth token not provided in request", struct_data={"headers": dict(request.headers)})
+		except ValueError:
+			L.log(asab.LOG_NOTICE, "Basic auth token must match the 'username:password' format")
 			return None
 
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(username, stop_at_first=True)
 		if credentials_id is None:
-			L.warning("Credentials not found", struct_data={"username": username})
+			L.log(asab.LOG_NOTICE, "Credentials not found", struct_data={"username": username})
 			return None
 		provider = self.CredentialsService.get_provider(credentials_id)
 
 		# Check if machine credentials
 		if provider.Type != "m2m":
-			L.warning("Authn method not available for given credentials", struct_data={
-				"headers": dict(request.headers)
-			})
+			L.log(
+				asab.LOG_NOTICE,
+				"Authentication method only available for machine credentials",
+				struct_data={"cid": credentials_id})
 			return None
 
 		# Authenticate request
@@ -63,9 +75,7 @@ class M2MIntrospectHandler(object):
 			{"password": password}
 		)
 		if not authenticated:
-			L.warning("Basic authentication failed", struct_data={
-				"headers": dict(request.headers)
-			})
+			L.log(asab.LOG_NOTICE, "Basic authentication failed", struct_data={"cid": credentials_id})
 			return None
 
 		# Find session object
@@ -128,12 +138,12 @@ class M2MIntrospectHandler(object):
 		# TODO: Certificate auth
 		# TODO: Require client_id in query string
 		client_id = request.query.get("client_id")
-		session = await self.authenticate_request(request, client_id)
+		session = await self._authenticate_request(request, client_id)
 		if session is not None:
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.exception("Request authorization failed: {}".format(e))
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 		else:
 			response = aiohttp.web.HTTPUnauthorized()
