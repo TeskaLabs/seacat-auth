@@ -83,8 +83,11 @@ class CookieService(asab.Service):
 		"""
 		Get Seacat session cookie value from request header
 		"""
-		cookie = request.cookies.get(self.get_cookie_name(client_id))
+		cookie_name = self.get_cookie_name(client_id)
+		cookie = request.cookies.get(cookie_name)
 		if cookie is None:
+			L.log(asab.LOG_NOTICE, "Cookie not found in request", struct_data={
+				"cookie_name": cookie_name, "client_id": client_id})
 			return None
 		return cookie
 
