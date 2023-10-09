@@ -4,9 +4,11 @@
 
 ### Fix
 - Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
+- Allow username for WebAuthn credentials username (#297, PLUM Sprint 230908)
 
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
+- Webauthn authenticator metadata (#256, PLUM Sprint 230908)
 
 ---
 
@@ -25,6 +27,7 @@
 - Log failed password change requests (#291, PLUM Sprint 230908)
 - Get Github user email address (#289, PLUM Sprint 230908)
 - External login ID token validation (#292, PLUM Sprint 230908)
+- Log reasons for introspection failure (#299, PLUM Sprint 231006)
 
 ---
 

@@ -4,6 +4,7 @@ import typing
 import aiohttp.web
 
 import asab
+import asab.log
 import asab.web.rest
 import asab.exceptions
 
@@ -90,11 +91,14 @@ class TokenIntrospectionHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
-	async def authenticate_request(self, request):
+	async def _authenticate_request(self, request):
 		token_value = get_bearer_token_value(request)
 		if token_value is None:
+			L.log(asab.LOG_NOTICE, "No Bearer token in Authorization header.")
 			return None
-		return await self.OpenIdConnectService.get_session_by_access_token(token_value)
+		session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+		if session is None:
+			L.log(asab.LOG_NOTICE, "Access token matched no session.")
 
 
 	async def introspect_nginx(self, request):
@@ -145,13 +149,13 @@ class TokenIntrospectionHandler(object):
 		}
 		"""
 
-		session = await self.authenticate_request(request)
+		session = await self._authenticate_request(request)
 
 		if session is not None:
 			try:
 				response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
 			except Exception as e:
-				L.exception("Request authorization failed: {}".format(e))
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 		else:
 			response = aiohttp.web.HTTPUnauthorized()
