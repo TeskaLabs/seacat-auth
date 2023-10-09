@@ -451,6 +451,7 @@ class CookieHandler(object):
 	async def _authenticate_request(self, request, client_id=None):
 		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
 		if cookie_value is None:
+			L.log(asab.LOG_NOTICE, "Session cookie not found in request", struct_data={"client_id": client_id})
 			return None
 		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 
