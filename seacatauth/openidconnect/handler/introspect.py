@@ -1,6 +1,4 @@
 import logging
-import typing
-
 import aiohttp.web
 
 import asab
@@ -9,7 +7,6 @@ import asab.web.rest
 import asab.exceptions
 
 from ...generic import nginx_introspection, get_bearer_token_value
-from ... import exceptions
 
 #
 
