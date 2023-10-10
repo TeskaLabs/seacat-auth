@@ -69,8 +69,6 @@ class OpenIdConnectService(asab.Service):
 		else:
 			self.PublicApiBaseUrl = public_api_base_url
 
-		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
-
 		# The Issuer value must be an URL, such that when "/.well-known/openid-configuration" is appended to it,
 		# we obtain a valid URL containing the issuer's OpenID configuration metadata.
 		# (https://www.rfc-editor.org/rfc/rfc8414#section-3)
@@ -84,6 +82,8 @@ class OpenIdConnectService(asab.Service):
 		else:
 			# Default fallback option
 			self.Issuer = self.PublicApiBaseUrl
+
+		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm", fallback=None) or self.Issuer
 
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")

@@ -31,7 +31,6 @@ asab.Config.add_defaults({
 	},
 
 	"openidconnect": {
-		"bearer_realm": "asab",
 		"auth_code_timeout": "60 s",
 	},
 
