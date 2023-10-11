@@ -154,16 +154,17 @@ class CookieHandler(object):
 
 		session = await self._authenticate_request(request, client_id)
 		if session is None:
+			L.log(asab.LOG_NOTICE, "No session found by cookie", struct_data={"client_id": client_id})
 			response = aiohttp.web.HTTPUnauthorized()
 		elif session.is_anonymous():
-			L.warning("Regular cookie introspection does not allow anonymous user access.", struct_data={
+			L.log(asab.LOG_NOTICE, "Anonymous user access not allowed", struct_data={
 				"client_id": client_id, "cid": session.Credentials.Id})
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.error("Request authorization failed: {}".format(e), exc_info=True)
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
@@ -255,7 +256,7 @@ class CookieHandler(object):
 			try:
 				response = await nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.error("Request authorization failed: {}".format(e), exc_info=True)
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 
 		cookie_domain = client.get("cookie_domain") or None
@@ -450,6 +451,7 @@ class CookieHandler(object):
 	async def _authenticate_request(self, request, client_id=None):
 		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
 		if cookie_value is None:
+			L.log(asab.LOG_NOTICE, "Session cookie not found in request", struct_data={"client_id": client_id})
 			return None
 		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 

@@ -89,6 +89,11 @@ class GenericOAuth2Login(asab.Configurable):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
+		self.IDClaimsToVerify = {
+			"iss": self.Issuer,
+			"aud": self.ClientId
+		}
+
 		# Label for "Sign up with {ext_login_provider}" button
 		# TODO: Make this i18n-compatible (like login descriptors)
 		# TODO: Separate label for "Add external login" button
@@ -136,7 +141,11 @@ class GenericOAuth2Login(asab.Configurable):
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
 		L.log(asab.LOG_NOTICE, "Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
-	def _get_authorize_uri(self, redirect_uri, state=None):
+	def _get_authorize_uri(
+		self, redirect_uri: str,
+		state: typing.Optional[str] = None,
+		nonce: typing.Optional[str] = None
+	):
 		query_params = [
 			("response_type", "code"),
 			("client_id", self.ClientId),
@@ -146,13 +155,15 @@ class GenericOAuth2Login(asab.Configurable):
 		]
 		if state is not None:
 			query_params.append(("state", state))
+		if nonce is not None:
+			query_params.append(("nonce", nonce))
 		return "{authorize_uri}?{query_string}".format(
 			authorize_uri=self.AuthorizationEndpoint,
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
 	@contextlib.asynccontextmanager
-	async def token_request(self, code, redirect_uri):
+	async def token_request(self, code: str, redirect_uri: str):
 		"""
 		Send auth code to token request endpoint and return access token
 		"""
@@ -181,7 +192,7 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def _get_user_info(self, authorize_data: typing.Mapping, redirect_uri):
+	async def _get_user_info(self, authorize_data: dict, redirect_uri: str):
 		# TODO: This needs to be a public method and return the full ID token claims.
 		#   The normalization should be done separately.
 		code = authorize_data.get("code")
@@ -204,15 +215,8 @@ class GenericOAuth2Login(asab.Configurable):
 		id_token = token_data["id_token"]
 		await self._prepare_jwks()
 
-		try:
-			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet)
-			claims = id_token.token.objects.get("payload")
-			claims = json.loads(claims)
-		except Exception as e:
-			L.error("Error reading id_token claims.", struct_data={
-				"provider": self.Type,
-				"err": str(e),
-				"resp": token_data})
+		claims = self._get_verified_claims(id_token)
+		if not claims:
 			return None
 
 		user_info = {}
@@ -224,15 +228,30 @@ class GenericOAuth2Login(asab.Configurable):
 			user_info["ident"] = claims[self.Ident]
 		return user_info
 
-	def get_login_authorize_uri(self, state=None):
+	def _get_verified_claims(self, id_token):
+		try:
+			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=self.IDClaimsToVerify)
+			claims = json.loads(id_token.claims)
+		except jwcrypto.jws.InvalidJWSSignature:
+			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
+			return None
+		except jwcrypto.jwt.JWTExpired:
+			L.error("Expired ID token.", struct_data={"provider": self.Type})
+			return None
+		except Exception as e:
+			L.error("Error reading ID token claims.", struct_data={
+				"provider": self.Type, "error": str(e)})
+			return None
+		return claims
+
+	def get_login_authorize_uri(self, state: typing.Optional[str] = None):
 		return self._get_authorize_uri(self.LoginURI, state)
 
-	def get_addlogin_authorize_uri(self, state=None):
+	def get_addlogin_authorize_uri(self, state: typing.Optional[str] = None):
 		return self._get_authorize_uri(self.AddExternalLoginURI, state)
 
-	# TODO: These two methods do the exact same thing. Refactor.
-	async def do_external_login(self, authorize_data: typing.Mapping):
+	async def do_external_login(self, authorize_data: dict):
 		return await self._get_user_info(authorize_data, redirect_uri=self.LoginURI)
 
-	async def add_external_login(self, authorize_data: typing.Mapping):
+	async def add_external_login(self, authorize_data: dict):
 		return await self._get_user_info(authorize_data, redirect_uri=self.AddExternalLoginURI)
