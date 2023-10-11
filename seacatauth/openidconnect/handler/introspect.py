@@ -6,7 +6,7 @@ import asab
 import asab.log
 import asab.web.rest
 
-from ...generic import nginx_introspection, get_bearer_token_value
+from ...generic import nginx_introspection, get_bearer_token_value, get_access_token_value_from_webhook
 
 #
 
@@ -76,6 +76,8 @@ class TokenIntrospectionHandler(object):
 
 	async def _authenticate_request(self, request):
 		token_value = get_bearer_token_value(request)
+		if token_value is None:
+			token_value = get_access_token_value_from_webhook(request)
 		if token_value is None:
 			L.log(asab.LOG_NOTICE, "No Bearer token in Authorization header.")
 			return None
