@@ -22,6 +22,7 @@ asab.Config.add_defaults({
 		"registration_webhook_uri": "",
 	}})
 
+
 class ExternalLoginService(asab.Service):
 
 	ExternalLoginCollection = "el"
