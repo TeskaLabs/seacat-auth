@@ -53,14 +53,23 @@ class TokenIntrospectionHandler(object):
 
 		token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
 		"""
+		params = await request.post()
+
+		client_id = params.get("client_id")
+		if not client_id:
+			L.error("Missing 'client_id' parameter.")
+			return aiohttp.web.HTTPUnauthorized()
+		try:
+			await self.OpenIdConnectService.ClientService.get(client_id)
+		except KeyError:
+			L.error("Client not found.", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPUnauthorized()
 
 		# TODO: To prevent token scanning attacks, the endpoint MUST also require
 		#    some form of authorization to access this endpoint, such as client
 		#    authentication as described in OAuth 2.0 [RFC6749] or a separate
 		#    OAuth 2.0 access token such as the bearer token described in OAuth
 		#    2.0 Bearer Token Usage [RFC6750].
-
-		params = await request.post()
 
 		token = params.get("token")
 		if not token:
@@ -69,7 +78,7 @@ class TokenIntrospectionHandler(object):
 
 		# If the server is unable to locate the token using the given hint, it MUST extend its search across
 		# all of its supported token types.
-		token_type_hint = params.get("token_type_hint")
+		token_type_hint = params.get("token_type_hint", "access_token")
 		if token_type_hint != "access_token":
 			# No other types are supported at the moment.
 			L.error("Unsupported token_type_hint {!r}.".format(token_type_hint))
