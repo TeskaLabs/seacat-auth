@@ -96,8 +96,10 @@ class ExternalLoginHandler(object):
 			L.log(asab.LOG_NOTICE, "Unknown external login sub.", struct_data={
 				"provider_type": provider.Type, "sub": sub})
 			if self.ExternalLoginService.RegistrationWebhookUri:
+				# Do not send the authorization code
+				authorize_data_safe = {k: v for k, v in authorize_data.items() if k != "code"}
 				credentials_id = await self.ExternalLoginService.register_credentials_via_webhook(
-					login_provider_type, authorize_data, user_info)
+					login_provider_type, authorize_data_safe, user_info)
 		if credentials_id is None:
 			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
