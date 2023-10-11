@@ -31,13 +31,17 @@ class ExternalLoginHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
+		web_app.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
 		web_app.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
 		web_app.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
+		web_app_public.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
 		web_app_public.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app_public.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
 		web_app_public.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 
@@ -48,7 +52,16 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		authorize_data = request.query
+		login_provider_type = request.match_info["ext_login_provider"]
+
+		if request.method == "POST":
+			authorize_data: dict = dict(await request.post())
+		else:
+			authorize_data = dict(request.query)
+
+		if not authorize_data:
+			L.error("External login provider returned no data in authorize callback.", struct_data={
+				"provider": login_provider_type})
 
 		# TODO: Implement state parameter for XSRF prevention
 		# state = authorize_data.get("state")
@@ -56,7 +69,6 @@ class ExternalLoginHandler(object):
 		# 	L.error("State parameter not provided in external login response")
 		state = None
 
-		login_provider_type = request.match_info["ext_login_provider"]
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
 		user_info = await provider.do_external_login(authorize_data)
 
@@ -147,19 +159,25 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def register_external_login(self, request, *, credentials_id):
+	async def register_external_login(self, request: aiohttp.web.Request, *, credentials_id):
 		"""
 		Register a new external login provider account
 		"""
-		authorize_data = request.query
+		login_provider_type = request.match_info["ext_login_provider"]
+
+		if request.method == "POST":
+			authorize_data: dict = dict(await request.post())
+		else:
+			authorize_data = dict(request.query)
+
+		if not authorize_data:
+			L.error("External login provider returned no data in authorize callback.", struct_data={
+				"provider": login_provider_type})
 
 		# TODO: Implement state parameter for XSRF prevention
-		# state = authorize_data.get("state")
 		# if state is None:
 		# 	L.error("State parameter not provided in external login response")
-		state = None
-
-		login_provider_type = request.match_info["ext_login_provider"]
+		state = authorize_data.get("state")
 
 		# Check if the credentials don't have this login type enabled already
 		login_exists = False
