@@ -215,17 +215,18 @@ class GenericOAuth2Login(asab.Configurable):
 		id_token = token_data["id_token"]
 		await self._prepare_jwks()
 
-		claims = self._get_verified_claims(id_token)
-		if not claims:
-			return None
+		id_token_claims = self._get_verified_claims(id_token)
+		user_info = await self._user_data_from_id_token_claims(id_token_claims)
+		return user_info
 
-		user_info = {}
-		if "sub" in claims.keys():
-			user_info["sub"] = claims["sub"]
-		if "email" in claims.keys():
-			user_info["email"] = claims["email"]
-		if self.Ident in claims.keys():
-			user_info["ident"] = claims[self.Ident]
+	async def _user_data_from_id_token_claims(self, id_token_claims: dict):
+		user_info = {
+			k: v
+			for k, v in id_token_claims.items()
+			if k in {
+				"sub", "email", "phone_number", "preferred_username", "name", "email_verified", "phone_number_verified"
+			} and v is not None
+		}
 		return user_info
 
 	def _get_verified_claims(self, id_token):

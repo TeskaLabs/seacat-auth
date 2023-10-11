@@ -139,7 +139,12 @@ class ExternalLoginService(asab.Service):
 		})
 
 
-	async def register_credentials_via_webhook(self, provider_type: str, user_info: dict) -> str | None:
+	async def register_credentials_via_webhook(
+		self,
+		provider_type: str,
+		authorize_data: dict,
+		user_info: dict,
+	) -> str | None:
 		"""
 		Send external login user_info to webhook for registration.
 		If the server responds with 200 and the JSON body contains 'cid' of the registered credentials,
@@ -151,7 +156,8 @@ class ExternalLoginService(asab.Service):
 
 		request_data = {
 			"provider_type": provider_type,
-			"user_info": user_info
+			"authorization_response": authorize_data,
+			"user_info": user_info,
 		}
 
 		async with aiohttp.ClientSession() as session:
@@ -163,9 +169,10 @@ class ExternalLoginService(asab.Service):
 					return None
 				response_data = await resp.json()
 
-		credentials_id = response_data.get("cid")
+		credentials_id = response_data.get("credentials_id")
 		if not credentials_id:
-			L.error("Webhook response does not contain valid 'cid'.", struct_data={"response_data": response_data})
+			L.error("Webhook response does not contain valid 'credentials_id'.", struct_data={
+				"response_data": response_data})
 			return None
 
 		# Test if the ID is reachable

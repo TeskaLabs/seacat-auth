@@ -84,7 +84,6 @@ class ExternalLoginHandler(object):
 			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response
-
 		sub = str(sub)
 
 		# Get credentials by sub
@@ -98,7 +97,7 @@ class ExternalLoginHandler(object):
 				"provider_type": provider.Type, "sub": sub})
 			if self.ExternalLoginService.RegistrationWebhookUri:
 				credentials_id = await self.ExternalLoginService.register_credentials_via_webhook(
-					login_provider_type, user_info)
+					login_provider_type, authorize_data, user_info)
 		if credentials_id is None:
 			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
