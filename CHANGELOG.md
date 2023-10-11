@@ -9,6 +9,8 @@
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
 - Webauthn authenticator metadata (#256, PLUM Sprint 230908)
+- Log reasons for introspection failure (#299, PLUM Sprint 231006)
+- OAuth 2.0 Token Introspection endpoint (#295, PLUM Sprint 231006)
 
 ---
 
@@ -27,7 +29,6 @@
 - Log failed password change requests (#291, PLUM Sprint 230908)
 - Get Github user email address (#289, PLUM Sprint 230908)
 - External login ID token validation (#292, PLUM Sprint 230908)
-- Log reasons for introspection failure (#299, PLUM Sprint 231006)
 
 ---
 
