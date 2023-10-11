@@ -111,10 +111,21 @@ class TokenIntrospectionHandler(object):
 			L.log(asab.LOG_NOTICE, "Access token matched no active session.")
 			return asab.web.rest.json_response(request, {"active": False})
 
-		response_data = {"active": True}
-
-		# Add OPTIONAL user info data
-		response_data.update(**await self.OpenIdConnectService.build_userinfo(session))
+		user_info = await self.OpenIdConnectService.build_userinfo(session)
+		response_data = {
+			# REQUIRED
+			"active": True,
+			# OPTIONAL
+			"token_type": "access_token",
+			"client_id": user_info.get("azp"),
+			"exp": user_info.get("exp"),
+			"iat": user_info.get("iat"),
+			"sub": user_info.get("sub"),
+			"aud": user_info.get("aud"),
+			"iss": user_info.get("iss"),
+		}
+		if "preferred_username" in user_info:
+			response_data["username"] = user_info["preferred_username"]
 
 		return asab.web.rest.json_response(request, response_data)
 
