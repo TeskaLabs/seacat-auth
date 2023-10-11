@@ -80,12 +80,12 @@ class TokenIntrospectionHandler(object):
 		client_id = params.get("client_id")
 		if not client_id:
 			L.error("Missing 'client_id' parameter.")
-			return aiohttp.web.HTTPUnauthorized()
+			return asab.web.rest.json_response(request, {"active": False})
 		try:
 			await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError:
 			L.error("Client not found.", struct_data={"client_id": client_id})
-			return aiohttp.web.HTTPUnauthorized()
+			return asab.web.rest.json_response(request, {"active": False})
 
 		# TODO: To prevent token scanning attacks, the endpoint MUST also require
 		#    some form of authorization to access this endpoint, such as client
@@ -126,6 +126,8 @@ class TokenIntrospectionHandler(object):
 		}
 		if "preferred_username" in user_info:
 			response_data["username"] = user_info["preferred_username"]
+
+		# TODO: Verify that the token is  client_id is included in the aud claim
 
 		return asab.web.rest.json_response(request, response_data)
 
