@@ -26,7 +26,7 @@ def get_bearer_token_value(request):
 	return None
 
 
-def get_access_token_value_from_webhook(request):
+def get_access_token_value_from_websocket(request):
 	token_prefix = "access_token_"
 	ws_protocol_header: str = request.headers.get("Sec-WebSocket-Protocol")
 	if ws_protocol_header is None:
