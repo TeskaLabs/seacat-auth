@@ -52,6 +52,28 @@ class TokenIntrospectionHandler(object):
 		Content-Type: application/x-www-form-urlencoded
 
 		token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
+
+		---
+		requestBody:
+			required: true
+			content:
+				application/x-www-form-urlencoded:
+					schema:
+						type: object
+						properties:
+							client_id:
+								type: string
+								description: ID of the client requesting the introspection.
+							token:
+								type: string
+								description: The OAuth 2.0 token to introspect.
+							token_type_hint:
+								type: string
+								enum: [access_token, refresh_token]
+								description: The type of token being introspected (optional).
+						required:
+						- token
+						- client_id
 		"""
 		params = await request.post()
 
