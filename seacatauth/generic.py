@@ -21,9 +21,23 @@ def get_bearer_token_value(request):
 		return None
 	if auth_header.startswith(bearer_prefix):
 		return auth_header[len(bearer_prefix):]
-	else:
-		L.info("No Bearer token in Authorization header")
+
+	L.info("No Bearer token in Authorization header")
+	return None
+
+
+def get_access_token_value_from_webhook(request):
+	token_prefix = "access_token_"
+	ws_protocol_header: str = request.headers.get("Sec-WebSocket-Protocol")
+	if ws_protocol_header is None:
+		L.info("Request has no 'Sec-WebSocket-Protocol' header")
 		return None
+	for value in ws_protocol_header.split(", "):
+		if value.startswith(token_prefix):
+			return value[len(token_prefix):]
+	
+	L.info("No access token in Sec-WebSocket-Protocol header")
+	return None
 
 
 async def add_to_header(headers, attributes_to_add, session, requested_tenant=None):
