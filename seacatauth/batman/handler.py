@@ -20,16 +20,10 @@ class BatmanHandler(object):
 	"""
 
 	def __init__(self, app, batman_svc):
-		web_app_public = app.PublicWebContainer.WebApp
 		self.BatmanService = batman_svc
-
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/batman/nginx", self.batman_nginx)
-		web_app.router.add_post("/batman/nginx", self.batman_nginx)
-
-		# Public endpoints
-		web_app_public.router.add_put("/batman/nginx", self.batman_nginx)
-		web_app_public.router.add_post("/batman/nginx", self.batman_nginx)
+		web_app.router.add_put("/nginx/batman", self.batman_nginx)
+		web_app.router.add_post("/nginx/batman", self.batman_nginx)
 
 
 	async def batman_nginx(self, request):
