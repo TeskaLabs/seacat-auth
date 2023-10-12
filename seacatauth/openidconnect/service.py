@@ -48,7 +48,6 @@ class OpenIdConnectService(asab.Service):
 	UserInfoPath = "/openidconnect/userinfo"
 	JwksPath = "/openidconnect/public_keys"
 	EndSessionPath = "/openidconnect/logout"
-	NginxIntrospectionPath = "/openidconnect/introspect/nginx"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
