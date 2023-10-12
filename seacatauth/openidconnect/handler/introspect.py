@@ -42,15 +42,31 @@ class TokenIntrospectionHandler(object):
 
 	async def introspect(self, request):
 		"""
-		OAuth 2.0 Access Token Introspection Endpoint
+		OAuth 2.0 Token Introspection Endpoint
+		https://datatracker.ietf.org/doc/html/rfc7662#section-2
+		OAuth 2.0 endpoint that takes a parameter representing an OAuth 2.0 token and returns a JSON document
+		representing the meta information surrounding the token, including whether this token is currently active.
 
-		RFC7662 chapter 2
+		To protect this endpoint with authorization (as required by RFC7662), use NGINX reverse proxy
+		with auth_request to an NGINX introspection endpoint, for example:
 
-		POST /introspect HTTP/1.1
-		Accept: application/json
-		Content-Type: application/x-www-form-urlencoded
+		```nginx
+		location = /openidconnect/introspect {
+			auth_request       /_bearer_introspect;
+			auth_request_set   $authorization $upstream_http_authorization;
+			proxy_set_header   Authorization $authorization;
+			proxy_pass         http://localhost:8900;
+		}
 
-		token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
+		location = /_bearer_introspect {
+			internal;
+			proxy_method          POST;
+			proxy_set_body        "$http_authorization";
+			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
+			proxy_pass            http://seacat_private_api/nginx/openidconnect;
+			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
+		}
+		```
 
 		---
 		requestBody:
@@ -60,37 +76,17 @@ class TokenIntrospectionHandler(object):
 					schema:
 						type: object
 						properties:
-							client_id:
-								type: string
-								description: ID of the client requesting the introspection.
 							token:
 								type: string
 								description: The OAuth 2.0 token to introspect.
 							token_type_hint:
 								type: string
-								enum: [access_token, refresh_token]
+								enum: [access_token]
 								description: The type of token being introspected (optional).
 						required:
 						- token
-						- client_id
 		"""
 		params = await request.post()
-
-		client_id = params.get("client_id")
-		if not client_id:
-			L.error("Missing 'client_id' parameter.")
-			return asab.web.rest.json_response(request, {"active": False})
-		try:
-			await self.OpenIdConnectService.ClientService.get(client_id)
-		except KeyError:
-			L.error("Client not found.", struct_data={"client_id": client_id})
-			return asab.web.rest.json_response(request, {"active": False})
-
-		# TODO: To prevent token scanning attacks, the endpoint MUST also require
-		#    some form of authorization to access this endpoint, such as client
-		#    authentication as described in OAuth 2.0 [RFC6749] or a separate
-		#    OAuth 2.0 access token such as the bearer token described in OAuth
-		#    2.0 Bearer Token Usage [RFC6750].
 
 		token = params.get("token")
 		if not token:
