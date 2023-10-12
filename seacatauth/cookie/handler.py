@@ -89,15 +89,13 @@ class CookieHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/cookie/nginx", self.nginx)
-		web_app.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
+		web_app.router.add_post("/nginx/cookie", self.nginx)
+		web_app.router.add_post("/nginx/cookie/anonymous", self.nginx_anonymous)
 		web_app.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app.router.add_post("/cookie/entry", self.bouncer_post)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/cookie/nginx", self.nginx)
-		web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
 		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
 

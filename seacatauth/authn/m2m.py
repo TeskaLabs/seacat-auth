@@ -26,11 +26,7 @@ class M2MIntrospectHandler(object):
 		self.BasicRealm = "asab"  # TODO: Configurable
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post('/m2m/nginx', self.nginx)
-
-		# Public aliases
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post('/m2m/nginx', self.nginx)
+		web_app.router.add_post("/nginx/m2m", self.nginx)
 
 
 	async def _authenticate_request(self, request, client_id):
