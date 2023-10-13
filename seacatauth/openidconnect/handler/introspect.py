@@ -51,13 +51,15 @@ class TokenIntrospectionHandler(object):
 		with auth_request to an NGINX introspection endpoint, for example:
 
 		```nginx
-		location = /openidconnect/introspect {
+		# Proxied OAuth introspection endpoint
+		location = /openidconnect/token/introspect {
 			auth_request       /_bearer_introspect;
 			auth_request_set   $authorization $upstream_http_authorization;
 			proxy_set_header   Authorization $authorization;
 			proxy_pass         http://localhost:8900;
 		}
 
+		# Internal Bearer token introspection endpoint for client authentication
 		location = /_bearer_introspect {
 			internal;
 			proxy_method          POST;
