@@ -121,6 +121,8 @@ class TokenIntrospectionHandler(object):
 		}
 		if "preferred_username" in user_info:
 			response_data["username"] = user_info["preferred_username"]
+		elif "username" in user_info:
+			response_data["username"] = user_info["username"]
 
 		# TODO: Verify that the requesting client is part of the token's intended audience
 		#  (i.e. that their client_id is included in the aud claim).
