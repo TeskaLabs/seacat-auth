@@ -235,7 +235,8 @@ class GenericOAuth2Login(asab.Configurable):
 			k: v
 			for k, v in id_token_claims.items()
 			if k in {
-				"sub", "email", "phone_number", "preferred_username", "name", "email_verified", "phone_number_verified"
+				"iss", "sub", "email", "phone_number", "preferred_username", "name", "email_verified",
+				"phone_number_verified", "nonce"
 			} and v is not None
 		}
 		return user_info
