@@ -169,9 +169,9 @@ class ExternalLoginService(asab.Service):
 					return None
 				response_data = await resp.json()
 
-		credentials_id = response_data.get("credentials_id")
+		credentials_id = response_data.get("credential_id")
 		if not credentials_id:
-			L.error("Webhook response does not contain valid 'credentials_id'.", struct_data={
+			L.error("Webhook response does not contain valid 'credential_id'.", struct_data={
 				"response_data": response_data})
 			return None
 
@@ -179,7 +179,7 @@ class ExternalLoginService(asab.Service):
 		try:
 			await self.CredentialsService.get(credentials_id)
 		except KeyError:
-			L.error("Returned credentials ID not found.", struct_data={"response_data": response_data})
+			L.error("Returned credential ID not found.", struct_data={"response_data": response_data})
 			return None
 
 		# Link the credentials ID to the external identity provider subject ID
