@@ -3,7 +3,6 @@ import logging
 import aiohttp.web
 
 import asab
-import asab.log
 import asab.web.rest
 
 from ...generic import nginx_introspection, get_bearer_token_value
@@ -82,6 +81,7 @@ class TokenIntrospectionHandler(object):
 		session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 		if session is None:
 			L.log(asab.LOG_NOTICE, "Access token matched no session.")
+		return session
 
 
 	async def introspect_nginx(self, request):
