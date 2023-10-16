@@ -193,8 +193,19 @@ class GenericOAuth2Login(asab.Configurable):
 					yield resp
 
 	async def _get_user_info(self, authorize_data: dict, redirect_uri: str):
-		# TODO: This needs to be a public method and return the full ID token claims.
-		#   The normalization should be done separately.
+		"""
+		Obtain the authenticated user's profile info, with the claims normalized to be in line with
+		OpenID UserInfo response.
+
+		Supported claims:
+		- sub (required)
+		- preferred_username
+		- email
+		- phone_number
+		- name
+		- first_name
+		- last_name
+		"""
 		code = authorize_data.get("code")
 		if code is None:
 			L.error("Code parameter not provided in authorize response.", struct_data={
