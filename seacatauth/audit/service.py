@@ -50,7 +50,7 @@ class AuditService(asab.Service):
 		"""
 		assert (isinstance(code, AuditCode))
 
-		# Only audit anonymous sessions if desired (performance reasons)
+		# Do not audit anonymous sessions if desired (performance reasons)
 		if code == AuditCode.ANONYMOUS_SESSION_CREATED and not self.IsAnonymousLoggingEnabled:
 			return
 
