@@ -87,7 +87,8 @@ class CookieHandler(object):
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_svc
 		self.RBACService = app.get_service("seacatauth.RBACService")
-		self.IsAnonymousWebhookEnabled = False
+		self.IsAnonymousWebhookEnabled = asab.Config.getboolean(
+			"seacatauth:cookie", "enable_webhook_for_anonymous_sessions")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/cookie/nginx", self.nginx)
@@ -473,12 +474,14 @@ class CookieHandler(object):
 		}
 		```
 		"""
+		# Webhook may be skipped for anonymous sessions
+		if not self.IsAnonymousWebhookEnabled and session is not None and session.is_anonymous():
+			return None
+
 		cookie_webhook_uri = client.get("cookie_webhook_uri")
 		if cookie_webhook_uri is None:
 			return None
-		# skip webhook for alg webhook
-		if self.IsAnonymousWebhookEnabled is False and session is not None and session.is_algorithmic():
-			return None
+
 		async with aiohttp.ClientSession() as http_session:
 			# TODO: Better serialization
 			userinfo = await self.CookieService.OpenIdConnectService.build_userinfo(session)
