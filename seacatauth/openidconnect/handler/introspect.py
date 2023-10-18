@@ -78,7 +78,7 @@ class TokenIntrospectionHandler(object):
 		if token_value is None:
 			token_value = get_access_token_value_from_websocket(request)
 		if token_value is None:
-			L.log(asab.LOG_NOTICE, "No Bearer token in Authorization header.")
+			L.log(asab.LOG_NOTICE, "Access token not found in 'Authorization' nor 'Sec-WebSocket-Protocol' header")
 			return None
 		session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 		if session is None:
