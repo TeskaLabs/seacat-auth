@@ -93,8 +93,7 @@ class ExternalLoginHandler(object):
 			credentials_id = el_credentials["cid"]
 		except KeyError:
 			# Credentials do not exist in Seacat Auth
-			L.log(asab.LOG_NOTICE, "Unknown external login sub.", struct_data={
-				"provider_type": provider.Type, "sub": sub})
+			L.info("Unknown external login credential.", struct_data={"provider_type": provider.Type, "sub": sub})
 			# TODO: Attempt registration with local credential providers if enabled.
 			# Attempt registration via webhook
 			if self.ExternalLoginService.RegistrationWebhookUri:
