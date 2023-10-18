@@ -35,7 +35,7 @@ def get_access_token_value_from_websocket(request):
 	for value in ws_protocol_header.split(", "):
 		if value.startswith(token_prefix):
 			return value[len(token_prefix):]
-	
+
 	L.info("No access token in Sec-WebSocket-Protocol header")
 	return None
 
