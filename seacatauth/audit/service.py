@@ -11,14 +11,6 @@ L = logging.getLogger(__name__)
 
 #
 
-asab.Config.add_defaults({
-	"seacatauth:audit": {
-		# Enable or disable the auditing of anonymous sessions.
-		# Disabling may be desirable for database performance reasons.
-		"log_anonymous_sessions": True,
-	},
-})
-
 
 class AuditService(asab.Service):
 
@@ -34,7 +26,6 @@ class AuditService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.AuditService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
-		self.IsAnonymousLoggingEnabled = asab.Config.getboolean("seacatauth:audit", "log_anonymous_sessions")
 
 
 	async def append(
@@ -49,10 +40,6 @@ class AuditService(asab.Service):
 		Records a new audit entry.
 		"""
 		assert (isinstance(code, AuditCode))
-
-		# Do not audit anonymous sessions if desired (performance reasons)
-		if code == AuditCode.ANONYMOUS_SESSION_CREATED and not self.IsAnonymousLoggingEnabled:
-			return
 
 		# Do not use upsertor because it can trigger webhook
 		now = datetime.datetime.now(datetime.timezone.utc)
