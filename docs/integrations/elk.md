@@ -16,8 +16,8 @@ synchronizes Kibana/ElasticSearch users with Seacat Auth credentials and their a
 
 The flow for using Batman auth is almost the same as the [cookie auth flow](index#cookie-authorization-flow), 
 the only difference being in the type of introspection used. 
-Instead of the `PUT /cookie/nginx` endpoint (which exchanges Seacat client cookie for ID token), 
-Batman auth uses `PUT /batman/nginx` (which exchanges Seacat client cookie for Basic auth header).
+Instead of the `PUT /nginx/cookie` endpoint (which exchanges Seacat client cookie for ID token), 
+Batman auth uses `PUT /nginx/batman` (which exchanges Seacat client cookie for Basic auth header).
 
 
 ## Configuration example
@@ -123,8 +123,8 @@ location = /_kibana_introspection {
 
 	# Seacat Auth Batman introspection upstream
 	# !! Use your client's actual client_id !!
-	proxy_method          PUT;
-	proxy_pass            http://seacat_auth_api/batman/nginx?client_id=RZhlE-D4yuJxoKitYVL4dg;
+	proxy_method          POST;
+	proxy_pass            http://seacat_auth_api/nginx/batman?client_id=RZhlE-D4yuJxoKitYVL4dg;
 
 	proxy_set_header      X-Request-URI "$request_uri";
 	proxy_ignore_headers  Cache-Control Expires Set-Cookie;
