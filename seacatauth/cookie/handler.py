@@ -60,7 +60,7 @@ class CookieHandler(object):
 			proxy_method          POST;
 			proxy_set_body        "$http_authorization";
 			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
-			proxy_pass            http://auth_api/nginx/cookie?client_id=my-protected-app;
+			proxy_pass            http://auth_api/nginx/introspect/cookie?client_id=my-protected-app;
 			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 
 			# Successful introspection responses should be cached
@@ -89,8 +89,8 @@ class CookieHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/nginx/cookie", self.nginx)
-		web_app.router.add_post("/nginx/cookie/anonymous", self.nginx_anonymous)
+		web_app.router.add_post("/nginx/introspect/cookie", self.nginx)
+		web_app.router.add_post("/nginx/introspect/cookie/anonymous", self.nginx_anonymous)
 		web_app.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app.router.add_post("/cookie/entry", self.bouncer_post)
 
