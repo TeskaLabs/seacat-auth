@@ -3,15 +3,22 @@ import datetime
 import json
 import logging
 import secrets
+import typing
 import urllib.parse
-import re
 
+import aiohttp
 import asab.storage
+import jwcrypto.jwt
+import jwcrypto.jwk
 import webauthn
 import webauthn.registration
 import webauthn.helpers.structs
+import cryptography.hazmat.primitives.serialization
+import cryptography.x509
 
+from ... import exceptions
 from ...events import EventTypes
+
 #
 
 L = logging.getLogger(__name__)
@@ -19,9 +26,18 @@ L = logging.getLogger(__name__)
 #
 
 
+asab.Config.add_defaults({
+	"seacatauth:webauthn": {
+		"attestation": "direct"
+	}
+})
+
+
 class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
+	FidoMetadataServiceCollection = "fms"
+	FidoMetadataServiceUrl = "https://mds3.fidoalliance.org"
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
@@ -42,18 +58,89 @@ class WebAuthnService(asab.Service):
 		if self.RelyingPartyId is None:
 			self.RelyingPartyId = str(urllib.parse.urlparse(self.Origin).hostname)
 
+		self.AttestationPreference = asab.Config.get("seacatauth:webauthn", "attestation")
+		# Use "indirect" or "direct" attestation to get metadata about registered authenticators.
+		# Doing so may however impose higher trust requirements on your environment though.
+		if self.AttestationPreference not in {"none", "direct", "indirect", "enterprise"}:
+			raise ValueError("Unsupported WebAuthn 'attestation' value: {!r}".format(self.AttestationPreference))
+
 		self.RegistrationTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
 			webauthn.helpers.structs.COSEAlgorithmIdentifier(-7)  # Es256
 		]
 
-		self.KeyNameRegex = re.compile(r"^[a-z][a-z0-9._-]{0,128}[a-z0-9]$")
+		self._FidoMetadataByAAGUID: typing.Dict[int, dict] | None = None
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
+	async def initialize(self, app):
+		await self._load_fido_metadata()
+
+
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
+		await self._load_fido_metadata(only_if_empty=False)
+
+
+	async def _load_fido_metadata(self, only_if_empty=True):
+		"""
+		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
+		"""
+		if only_if_empty:
+			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+			count = await coll.estimated_document_count()
+			if count > 0:
+				return
+
+		try:
+			async with aiohttp.ClientSession() as session:
+				async with session.get(self.FidoMetadataServiceUrl) as resp:
+					if resp.status != 200:
+						text = await resp.text()
+						L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
+						return
+					jwt = await resp.text()
+		except ConnectionError:
+			L.error("Cannot connect to FIDO Alliance Metadata Service.")
+			return
+
+		jwt = jwcrypto.jwt.JWT(jwt=jwt)
+		cert_chain = jwt.token.jose_header.get("x5c", [])
+		leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
+		public_key = leaf_cert.public_key()
+		public_key = public_key.public_bytes(
+			cryptography.hazmat.primitives.serialization.Encoding.PEM,
+			cryptography.hazmat.primitives.serialization.PublicFormat.PKCS1)
+		public_key = jwcrypto.jwk.JWK.from_pem(public_key)
+		jwt.validate(public_key)
+		entries = json.loads(jwt.claims)["entries"]
+
+		# FIDO2 authenticators are identified with AAGUID
+		# Other identifiers (AAID, AKI) are not supported at the moment.
+		for entry in entries:
+			if "aaguid" not in entry:
+				continue
+			aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
+			metadata = entry.get("metadataStatement")
+			metadata["_id"] = aaguid
+
+		collection = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+		client = self.StorageService.Client
+		n_inserted = 0
+		async with await client.start_session() as session:
+			async with session.start_transaction():
+				await collection.delete_many({})
+				for entry in entries:
+					if "aaguid" not in entry:
+						continue
+					aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
+					metadata = entry.get("metadataStatement")
+					metadata["_id"] = aaguid
+					await collection.insert_one(metadata)
+					n_inserted += 1
+
+		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
 
 
 	async def create_webauthn_credential(
@@ -65,11 +152,12 @@ class WebAuthnService(asab.Service):
 		"""
 		Create database entry for a verified WebAuthn credential
 		"""
+		metadata = await self._get_authenticator_metadata(verified_registration)
 		if name is None:
-			name = "key-{}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
-		else:
-			if self.KeyNameRegex.fullmatch(name) is None:
-				raise ValueError("Invalid WebAuthn credential name", {"name": name})
+			if metadata is not None:
+				name = metadata["description"]
+			else:
+				name = "Authenticator {}".format(datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d-%H%M%S"))
 
 		upsertor = self.StorageService.upsertor(
 			self.WebAuthnCredentialCollection,
@@ -88,8 +176,18 @@ class WebAuthnService(asab.Service):
 		upsertor.set("name", name)
 
 		wacid = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid})
+		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid.hex()})
 
+	async def _get_authenticator_metadata(self, verified_registration):
+		await self._load_fido_metadata()
+		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
+		if aaguid == 0:
+			# Authenticators with other identifiers than AAGUID are not supported
+			metadata = None
+		else:
+			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+			metadata = await coll.find_one(aaguid)
+		return metadata
 
 	async def get_webauthn_credential(self, webauthn_credential_id):
 		"""
@@ -159,7 +257,7 @@ class WebAuthnService(asab.Service):
 
 		await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_UPDATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
-			"wacid": webauthn_credential_id,
+			"wacid": webauthn_credential_id.hex(),
 		})
 
 
@@ -179,7 +277,7 @@ class WebAuthnService(asab.Service):
 				})
 
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id})
+		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id.hex()})
 
 
 	async def delete_all_webauthn_credentials(self, credentials_id: str):
@@ -190,7 +288,7 @@ class WebAuthnService(asab.Service):
 
 		query_filter = {"cid": credentials_id}
 		result = await collection.delete_many(query_filter)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={
+		L.log(asab.LOG_NOTICE, "WebAuthn credentials deleted", struct_data={
 			"cid": credentials_id,
 			"count": result.deleted_count
 		})
@@ -268,10 +366,13 @@ class WebAuthnService(asab.Service):
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialcreationoptions
 		"""
 		credentials = await self.CredentialsService.get(session.Credentials.Id)
-		# User_name should be a unique human-palatable identifier (typically email, phone)
-		user_name = credentials.get("email") or credentials.get("phone")
-		if not user_name:
-			raise Exception("Credentials have no email address nor phone number.")
+		# User_name should be a unique human-palatable identifier
+		user_name = credentials.get("username") or credentials.get("email") or credentials.get("phone")
+		if user_name is None:
+			L.error(
+				"Cannot register WebAuthn credential for credentials with no username, email, nor phone.",
+				struct_data={"cid": session.Credentials.Id})
+			raise exceptions.AccessDeniedError("Credentials have no username, email, nor phone.")
 
 		challenge = await self.create_registration_challenge(session.Session.Id)
 		options = webauthn.generate_registration_options(
@@ -285,6 +386,7 @@ class WebAuthnService(asab.Service):
 			# authenticator_selection=...,  # Optional
 			# exclude_credentials=...,  # Optional
 			supported_pub_key_algs=self.SupportedAlgorithms,
+			attestation=self.AttestationPreference
 		)
 		options = webauthn.options_to_json(options)
 		return options
