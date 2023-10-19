@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Authorization for websocket requests (#300, PLUM Sprint 231006)
+
+---
+
+
 ## v23.42-beta
 
 ### Breaking changes
