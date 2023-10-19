@@ -2,13 +2,18 @@
 
 ## Release candidate
 
+### Breaking changes
+- NGINX introspection endpoints paths changed and moved to private API (#301, PLUM Sprint 231006)
+
 ### Fix
 - Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
 - Allow username for WebAuthn credentials username (#297, PLUM Sprint 230908)
+- NGINX introspection endpoints moved to private API (#301, PLUM Sprint 231006)
 
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
 - Webauthn authenticator metadata (#256, PLUM Sprint 230908)
+- Configurably disable auditing of anonymous sessions (#304, PLUM Sprint 231006)
 - Log reasons for introspection failure (#299, PLUM Sprint 231006)
 - OAuth 2.0 Token Introspection endpoint (#295, PLUM Sprint 231006)
 
