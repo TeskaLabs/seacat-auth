@@ -530,6 +530,9 @@ class AuthorizeHandler(object):
 			code_challenge_method=code_challenge_method)
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
+		"""
+		Get the client's configured cookie entry URI and extend it with relevant authorization parameters.
+		"""
 		cookie_entry_uri = client_dict.get("cookie_entry_uri")
 		if cookie_entry_uri is None:
 			L.error("Client has no cookie_entry_uri configured.", struct_data={"client_id": client_dict["_id"]})
@@ -548,6 +551,9 @@ class AuthorizeHandler(object):
 
 
 	async def _validate_client_options(self, client_id, redirect_uri, response_type):
+		"""
+		Verify that the requested authorization options comply with the client's configuration and permissions.
+		"""
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError as e:
@@ -569,6 +575,9 @@ class AuthorizeHandler(object):
 
 
 	async def _get_authorize_type(self, client_id, scope):
+		"""
+		Extract authorization type - either 'openid' or 'cookie'.
+		"""
 		if "openid" in scope:
 			# OpenID Connect requests MUST contain the openid scope value.
 			# Otherwise, the request is not considered OpenID and its behavior is unspecified
@@ -821,6 +830,9 @@ class AuthorizeHandler(object):
 		return aiohttp.web.HTTPFound(redirect)
 
 	async def audit_authorize_success(self, session, from_info):
+		"""
+		Append an authorization success entry to the audit.
+		"""
 		await self.OpenIdConnectService.AuditService.append(
 			AuditCode.AUTHORIZE_SUCCESS,
 			credentials_id=session.Credentials.Id,
@@ -832,6 +844,9 @@ class AuthorizeHandler(object):
 
 
 	async def audit_authorize_error(self, error: OAuthAuthorizeError, access_ips: list = None):
+		"""
+		Append an authorization error entry to the audit.
+		"""
 		await self.OpenIdConnectService.AuditService.append(
 			AuditCode.AUTHORIZE_ERROR,
 			error=error.Error,
@@ -842,6 +857,10 @@ class AuthorizeHandler(object):
 
 
 	async def authorize_tenants_by_scope(self, scope, authz, credentials_id, client_id):
+		"""
+		Extract requested tenants from scope and verify that the credential has access to all of them.
+		Return a list of the authorized tenants.
+		"""
 		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
 			authz, tenant=None, requested_resources=["authz:superuser"]) \
 			or self.OpenIdConnectService.RBACService.has_resource_access(
@@ -889,6 +908,11 @@ class AuthorizeHandler(object):
 
 
 	def _validate_request_parameters(self, request_parameters):
+		"""
+		Verify the presence of required parameters.
+
+		As specified in OAuth 2.0 [RFC6749], Authorization Servers SHOULD ignore unrecognized request parameters.
+		"""
 		state = request_parameters.get("state") or None
 
 		# Check for required parameters
