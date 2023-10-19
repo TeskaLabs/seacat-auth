@@ -99,6 +99,12 @@ class CookieHandler(object):
 		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
 
+		# TODO: Insecure, back-compat only - will be removed in next release!
+		# >>>
+		web_app_public.router.add_post("/cookie/nginx", self.nginx)
+		web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
+		# <<<
+
 
 	async def nginx(self, request):
 		"""
