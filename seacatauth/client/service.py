@@ -488,6 +488,9 @@ class ClientService(asab.Service):
 		grant_type: str = None,
 		response_type: str = None,
 	):
+		"""
+		Verify that the specified authorization parameters are valid for the client.
+		"""
 		if not self.OIDCService.DisableRedirectUriValidation and not validate_redirect_uri(
 			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
 			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
@@ -503,8 +506,9 @@ class ClientService(asab.Service):
 
 	async def authenticate_client(self, client: dict, client_secret: str = None):
 		"""
-		Verify client secret
+		Verify client credentials (client_id and client_secret).
 		"""
+		# TODO: Use a client credential provider.
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
