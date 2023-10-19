@@ -15,7 +15,7 @@ Thanks to such integration, you may use your Active Directory, LDAP or social lo
 ## Cookie authorization for non-OAuth clients
 
 Seacat Auth provides cookie-based authorization for older websites and apps that do not support OAuth 2.0.
-Its `PUT /nginx/cookie` endpoint is designed to work with Nginx reverse proxy and its `auth_request` directive.
+Its `PUT /nginx/introspect/cookie` endpoint is designed to work with Nginx reverse proxy and its `auth_request` directive.
 
 ### Cookie authorization flow
 

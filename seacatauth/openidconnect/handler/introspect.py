@@ -32,7 +32,7 @@ class TokenIntrospectionHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
-		web_app.router.add_post("/nginx/openidconnect", self.introspect_nginx)
+		web_app.router.add_post("/nginx/introspect/openidconnect", self.introspect_nginx)
 
 
 	async def introspect(self, request):
@@ -115,7 +115,7 @@ class TokenIntrospectionHandler(object):
 					internal;
 					proxy_method          POST;
 					proxy_set_body        "$http_authorization";
-					proxy_pass            http://localhost:8900/nginx/openidconnect/introspect?client_id=my-app;
+					proxy_pass            http://localhost:8900/nginx/introspect/openidconnect?client_id=my-app;
 
 					proxy_cache           token_responses;     # Enable caching
 					proxy_cache_key       $http_authorization; # Cache for each access token

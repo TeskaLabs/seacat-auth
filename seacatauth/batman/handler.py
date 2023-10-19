@@ -22,7 +22,7 @@ class BatmanHandler(object):
 	def __init__(self, app, batman_svc):
 		self.BatmanService = batman_svc
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/nginx/batman", self.batman_nginx)
+		web_app.router.add_post("/nginx/introspect/batman", self.batman_nginx)
 
 
 	async def batman_nginx(self, request):
