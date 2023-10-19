@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- OAuth 2.0 Token Introspection endpoint (#295, PLUM Sprint 231006)
+
+---
+
+
 ## v23.42-beta
 
 ### Breaking changes
