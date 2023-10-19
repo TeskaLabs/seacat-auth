@@ -88,10 +88,6 @@ class DiscoveryHandler(object):
 
 			# PKCE
 			"code_challenge_methods_supported": ["plain", "S256"],
-
-			# NON-STANDARD
-			"nginx_introspection_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.NginxIntrospectionPath),
 		}
 
 		return asab.web.rest.json_response(request, data)
