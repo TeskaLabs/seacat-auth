@@ -115,7 +115,7 @@ class TokenIntrospectionHandler(object):
 					internal;
 					proxy_method          POST;
 					proxy_set_body        "$http_authorization";
-					proxy_pass            http://localhost:8080/openidconnect/introspect/nginx;
+					proxy_pass            http://localhost:8900/nginx/openidconnect/introspect?client_id=my-app;
 
 					proxy_cache           token_responses;     # Enable caching
 					proxy_cache_key       $http_authorization; # Cache for each access token

@@ -46,7 +46,7 @@ When it does, the request continues to the protected location.
 When it does not have a valid cookie, a `HTTP 401 Not Authorized` response is sent back to the user. 
 Or the user can be directly forwarded to an authorization endpoint.
 
-The cookie introspection endpoint is found at path `/cookie/nginx` and uses `POST` requests.
+The cookie introspection endpoint is found at path `/nginx/cookie` and uses `POST` requests.
 Furthermore, it has the capability to add certain information about the user into HTTP X-headers, 
 such as username, roles or tenants.
 This is done using `add=` query parameters in the introspection call.
@@ -59,7 +59,7 @@ location = /_cookie_introspect {
     internal;
     proxy_method          POST;
     proxy_set_body        "$http_authorization";
-    proxy_pass            <SEACAT_AUTH_SERVICE_URL>/cookie/nginx;
+    proxy_pass            <SEACAT_AUTH_SERVICE_URL>/nginx/cookie;
     proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 }
 ```
@@ -146,7 +146,7 @@ location = /_cookie_introspect {
     internal;
     proxy_method          POST;
     proxy_set_body        "$http_authorization";
-    proxy_pass            <SEACAT_AUTH_PUBLIC_API_INTERNAL_URL>/cookie/nginx;
+    proxy_pass            <SEACAT_AUTH_PUBLIC_API_INTERNAL_URL>/nginx/cookie;
     proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 }
 ```

@@ -60,7 +60,7 @@ class CookieHandler(object):
 			proxy_method          POST;
 			proxy_set_body        "$http_authorization";
 			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
-			proxy_pass            http://auth_api/cookie/nginx?client_id=my-protected-app;
+			proxy_pass            http://auth_api/nginx/cookie?client_id=my-protected-app;
 			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 
 			# Successful introspection responses should be cached
