@@ -64,7 +64,7 @@ class DiscoveryHandler(object):
 			# RECOMMENDED
 			"userinfo_endpoint": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.UserInfoPath),
-			# "registration_endpoint": "{}/public/client/register",  # TODO: Implement a PUBLIC client registration API
+			# "registration_endpoint": ...,  # Client registration is on private API only
 			"scopes_supported": [
 				"openid", "profile", "email", "phone",
 				"cookie", "batman", "anonymous", "impersonate:<credentials_id>", "tenant:<tenant_id>"],

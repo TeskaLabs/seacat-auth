@@ -48,6 +48,7 @@ class OpenIdConnectService(asab.Service):
 	UserInfoPath = "/openidconnect/userinfo"
 	JwksPath = "/openidconnect/public_keys"
 	EndSessionPath = "/openidconnect/logout"
+	IntrospectionPath = "/openidconnect/token/introspect"
 
 	def __init__(self, app, service_name="seacatauth.OpenIdConnectService"):
 		super().__init__(app, service_name)
@@ -59,15 +60,13 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
-		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
+		self.PKCE = pkce.PKCE()
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		if public_api_base_url.endswith("/"):
 			self.PublicApiBaseUrl = public_api_base_url[:-1]
 		else:
 			self.PublicApiBaseUrl = public_api_base_url
-
-		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
 
 		# The Issuer value must be an URL, such that when "/.well-known/openid-configuration" is appended to it,
 		# we obtain a valid URL containing the issuer's OpenID configuration metadata.
@@ -82,6 +81,8 @@ class OpenIdConnectService(asab.Service):
 		else:
 			# Default fallback option
 			self.Issuer = self.PublicApiBaseUrl
+
+		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm", fallback=None) or self.Issuer
 
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")

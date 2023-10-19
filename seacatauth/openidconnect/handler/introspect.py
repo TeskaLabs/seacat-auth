@@ -1,9 +1,9 @@
-import urllib
 import logging
 import aiohttp.web
 
 import asab
 import asab.web.rest
+import asab.exceptions
 
 from ...generic import nginx_introspection, get_bearer_token_value
 
@@ -31,7 +31,7 @@ class TokenIntrospectionHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/openidconnect/introspect", self.introspect)
+		web_app.router.add_post(self.OpenIdConnectService.IntrospectionPath, self.introspect)
 		web_app.router.add_post("/nginx/introspect/openidconnect", self.introspect_nginx)
 
 		# TODO: Insecure, back-compat only - remove after 2024-03-31
@@ -48,35 +48,92 @@ class TokenIntrospectionHandler(object):
 
 	async def introspect(self, request):
 		"""
-		OAuth 2.0 Access Token Introspection Endpoint
+		OAuth 2.0 Token Introspection Endpoint
+		https://datatracker.ietf.org/doc/html/rfc7662#section-2
+		OAuth 2.0 endpoint that takes a parameter representing an OAuth 2.0 token and returns a JSON document
+		representing the meta information surrounding the token, including whether this token is currently active.
 
-		RFC7662 chapter 2
+		To protect this endpoint with authorization (as required by RFC7662), use NGINX reverse proxy
+		with auth_request to an NGINX introspection endpoint, for example:
 
-		POST /introspect HTTP/1.1
-		Accept: application/json
-		Content-Type: application/x-www-form-urlencoded
-
-		token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
-		"""
-
-		data = await request.text()
-		qs_data = dict(urllib.parse.parse_qsl(data))
-
-		if qs_data.get('token_type_hint', 'access_token') != 'access_token':
-			raise RuntimeError("Token type is not 'access_token' but '{}'".format(
-				qs_data.get('token_type_hint', '<not provided>'))
-			)
-
-		token = qs_data.get('token')
-		if token is None:
-			raise KeyError("Token not found")
-
-		# TODO: Implement a token validation
-
-		response = {
-			"active": True,
+		```nginx
+		# Proxied OAuth introspection endpoint
+		location = /openidconnect/token/introspect {
+			auth_request       /_bearer_introspect;
+			auth_request_set   $authorization $upstream_http_authorization;
+			proxy_set_header   Authorization $authorization;
+			proxy_pass         http://seacat_private_api;
 		}
-		return asab.web.rest.json_response(request, response)
+
+		# Internal Bearer token introspection endpoint for client authentication
+		location = /_bearer_introspect {
+			internal;
+			proxy_method          POST;
+			proxy_set_body        "$http_authorization";
+			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
+			proxy_pass            http://seacat_private_api/nginx/openidconnect;
+			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
+		}
+		```
+
+		---
+		requestBody:
+			required: true
+			content:
+				application/x-www-form-urlencoded:
+					schema:
+						type: object
+						properties:
+							token:
+								type: string
+								description: The OAuth 2.0 token to introspect.
+							token_type_hint:
+								type: string
+								enum: [access_token]
+								description: The type of token being introspected (optional).
+						required:
+						- token
+		"""
+		params = await request.post()
+
+		token = params.get("token")
+		if not token:
+			raise asab.exceptions.ValidationError("Missing token parameter.")
+
+		# If the server is unable to locate the token using the given hint, it MUST extend its search across
+		# all of its supported token types.
+		token_type_hint = params.get("token_type_hint", "access_token")
+		if token_type_hint != "access_token":
+			# No other types are supported at the moment.
+			raise asab.exceptions.ValidationError("Unsupported token_type_hint {!r}.".format(token_type_hint))
+
+		session = await self.OpenIdConnectService.get_session_by_access_token(token)
+		if session is None:
+			L.log(asab.LOG_NOTICE, "Access token matched no active session.")
+			return asab.web.rest.json_response(request, {"active": False})
+
+		user_info = await self.OpenIdConnectService.build_userinfo(session)
+		response_data = {
+			# REQUIRED
+			"active": True,
+			# OPTIONAL
+			"token_type": "access_token",
+			"client_id": user_info.get("azp"),
+			"exp": user_info.get("exp"),
+			"iat": user_info.get("iat"),
+			"sub": user_info.get("sub"),
+			"aud": user_info.get("aud"),
+			"iss": user_info.get("iss"),
+		}
+		if "preferred_username" in user_info:
+			response_data["username"] = user_info["preferred_username"]
+		elif "username" in user_info:
+			response_data["username"] = user_info["username"]
+
+		# TODO: Authorization - Verify that the requesting client is part of the token's intended audience
+		#  (i.e. that their client_id is included in the aud claim).
+
+		return asab.web.rest.json_response(request, response_data)
 
 
 	async def _authenticate_request(self, request):
