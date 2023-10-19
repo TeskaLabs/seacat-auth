@@ -4,13 +4,20 @@ import logging
 import asab.storage.exceptions
 
 from .codes import AuditCode
-from ..events import EventTypes
 
 #
 
 L = logging.getLogger(__name__)
 
 #
+
+asab.Config.add_defaults({
+	"seacatauth:audit": {
+		# Enable or disable the auditing of anonymous sessions.
+		# Disabling may be desirable for database performance reasons.
+		"log_anonymous_sessions": True,
+	},
+})
 
 
 class AuditService(asab.Service):
@@ -27,6 +34,7 @@ class AuditService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.AuditService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.IsAnonymousLoggingEnabled = asab.Config.getboolean("seacatauth:audit", "log_anonymous_sessions")
 
 
 	async def append(
@@ -42,38 +50,39 @@ class AuditService(asab.Service):
 		"""
 		assert (isinstance(code, AuditCode))
 
-		upsertor = self.StorageService.upsertor(
-			self.AuditCollection, version=0)
-		upsertor.set("c", code.name)
-		if credentials_id is not None:
-			upsertor.set("cid", credentials_id)
-		if client_id is not None:
-			upsertor.set("clid", client_id)
-		if session_id is not None:
-			upsertor.set("sid", session_id)
-		if tenant is not None:
-			upsertor.set("t", tenant)
-		for k, v in kwargs.items():
-			upsertor.set(k, v)
+		# Do not audit anonymous sessions if desired (performance reasons)
+		if not self.IsAnonymousLoggingEnabled and code == AuditCode.ANONYMOUS_SESSION_CREATED:
+			return
 
-		await upsertor.execute(event_type=EventTypes.AUDIT_ENTRY_CREATED)
+		# Do not use upsertor because it can trigger webhook
+		now = datetime.datetime.now(datetime.timezone.utc)
+		entry = {
+			"_c": now,
+			"c": code.name
+		}
+		if credentials_id is not None:
+			entry["cid"] = credentials_id
+		if client_id is not None:
+			entry["clid"] = client_id
+		if session_id is not None:
+			entry["sid"] = session_id
+		if tenant is not None:
+			entry["t"] = tenant
+		entry.update(kwargs)
+
+		coll = await self.StorageService.collection(self.AuditCollection)
+		await coll.insert_one(entry)
 
 		if code in self.LastCredentialsEventCodes:
 			await self._upsert_last_credentials_event(code, credentials_id, **kwargs)
 
 
 	async def _upsert_last_credentials_event(self, code: AuditCode, credentials_id: str, **kwargs):
-		try:
-			last_events = await self.StorageService.get(self.LastCredentialsEventCollection, credentials_id)
-			version = last_events["_v"]
-		except KeyError:
-			version = 0
-
 		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
-		upsertor = self.StorageService.upsertor(
-			self.LastCredentialsEventCollection, obj_id=credentials_id, version=version)
-		upsertor.set(code.name, kwargs)
-		await upsertor.execute(event_type=EventTypes.LAST_CREDENTIALS_EVENT_UPDATED)
+
+		# Do not use upsertor because it can trigger webhook
+		coll = await self.StorageService.collection(self.LastCredentialsEventCollection)
+		await coll.update_one({"_id": credentials_id}, {"$set": {code.name: kwargs}}, upsert=True)
 
 
 	async def delete_old_entries(self, before_datetime: datetime.datetime):

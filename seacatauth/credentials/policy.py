@@ -148,15 +148,13 @@ class CredentialsPolicy:
 
 	def validate_creation_data(self, creation_data: dict):
 		validated_data = self._validate_credentials_data(creation_data, self.CreationPolicy)
+		if validated_data is None:
+			return None
 		# At least one of (phone, email) must be specified
 		if not (validated_data.get("email") or validated_data.get("phone")):
 			L.error(
 				"Cannot create credentials: Phone or email must be specified",
-				struct_data={
-					"username": validated_data["username"],
-					"phone": validated_data["phone"]
-				}
-			)
+				struct_data={"credentials": validated_data})
 			return None
 		return validated_data
 

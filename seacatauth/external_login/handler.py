@@ -31,13 +31,17 @@ class ExternalLoginHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
+		web_app.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
 		web_app.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
 		web_app.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
+		web_app_public.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
 		web_app_public.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
+		web_app_public.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
 		web_app_public.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
 
 
@@ -48,24 +52,31 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		state = request.query.get("state")
-		if state is None:
-			L.error("State parameter not provided in external login response")
-
-		code = request.query.get("code")
-		if code is None:
-			L.error("Authentication code not provided in external login response")
-			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
-			return response
-
 		login_provider_type = request.match_info["ext_login_provider"]
+
+		if request.method == "POST":
+			authorize_data: dict = dict(await request.post())
+		else:
+			authorize_data = dict(request.query)
+
+		if not authorize_data:
+			L.error("External login provider returned no data in authorize callback.", struct_data={
+				"provider": login_provider_type})
+
+		# TODO: Implement state parameter for XSRF prevention
+		# state = authorize_data.get("state")
+		# if state is None:
+		# 	L.error("State parameter not provided in external login response")
+		state = None
+
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.do_external_login(code)
+		user_info = await provider.do_external_login(authorize_data)
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
-			return self._my_account_redirect_response(state=state, error="external_login_failed")
+			response = self._login_redirect_response(state=state, error="external_login_failed")
+			delete_cookie(self.App, response)
+			return response
 
 		sub = user_info.get("sub")
 		if sub is None:
@@ -140,20 +151,25 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def register_external_login(self, request, *, credentials_id):
+	async def register_external_login(self, request: aiohttp.web.Request, *, credentials_id):
 		"""
 		Register a new external login provider account
 		"""
-		state = request.query.get("state")
-		# if state is None:
-		# 	L.warning("State parameter not provided in external login response")
-
-		code = request.query.get("code")
-		if code is None:
-			L.error("Authentication code not provided in query")
-			raise aiohttp.web.HTTPBadRequest()
-
 		login_provider_type = request.match_info["ext_login_provider"]
+
+		if request.method == "POST":
+			authorize_data: dict = dict(await request.post())
+		else:
+			authorize_data = dict(request.query)
+
+		if not authorize_data:
+			L.error("External login provider returned no data in authorize callback.", struct_data={
+				"provider": login_provider_type})
+
+		# TODO: Implement state parameter for XSRF prevention
+		# if state is None:
+		# 	L.error("State parameter not provided in external login response")
+		state = authorize_data.get("state")
 
 		# Check if the credentials don't have this login type enabled already
 		login_exists = False
@@ -173,7 +189,7 @@ class ExternalLoginHandler(object):
 			return response
 
 		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await login_provider.add_external_login(code)
+		user_info = await login_provider.add_external_login(authorize_data)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
 			return self._my_account_redirect_response(state=state, error="external_login_failed")

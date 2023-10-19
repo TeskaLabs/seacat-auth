@@ -2,12 +2,45 @@
 
 ## Release candidate
 
+### Features
+- Authorization for websocket requests (#300, PLUM Sprint 231006)
+
+---
+
+
+## v23.42-beta
+
+### Breaking changes
+- NGINX introspection endpoints paths changed and moved to private API (#301, #311, PLUM Sprint 231006)
+
+### Fix
+- Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
+- Allow username for WebAuthn credentials username (#297, PLUM Sprint 230908)
+- NGINX introspection endpoints moved to private API (#301, #311, PLUM Sprint 231006)
+
+### Features
+- Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
+- Webauthn authenticator metadata (#256, PLUM Sprint 230908)
+- Configurably disable auditing of anonymous sessions (#304, PLUM Sprint 231006)
+
+---
+
+
+## v23.39-beta
+
 ### Fix
 - Fix private key provisioning (#267, @vosmol)
+- Handle missing fields in credential creation (#290, PLUM Sprint 230908)
+- Remove upsertor from audit service (#269, PLUM Sprint 230908)
 
 ### Features
 - Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
 - Public invitations to tenant (#261, PLUM Sprint 230908)
+- Human-readable tenant label (#285, PLUM Sprint 230908)
+- Log failed password change requests (#291, PLUM Sprint 230908)
+- Get Github user email address (#289, PLUM Sprint 230908)
+- External login ID token validation (#292, PLUM Sprint 230908)
+- Log reasons for introspection failure (#299, PLUM Sprint 231006)
 
 ---
 
