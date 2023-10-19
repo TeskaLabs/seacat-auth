@@ -34,6 +34,12 @@ class TokenIntrospectionHandler(object):
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
 		web_app.router.add_post("/nginx/introspect/openidconnect", self.introspect_nginx)
 
+		# TODO: Insecure, back-compat only - will be removed in next release!
+		# >>>
+		web_app_public = app.PublicWebContainer.WebApp
+		web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
+		# <<<
+
 
 	async def introspect(self, request):
 		"""

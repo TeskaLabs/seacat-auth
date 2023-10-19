@@ -28,6 +28,12 @@ class M2MIntrospectHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/nginx/introspect/m2m", self.nginx)
 
+		# TODO: Insecure, back-compat only - will be removed in next release!
+		# >>>
+		web_app_public = app.PublicWebContainer.WebApp
+		web_app_public.router.add_post("/m2m/nginx", self.nginx)
+		# <<<
+
 
 	async def _authenticate_request(self, request, client_id):
 		# Get credentials from request

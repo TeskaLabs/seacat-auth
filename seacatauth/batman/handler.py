@@ -24,6 +24,12 @@ class BatmanHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/nginx/introspect/batman", self.batman_nginx)
 
+		# TODO: Insecure, back-compat only - will be removed in next release!
+		# >>>
+		web_app_public = app.PublicWebContainer.WebApp
+		web_app_public.router.add_post("/batman/nginx", self.batman_nginx)
+		# <<<
+
 
 	async def batman_nginx(self, request):
 		"""
