@@ -37,6 +37,18 @@ class TenantService(asab.Service):
 		self.TenantsProvider = provider
 
 
+	async def list_tenant_ids(self):
+		"""
+		List all registered tenant IDs
+		"""
+		# TODO: This has to be cached agressivelly
+		provider = self.get_provider()
+		result = []
+		async for tenant in provider.iterate():
+			result.append(tenant["_id"])
+		return result
+
+
 	async def get_tenant(self, tenant_id: str):
 		return await self.TenantsProvider.get(tenant_id)
 
