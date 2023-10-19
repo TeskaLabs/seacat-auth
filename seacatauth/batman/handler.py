@@ -28,6 +28,7 @@ class BatmanHandler(object):
 		# >>>
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/batman/nginx", self.batman_nginx)
+		web_app_public.router.add_put("/batman/nginx", self.batman_nginx)
 		# <<<
 
 
