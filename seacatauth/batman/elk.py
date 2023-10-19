@@ -4,6 +4,7 @@ import ssl
 import logging
 import typing
 import aiohttp
+import aiohttp.client_exceptions
 import asab.config
 import asab.tls
 
@@ -95,6 +96,11 @@ class ELKIntegration(asab.config.Configurable):
 
 		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
+		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	async def _on_housekeeping(self, event_name):
+		await self._sync_tenants_and_spaces()
 
 
 	@contextlib.asynccontextmanager
@@ -112,6 +118,21 @@ class ELKIntegration(asab.config.Configurable):
 	async def _on_tenant_created(self, event_name, tenant_id):
 		space_id = await self._create_kibana_space(tenant_id)
 		await self._create_kibana_role(tenant_id, space_id)
+
+
+	async def _sync_tenants_and_spaces(self):
+		tenants = await self.TenantService.list_tenant_ids()
+		spaces = {
+			space["id"] for space in
+			await self._get_kibana_spaces()
+		}
+		for tenant in tenants:
+			if tenant in spaces:
+				# Tenant space already exists
+				continue
+			space_id = await self._create_kibana_space(tenant)
+			await self._create_kibana_role(tenant, space_id)
+
 
 
 	async def _create_kibana_space(self, tenant_id):
@@ -134,7 +155,9 @@ class ELKIntegration(asab.config.Configurable):
 		except Exception as e:
 			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
 			return
-		L.log(asab.LOG_NOTICE, "Kibana space created.", struct_data={"id": space_id})
+
+		L.log(asab.LOG_NOTICE, "Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
+		return space_id
 
 
 	async def _create_kibana_role(self, tenant_id, space_id):
