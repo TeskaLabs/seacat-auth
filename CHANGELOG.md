@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Release candidate
+
+### Features
+- Authorization for websocket requests (#300, PLUM Sprint 231006)
+
+---
+
+
 ## v23.42-beta
 
 ### Breaking changes
@@ -14,7 +22,6 @@
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
 - Webauthn authenticator metadata (#256, PLUM Sprint 230908)
 - Configurably disable auditing of anonymous sessions (#304, PLUM Sprint 231006)
-- Authorization for websocket requests (#300, PLUM Sprint 231006)
 
 ---
 
