@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Release candidate
+## v23.42-beta
 
 ### Breaking changes
 - NGINX introspection endpoints paths changed and moved to private API (#301, #311, PLUM Sprint 231006)
