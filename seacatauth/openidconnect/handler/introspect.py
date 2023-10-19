@@ -62,7 +62,7 @@ class TokenIntrospectionHandler(object):
 			auth_request       /_bearer_introspect;
 			auth_request_set   $authorization $upstream_http_authorization;
 			proxy_set_header   Authorization $authorization;
-			proxy_pass         http://localhost:8900;
+			proxy_pass         http://seacat_private_api;
 		}
 
 		# Internal Bearer token introspection endpoint for client authentication
