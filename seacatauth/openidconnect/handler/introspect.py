@@ -32,12 +32,13 @@ class TokenIntrospectionHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
-		web_app.router.add_post(self.OpenIdConnectService.NginxIntrospectionPath, self.introspect_nginx)
+		web_app.router.add_post("/nginx/introspect/openidconnect", self.introspect_nginx)
 
-		# Public endpoints
+		# TODO: Insecure, back-compat only - will be removed in next release!
+		# >>>
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/openidconnect/introspect", self.introspect)
-		web_app_public.router.add_post(self.OpenIdConnectService.NginxIntrospectionPath, self.introspect_nginx)
+		web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
+		# <<<
 
 
 	async def introspect(self, request):
@@ -120,7 +121,7 @@ class TokenIntrospectionHandler(object):
 					internal;
 					proxy_method          POST;
 					proxy_set_body        "$http_authorization";
-					proxy_pass            http://localhost:8080/openidconnect/introspect/nginx;
+					proxy_pass            http://localhost:8900/nginx/introspect/openidconnect?client_id=my-app;
 
 					proxy_cache           token_responses;     # Enable caching
 					proxy_cache_key       $http_authorization; # Cache for each access token
