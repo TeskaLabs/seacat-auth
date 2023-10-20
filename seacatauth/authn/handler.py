@@ -14,6 +14,7 @@ import seacatauth.exceptions
 from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
+from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
 #
 
@@ -475,10 +476,8 @@ class AuthenticationHandler(object):
 		client_dict = await client_service.get(request_data["client_id"])
 		query = {
 			k: v for k, v in request_data.items()
-			if k in frozenset([
-				"redirect_uri", "response_type", "scope", "prompt", "code_challenge", "code_challenge_method"])
-		}
-		authorize_uri = oidc_service.build_authorize_uri(client_dict, client_id=request_data["client_id"], **query)
+			if k in AUTHORIZE_PARAMETERS}
+		authorize_uri = oidc_service.build_authorize_uri(client_dict, **query)
 
 		response = aiohttp.web.HTTPFound(
 			authorize_uri,
