@@ -39,7 +39,7 @@ class TokenIntrospectionHandler(object):
 			asab.LogObsolete.warning(
 				"Insecure legacy introspection endpoints are enabled. Please migrate your Nginx configuration to the "
 				"new recommended endpoints and then turn off the '_enable_legacy_endpoints' option. "
-				"See https://github.com/TeskaLabs/seacat-auth/pull/301 for migration details.",
+				"See https://github.com/TeskaLabs/seacat-auth/pull/311 for migration details.",
 				struct_data={"eol": "2024-03-31"}
 			)
 			web_app_public = app.PublicWebContainer.WebApp
