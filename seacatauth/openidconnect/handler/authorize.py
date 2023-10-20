@@ -284,6 +284,7 @@ class AuthorizeHandler(object):
 		prompt: str = None,
 		code_challenge: str = None,
 		code_challenge_method: str = "none",
+		**kwargs
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -708,7 +709,7 @@ class AuthorizeHandler(object):
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
 		# Build redirect uri
-		callback_uri = await self.OpenIdConnectService.build_authorize_uri(
+		callback_uri = self.OpenIdConnectService.build_authorize_uri(
 			client_dict=client_dict,
 			client_id=client_id,
 			response_type=response_type,
@@ -753,7 +754,7 @@ class AuthorizeHandler(object):
 
 		# Gather params which will be passed to the oidc/authorize request called after the OTP setup
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-		callback_uri = await self.OpenIdConnectService.build_authorize_uri(
+		callback_uri = self.OpenIdConnectService.build_authorize_uri(
 			client_dict=client_dict,
 			client_id=client_id,
 			response_type=response_type,
