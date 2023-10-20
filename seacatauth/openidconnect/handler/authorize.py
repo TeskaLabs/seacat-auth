@@ -270,10 +270,10 @@ class AuthorizeHandler(object):
 
 		# Authentication Code Flow
 		assert request_parameters["response_type"] == "code"
-		return await self.authentication_code_flow(request, **request_parameters)
+		return await self.authorization_code_flow(request, **request_parameters)
 
 
-	async def authentication_code_flow(
+	async def authorization_code_flow(
 		self,
 		request,
 		scope: str,
