@@ -84,14 +84,24 @@ class ExternalLoginHandler(object):
 			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response
-
 		sub = str(sub)
 
 		# Get credentials by sub
+		credentials_id = None
 		try:
 			el_credentials = await self.ExternalLoginService.get(login_provider_type, sub)
 			credentials_id = el_credentials["cid"]
 		except KeyError:
+			# Credentials do not exist in Seacat Auth
+			L.info("Unknown external login credential.", struct_data={"provider_type": provider.Type, "sub": sub})
+			# TODO: Attempt registration with local credential providers if enabled.
+			# Attempt registration via webhook
+			if self.ExternalLoginService.RegistrationWebhookUri:
+				# Do not send the authorization code
+				authorize_data_safe = {k: v for k, v in authorize_data.items() if k != "code"}
+				credentials_id = await self.ExternalLoginService.register_credentials_via_webhook(
+					login_provider_type, authorize_data_safe, user_info)
+		if credentials_id is None:
 			response = self._login_redirect_response(state=state, error="external_login_failed")
 			delete_cookie(self.App, response)
 			return response

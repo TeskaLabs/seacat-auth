@@ -2,9 +2,23 @@
 
 ## Release candidate
 
+### Features
+- Authorization for websocket requests (#300, PLUM Sprint 231006)
+- Silence stable log messages (#312, PLUM Sprint 231006)
+- External login registration webhook (#286, PLUM Sprint 231006)
+
+---
+
+
+## v23.42-beta
+
+### Breaking changes
+- NGINX introspection endpoints paths changed and moved to private API (#301, #311, PLUM Sprint 231006)
+
 ### Fix
 - Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
 - Allow username for WebAuthn credentials username (#297, PLUM Sprint 230908)
+- NGINX introspection endpoints moved to private API (#301, #311, PLUM Sprint 231006)
 
 ### Features
 - Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)

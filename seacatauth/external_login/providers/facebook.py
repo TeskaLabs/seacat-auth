@@ -102,5 +102,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			user_info["sub"] = data["id"]
 		if "email" in data:
 			user_info["email"] = data["email"]
+		if "name" in data:
+			user_info["name"] = data["name"]
 
 		return user_info
