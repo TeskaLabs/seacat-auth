@@ -60,7 +60,7 @@ class CookieHandler(object):
 			proxy_method          POST;
 			proxy_set_body        "$http_authorization";
 			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
-			proxy_pass            http://auth_api/cookie/nginx?client_id=my-protected-app;
+			proxy_pass            http://auth_api/nginx/introspect/cookie?client_id=my-protected-app;
 			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 
 			# Successful introspection responses should be cached
@@ -89,17 +89,20 @@ class CookieHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/cookie/nginx", self.nginx)
-		web_app.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
+		web_app.router.add_post("/nginx/introspect/cookie", self.nginx)
+		web_app.router.add_post("/nginx/introspect/cookie/anonymous", self.nginx_anonymous)
 		web_app.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app.router.add_post("/cookie/entry", self.bouncer_post)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/cookie/nginx", self.nginx)
-		web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
 		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
+
+		# TODO: Insecure, back-compat only - remove after 2024-03-31
+		if asab.Config.getboolean("seacatauth:introspection", "_enable_insecure_legacy_endpoints", fallback=False):
+			web_app_public.router.add_post("/cookie/nginx", self.nginx)
+			web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
 
 
 	async def nginx(self, request):
