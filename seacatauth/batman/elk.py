@@ -136,8 +136,8 @@ class ELKIntegration(asab.config.Configurable):
 
 
 	async def _create_kibana_space(self, tenant_id):
-		tenant = await self.TenantService.get_tenant(tenant_id)
-		space_id = tenant_id
+		tenant = self.TenantService.get_tenant(tenant_id)
+		space_id = self._kibana_space_id_from_tenant(tenant)
 		space = {
 			"id": tenant_id,  # TODO: Space ID cannot contain "." while tenant_id can!
 			"name": tenant.get("label", tenant_id)
@@ -161,7 +161,7 @@ class ELKIntegration(asab.config.Configurable):
 
 
 	async def _create_kibana_role(self, tenant_id, space_id):
-		role_name = "tenant_{}".format(tenant_id)
+		role_name = self._elastic_role_from_tenant(tenant_id)
 		role = {
 			# Add all privileges for the new space
 			"kibana": [{"spaces": [space_id], "base": ["all"]}]
@@ -245,7 +245,7 @@ class ELKIntegration(asab.config.Configurable):
 			await self.sync(cred, elk_resources)
 
 
-	async def sync(self, cred: dict, elk_resources: typing.Iterable):
+	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
@@ -277,13 +277,16 @@ class ELKIntegration(asab.config.Configurable):
 			json["full_name"] = v
 
 		elk_roles = {self.ELKSeacatFlagRole}  # Add a role that marks users managed by Seacat Auth
-		# TODO: Add roles derived from Seacat tenants
+
+		for tenant in await self.TenantService.get_tenants(cred["_id"]):
+			elk_roles.add(self._elastic_role_from_tenant(tenant))
 
 		# Get authz dict
 		authz = await build_credentials_authz(self.TenantService, self.RoleService, cred["_id"])
 
 		# ELK roles from SCA resources
 		# Use only global "*" roles for now
+		# TODO: Use tenant-authorized resources instead of global
 		user_resources = set(authz.get("*", []))
 		if "authz:superuser" in user_resources:
 			elk_roles.update(
@@ -318,3 +321,11 @@ class ELKIntegration(asab.config.Configurable):
 				"Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)),
 				struct_data={"cid": cred["_id"]}
 			)
+
+
+	def _elastic_role_from_tenant(self, tenant):
+		return "tenant_{}".format(tenant)
+
+
+	def _kibana_space_id_from_tenant(self, tenant:str):
+		return tenant.replace(".", "-")
