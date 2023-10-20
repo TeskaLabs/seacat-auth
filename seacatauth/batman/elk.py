@@ -112,7 +112,7 @@ class ELKIntegration(asab.config.Configurable):
 
 	async def _on_tick(self, event_name):
 		await self._initialize_resources()
-		await self.sync_all()
+		await self.sync_all_credentials()
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
@@ -199,7 +199,7 @@ class ELKIntegration(asab.config.Configurable):
 
 	async def initialize(self):
 		await self._initialize_resources()
-		await self.sync_all()
+		await self.sync_all_credentials()
 
 	async def _initialize_resources(self):
 		# TODO: Remove resource if its respective kibana role has been removed
@@ -235,7 +235,7 @@ class ELKIntegration(asab.config.Configurable):
 					description="Grants access to ELK role {!r}.".format(role)
 				)
 
-	async def sync_all(self):
+	async def sync_all_credentials(self):
 		elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
 		elk_resources = set(
 			resource["_id"]
@@ -244,12 +244,24 @@ class ELKIntegration(asab.config.Configurable):
 		try:
 			async with self._elasticsearch_session() as session:
 				async for cred in self.CredentialsService.iterate():
-					await self.sync_credentials(session, cred, elk_resources)
+					await self._sync_credential(session, cred, elk_resources)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
 
 
-	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
+	async def sync_credential(self, cred: dict):
+		elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
+		elk_resources = set(
+			resource["_id"]
+			for resource in elk_resources["data"]
+		)
+		try:
+			async with self._elasticsearch_session() as session:
+				await self._sync_credential(session, cred, elk_resources)
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
+
+	async def _sync_credential(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
@@ -259,26 +271,23 @@ class ELKIntegration(asab.config.Configurable):
 		if username in self.IgnoreUsernames:
 			return
 
-		json = {
+		elastic_user = {
 			"enabled": cred.get("suspended", False) is not True,
-
-			# Generate technical password
+			# Generate complex deterministic password
 			"password": self.BatmanService.generate_password(cred["_id"]),
-
 			"metadata": {
-				# We are managed by SeaCat Auth
+				# Flag users managed by SeaCat Auth
 				"seacatauth": True
 			},
-
 		}
 
 		v = cred.get("email")
 		if v is not None:
-			json["email"] = v
+			elastic_user["email"] = v
 
 		v = cred.get("full_name")
 		if v is not None:
-			json["full_name"] = v
+			elastic_user["full_name"] = v
 
 		elk_roles = {self.ELKSeacatFlagRole}  # Add a role that marks users managed by Seacat Auth
 
@@ -303,11 +312,11 @@ class ELKIntegration(asab.config.Configurable):
 				for resource in user_resources.intersection(elk_resources)
 			)
 
-		json["roles"] = list(elk_roles)
+		elastic_user["roles"] = list(elk_roles)
 
 		async with session.post(
 			"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
-			json=json
+			json=elastic_user
 		) as resp:
 			if resp.status // 100 == 2:
 				# Everything is alright here
