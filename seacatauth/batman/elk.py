@@ -241,8 +241,12 @@ class ELKIntegration(asab.config.Configurable):
 			resource["_id"]
 			for resource in elk_resources["data"]
 		)
-		async for cred in self.CredentialsService.iterate():
-			await self.sync(cred, elk_resources)
+		try:
+			async with self._elasticsearch_session() as session:
+				async for cred in self.CredentialsService.iterate():
+					await self.sync_credentials(session, cred, elk_resources)
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
 
 
 	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
@@ -301,26 +305,19 @@ class ELKIntegration(asab.config.Configurable):
 
 		json["roles"] = list(elk_roles)
 
-		try:
-			async with self._elasticsearch_session() as session:
-				async with session.post(
-					"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
-					json=json
-				) as resp:
-					if resp.status // 100 == 2:
-						# Everything is alright here
-						pass
-					else:
-						text = await resp.text()
-						L.warning(
-							"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
-							struct_data={"cid": cred["_id"]}
-						)
-		except Exception as e:
-			L.error(
-				"Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)),
-				struct_data={"cid": cred["_id"]}
-			)
+		async with session.post(
+			"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
+			json=json
+		) as resp:
+			if resp.status // 100 == 2:
+				# Everything is alright here
+				pass
+			else:
+				text = await resp.text()
+				L.warning(
+					"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
+					struct_data={"cid": cred["_id"]}
+				)
 
 
 	def _elastic_role_from_tenant(self, tenant):
