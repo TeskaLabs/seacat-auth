@@ -1,12 +1,12 @@
 import logging
-
-import asab
+import aiohttp
 import typing
-
 import pymongo
 
-from .providers import create_provider, GenericOAuth2Login
+import asab
+import asab.web.rest
 
+from .providers import create_provider, GenericOAuth2Login
 from ..events import EventTypes
 
 #
@@ -14,6 +14,13 @@ from ..events import EventTypes
 L = logging.getLogger(__name__)
 
 #
+
+
+asab.Config.add_defaults({
+	"seacatauth:external_login": {
+		# URI for the external registration of unknown accounts from external identity providers.
+		"registration_webhook_uri": "",
+	}})
 
 
 class ExternalLoginService(asab.Service):
@@ -28,6 +35,8 @@ class ExternalLoginService(asab.Service):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
+		self.RegistrationWebhookUri = asab.Config.get(
+			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
 		self.AuthUiBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 		self.HomeUiFragmentPath = "/"
 		self.LoginUiFragmentPath = "/login"
@@ -66,6 +75,7 @@ class ExternalLoginService(asab.Service):
 
 
 	async def create(self, credentials_id: str, provider_type: str, sub: str, email: str = None, ident: str = None):
+		sub = str(sub)
 		upsertor = self.StorageService.upsertor(
 			self.ExternalLoginCollection,
 			obj_id=self._make_id(provider_type, sub)
@@ -127,3 +137,56 @@ class ExternalLoginService(asab.Service):
 			"type": provider_type,
 			"sub": sub,
 		})
+
+
+	async def register_credentials_via_webhook(
+		self,
+		provider_type: str,
+		authorize_data: dict,
+		user_info: dict,
+	) -> str | None:
+		"""
+		Send external login user_info to webhook for registration.
+		If the server responds with 200 and the JSON body contains 'cid' of the registered credentials,
+		create an entry in the external login collection and return the credential ID.
+		Otherwise, return None.
+		"""
+		if self.RegistrationWebhookUri is None:
+			return None
+
+		request_data = {
+			"provider_type": provider_type,
+			"authorization_response": authorize_data,
+			"user_info": user_info,
+		}
+
+		async with aiohttp.ClientSession() as session:
+			async with session.post(self.RegistrationWebhookUri, json=request_data) as resp:
+				if resp.status not in frozenset([200, 201]):
+					text = await resp.text()
+					L.error("Webhook responded with error.", struct_data={
+						"status": resp.status, "text": text, "url": self.RegistrationWebhookUri})
+					return None
+				response_data = await resp.json()
+
+		credentials_id = response_data.get("credential_id")
+		if not credentials_id:
+			L.error("Webhook response does not contain valid 'credential_id'.", struct_data={
+				"response_data": response_data})
+			return None
+
+		# Test if the ID is reachable
+		try:
+			await self.CredentialsService.get(credentials_id)
+		except KeyError:
+			L.error("Returned credential ID not found.", struct_data={"response_data": response_data})
+			return None
+
+		# Link the credentials ID to the external identity provider subject ID
+		await self.create(
+			credentials_id=credentials_id,
+			provider_type=provider_type,
+			sub=user_info["sub"],
+			email=user_info.get("email"))
+
+		return credentials_id

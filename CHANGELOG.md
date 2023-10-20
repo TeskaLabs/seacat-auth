@@ -5,6 +5,7 @@
 ### Features
 - Authorization for websocket requests (#300, PLUM Sprint 231006)
 - Silence stable log messages (#312, PLUM Sprint 231006)
+- External login registration webhook (#286, PLUM Sprint 231006)
 
 ---
 
