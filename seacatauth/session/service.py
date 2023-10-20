@@ -424,7 +424,9 @@ class SessionService(asab.Service):
 		try:
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
 		except KeyError:
-			L.error("Conflict: Session already touched.", struct_data={"sid": session.Session.Id, "v": version})
+			# This is often caused by a race condition when simultaneous requests attempt to touch the session.
+			# It can be ignored.
+			L.info("Conflict: Session already touched", struct_data={"sid": session.Session.Id, "v": version})
 
 		return await self.get(session.SessionId)
 
