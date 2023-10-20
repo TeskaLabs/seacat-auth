@@ -142,9 +142,9 @@ class GrafanaIntegration(asab.config.Configurable):
 				pass
 			elif resp.status == 412:
 				# User already exists
-				L.debug("Grafana user already exists",
-					struct_data={"cid": cred["_id"], "status": resp.status}
-				)
+				L.debug(
+					"Grafana user already exists",
+					struct_data={"cid": cred["_id"], "status": resp.status})
 				return
 			else:
 				text = await resp.text()
