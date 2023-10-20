@@ -264,7 +264,7 @@ class AuthorizeHandler(object):
 
 		3.1.2.1.  Authentication Request
 		"""
-
+		print(request_parameters)
 		# Check the presence of required parameters
 		self._validate_request_parameters(request_parameters)
 
@@ -378,38 +378,38 @@ class AuthorizeHandler(object):
 				# Delete current session and redirect to login
 				await self.SessionService.delete(root_session.SessionId)
 				return await self.reply_with_redirect_to_login(
-					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
 					nonce=nonce,
 					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method)
+					code_challenge_method=code_challenge_method,
+					**kwargs)
 			elif prompt == "select_account":
 				# Redirect to login without deleting current session
 				return await self.reply_with_redirect_to_login(
-					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
 					nonce=nonce,
 					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method)
+					code_challenge_method=code_challenge_method,
+					**kwargs)
 
 		elif allow_anonymous:
 			# Create anonymous session or redirect to login if requested
 			if prompt == "login" or prompt == "select_account":
 				return await self.reply_with_redirect_to_login(
-					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
 					nonce=nonce,
 					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method)
+					code_challenge_method=code_challenge_method,
+					**kwargs)
 
 		else:  # NOT authenticated and NOT allowing anonymous access
 			# Redirect to login unless prompt=none requested
@@ -419,14 +419,14 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state)
 			return await self.reply_with_redirect_to_login(
-				response_type="code",
 				scope=scope,
 				client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
 				nonce=nonce,
 				code_challenge=code_challenge,
-				code_challenge_method=code_challenge_method)
+				code_challenge_method=code_challenge_method,
+				**kwargs)
 
 		# Here the request must be authenticated or anonymous access must be allowed
 		assert authenticated or allow_anonymous
