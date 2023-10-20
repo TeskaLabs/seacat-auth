@@ -139,7 +139,7 @@ class GenericOAuth2Login(asab.Configurable):
 					return
 				jwks = await resp.text()
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
-		L.log(asab.LOG_NOTICE, "Identity provider public JWK set loaded.", struct_data={"type": self.Type})
+		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
 	def _get_authorize_uri(
 		self, redirect_uri: str,
