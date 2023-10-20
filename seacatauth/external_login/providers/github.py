@@ -28,7 +28,6 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		"user_emails_endpoint": "https://api.github.com/user/emails",
 		"scope": "user:email",  # Scope is not used
 		"label": "Sign in with Github",
-		"ident": "login",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
@@ -79,10 +78,12 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		user_info = {}
 		if "id" in user_data:
 			user_info["sub"] = user_data["id"]
-		if self.Ident in user_data:
-			user_info["ident"] = user_data[self.Ident]
 		if email:
 			user_info["email"] = email
+		if "login" in user_data:
+			user_info["login"] = user_data["login"]
+		if "name" in user_data:
+			user_info["name"] = user_data["name"]
 
 		return user_info
 
