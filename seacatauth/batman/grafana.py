@@ -1,6 +1,7 @@
 import re
 import logging
 import aiohttp
+import aiohttp.client_exceptions
 import asab.config
 
 from seacatauth.authz import build_credentials_authz
@@ -59,6 +60,7 @@ class GrafanaIntegration(asab.config.Configurable):
 		batman_svc.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
 
 	async def _on_tick(self, event_name):
+		# TODO: Sync on housekeeping + on credential update + on permissions update
 		await self.sync_all()
 
 	async def _initialize_resources(self):
@@ -84,11 +86,15 @@ class GrafanaIntegration(asab.config.Configurable):
 
 	async def sync_all(self):
 		cred_svc = self.BatmanService.App.get_service('seacatauth.CredentialsService')
-		async for cred in cred_svc.iterate():
-			await self.sync(cred)
+		try:
+			async with aiohttp.ClientSession(auth=self.Authorization) as session:
+				async for cred in cred_svc.iterate():
+					await self._sync_credential(session, cred)
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Grafana: {}".format(str(e)))
 
 
-	async def sync(self, cred: dict):
+	async def _sync_credential(self, session: aiohttp.ClientSession, cred: dict):
 		username = cred.get('username')
 		if username is None:
 			# Be defensive
@@ -110,7 +116,7 @@ class GrafanaIntegration(asab.config.Configurable):
 			and not self.RBACService.has_resource_access(authz, "*", [_GRAFANA_USER_RESOURCE]):
 			return
 
-		json = {
+		grafana_user = {
 			'login': username,
 
 			# Generate technical password
@@ -124,60 +130,55 @@ class GrafanaIntegration(asab.config.Configurable):
 
 		v = cred.get('email')
 		if v is not None:
-			json['email'] = v
+			grafana_user['email'] = v
 
 		v = cred.get('full_name')
 		if v is not None:
-			json['name'] = v
+			grafana_user['name'] = v
 
 		# TODO: Check if user exists
-		try:
-			async with aiohttp.ClientSession(auth=self.Authorization) as session:
-				async with session.post('{}/api/admin/users'.format(self.URL), json=json) as resp:
-					if resp.status == 200:
+		async with session.post('{}/api/admin/users'.format(self.URL), json=grafana_user) as resp:
+			if resp.status == 200:
+				pass
+			elif resp.status == 412:
+				# User already exists
+				L.debug(
+					"Grafana user already exists",
+					struct_data={"cid": cred["_id"], "status": resp.status})
+				return
+			else:
+				text = await resp.text()
+				L.warning(
+					"Failed to create user in Grafana:\n{}".format(text[:1000]),
+					struct_data={"cid": cred["_id"], "status": resp.status}
+				)
+				return
+
+			# Set admin role if Grafana admin resource is present
+			if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]):
+				response = await resp.json()
+				_id = response["id"]
+				async with session.put("{}/api/admin/users/{}/permissions".format(self.URL, _id), json={
+					"isGrafanaAdmin": True
+				}) as resp_role:
+					if resp_role.status == 200:
 						pass
-					elif resp.status == 412:
-						# User already exists
-						return
 					else:
-						text = await resp.text()
+						text = await resp_role.text()
 						L.warning(
-							"Failed to create user in Grafana:\n{}".format(text[:1000]),
+							"Failed to update user permissions in Grafana:\n{}".format(text[:1000]),
 							struct_data={"cid": cred["_id"], "status": resp.status}
 						)
-						return
 
-					# Set admin role if Grafana admin resource is present
-					if self.RBACService.has_resource_access(authz, "*", [_GRAFANA_ADMIN_RESOURCE]):
-						response = await resp.json()
-						_id = response["id"]
-						async with session.put("{}/api/admin/users/{}/permissions".format(self.URL, _id), json={
-							"isGrafanaAdmin": True
-						}) as resp_role:
-							if resp_role.status == 200:
-								pass
-							else:
-								text = await resp_role.text()
-								L.warning(
-									"Failed to update user permissions in Grafana:\n{}".format(text[:1000]),
-									struct_data={"cid": cred["_id"], "status": resp.status}
-								)
-
-						# Update role
-						async with session.patch("{}/api/org/users/{}".format(self.URL, _id), json={
-							"role": "Admin"
-						}) as resp_role:
-							if resp_role.status == 200:
-								pass
-							else:
-								text = await resp_role.text()
-								L.warning(
-									"Failed to update user roles in Grafana:\n{}".format(text[:1000]),
-									struct_data={"cid": cred["_id"], "status": resp.status}
-								)
-
-		except Exception as e:
-			L.error(
-				"Communication with Grafana produced {}: {}".format(type(e).__name__, str(e)),
-				struct_data={"cid": cred["_id"]}
-			)
+				# Update role
+				async with session.patch("{}/api/org/users/{}".format(self.URL, _id), json={
+					"role": "Admin"
+				}) as resp_role:
+					if resp_role.status == 200:
+						pass
+					else:
+						text = await resp_role.text()
+						L.warning(
+							"Failed to update user roles in Grafana:\n{}".format(text[:1000]),
+							struct_data={"cid": cred["_id"], "status": resp.status}
+						)

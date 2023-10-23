@@ -481,25 +481,16 @@ class ClientService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Client deleted", struct_data={"client_id": client_id})
 
 
-	async def authorize_client(
+	async def validate_client_authorize_options(
 		self,
 		client: dict,
 		redirect_uri: str,
-		client_secret: str = None,
 		grant_type: str = None,
 		response_type: str = None,
 	):
-		if client_secret is None:
-			# The client MAY omit the parameter if the client secret is an empty string.
-			# [rfc6749#section-2.3.1]
-			client_secret = ""
-		if "client_secret_expires_at" in client \
-			and client["client_secret_expires_at"] != 0 \
-			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.InvalidClientSecret(client["_id"])
-		if client_secret != client.get("__client_secret", ""):
-			raise exceptions.InvalidClientSecret(client["_id"])
-
+		"""
+		Verify that the specified authorization parameters are valid for the client.
+		"""
 		if not self.OIDCService.DisableRedirectUriValidation and not validate_redirect_uri(
 			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
 			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
@@ -511,6 +502,25 @@ class ClientService(asab.Service):
 			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
 
 		return True
+
+
+	async def authenticate_client(self, client: dict, client_secret: str = None):
+		"""
+		Verify client credentials (client_id and client_secret).
+		"""
+		# TODO: Use a client credential provider.
+		if client_secret is None:
+			# The client MAY omit the parameter if the client secret is an empty string.
+			# [rfc6749#section-2.3.1]
+			client_secret = ""
+		if "client_secret_expires_at" in client \
+			and client["client_secret_expires_at"] != 0 \
+			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
+			L.warning("Client secret expired.", struct_data={"client_id": client["_id"]})
+		if client_secret != client.get("__client_secret", ""):
+			L.warning("Incorrect client secret.", struct_data={"client_id": client["_id"]})
+		return True
+
 
 	def _check_grant_types(self, grant_types, response_types):
 		# https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata

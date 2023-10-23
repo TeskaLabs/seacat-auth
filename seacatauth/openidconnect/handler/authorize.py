@@ -11,7 +11,7 @@ from ...authz import build_credentials_authz
 from ...cookie.utils import delete_cookie
 from ... import client, generic
 from ... import exceptions
-from ..utils import AuthErrorResponseCode
+from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
 from ...generic import urlparse, urlunparse
 
@@ -190,8 +190,14 @@ class AuthorizeHandler(object):
 				enum: ["S256", "plain"]
 		"""
 		access_ips = generic.get_request_access_ips(request)
+		# Authorization Servers SHOULD ignore unrecognized request parameters [RFC6749]
+		supported_parameters = {
+			k: v for k, v
+			in request.query.items()
+			if k in AUTHORIZE_PARAMETERS}
+
 		try:
-			return await self.authorize(request, request.query)
+			return await self.authorize(request, supported_parameters)
 		# If the request fails due to a missing, invalid, or mismatching redirection URI, or if the client identifier
 		#   is missing or invalid, the authorization server SHOULD inform the resource owner of the error and MUST NOT
 		#   automatically redirect the user-agent to the invalid redirection URI. (rfc6749#section-4.1.2.1)
@@ -223,7 +229,33 @@ class AuthorizeHandler(object):
 		If using the HTTP POST method, the request parameters are serialized using Form Serialization
 		"""
 		request_parameters = await request.post()
-		return await self.authorize(request, request_parameters)
+		access_ips = generic.get_request_access_ips(request)
+		# Authorization Servers SHOULD ignore unrecognized request parameters [RFC6749]
+		supported_parameters = {
+			k: v for k, v
+			in request_parameters.items()
+			if k in AUTHORIZE_PARAMETERS}
+
+		try:
+			return await self.authorize(request, supported_parameters)
+		# If the request fails due to a missing, invalid, or mismatching redirection URI, or if the client identifier
+		#   is missing or invalid, the authorization server SHOULD inform the resource owner of the error and MUST NOT
+		#   automatically redirect the user-agent to the invalid redirection URI. (rfc6749#section-4.1.2.1)
+		except ClientIdError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return aiohttp.web.HTTPBadRequest()
+		except RedirectUriError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return aiohttp.web.HTTPBadRequest()
+		#  If the resource owner denies the access request or if the request fails for reasons other than a missing or
+		#    invalid redirection URI, the authorization server informs the client by adding the following parameters to
+		#    the query component of the redirection URI. (rfc6749#section-4.1.2.1)
+		except OAuthAuthorizeError as e:
+			await self.audit_authorize_error(e, access_ips=access_ips)
+			return self.reply_with_authentication_error(
+				e.Error, e.RedirectUri,
+				error_description=e.ErrorDescription,
+				state=e.State)
 
 
 	async def authorize(self, request, request_parameters):
@@ -232,55 +264,38 @@ class AuthorizeHandler(object):
 
 		3.1.2.1.  Authentication Request
 		"""
-
+		print(request_parameters)
 		# Check the presence of required parameters
 		self._validate_request_parameters(request_parameters)
 
-		# TODO: Remove this. These extra options should either be in scope or in client config.
-		login_parameters = {
-			k: v for k, v in request_parameters.items()
-			if k in frozenset(("ldid",))
-		}
-
 		# Authentication Code Flow
 		assert request_parameters["response_type"] == "code"
-		return await self.authentication_code_flow(
-			request,
-			scope=request_parameters["scope"].split(" "),
-			client_id=request_parameters["client_id"],
-			redirect_uri=request_parameters["redirect_uri"],
-			client_secret=request_parameters.get("client_secret"),
-			state=request_parameters.get("state"),
-			nonce=request_parameters.get("nonce"),
-			prompt=request_parameters.get("prompt"),
-			code_challenge=request_parameters.get("code_challenge"),
-			code_challenge_method=request_parameters.get("code_challenge_method", "none"),
-			login_parameters=login_parameters
-		)
+		return await self.authorization_code_flow(request, **request_parameters)
 
 
-	async def authentication_code_flow(
+	async def authorization_code_flow(
 		self,
 		request,
-		scope: list,
+		scope: str,
 		client_id: str,
 		redirect_uri: str,
-		client_secret: str = None,
 		state: str = None,
 		nonce: str = None,
 		prompt: str = None,
 		code_challenge: str = None,
-		code_challenge_method: str = None,
-		login_parameters: dict = None,
+		code_challenge_method: str = "none",
+		**kwargs
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
 
 		Authentication Code Flow
 		"""
+		scope = scope.split(" ")
+
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			client_dict = await self._authorize_client(client_id, redirect_uri, client_secret)
+			client_dict = await self._validate_client_options(client_id, redirect_uri, response_type="code")
 		except OAuthAuthorizeError as e:
 			e.State = state
 			e.RedirectUri = redirect_uri
@@ -363,7 +378,6 @@ class AuthorizeHandler(object):
 				# Delete current session and redirect to login
 				await self.SessionService.delete(root_session.SessionId)
 				return await self.reply_with_redirect_to_login(
-					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
@@ -371,11 +385,10 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
-					login_parameters=login_parameters)
+					**kwargs)
 			elif prompt == "select_account":
 				# Redirect to login without deleting current session
 				return await self.reply_with_redirect_to_login(
-					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
@@ -383,13 +396,12 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
-					login_parameters=login_parameters)
+					**kwargs)
 
 		elif allow_anonymous:
 			# Create anonymous session or redirect to login if requested
 			if prompt == "login" or prompt == "select_account":
 				return await self.reply_with_redirect_to_login(
-					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
@@ -397,7 +409,7 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
-					login_parameters=login_parameters)
+					**kwargs)
 
 		else:  # NOT authenticated and NOT allowing anonymous access
 			# Redirect to login unless prompt=none requested
@@ -407,7 +419,6 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state)
 			return await self.reply_with_redirect_to_login(
-				response_type="code",
 				scope=scope,
 				client_id=client_id,
 				redirect_uri=redirect_uri,
@@ -415,7 +426,7 @@ class AuthorizeHandler(object):
 				nonce=nonce,
 				code_challenge=code_challenge,
 				code_challenge_method=code_challenge_method,
-				login_parameters=login_parameters)
+				**kwargs)
 
 		# Here the request must be authenticated or anonymous access must be allowed
 		assert authenticated or allow_anonymous
@@ -431,14 +442,12 @@ class AuthorizeHandler(object):
 				L.log(asab.LOG_NOTICE, "Auth factor setup required. Redirecting to setup.", struct_data={
 					"missing_factors": " ".join(factors_to_setup), "cid": root_session.Credentials.Id})
 				return await self.reply_with_factor_setup_redirect(
-					session=root_session,
 					missing_factors=factors_to_setup,
 					response_type="code",
 					scope=scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					login_parameters=login_parameters
 				)
 
 			# Authorize access to tenants requested in scope
@@ -534,6 +543,9 @@ class AuthorizeHandler(object):
 			code_challenge_method=code_challenge_method)
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
+		"""
+		Get the client's configured cookie entry URI and extend it with relevant authorization parameters.
+		"""
 		cookie_entry_uri = client_dict.get("cookie_entry_uri")
 		if cookie_entry_uri is None:
 			L.error("Client has no cookie_entry_uri configured.", struct_data={"client_id": client_dict["_id"]})
@@ -551,23 +563,21 @@ class AuthorizeHandler(object):
 					("redirect_uri", redirect_uri)]))
 
 
-	async def _authorize_client(self, client_id, redirect_uri, client_secret=None):
+	async def _validate_client_options(self, client_id, redirect_uri, response_type):
+		"""
+		Verify that the requested authorization options comply with the client's configuration and permissions.
+		"""
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError as e:
 			raise client.exceptions.ClientNotFoundError(client_id) from e
 
 		try:
-			await self.OpenIdConnectService.ClientService.authorize_client(
+			await self.OpenIdConnectService.ClientService.validate_client_authorize_options(
 				client=client_dict,
-				client_secret=client_secret,
 				redirect_uri=redirect_uri,
-				response_type="code",
+				response_type=response_type,
 			)
-		except client.exceptions.InvalidClientSecret:
-			L.error("Invalid client secret.", struct_data={"client_id": client_id})
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.UnauthorizedClient, client_id)
 		except client.exceptions.InvalidRedirectURI as e:
 			raise e
 		except client.exceptions.ClientError as e:
@@ -578,6 +588,9 @@ class AuthorizeHandler(object):
 
 
 	async def _get_authorize_type(self, client_id, scope):
+		"""
+		Extract authorization type - either 'openid' or 'cookie'.
+		"""
 		if "openid" in scope:
 			# OpenID Connect requests MUST contain the openid scope value.
 			# Otherwise, the request is not considered OpenID and its behavior is unspecified
@@ -677,12 +690,12 @@ class AuthorizeHandler(object):
 
 
 	async def reply_with_redirect_to_login(
-		self, response_type: str, scope: list, client_id: str, redirect_uri: str,
-		state: str = None,
-		nonce: str = None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
-		login_parameters: dict = None
+		self,
+		client_id: str,
+		response_type: str,
+		scope: list,
+		redirect_uri: str,
+		**authorize_params
 	):
 		"""
 		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
@@ -691,35 +704,24 @@ class AuthorizeHandler(object):
 
 		# Gather params which will be passed to the login page
 		login_query_params = []
-		if login_parameters is not None:
-			login_query_params = list(login_parameters.items())
-
-		# Gather params which will be passed to the after-login oidc/authorize call
-		authorize_query_params = {
-			"response_type": response_type,
-			"scope": " ".join(scope),
-			"client_id": client_id,
-			"redirect_uri": redirect_uri,
-		}
-		if state is not None:
-			authorize_query_params["state"] = state
-		if nonce is not None:
-			authorize_query_params["nonce"] = nonce
-		if code_challenge is not None:
-			authorize_query_params["code_challenge"] = code_challenge
-			if code_challenge_method not in (None, "none"):
-				authorize_query_params["code_challenge_method"] = code_challenge_method
 
 		# Get client collection
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
 		# Build redirect uri
-		callback_uri = self.OpenIdConnectService.build_authorize_uri(client_dict, **authorize_query_params)
-
-		login_query_params.append(("redirect_uri", callback_uri))
-		login_query_params.append(("client_id", client_id))
+		callback_uri = self.OpenIdConnectService.build_authorize_uri(
+			client_dict=client_dict,
+			client_id=client_id,
+			response_type=response_type,
+			scope=scope,
+			redirect_uri=redirect_uri,
+			**authorize_params
+		)
 
 		# Build login uri
+		login_query_params = [
+			("redirect_uri", callback_uri),
+			("client_id", client_id)]
 		login_url = self._build_login_uri(client_dict, login_query_params)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
@@ -733,10 +735,13 @@ class AuthorizeHandler(object):
 		return response
 
 	async def reply_with_factor_setup_redirect(
-		self, session, missing_factors: list,
-		response_type: str, scope: list, client_id: str, redirect_uri: str,
-		state: str = None,
-		login_parameters: dict = None
+		self,
+		missing_factors: list,
+		client_id: str,
+		response_type: str,
+		scope: list,
+		redirect_uri: str,
+		**authorize_params
 	):
 		"""
 		Redirect to home screen and force factor (re)configuration
@@ -748,28 +753,21 @@ class AuthorizeHandler(object):
 		))
 
 		# Gather params which will be passed to the oidc/authorize request called after the OTP setup
-		authorize_query_params = [
-			("prompt", "login"),
-			("response_type", response_type),
-			("scope", " ".join(scope)),
-			("client_id", client_id),
-			("redirect_uri", redirect_uri),
-		]
-		if state is not None:
-			authorize_query_params.append(("state", state))
-
-		# Build the redirect URI back to this endpoint and add it to auth URL params
-		authorize_redirect_uri = "{}{}?{}".format(
-			self.PublicApiBaseUrl,
-			self.AuthorizePath,
-			urllib.parse.urlencode(authorize_query_params)
+		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
+		callback_uri = self.OpenIdConnectService.build_authorize_uri(
+			client_dict=client_dict,
+			client_id=client_id,
+			response_type=response_type,
+			scope=scope,
+			redirect_uri=redirect_uri,
+			**authorize_params
 		)
 
 		auth_url_params = [
 			("setup", " ".join(missing_factors)),
 			# Redirect URI needs an extra layer of percent-encoding when placed in fragment
 			# because browsers automatically do one layer of decoding
-			("redirect_uri", urllib.parse.quote(authorize_redirect_uri))
+			("redirect_uri", urllib.parse.quote(callback_uri))
 		]
 		# Add the query params to the #fragment part
 		# TODO: There should be no fragment in redirect URI. Move to regular query.
@@ -842,6 +840,9 @@ class AuthorizeHandler(object):
 		return aiohttp.web.HTTPFound(redirect)
 
 	async def audit_authorize_success(self, session, from_info):
+		"""
+		Append an authorization success entry to the audit.
+		"""
 		await self.OpenIdConnectService.AuditService.append(
 			AuditCode.AUTHORIZE_SUCCESS,
 			credentials_id=session.Credentials.Id,
@@ -853,6 +854,9 @@ class AuthorizeHandler(object):
 
 
 	async def audit_authorize_error(self, error: OAuthAuthorizeError, access_ips: list = None):
+		"""
+		Append an authorization error entry to the audit.
+		"""
 		await self.OpenIdConnectService.AuditService.append(
 			AuditCode.AUTHORIZE_ERROR,
 			error=error.Error,
@@ -863,6 +867,10 @@ class AuthorizeHandler(object):
 
 
 	async def authorize_tenants_by_scope(self, scope, authz, credentials_id, client_id):
+		"""
+		Extract requested tenants from scope and verify that the credential has access to all of them.
+		Return a list of the authorized tenants.
+		"""
 		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
 			authz, tenant=None, requested_resources=["authz:superuser"]) \
 			or self.OpenIdConnectService.RBACService.has_resource_access(
@@ -910,6 +918,11 @@ class AuthorizeHandler(object):
 
 
 	def _validate_request_parameters(self, request_parameters):
+		"""
+		Verify the presence of required parameters.
+
+		As specified in OAuth 2.0 [RFC6749], Authorization Servers SHOULD ignore unrecognized request parameters.
+		"""
 		state = request_parameters.get("state") or None
 
 		# Check for required parameters
@@ -973,11 +986,3 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state)
 			L.info("Prompt {!r} requested.".format(prompt))
-
-		# Check non-standard authorize parameters
-		# TODO: Move these parameters to client configuration instead
-		for parameter in frozenset(["ldid", "expiration"]):
-			if parameter in request_parameters:
-				L.info("Using non-standard authorize parameter {!r}.".format(parameter))
-
-		# TODO: Move code challenge method validation here
