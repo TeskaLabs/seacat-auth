@@ -5,6 +5,9 @@
 ### Breaking changes
 - Dropped support for authorize query params `ldid` and `expiration` (#296, PLUM Sprint 231006)
 
+### Fix
+- Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
+
 ### Features
 - Authorization for websocket requests (#300, PLUM Sprint 231006)
 - Silence stable log messages (#312, PLUM Sprint 231006)

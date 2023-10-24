@@ -519,7 +519,7 @@ class OpenIdConnectService(asab.Service):
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
-		return add_params_to_url_query(authorize_uri, **query_params)
+		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
 	async def revoke_token(self, token, token_type_hint=None):
