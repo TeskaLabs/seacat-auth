@@ -264,7 +264,6 @@ class AuthorizeHandler(object):
 
 		3.1.2.1.  Authentication Request
 		"""
-		print(request_parameters)
 		# Check the presence of required parameters
 		self._validate_request_parameters(request_parameters)
 
@@ -283,7 +282,7 @@ class AuthorizeHandler(object):
 		nonce: str = None,
 		prompt: str = None,
 		code_challenge: str = None,
-		code_challenge_method: str = "none",
+		code_challenge_method: str = None,
 		**kwargs
 	):
 		"""
@@ -333,8 +332,8 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state,
 					struct_data={"reason": "code_challenge_error"})
-			except InvalidCodeChallengeError:
-				L.error("Invalid code challenge request.", struct_data={
+			except InvalidCodeChallengeError as e:
+				L.error("Invalid code challenge request: {}".format(e), struct_data={
 					"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidRequest, client_id,
@@ -701,10 +700,6 @@ class AuthorizeHandler(object):
 		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
 		Pass on the query parameters.
 		"""
-
-		# Gather params which will be passed to the login page
-		login_query_params = []
-
 		# Get client collection
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
@@ -713,7 +708,7 @@ class AuthorizeHandler(object):
 			client_dict=client_dict,
 			client_id=client_id,
 			response_type=response_type,
-			scope=scope,
+			scope=" ".join(scope),
 			redirect_uri=redirect_uri,
 			**authorize_params
 		)
