@@ -1,11 +1,15 @@
 import typing
 
 
-class TenantNotSpecifiedError(Exception):
+class SeacatAuthError(Exception):
 	pass
 
 
-class AccessDeniedError(Exception):
+class TenantNotSpecifiedError(SeacatAuthError):
+	pass
+
+
+class AccessDeniedError(SeacatAuthError):
 	"""
 	Subject is not authorized to access requested resource (or tenant, operation...).
 
@@ -44,19 +48,19 @@ class NoTenantsError(AccessDeniedError):
 		super().__init__("Subject has access to no tenant.", *args)
 
 
-class TenantNotFoundError(KeyError):
+class TenantNotFoundError(SeacatAuthError, KeyError):
 	def __init__(self, tenant, *args):
 		self.Tenant = tenant
 		super().__init__("Tenant not found.", *args)
 
 
-class RoleNotFoundError(KeyError):
+class RoleNotFoundError(SeacatAuthError, KeyError):
 	def __init__(self, role, *args):
 		self.Role = role
 		super().__init__("Role not found.", *args)
 
 
-class CredentialsNotFoundError(KeyError):
+class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials not found.", *args)
@@ -73,7 +77,7 @@ class UnauthorizedTenantAccessError(AccessDeniedError):
 		super().__init__("Credentials are not authorized under tenant.", *args)
 
 
-class TenantNotAssignedError(KeyError):
+class TenantNotAssignedError(SeacatAuthError, KeyError):
 	"""
 	Credentials do not have the tenant assigned.
 	"""
@@ -83,27 +87,27 @@ class TenantNotAssignedError(KeyError):
 		super().__init__("Credentials do not have the tenant assigned.", *args)
 
 
-class TOTPNotActiveError(Exception):
+class TOTPNotActiveError(SeacatAuthError):
 	def __init__(self, credential_id: str):
 		self.CredentialID: str = credential_id
 		super().__init__("TOTP not active for credentials.")
 
 
-class ClientResponseError(Exception):
+class ClientResponseError(SeacatAuthError):
 	def __init__(self, status: int, data: typing.Union[str, dict]):
 		self.Status = status
 		self.Data = data
 		super().__init__("Client responded with error {}: {}".format(status, data))
 
 
-class SessionNotFoundError(KeyError):
+class SessionNotFoundError(SeacatAuthError, KeyError):
 	def __init__(self, message, session_id=None, query=None, *args):
 		self.SessionId = session_id
 		self.Query = query
 		super().__init__(message, *args)
 
 
-class CommunicationError(Exception):
+class CommunicationError(SeacatAuthError):
 	def __init__(self, message, credentials_id=None, *args):
 		self.CredentialsId = credentials_id
 		super().__init__(message, *args)
