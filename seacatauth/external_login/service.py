@@ -119,7 +119,7 @@ class ExternalLoginService(asab.Service):
 		query_filter = {"cid": credentials_id, "t": provider_type}
 		result = await collection.find_one(query_filter)
 		if result is None:
-			raise KeyError("External login for type '{}' not registered for credentials".format(provider_type))
+			raise KeyError("External login for type {!r} not registered for credentials".format(provider_type))
 		return result
 
 
