@@ -100,8 +100,7 @@ class AuthenticationHandler(object):
 			for k, v in query_dict.items():
 				if k in self.AuthenticationService.CustomLoginParameters:
 					if len(v) > 1:
-						L.error("Repeated query parameters are not supported", struct_data={"qs": query_string})
-						raise asab.exceptions.ValidationError("Invalid request")
+						raise asab.exceptions.ValidationError("Repeated query parameters are not supported")
 					login_dict[k] = v[0]
 
 			# Get preferred login descriptor IDs

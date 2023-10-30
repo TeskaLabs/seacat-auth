@@ -300,10 +300,10 @@ class AuthorizeHandler(object):
 			e.RedirectUri = redirect_uri
 			raise e
 		except client.exceptions.ClientNotFoundError as e:
-			L.error("Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			L.log(asab.LOG_NOTICE, "Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise ClientIdError(client_id) from e
 		except client.exceptions.InvalidRedirectURI as e:
-			L.error("Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			L.log(asab.LOG_NOTICE, "Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise RedirectUriError(redirect_uri, client_id) from e
 
 		# Extract request source
