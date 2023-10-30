@@ -89,10 +89,9 @@ class RolesHandler(object):
 		if "authz:superuser" in resources:
 			include_global = True
 		elif tenant == "*":
-			L.warning("Not authorized to manage global roles.", struct_data={
-				"cid": request.CredentialsId
-			})
-			raise aiohttp.web.HTTPForbidden()
+			L.log(asab.LOG_NOTICE, "Not authorized to manage global roles.", struct_data={
+				"cid": request.CredentialsId})
+			return aiohttp.web.HTTPForbidden()
 		else:
 			include_global = False
 
