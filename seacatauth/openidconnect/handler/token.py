@@ -151,8 +151,8 @@ class TokenHandler(object):
 			if token_value is not None:
 				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
-					L.error("Cannot transfer Track ID: Invalid access token.", struct_data={"value": token_value})
-					raise aiohttp.web.HTTPBadRequest()
+					L.log(asab.LOG_NOTICE, "Cannot transfer track ID: No source session found by access token")
+					return aiohttp.web.HTTPBadRequest()
 			elif cookie_value is not None:
 				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 			else:
@@ -160,8 +160,10 @@ class TokenHandler(object):
 
 			try:
 				new_session = await self.SessionService.inherit_or_generate_new_track_id(new_session, old_session)
-			except ValueError:
-				raise aiohttp.web.HTTPBadRequest()
+			except ValueError as e:
+				# Return 400 to prevent disclosure while keeping the stacktrace
+				L.error("Failed to produce session track ID")
+				raise aiohttp.web.HTTPBadRequest() from e
 
 		headers = {
 			"Cache-Control": "no-store",
