@@ -259,11 +259,7 @@ class ExternalLoginHandler(object):
 		Unregister an external login provider account
 		"""
 		provider_type = request.match_info["ext_login_provider"]
-
-		try:
-			el_credentials = await self.ExternalLoginService.get_sub(credentials_id, provider_type)
-		except KeyError as e:
-			raise aiohttp.web.HTTPNotFound(text=str(e))
+		el_credentials = await self.ExternalLoginService.get_sub(credentials_id, provider_type)
 		await self.ExternalLoginService.delete(provider_type, sub=el_credentials["s"])
 
 		L.log(asab.LOG_NOTICE, "External login successfully removed", struct_data={
