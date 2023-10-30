@@ -40,17 +40,8 @@ class RolesHandler(object):
 		Get credentials' roles
 		"""
 		creds_id = request.match_info["credentials_id"]
-		try:
-			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
-		except ValueError as e:
-			L.log(asab.LOG_NOTICE, str(e))
-			raise aiohttp.web.HTTPBadRequest()
-		except KeyError as e:
-			L.log(asab.LOG_NOTICE, str(e))
-			raise aiohttp.web.HTTPNotFound()
-		return asab.web.rest.json_response(
-			request, result
-		)
+		result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
+		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.rest.json_schema_handler({
