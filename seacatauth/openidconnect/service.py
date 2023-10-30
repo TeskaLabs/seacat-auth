@@ -218,8 +218,8 @@ class OpenIdConnectService(asab.Service):
 
 		try:
 			session = await self.SessionService.get(session_id)
-		except ValueError:
-			L.error("Session not found")
+		except exceptions.SessionNotFoundError:
+			L.error("Session associated with ID token not found", struct_data={"sid": session_id})
 			return None
 
 		return session
