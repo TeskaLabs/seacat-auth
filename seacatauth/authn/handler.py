@@ -11,6 +11,7 @@ import urllib.parse
 import jwcrypto.jwk
 
 import seacatauth.exceptions
+from .. import exceptions
 from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
@@ -271,9 +272,13 @@ class AuthenticationHandler(object):
 		"""
 		Log out of the current session and all its subsessions
 		"""
-		session = await self.CookieService.get_session_by_request_cookie(request)
-		if session is None:
-			L.log(asab.LOG_NOTICE, "Unauthorized: Authentication required")
+		try:
+			session = await self.CookieService.get_session_by_request_cookie(request)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "Unauthorized: No root cookie in request")
+			return aiohttp.web.HTTPBadRequest()
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Unauthorized: Request cookie matched no active session")
 			return aiohttp.web.HTTPBadRequest()
 
 		await self.SessionService.delete(session.Session.Id)

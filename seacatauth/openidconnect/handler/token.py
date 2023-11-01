@@ -14,6 +14,7 @@ import json
 
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
+from ... import exceptions
 from ...generic import get_bearer_token_value
 
 #
@@ -147,16 +148,19 @@ class TokenHandler(object):
 		if new_session.TrackId is None:
 			# Obtain the old session by request access token or cookie
 			token_value = get_bearer_token_value(request)
-			cookie_value = self.CookieService.get_session_cookie_value(request, new_session.OAuth2.ClientId)
 			if token_value is not None:
 				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
 					L.log(asab.LOG_NOTICE, "Cannot transfer track ID: No source session found by access token")
 					return aiohttp.web.HTTPBadRequest()
-			elif cookie_value is not None:
-				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 			else:
-				old_session = None
+				# Use cookie only if there is no access token
+				try:
+					old_session = await self.CookieService.get_session_by_request_cookie(request, new_session.OAuth2.ClientId)
+				except exceptions.SessionNotFoundError:
+					old_session = None
+				except exceptions.NoCookieError:
+					old_session = None
 
 			try:
 				new_session = await self.SessionService.inherit_or_generate_new_track_id(new_session, old_session)

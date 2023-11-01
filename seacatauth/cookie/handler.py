@@ -392,14 +392,19 @@ class CookieHandler(object):
 			session = await self.SessionService.inherit_track_id_from_root(session)
 		if session.TrackId is None:
 			# Obtain the old session by request cookie or access token
-			cookie_value = self.CookieService.get_session_cookie_value(request, session.OAuth2.ClientId)
+			try:
+				old_session = await self.CookieService.get_session_by_request_cookie(
+					request, session.OAuth2.ClientId)
+			except exceptions.SessionNotFoundError:
+				old_session = None
+			except exceptions.NoCookieError:
+				old_session = None
+
 			token_value = get_bearer_token_value(request)
-			old_session = None
-			if cookie_value is not None:
-				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 			if old_session is None and token_value is not None:
 				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
+					# Invalid access token should result in error
 					L.log(asab.LOG_NOTICE, "Cannot transfer track ID: No source session found by access token")
 					return aiohttp.web.HTTPBadRequest()
 			try:
@@ -447,11 +452,19 @@ class CookieHandler(object):
 
 
 	async def _authenticate_request(self, request, client_id=None):
-		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
-		if cookie_value is None:
-			L.log(asab.LOG_NOTICE, "Session cookie not found in request", struct_data={"client_id": client_id})
+		"""
+		Locate session by request cookie
+		"""
+		try:
+			session = await self.CookieService.get_session_by_request_cookie(request)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "No client cookie found in request", struct_data={"client_id": client_id})
 			return None
-		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
+			return None
+
+		return session
 
 
 	async def _fetch_webhook_data(self, client, session):

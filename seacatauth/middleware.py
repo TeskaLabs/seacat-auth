@@ -2,6 +2,7 @@ import aiohttp.web
 import asab
 import logging
 
+from . import exceptions
 from .generic import get_bearer_token_value
 
 #
@@ -141,7 +142,14 @@ def public_auth_middleware_factory(app):
 					return aiohttp.web.HTTPUnauthorized()
 		else:
 			# No Bearer token exists, authorize using cookie
-			request.Session = await cookie_service.get_session_by_request_cookie(request)
+			try:
+				request.Session = await cookie_service.get_session_by_request_cookie(request)
+			except exceptions.NoCookieError:
+				L.info("No root cookie found in request")
+				request.Session = None
+			except exceptions.SessionNotFoundError:
+				L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
+				request.Session = None
 
 		return await handler(request)
 
