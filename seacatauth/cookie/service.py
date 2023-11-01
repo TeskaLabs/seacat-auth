@@ -9,6 +9,7 @@ import asab.storage
 import asab.exceptions
 import jwcrypto.jws
 
+from .. import exceptions
 from ..session import SessionAdapter
 from ..session.adapter import CookieData
 from ..session import (
@@ -97,8 +98,7 @@ class CookieService(asab.Service):
 		"""
 		session_cookie_id = self.get_session_cookie_value(request, client_id)
 		if session_cookie_id is None:
-			L.log(asab.LOG_NOTICE, "Session cookie not found in request", struct_data={"client_id": client_id})
-			return None
+			raise exceptions.NoCookieError(client_id)
 		return await self.get_session_by_session_cookie_value(session_cookie_id)
 
 
@@ -110,9 +110,10 @@ class CookieService(asab.Service):
 		if "." in cookie_value:
 			try:
 				return await self.SessionService.Algorithmic.deserialize(cookie_value)
-			except asab.exceptions.NotAuthenticatedError:
+			except asab.exceptions.NotAuthenticatedError as e:
 				# The JWToken is invalid or expired
-				return None
+				raise exceptions.SessionNotFoundError(
+					"Invalid algorithmic session token", query={"cookie_value": cookie_value}) from e
 			except jwcrypto.jws.InvalidJWSObject:
 				# Not a JWT token
 				pass
@@ -120,18 +121,18 @@ class CookieService(asab.Service):
 		# Then try looking for the session in the database
 		try:
 			cookie_value = base64.urlsafe_b64decode(cookie_value.encode("ascii"))
-		except ValueError:
-			L.error("Cookie value is not base64", struct_data={"sci": cookie_value})
-			return None
+		except ValueError as e:
+			raise exceptions.SessionNotFoundError(
+				"Cookie value is not base64", query={"cookie_value": cookie_value}) from e
 
 		try:
 			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, cookie_value)
-		except KeyError:
-			L.info("Session not found.", struct_data={"sci": cookie_value})
-			return None
-		except ValueError:
-			L.exception("Error retrieving session.", struct_data={"sci": cookie_value})
-			return None
+		except KeyError as e:
+			raise exceptions.SessionNotFoundError(
+				"Session not found", query={"cookie_value": cookie_value}) from e
+		except ValueError as e:
+			raise exceptions.SessionNotFoundError(
+				"Error deserializing session", query={"cookie_value": cookie_value}) from e
 
 		return session
 
