@@ -111,3 +111,13 @@ class CommunicationError(SeacatAuthError):
 	def __init__(self, message, credentials_id=None, *args):
 		self.CredentialsId = credentials_id
 		super().__init__(message, *args)
+
+
+class NoCookieError(SeacatAuthError):
+	def __init__(self, client_id=None, *args):
+		self.ClientId = client_id
+		if self.ClientId:
+			message = "Request contains no cookie of client {!r}".format(self.ClientId)
+		else:
+			message = "Request contains no root session cookie"
+		super().__init__(message, *args)
