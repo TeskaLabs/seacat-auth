@@ -2,10 +2,16 @@ import typing
 
 
 class SeacatAuthError(Exception):
+	"""
+	Generic Seacat Auth error
+	"""
 	pass
 
 
 class TenantNotSpecifiedError(SeacatAuthError):
+	"""
+	No tenant specified in a tenant-dependent context
+	"""
 	pass
 
 
@@ -49,18 +55,27 @@ class NoTenantsError(AccessDeniedError):
 
 
 class TenantNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Tenant not found
+	"""
 	def __init__(self, tenant, *args):
 		self.Tenant = tenant
 		super().__init__("Tenant not found.", *args)
 
 
 class RoleNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Role not found
+	"""
 	def __init__(self, role, *args):
 		self.Role = role
 		super().__init__("Role not found.", *args)
 
 
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Credentials not found
+	"""
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials not found.", *args)
@@ -88,12 +103,18 @@ class TenantNotAssignedError(SeacatAuthError, KeyError):
 
 
 class TOTPNotActiveError(SeacatAuthError):
+	"""
+	Credentials do not have any registered TOTP secret
+	"""
 	def __init__(self, credential_id: str):
 		self.CredentialID: str = credential_id
 		super().__init__("TOTP not active for credentials.")
 
 
 class ClientResponseError(SeacatAuthError):
+	"""
+	OAuth client responded with HTTP error
+	"""
 	def __init__(self, status: int, data: typing.Union[str, dict]):
 		self.Status = status
 		self.Data = data
@@ -101,6 +122,9 @@ class ClientResponseError(SeacatAuthError):
 
 
 class SessionNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Missing or expired session
+	"""
 	def __init__(self, message, session_id=None, query=None, *args):
 		self.SessionId = session_id
 		self.Query = query
@@ -108,12 +132,18 @@ class SessionNotFoundError(SeacatAuthError, KeyError):
 
 
 class CommunicationError(SeacatAuthError):
+	"""
+	Failed to send notification or message
+	"""
 	def __init__(self, message, credentials_id=None, *args):
 		self.CredentialsId = credentials_id
 		super().__init__(message, *args)
 
 
 class NoCookieError(SeacatAuthError):
+	"""
+	Request has no (roo or client) cookie
+	"""
 	def __init__(self, client_id=None, *args):
 		self.ClientId = client_id
 		if self.ClientId:
