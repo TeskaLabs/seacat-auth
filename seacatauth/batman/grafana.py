@@ -89,7 +89,7 @@ class GrafanaIntegration(asab.config.Configurable):
 
 	async def sync_all(self):
 		"""
-		Synchronize Seacat credential metadata and relevant access rights to Grafana user
+		Synchronize all Seacat credentials' metadata and relevant access rights to Grafana user
 
 		Args:
 			credential_id: Seacat Auth credential ID
@@ -100,23 +100,24 @@ class GrafanaIntegration(asab.config.Configurable):
 				async for cred in cred_svc.iterate():
 					await self._sync_credentials(session, cred)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Grafana: {}".format(str(e)))
+			L.error("Failed to sync Grafana users (Connection error): {}".format(str(e)))
 
 
-	async def sync_credentials(self, credential_id: str):
+	async def sync_credentials(self, credentials_id: str):
 		"""
-		Synchronize Seacat credential metadata and relevant access rights to Grafana user
+		Synchronize a single Seacat credential metadata and relevant access rights to Grafana user
 
 		Args:
-			credential_id: Seacat Auth credential ID
+			credentials_id: Seacat Auth credential ID
 		"""
 		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
-		credentials = await cred_svc.get(credential_id)
+		credentials = await cred_svc.get(credentials_id)
 		try:
 			async with aiohttp.ClientSession(auth=self.Authorization) as session:
 				await self._sync_credentials(session, credentials)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Grafana: {}".format(str(e)))
+			L.error("Failed to sync Grafana user (Connection error): {}".format(str(e)), struct_data={
+				"cid": credentials_id})
 
 
 	async def _sync_credentials(self, session: aiohttp.ClientSession, credentials: dict):
