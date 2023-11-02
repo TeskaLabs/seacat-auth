@@ -274,8 +274,11 @@ class SessionService(asab.Service):
 	async def get(self, session_id):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
-		session_dict = await self.StorageService.get(
-			self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
+		try:
+			session_dict = await self.StorageService.get(
+				self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
+		except KeyError:
+			raise exceptions.SessionNotFoundError("Session not found", session_id=session_id)
 
 		# Do not return expired sessions
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):

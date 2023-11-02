@@ -11,6 +11,7 @@ import urllib.parse
 import jwcrypto.jwk
 
 import seacatauth.exceptions
+from .. import exceptions
 from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
@@ -100,8 +101,7 @@ class AuthenticationHandler(object):
 			for k, v in query_dict.items():
 				if k in self.AuthenticationService.CustomLoginParameters:
 					if len(v) > 1:
-						L.error("Repeated query parameters are not supported", struct_data={"qs": query_string})
-						raise asab.exceptions.ValidationError("Invalid request")
+						raise asab.exceptions.ValidationError("Repeated query parameters are not supported")
 					login_dict[k] = v[0]
 
 			# Get preferred login descriptor IDs
@@ -272,9 +272,14 @@ class AuthenticationHandler(object):
 		"""
 		Log out of the current session and all its subsessions
 		"""
-		session = await self.CookieService.get_session_by_request_cookie(request)
-		if session is None:
-			raise aiohttp.web.HTTPBadRequest()
+		try:
+			session = await self.CookieService.get_session_by_request_cookie(request)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "Unauthorized: No root cookie in request")
+			return aiohttp.web.HTTPBadRequest()
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Unauthorized: Request cookie matched no active session")
+			return aiohttp.web.HTTPBadRequest()
 
 		await self.SessionService.delete(session.Session.Id)
 
@@ -292,7 +297,7 @@ class AuthenticationHandler(object):
 			try:
 				impersonator_session = await self.SessionService.get(session.Authentication.ImpersonatorSessionId)
 			except KeyError:
-				L.log(asab.LOG_NOTICE, "Impersonator session not found.", struct_data={
+				L.log(asab.LOG_NOTICE, "Impersonator session not found", struct_data={
 					"sid": session.Authentication.ImpersonatorSessionId})
 			else:
 				if impersonator_session.Cookie is None:
@@ -311,8 +316,8 @@ class AuthenticationHandler(object):
 		lsid = request.match_info["lsid"]
 		login_session = await self.AuthenticationService.get_login_session(lsid)
 		if login_session is None:
-			L.error("Login session not found.", struct_data={"lsid": lsid})
-			raise aiohttp.web.HTTPUnauthorized()
+			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
 
@@ -339,8 +344,8 @@ class AuthenticationHandler(object):
 		lsid = request.match_info["lsid"]
 		login_session = await self.AuthenticationService.get_login_session(lsid)
 		if login_session is None:
-			L.error("Login session not found.", struct_data={"lsid": lsid})
-			raise aiohttp.web.HTTPUnauthorized()
+			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
 
@@ -500,7 +505,7 @@ class AuthenticationHandler(object):
 		try:
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)
-		except seacatauth.exceptions.AccessDeniedError as e:
+		except seacatauth.exceptions.AccessDeniedError:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,
 				credentials_id=impersonator_cid,
@@ -508,7 +513,9 @@ class AuthenticationHandler(object):
 				target_cid=target_cid,
 				fi=impersonator_from_info
 			)
-			raise aiohttp.web.HTTPForbidden() from e
+			L.warning("Impersonation failed: Access denied", struct_data={
+				"impersonator_cid": impersonator_cid, "target_cid": target_cid, "from_info": impersonator_from_info})
+			return aiohttp.web.HTTPForbidden()
 		except Exception as e:
 			await self.AuditService.append(
 				AuditCode.IMPERSONATION_FAILED,

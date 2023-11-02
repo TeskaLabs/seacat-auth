@@ -43,7 +43,7 @@ class UserInfoHandler(object):
 		session = request.Session
 
 		if session is None:
-			L.log(asab.LOG_NOTICE, "Access token or cookie is invalid.")
+			L.log(asab.LOG_NOTICE, "Authentication required")
 			return self.error_response("invalid_token", "Access token or cookie is invalid.")
 
 		# # if authorized get provider for this identity

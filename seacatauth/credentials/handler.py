@@ -1,8 +1,5 @@
 import logging
 
-import aiohttp
-import aiohttp.web
-
 import asab
 import asab.web.rest
 import asab.web.webcrypto
@@ -208,8 +205,8 @@ class CredentialsHandler(object):
 		# Filtering based on IDs obtained form another collection
 		if mode in frozenset(["role", "tenant"]):
 			if filtr is None:
-				L.error("No filter string specified.", struct_data={"mode": mode})
-				raise aiohttp.web.HTTPBadRequest()
+				raise asab.exceptions.ValidationError(
+					"Filter mode {!r} requires that a filter string is specified".format(mode))
 
 			# These filters require access dedicated resource
 			rbac_svc = self.CredentialsService.App.get_service("seacatauth.RBACService")
@@ -310,8 +307,7 @@ class CredentialsHandler(object):
 					continue
 
 		else:
-			L.error("Unsupported filter mode", struct_data={"mode": mode})
-			raise aiohttp.web.HTTPBadRequest()
+			raise asab.exceptions.ValidationError("Unsupported filter mode {!r}".format(mode))
 
 		return asab.web.rest.json_response(request, {
 			"result": "OK",

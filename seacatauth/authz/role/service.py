@@ -125,6 +125,7 @@ class RoleService(asab.Service):
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="role", value=role_id)
 
+		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
 		return role_id
 
 
@@ -138,6 +139,7 @@ class RoleService(asab.Service):
 		# Delete the role
 		await self.StorageService.delete(self.RoleCollection, role_id)
 		L.log(asab.LOG_NOTICE, "Role deleted", struct_data={'role_id': role_id})
+		self.App.PubSub.publish("Role.deleted!", role_id=role_id, asynchronously=True)
 		return "OK"
 
 
@@ -215,6 +217,8 @@ class RoleService(asab.Service):
 
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
+		self.App.PubSub.publish("Role.updated!", role_id=role_id, asynchronously=True)
+
 		return "OK"
 
 
@@ -365,6 +369,7 @@ class RoleService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict("Role already assigned.") from e
 
+		self.App.PubSub.publish("Role.assigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
 		L.log(asab.LOG_NOTICE, "Role assigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,
@@ -374,6 +379,7 @@ class RoleService(asab.Service):
 	async def unassign_role(self, credentials_id: str, role_id: str):
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
+		self.App.PubSub.publish("Role.unassigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
 		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,

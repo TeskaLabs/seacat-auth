@@ -40,17 +40,8 @@ class RolesHandler(object):
 		Get credentials' roles
 		"""
 		creds_id = request.match_info["credentials_id"]
-		try:
-			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
-		except ValueError as e:
-			L.log(asab.LOG_NOTICE, str(e))
-			raise aiohttp.web.HTTPBadRequest()
-		except KeyError as e:
-			L.log(asab.LOG_NOTICE, str(e))
-			raise aiohttp.web.HTTPNotFound()
-		return asab.web.rest.json_response(
-			request, result
-		)
+		result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
+		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -98,10 +89,9 @@ class RolesHandler(object):
 		if "authz:superuser" in resources:
 			include_global = True
 		elif tenant == "*":
-			L.warning("Not authorized to manage global roles.", struct_data={
-				"cid": request.CredentialsId
-			})
-			raise aiohttp.web.HTTPForbidden()
+			L.log(asab.LOG_NOTICE, "Not authorized to manage global roles.", struct_data={
+				"cid": request.CredentialsId})
+			return aiohttp.web.HTTPForbidden()
 		else:
 			include_global = False
 

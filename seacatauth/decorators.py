@@ -3,6 +3,9 @@ import functools
 import inspect
 
 import aiohttp.web
+import asab
+
+from seacatauth import exceptions
 
 #
 
@@ -14,7 +17,7 @@ L = logging.getLogger(__name__)
 def access_control(resource=None):
 	"""
 	This handler decorator fulfills the following purposes:
-	- auhtenticate the request,
+	- authenticate the request,
 	- perform tenant access authorization, if the request is tenant-specific,
 	- perform resource access authorization, if the `resource` argument is not None,
 	- pass `credentials_id`, `tenant` and/or `resources` to the decorated function.
@@ -84,29 +87,37 @@ def access_control(resource=None):
 			# Retrieve the session object
 			request = args[-1]
 
-			# Session must be provided by auth_middleware at this point
-			# If not, something has gone wrong
 			if request.Session is None:
-				L.error("Unauthenticated access: session missing")
-				raise aiohttp.web.HTTPUnauthorized()
+				L.log(asab.LOG_NOTICE, "Unauthorized access: Authentication required")
+				return aiohttp.web.HTTPUnauthorized()
 
 			# 2) Authorize tenant
 			# Use the session object to extend the request with credentials_id, requested tenant and set of resources.
 			# If no tenant is present in the request, the request is considered global (i.e. `request.Tenant = "*"`)
 			# and tenant access authorization always passes.
-			request = await _authorize_tenant(request)
+			try:
+				request = await _authorize_tenant(request)
+			except exceptions.TenantNotFoundError as e:
+				L.log(asab.LOG_NOTICE, "Unauthorized access: Tenant not found", struct_data={"tenant": e.Tenant})
+				return aiohttp.web.HTTPForbidden()
+			except exceptions.TenantAccessDeniedError as e:
+				L.log(asab.LOG_NOTICE, "Unauthorized tenant access", struct_data={"tenant": e.Tenant})
+				return aiohttp.web.HTTPForbidden()
+			except Exception as e:
+				L.exception("Failed to authorize tenant access: {}".format(e.__class__.__name__))
+				return aiohttp.web.HTTPForbidden()
 
 			# 3) Authorize resource
 			# (if the decorator specifies a required `resource`)
 			if resource is not None:
 				if resource not in request.Resources \
 					and "authz:superuser" not in request.Resources:
-					L.warning("Unauthorized access", struct_data={
+					L.log(asab.LOG_NOTICE, "Unauthorized resource access", struct_data={
 						"cid": request.CredentialsId,
-						"requested_tenant": request.Tenant,
-						"required_resource": resource
+						"tenant": request.Tenant,
+						"resource": resource
 					})
-					raise aiohttp.web.HTTPForbidden()
+					return aiohttp.web.HTTPForbidden()
 
 			# Add keyword arguments
 			if "credentials_id" in handler_kwargs:
@@ -142,7 +153,7 @@ async def _authorize_tenant(request):
 		try:
 			await tenant_service.get_tenant(requested_tenant)
 		except KeyError as e:
-			raise aiohttp.web.HTTPForbidden() from e
+			raise exceptions.TenantNotFoundError(requested_tenant) from e
 
 		if requested_tenant in request.Session.Authorization.Authz:
 			# Tenant accessible
@@ -157,7 +168,7 @@ async def _authorize_tenant(request):
 				"cid": request.Session.Credentials.Id,
 				"requested_tenant": requested_tenant
 			})
-			raise aiohttp.web.HTTPForbidden()
+			raise exceptions.TenantAccessDeniedError(requested_tenant, subject=request.Session.Credentials.Id)
 
 	# Add credentials and tenant info to request
 	request.CredentialsId = request.Session.Credentials.Id
