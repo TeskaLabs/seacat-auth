@@ -1,7 +1,5 @@
 import logging
 
-import asab.exceptions
-
 from .abc import LoginFactorABC
 
 #
