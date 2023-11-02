@@ -48,8 +48,8 @@ class AuthenticationHandler(object):
 		web_app.router.add_put("/public/login/{lsid}/smslogin", self.smslogin)
 		web_app.router.add_put("/public/login/{lsid}/webauthn", self.webauthn_login)
 		web_app.router.add_put("/public/logout", self.logout)
-		web_app.router.add_put("/impersonate", self.impersonate)
-		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
+		web_app.router.add_put("/admin/impersonate", self.impersonate)
+		web_app.router.add_post("/admin/impersonate", self.impersonate_and_redirect)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
