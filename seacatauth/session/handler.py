@@ -33,11 +33,7 @@ class SessionHandler(object):
 		web_app.router.add_get(r"/sessions/{credentials_id}", self.search_by_credentials_id)
 		web_app.router.add_delete(r"/sessions/{credentials_id}", self.delete_by_credentials_id)
 
-		web_app.router.add_delete(r"/public/sessions", self.delete_own_sessions)
-
-		# Public aliases
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_delete(r"/public/sessions", self.delete_own_sessions)
+		web_app.router.add_delete("/account/sessions", self.delete_own_sessions)
 
 
 	@access_control("seacat:session:access")

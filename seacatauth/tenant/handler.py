@@ -46,10 +46,6 @@ class TenantHandler(object):
 
 		web_app.router.add_get("/tenant_propose", self.propose_tenant_name)
 
-		# Public endpoints
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get("/tenant", self.list)
-
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
 	async def list(self, request):

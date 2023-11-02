@@ -58,8 +58,6 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
 		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
 		web_app_public.router.add_put(r"/public/logout", self.logout)
-		web_app_public.router.add_put("/impersonate", self.impersonate)
-		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",

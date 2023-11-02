@@ -36,7 +36,7 @@ class RegistrationHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
 		web_app.router.add_post("/invite/{credentials_id}", self.resend_invitation)
-		web_app.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
+		web_app.router.add_post("/account/{tenant}/invite", self.public_create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
@@ -45,7 +45,6 @@ class RegistrationHandler(object):
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
-		web_app_public.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
 		web_app_public.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
 		web_app_public.router.add_post(
