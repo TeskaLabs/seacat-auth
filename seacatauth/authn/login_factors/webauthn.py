@@ -1,5 +1,7 @@
 import logging
 
+import asab
+
 from .abc import LoginFactorABC
 
 #
@@ -27,7 +29,12 @@ class WebAuthnFactor(LoginFactorABC):
 		return False
 
 	async def authenticate(self, login_session, request_data) -> bool:
-		public_key_credential = request_data.get("webauthn")
+		if "webauthn" not in request_data:
+			L.log(asab.LOG_NOTICE, "No webauthn data in login request", struct_data={
+				"lsid": login_session.Id, "cid": login_session.CredentialsId})
+			return False
+		public_key_credential = request_data["webauthn"]
+
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
 		return await webauthn_svc.authenticate_credential(
 			login_session.CredentialsId,
