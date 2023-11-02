@@ -157,7 +157,6 @@ class CookieHandler(object):
 
 		session = await self._authenticate_request(request, client_id)
 		if session is None:
-			L.log(asab.LOG_NOTICE, "No session found by cookie", struct_data={"client_id": client_id})
 			response = aiohttp.web.HTTPUnauthorized()
 		elif session.is_anonymous():
 			L.log(asab.LOG_NOTICE, "Anonymous user access not allowed", struct_data={
@@ -240,17 +239,10 @@ class CookieHandler(object):
 			if forwarded_for is not None:
 				from_info.extend(forwarded_for.split(", "))
 			track_id = uuid.uuid4().bytes
-			try:
-				session = await self.CookieService.create_anonymous_cookie_client_session(
-					anonymous_cid, client, scope,
-					track_id=track_id,
-					from_info=from_info)
-			except exceptions.AccessDeniedError as e:
-				L.error(
-					"Failed to initialize anonymous session because of unauthorized access. "
-					"Please revise your introspection setup.",
-					struct_data={"reason": str(e)})
-				raise aiohttp.web.HTTPForbidden() from e
+			session = await self.CookieService.create_anonymous_cookie_client_session(
+				anonymous_cid, client, scope,
+				track_id=track_id,
+				from_info=from_info)
 			anonymous_session_created = True
 
 		if session is None:
@@ -399,20 +391,27 @@ class CookieHandler(object):
 			session = await self.SessionService.inherit_track_id_from_root(session)
 		if session.TrackId is None:
 			# Obtain the old session by request cookie or access token
-			cookie_value = self.CookieService.get_session_cookie_value(request, session.OAuth2.ClientId)
+			try:
+				old_session = await self.CookieService.get_session_by_request_cookie(
+					request, session.OAuth2.ClientId)
+			except exceptions.SessionNotFoundError:
+				old_session = None
+			except exceptions.NoCookieError:
+				old_session = None
+
 			token_value = get_bearer_token_value(request)
-			old_session = None
-			if cookie_value is not None:
-				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
 			if old_session is None and token_value is not None:
 				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
-					L.error("Cannot transfer Track ID: Invalid access token.", struct_data={"value": token_value})
-					raise aiohttp.web.HTTPBadRequest()
+					# Invalid access token should result in error
+					L.log(asab.LOG_NOTICE, "Cannot transfer track ID: No source session found by access token")
+					return aiohttp.web.HTTPBadRequest()
 			try:
 				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
-			except ValueError:
-				raise aiohttp.web.HTTPBadRequest()
+			except ValueError as e:
+				# Return 400 to prevent disclosure while keeping the stacktrace
+				L.error("Failed to produce session track ID")
+				raise aiohttp.web.HTTPBadRequest() from e
 
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):
@@ -452,11 +451,19 @@ class CookieHandler(object):
 
 
 	async def _authenticate_request(self, request, client_id=None):
-		cookie_value = self.CookieService.get_session_cookie_value(request, client_id)
-		if cookie_value is None:
-			L.log(asab.LOG_NOTICE, "Session cookie not found in request", struct_data={"client_id": client_id})
+		"""
+		Locate session by request cookie
+		"""
+		try:
+			session = await self.CookieService.get_session_by_request_cookie(request)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "No client cookie found in request", struct_data={"client_id": client_id})
 			return None
-		return await self.CookieService.get_session_by_session_cookie_value(cookie_value)
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
+			return None
+
+		return session
 
 
 	async def _fetch_webhook_data(self, client, session):
