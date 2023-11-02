@@ -13,6 +13,7 @@
 - Silence stable log messages (#312, PLUM Sprint 231006)
 - External login registration webhook (#286, PLUM Sprint 231006)
 - OAuth Authorize ignores all unknown parameters (#296, PLUM Sprint 231006)
+- Log failure reasons in introspection and authorization flow (#315, INDIGO Sprint 231027)
 
 ### Refactoring
 - Do not log "unhappy flow" as errors (#315, INDIGO Sprint 231027)
