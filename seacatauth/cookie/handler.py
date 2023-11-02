@@ -157,7 +157,6 @@ class CookieHandler(object):
 
 		session = await self._authenticate_request(request, client_id)
 		if session is None:
-			L.log(asab.LOG_NOTICE, "No session found by cookie", struct_data={"client_id": client_id})
 			response = aiohttp.web.HTTPUnauthorized()
 		elif session.is_anonymous():
 			L.log(asab.LOG_NOTICE, "Anonymous user access not allowed", struct_data={
