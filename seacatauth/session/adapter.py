@@ -418,13 +418,22 @@ def rest_get(session_dict):
 	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)
 	if psid is not None:
 		data["parent_session_id"] = psid
-	if session_dict.get(SessionAdapter.FN.OAuth2.IdToken) is not None:
-		data["oauth2"] = True
+
+	client_id = session_dict.get(SessionAdapter.FN.OAuth2.ClientId)
+	if client_id is not None:
+		data["client_id"] = client_id
+	scope = session_dict.get(SessionAdapter.FN.OAuth2.Scope)
+	if scope is not None:
+		data["scope"] = scope
+
+	if session_dict.get(SessionAdapter.FN.OAuth2.AccessToken) is not None:
+		data["access_token"] = True
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
 
 	if session_dict.get(SessionAdapter.FN.Authentication.IsAnonymous) is True:
 		data["anonymous"] = True
+
 	impersonator_cid = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId)
 	if impersonator_cid is not None:
 		data["impersonator_cid"] = impersonator_cid
