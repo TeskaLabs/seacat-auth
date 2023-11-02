@@ -91,13 +91,13 @@ class CookieHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/nginx/introspect/cookie", self.nginx)
 		web_app.router.add_post("/nginx/introspect/cookie/anonymous", self.nginx_anonymous)
-		web_app.router.add_get("/cookie/entry", self.bouncer_get)
-		web_app.router.add_post("/cookie/entry", self.bouncer_post)
+		web_app.router.add_get("/public/cookie/entry", self.bouncer_get)
+		web_app.router.add_post("/public/cookie/entry", self.bouncer_post)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
-		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
+		web_app_public.router.add_get("/public/cookie/entry", self.bouncer_get)
+		web_app_public.router.add_post("/public/cookie/entry", self.bouncer_post)
 
 		# TODO: Insecure, back-compat only - remove after 2024-03-31
 		if asab.Config.getboolean("seacatauth:introspection", "_enable_insecure_legacy_endpoints", fallback=False):
