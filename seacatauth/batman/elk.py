@@ -333,5 +333,5 @@ class ELKIntegration(asab.config.Configurable):
 		return "tenant_{}".format(tenant)
 
 
-	def _kibana_space_id_from_tenant(self, tenant:str):
+	def _kibana_space_id_from_tenant(self, tenant: str):
 		return tenant.replace(".", "-")
