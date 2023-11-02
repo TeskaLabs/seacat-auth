@@ -61,9 +61,9 @@ class GrafanaIntegration(asab.config.Configurable):
 	async def _on_housekeeping(self, event_name):
 		await self.sync_all()
 
-	async def _on_authz_change(self, event_name, credential_id=None, **kwargs):
-		if credential_id:
-			await self.sync_credentials(credential_id)
+	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
+		if credentials_id:
+			await self.sync_credentials(credentials_id)
 		else:
 			await self.sync_all()
 
