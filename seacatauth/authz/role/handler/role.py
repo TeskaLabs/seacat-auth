@@ -27,12 +27,12 @@ class RoleHandler(object):
 		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/role", self.list_all)
-		web_app.router.add_get("/role/{tenant}", self.list)
-		web_app.router.add_get("/role/{tenant}/{role_name}", self.get)
-		web_app.router.add_post("/role/{tenant}/{role_name}", self.create)
-		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete)
-		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
+		web_app.router.add_get("/admin/role", self.list_all)
+		web_app.router.add_get("/admin/role/{tenant}", self.list)
+		web_app.router.add_get("/admin/role/{tenant}/{role_name}", self.get)
+		web_app.router.add_post("/admin/role/{tenant}/{role_name}", self.create)
+		web_app.router.add_delete("/admin/role/{tenant}/{role_name}", self.delete)
+		web_app.router.add_put("/admin/role/{tenant}/{role_name}", self.update)
 
 
 	@access_control("authz:superuser")

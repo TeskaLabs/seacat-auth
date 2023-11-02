@@ -28,11 +28,11 @@ class RolesHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/roles/{tenant}/{credentials_id}", self.get_roles_by_credentials)
-		web_app.router.add_put("/roles/{tenant}/{credentials_id}", self.set_roles)
-		web_app.router.add_put("/roles/{tenant}", self.get_roles_batch)
-		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
-		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
+		web_app.router.add_get("/admin/roles/{tenant}/{credentials_id}", self.get_roles_by_credentials)
+		web_app.router.add_put("/admin/roles/{tenant}/{credentials_id}", self.set_roles)
+		web_app.router.add_put("/admin/roles/{tenant}", self.get_roles_batch)
+		web_app.router.add_post("/admin/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
+		web_app.router.add_delete("/admin/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
 	@access_control("seacat:role:access")
 	async def get_roles_by_credentials(self, request, *, tenant):

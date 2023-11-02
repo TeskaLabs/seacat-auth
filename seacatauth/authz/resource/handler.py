@@ -27,11 +27,11 @@ class ResourceHandler(object):
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/resource", self.list)
-		web_app.router.add_get("/resource/{resource_id}", self.get)
-		web_app.router.add_post("/resource/{resource_id}", self.create_or_undelete)
-		web_app.router.add_put("/resource/{resource_id}", self.update)
-		web_app.router.add_delete("/resource/{resource_id}", self.delete)
+		web_app.router.add_get("/admin/resource", self.list)
+		web_app.router.add_get("/admin/resource/{resource_id}", self.get)
+		web_app.router.add_post("/admin/resource/{resource_id}", self.create_or_undelete)
+		web_app.router.add_put("/admin/resource/{resource_id}", self.update)
+		web_app.router.add_delete("/admin/resource/{resource_id}", self.delete)
 
 
 	@access_control("seacat:resource:access")

@@ -27,7 +27,7 @@ class ChangePasswordHandler(object):
 		self.ChangePasswordService = change_password_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/password", self.admin_request_password_change)
+		web_app.router.add_put("/admin/password", self.admin_request_password_change)
 		web_app.router.add_put("/account/password-change", self.change_password)
 		web_app.router.add_put("/public/password-reset", self.reset_password)
 		web_app.router.add_put("/public/lost-password", self.lost_password)

@@ -43,21 +43,21 @@ class AuthenticationHandler(object):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
-		web_app.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
-		web_app.router.add_put(r"/public/logout", self.logout)
+		web_app.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app.router.add_put("/public/login/{lsid}", self.login)
+		web_app.router.add_put("/public/login/{lsid}/smslogin", self.smslogin)
+		web_app.router.add_put("/public/login/{lsid}/webauthn", self.webauthn_login)
+		web_app.router.add_put("/public/logout", self.logout)
 		web_app.router.add_put("/impersonate", self.impersonate)
 		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app_public.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
-		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
-		web_app_public.router.add_put(r"/public/logout", self.logout)
+		web_app_public.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app_public.router.add_put("/public/login/{lsid}", self.login)
+		web_app_public.router.add_put("/public/login/{lsid}/smslogin", self.smslogin)
+		web_app_public.router.add_put("/public/login/{lsid}/webauthn", self.webauthn_login)
+		web_app_public.router.add_put("/public/logout", self.logout)
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",

@@ -26,13 +26,13 @@ class ClientHandler(object):
 		self.ClientService = client_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/client", self.list)
-		web_app.router.add_get("/client/features", self.features)
-		web_app.router.add_get("/client/{client_id}", self.get)
-		web_app.router.add_post("/client", self.register)
-		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
-		web_app.router.add_put("/client/{client_id}", self.update)
-		web_app.router.add_delete("/client/{client_id}", self.delete)
+		web_app.router.add_get("/admin/client", self.list)
+		web_app.router.add_get("/admin/client/features", self.features)
+		web_app.router.add_get("/admin/client/{client_id}", self.get)
+		web_app.router.add_post("/admin/client", self.register)
+		web_app.router.add_post("/admin/client/{client_id}/reset_secret", self.reset_secret)
+		web_app.router.add_put("/admin/client/{client_id}", self.update)
+		web_app.router.add_delete("/admin/client/{client_id}", self.delete)
 
 
 	@access_control("seacat:client:access")

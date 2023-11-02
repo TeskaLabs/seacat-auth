@@ -26,12 +26,12 @@ class SessionHandler(object):
 		self.SessionService = session_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get(r"/session", self.session_list)
-		web_app.router.add_get(r"/session/{session_id}", self.session_detail)
-		web_app.router.add_delete(r"/session/{session_id}", self.session_delete)
-		web_app.router.add_delete(r"/sessions", self.delete_all)
-		web_app.router.add_get(r"/sessions/{credentials_id}", self.search_by_credentials_id)
-		web_app.router.add_delete(r"/sessions/{credentials_id}", self.delete_by_credentials_id)
+		web_app.router.add_get("/admin/session", self.session_list)
+		web_app.router.add_get("/admin/session/{session_id}", self.session_detail)
+		web_app.router.add_delete("/admin/session/{session_id}", self.session_delete)
+		web_app.router.add_delete("/admin/sessions", self.delete_all)
+		web_app.router.add_get("/admin/sessions/{credentials_id}", self.search_by_credentials_id)
+		web_app.router.add_delete("/admin/sessions/{credentials_id}", self.delete_by_credentials_id)
 
 		web_app.router.add_delete("/account/sessions", self.delete_own_sessions)
 

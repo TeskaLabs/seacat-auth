@@ -27,24 +27,24 @@ class TenantHandler(object):
 		self.NameProposerService = app.get_service("seacatauth.NameProposerService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/tenant", self.list)
-		web_app.router.add_get("/tenants", self.search)
-		web_app.router.add_get("/tenant/{tenant}", self.get)
-		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
-		web_app.router.add_put("/tenants", self.get_tenants_batch)
+		web_app.router.add_get("/admin/tenant", self.list)
+		web_app.router.add_get("/admin/tenants", self.search)
+		web_app.router.add_get("/admin/tenant/{tenant}", self.get)
+		web_app.router.add_put("/admin/tenant/{tenant}", self.update_tenant)
+		web_app.router.add_put("/admin/tenants", self.get_tenants_batch)
 
-		web_app.router.add_post("/tenant", self.create)
-		web_app.router.add_delete("/tenant/{tenant}", self.delete)
+		web_app.router.add_post("/admin/tenant", self.create)
+		web_app.router.add_delete("/admin/tenant/{tenant}", self.delete)
 
-		web_app.router.add_get("/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
-		web_app.router.add_put("/tenant_assign/{credentials_id}", self.set_tenants)
-		web_app.router.add_post("/tenant_assign/{credentials_id}/{tenant}", self.assign_tenant)
-		web_app.router.add_delete("/tenant_assign/{credentials_id}/{tenant}", self.unassign_tenant)
+		web_app.router.add_get("/admin/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
+		web_app.router.add_put("/admin/tenant_assign/{credentials_id}", self.set_tenants)
+		web_app.router.add_post("/admin/tenant_assign/{credentials_id}/{tenant}", self.assign_tenant)
+		web_app.router.add_delete("/admin/tenant_assign/{credentials_id}/{tenant}", self.unassign_tenant)
 
-		web_app.router.add_put("/tenant_assign_many", self.bulk_assign_tenants)
-		web_app.router.add_put("/tenant_unassign_many", self.bulk_unassign_tenants)
+		web_app.router.add_put("/admin/tenant_assign_many", self.bulk_assign_tenants)
+		web_app.router.add_put("/admin/tenant_unassign_many", self.bulk_unassign_tenants)
 
-		web_app.router.add_get("/tenant_propose", self.propose_tenant_name)
+		web_app.router.add_get("/admin/tenant_propose", self.propose_tenant_name)
 
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
