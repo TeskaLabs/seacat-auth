@@ -218,8 +218,8 @@ class OpenIdConnectService(asab.Service):
 
 		try:
 			session = await self.SessionService.get(session_id)
-		except ValueError:
-			L.error("Session not found")
+		except exceptions.SessionNotFoundError:
+			L.error("Session associated with ID token not found", struct_data={"sid": session_id})
 			return None
 
 		return session
@@ -228,13 +228,13 @@ class OpenIdConnectService(asab.Service):
 	def refresh_token(self, refresh_token, client_id, client_secret, scope):
 		# TODO: this is not implemented
 		L.error("refresh_token is not implemented", struct_data=[refresh_token, client_id, client_secret, scope])
-		raise aiohttp.web.HTTPNotImplemented()
+		return aiohttp.web.HTTPNotImplemented()
 
 
 	def check_access_token(self, bearer_token):
 		# TODO: this is not implemented
 		L.error("check_access_token is not implemented", struct_data={"bearer": bearer_token})
-		raise aiohttp.web.HTTPNotImplemented()
+		return aiohttp.web.HTTPNotImplemented()
 
 
 	async def create_oidc_session(
@@ -519,7 +519,7 @@ class OpenIdConnectService(asab.Service):
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
-		return add_params_to_url_query(authorize_uri, **query_params)
+		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
 	async def revoke_token(self, token, token_type_hint=None):

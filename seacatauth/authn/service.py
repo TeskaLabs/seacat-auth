@@ -425,7 +425,7 @@ class AuthenticationService(asab.Service):
 		try:
 			await self.CredentialsService.get(target_cid)
 		except KeyError:
-			L.warning("Impersonation target does not exist.", struct_data={
+			L.log(asab.LOG_NOTICE, "Impersonation target does not exist.", struct_data={
 				"impersonator_cid": impersonator_cid, "target_cid": target_cid})
 			raise exceptions.CredentialsNotFoundError(target_cid)
 
@@ -433,9 +433,10 @@ class AuthenticationService(asab.Service):
 		target_authz = await build_credentials_authz(
 			self.TenantService, self.RoleService, target_cid, tenants=None)
 		if self.RBACService.is_superuser(target_authz):
-			L.warning(
+			L.log(
+				asab.LOG_NOTICE,
 				"Impersonation target is a superuser. Resource 'authz:superuser' will be excluded "
-				"from the impersonated session.",
+				"from the impersonated session's authorization scope.",
 				struct_data={"impersonator_cid": impersonator_cid, "target_cid": target_cid})
 
 		scope = frozenset(["profile", "email", "phone"])

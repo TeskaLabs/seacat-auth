@@ -211,7 +211,8 @@ class RegistrationHandler(object):
 		"""
 		# Disable this endpoint if self-registration is not enabled
 		if not self.RegistrationService.SelfRegistrationEnabled:
-			raise aiohttp.web.HTTPNotFound()
+			L.log(asab.LOG_NOTICE, "Self-registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
 
 		# Log IPs from which the request was made
 		access_ips = [request.remote]

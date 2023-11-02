@@ -23,9 +23,7 @@ class LoginDescriptor:
 		data = descriptor_config
 
 		if len(factors_config) == 0:
-			message = "No login factors specified in descriptor"
-			L.error(message, struct_data={"ldid": ldid})
-			raise ValueError(message)
+			raise ValueError("No login factors specified in descriptor {!r}".format(ldid))
 
 		if not isinstance(factors_config[0], list):
 			# There is only one OR-group. Nest it to preserve schema.
