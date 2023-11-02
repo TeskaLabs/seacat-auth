@@ -3,13 +3,15 @@
 ## v23.44 (release candidate)
 
 ### Pre-releases
-- v23.44-alpha1
+- `v23.44-alpha4`
+- `v23.44-alpha3`
 
 ### Breaking changes
 - Dropped support for authorize query params `ldid` and `expiration` (#296, PLUM Sprint 231006)
 
 ### Fix
 - Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
+- Handle missing webauthn data in login request (#314, INDIGO Sprint 231027, `v23.44-alpha4`)
 
 ### Features
 - Authorization for websocket requests (#300, PLUM Sprint 231006)
@@ -17,7 +19,7 @@
 - External login registration webhook (#286, PLUM Sprint 231006)
 - OAuth Authorize ignores all unknown parameters (#296, PLUM Sprint 231006)
 - Log failure reasons in introspection and authorization flow (#315, INDIGO Sprint 231027)
-- Reduce grafana sync frequency (#317, INDIGO Sprint 231027, `v23.44-alpha1`)
+- Reduce grafana sync frequency (#317, INDIGO Sprint 231027, `v23.44-alpha3`)
 
 ### Refactoring
 - Do not log "unhappy flow" as errors (#315, INDIGO Sprint 231027)
