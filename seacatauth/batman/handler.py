@@ -3,6 +3,8 @@ import asab
 
 import aiohttp.web
 
+from seacatauth import exceptions
+
 #
 
 L = logging.getLogger(__name__)
@@ -44,8 +46,18 @@ class BatmanHandler(object):
 		if client_id is None:
 			raise ValueError("No 'client_id' parameter specified in Batman introspection query.")
 
-		session = await cookie_service.get_session_by_request_cookie(request, request.query.get("client_id"))
-		if session is None or session.Batman is None:
+		try:
+			session = await cookie_service.get_session_by_request_cookie(request, client_id)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "No client cookie in request", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPUnauthorized()
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
+			return aiohttp.web.HTTPUnauthorized()
+
+		if session.Batman is None:
+			# This should not happen - session is not of Batman type
+			L.error("Session not authorized for Batman")
 			return aiohttp.web.HTTPUnauthorized()
 
 		return aiohttp.web.HTTPOk(headers={
