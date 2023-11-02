@@ -300,10 +300,10 @@ class AuthorizeHandler(object):
 			e.RedirectUri = redirect_uri
 			raise e
 		except client.exceptions.ClientNotFoundError as e:
-			L.error("Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			L.log(asab.LOG_NOTICE, "Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise ClientIdError(client_id) from e
 		except client.exceptions.InvalidRedirectURI as e:
-			L.error("Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			L.log(asab.LOG_NOTICE, "Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise RedirectUriError(redirect_uri, client_id) from e
 
 		# Extract request source
@@ -376,6 +376,7 @@ class AuthorizeHandler(object):
 			if prompt == "login":
 				# Delete current session and redirect to login
 				await self.SessionService.delete(root_session.SessionId)
+				L.log(asab.LOG_NOTICE, "Login prompt requested by client", struct_data={"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
 					scope=scope,
 					client_id=client_id,
@@ -387,6 +388,8 @@ class AuthorizeHandler(object):
 					**kwargs)
 			elif prompt == "select_account":
 				# Redirect to login without deleting current session
+				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client", struct_data={
+					"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
 					scope=scope,
 					client_id=client_id,
@@ -400,6 +403,8 @@ class AuthorizeHandler(object):
 		elif allow_anonymous:
 			# Create anonymous session or redirect to login if requested
 			if prompt == "login" or prompt == "select_account":
+				L.log(asab.LOG_NOTICE, "Account selection or login prompt requested by client", struct_data={
+					"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
 					scope=scope,
 					client_id=client_id,
@@ -417,6 +422,8 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.LoginRequired, client_id,
 					redirect_uri=redirect_uri,
 					state=state)
+			L.log(asab.LOG_NOTICE, "Login required", struct_data={
+				"client_id": client_id})
 			return await self.reply_with_redirect_to_login(
 				scope=scope,
 				client_id=client_id,
