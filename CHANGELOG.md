@@ -14,6 +14,7 @@
 - Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
 
 ### Features
+- Include client ID and scope in session detail (#318, INDIGO Sprint 231027, `v23.44-alpha4`)
 - Reduce grafana sync frequency (#317, INDIGO Sprint 231027, `v23.44-alpha3`)
 - Authorization for websocket requests (#300, PLUM Sprint 231006)
 - Silence stable log messages (#312, PLUM Sprint 231006)
