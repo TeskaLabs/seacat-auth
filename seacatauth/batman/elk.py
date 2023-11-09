@@ -110,13 +110,12 @@ class ELKIntegration(asab.config.Configurable):
 		else:
 			self.SSLContext = None
 
-		self.App.PubSub.subscribe("Application.tick/60!", self._on_tick)
+		self.App.PubSub.subscribe("Application.init!", self._on_init)
+		self.App.PubSub.subscribe("Role.assigned!", self._on_authz_change)
+		self.App.PubSub.subscribe("Role.unassigned!", self._on_authz_change)
+		self.App.PubSub.subscribe("Role.updated!", self._on_authz_change)
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
-
-
-	async def _on_housekeeping(self, event_name):
-		await self._sync_tenants_and_spaces()
 
 
 	@contextlib.asynccontextmanager
@@ -126,9 +125,21 @@ class ELKIntegration(asab.config.Configurable):
 				yield session
 
 
-	async def _on_tick(self, event_name):
+	async def _on_init(self, event_name):
 		await self._initialize_resources()
+
+
+	async def _on_housekeeping(self, event_name):
+		await self._sync_tenants_and_spaces()
 		await self.sync_all_credentials()
+
+
+
+	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
+		if credentials_id:
+			await self.sync_credentials(credentials_id)
+		else:
+			await self.sync_all_credentials()
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
@@ -245,24 +256,26 @@ class ELKIntegration(asab.config.Configurable):
 		try:
 			async with self._elasticsearch_session() as session:
 				async for cred in self.CredentialsService.iterate():
-					await self._sync_credential(session, cred, elk_resources)
+					await self._sync_credentials(session, cred, elk_resources)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
 
 
-	async def sync_credential(self, cred: dict):
+	async def sync_credentials(self, credentials_id: str):
 		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
 		elk_resources = set(
 			resource["_id"]
 			for resource in elk_resources["data"]
 		)
+		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
+		credentials = await cred_svc.get(credentials_id)
 		try:
 			async with self._elasticsearch_session() as session:
-				await self._sync_credential(session, cred, elk_resources)
+				await self._sync_credentials(session, credentials, elk_resources)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
 
-	async def _sync_credential(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
+	async def _sync_credentials(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
