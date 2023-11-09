@@ -44,13 +44,29 @@ class ELKIntegration(asab.config.Configurable):
 		# to avoid interfering with kibana system users
 		"local_users": "elastic kibana logstash_system beats_system remote_monitoring_user",
 
-		# Resources with this prefix will be mapped to Kibana users as roles
-		# E.g.: Resource "elk:kibana-analyst" will be mapped to role "kibana-analyst"
-		"resource_prefix": "elk:",
-
 		# This role 'flags' users in ElasticSearch/Kibana that is managed by Seacat Auth
 		# There should be a role created in the ElasticSearch that grants no rights
 		"seacat_user_flag": "seacat_managed",
+	}
+
+	EssentialKibanaResources = {
+		"kibana:access": {
+			"description":
+				"Read-only access to tenant space in Kibana."},
+		"kibana:edit": {
+			"description":
+				"Read-write access to tenant space in Kibana."},
+		"kibana:admin": {
+			"role_name": "kibana_admin",
+			"description":
+				"Grants access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
+				"role in ElasticSearch documentation."},
+		"authz:superuser": {
+			"role_name": "superuser",
+			"description":
+				"Grants full access to cluster management and data indices. This role also grants direct read-only "
+				"access to restricted indices like .security. A user with the superuser role can impersonate "
+				"any other user in the system."},
 	}
 
 
@@ -77,11 +93,11 @@ class ELKIntegration(asab.config.Configurable):
 		elif api_key != "":
 			self.Headers["Authorization"] = "ApiKey {}".format(api_key)
 
-		self.ResourcePrefix = self.Config.get("resource_prefix")
-		self.ELKResourceRegex = re.compile("^{}".format(
-			re.escape(self.Config.get("resource_prefix"))
-		))
-		self.ELKSeacatFlagRole = self.Config.get("seacat_user_flag")
+		self.ResourcePrefix = "kibana:"
+		self.DeprecatedResourcePrefix = "elk:"
+		self.DeprecatedResourceRegex = re.compile("^elk:")
+
+		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
 
 		# Users that will not be synchronized to avoid conflicts with ELK system users
 		ignore_usernames = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
@@ -117,7 +133,8 @@ class ELKIntegration(asab.config.Configurable):
 
 	async def _on_tenant_created(self, event_name, tenant_id):
 		space_id = await self._create_kibana_space(tenant_id)
-		await self._create_kibana_role(tenant_id, space_id)
+		await self._create_kibana_role(tenant_id, space_id, "read")
+		await self._create_kibana_role(tenant_id, space_id, "all")
 
 
 	async def _sync_tenants_and_spaces(self):
@@ -126,12 +143,13 @@ class ELKIntegration(asab.config.Configurable):
 			space["id"] for space in
 			await self._get_kibana_spaces()
 		}
-		for tenant in tenants:
-			if tenant in spaces:
+		for tenant_id in tenants:
+			if tenant_id in spaces:
 				# Tenant space already exists
 				continue
-			space_id = await self._create_kibana_space(tenant)
-			await self._create_kibana_role(tenant, space_id)
+			space_id = await self._create_kibana_space(tenant_id)
+			await self._create_kibana_role(tenant_id, space_id, "read")
+			await self._create_kibana_role(tenant_id, space_id, "all")
 
 
 
@@ -160,11 +178,12 @@ class ELKIntegration(asab.config.Configurable):
 		return space_id
 
 
-	async def _create_kibana_role(self, tenant_id, space_id):
-		role_name = self._elastic_role_from_tenant(tenant_id)
+	async def _create_kibana_role(self, tenant_id: str, space_id: str, privileges: str= "read"):
+		assert privileges in {"read", "all"}
+		role_name = self._elastic_role_from_tenant(tenant_id, privileges)
 		role = {
 			# Add all privileges for the new space
-			"kibana": [{"spaces": [space_id], "base": ["all"]}]
+			"kibana": [{"spaces": [space_id], "base": [privileges]}]
 		}
 
 		try:
@@ -201,42 +220,24 @@ class ELKIntegration(asab.config.Configurable):
 		await self._initialize_resources()
 		await self.sync_all_credentials()
 
+
 	async def _initialize_resources(self):
-		# TODO: Remove resource if its respective kibana role has been removed
 		"""
-		Fetches roles from ELK and creates a Seacat Auth resource for each one of them.
+		Create Seacat Auth resources that grant access to ElasticSearch roles
 		"""
-		# Fetch ELK roles
-		try:
-			async with self._elasticsearch_session() as session:
-				async with session.get("{}/_xpack/security/role".format(self.ElasticSearchUrl)) as resp:
-					if resp.status // 100 != 2:
-						text = await resp.text()
-						L.error("Failed to fetch ElasticSearch roles:\n{}".format(text[:1000]))
-						return
-					elk_roles_data = await resp.json()
-		except Exception as e:
-			L.error("Communication with ElasticSearch produced {}: {}".format(type(e).__name__, str(e)))
-			return
-
-		# Fetch SCA resources for the ELK module
-		existing_elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
-		existing_elk_resources = set(
-			resource["_id"]
-			for resource in existing_elk_resources["data"]
-		)
-
-		# Create resources that don't exist yet
-		for role in elk_roles_data.keys():
-			resource_id = "{}{}".format(self.ResourcePrefix, role)
-			if resource_id not in existing_elk_resources:
-				await self.ResourceService.create(
-					resource_id,
-					description="Grants access to ELK role {!r}.".format(role)
-				)
+		# Create core resources that don't exist yet
+		for resource_id, resource in self.EssentialKibanaResources:
+			try:
+				await self.ResourceService.get(resource_id)
+			except KeyError:
+				continue
+			await self.ResourceService.create(
+				resource_id,
+				description=resource.get("description")
+			)
 
 	async def sync_all_credentials(self):
-		elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
+		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
 		elk_resources = set(
 			resource["_id"]
 			for resource in elk_resources["data"]
@@ -250,7 +251,7 @@ class ELKIntegration(asab.config.Configurable):
 
 
 	async def sync_credential(self, cred: dict):
-		elk_resources = await self.ResourceService.list(query_filter={"_id": self.ELKResourceRegex})
+		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
 		elk_resources = set(
 			resource["_id"]
 			for resource in elk_resources["data"]
@@ -289,28 +290,33 @@ class ELKIntegration(asab.config.Configurable):
 		if v is not None:
 			elastic_user["full_name"] = v
 
-		elk_roles = {self.ELKSeacatFlagRole}  # Add a role that marks users managed by Seacat Auth
+		elk_roles = {self.SeacatUserFlagRole}  # Add a role that marks users managed by Seacat Auth
 
-		for tenant in await self.TenantService.get_tenants(cred["_id"]):
-			elk_roles.add(self._elastic_role_from_tenant(tenant))
+		# Get full authorization scope
+		assigned_tenants = await self.TenantService.get_tenants(cred["_id"])
+		authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, cred["_id"], tenants=assigned_tenants)
 
-		# Get authz dict
-		authz = await build_credentials_authz(self.TenantService, self.RoleService, cred["_id"])
+		# Tenant-scoped resources grant privileges for specific tenant spaces
+		for tenant_id, resources in authz.items():
+			if "kibana:access" in resources:
+				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "read"))
+			if "kibana:edit" in resources:
+				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "all"))
 
-		# ELK roles from SCA resources
-		# Use only global "*" roles for now
-		# TODO: Use tenant-authorized resources instead of global
-		user_resources = set(authz.get("*", []))
-		if "authz:superuser" in user_resources:
-			elk_roles.update(
-				resource[len(self.ResourcePrefix):]
-				for resource in elk_resources
-			)
-		else:
-			elk_roles.update(
-				resource[len(self.ResourcePrefix):]
-				for resource in user_resources.intersection(elk_resources)
-			)
+		# Globally authorized resources grant privileges across all Kibana spaces
+		global_authz = authz.get("*", frozenset())
+		if "authz:superuser" in global_authz:
+			elk_roles.add(self.EssentialKibanaResources["authz:superuser"]["role_name"])
+		if "kibana:admin" in global_authz:
+			elk_roles.add(self.EssentialKibanaResources["kibana:admin"]["role_name"])
+
+		# BACK COMPAT
+		# Map globally authorized Seacat resources prefixed with "elk:" to Elastic roles
+		elk_roles.update(
+			resource[len(self.DeprecatedResourcePrefix):]
+			for resource in global_authz.intersection(elk_resources)
+		)
 
 		elastic_user["roles"] = list(elk_roles)
 
@@ -329,8 +335,8 @@ class ELKIntegration(asab.config.Configurable):
 				)
 
 
-	def _elastic_role_from_tenant(self, tenant):
-		return "tenant_{}".format(tenant)
+	def _elastic_role_from_tenant(self, tenant: str, privileges: str):
+		return "tenant_{}_{}".format(tenant, privileges)
 
 
 	def _kibana_space_id_from_tenant(self, tenant: str):
