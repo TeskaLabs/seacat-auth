@@ -151,3 +151,12 @@ class NoCookieError(SeacatAuthError):
 		else:
 			message = "Request contains no root session cookie"
 		super().__init__(message, *args)
+
+
+class IntegrityError(SeacatAuthError):
+	"""
+	Database is in an unexpected state; on object is missing its dependencies.
+	"""
+	def __init__(self, message, **struct_data):
+		self.StructData = struct_data
+		super().__init__(message)

@@ -333,7 +333,7 @@ class RoleService(asab.Service):
 			try:
 				await self.TenantService.get_tenant(tenant)
 			except KeyError:
-				raise exceptions.TenantNotFoundError(tenant)
+				raise exceptions.IntegrityError("Role's tenant not found", tenant_id=tenant, role_id=role_id)
 
 		if verify_credentials:
 			try:
