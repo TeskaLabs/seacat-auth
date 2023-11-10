@@ -115,6 +115,7 @@ class ELKIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Role.unassigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Role.updated!", self._on_authz_change)
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
+		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
@@ -130,9 +131,8 @@ class ELKIntegration(asab.config.Configurable):
 
 
 	async def _on_housekeeping(self, event_name):
-		await self._sync_tenants_and_spaces()
+		await self._sync_all_tenants_and_spaces()
 		await self.sync_all_credentials()
-
 
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
@@ -144,53 +144,120 @@ class ELKIntegration(asab.config.Configurable):
 
 	async def _on_tenant_created(self, event_name, tenant_id):
 		space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-		await self._create_kibana_space(tenant_id, space_id)
-		await self._create_kibana_role(tenant_id, space_id, "read")
-		await self._create_kibana_role(tenant_id, space_id, "all")
+		await self._create_or_update_kibana_space(tenant_id, space_id)
 
 
-	async def _sync_tenants_and_spaces(self):
-		space_ids = {
-			space["id"] for space in
-			(await self._get_kibana_spaces()) or {}
-		}
-		if not space_ids:
-			# TODO: Retry later
-			return
-		tenants = await self.TenantService.list_tenant_ids()
-		for tenant_id in tenants:
+	async def _on_tenant_updated(self, event_name, tenant_id):
+		space_id = self._kibana_space_id_from_tenant_id(tenant_id)
+		await self._create_or_update_kibana_space(tenant_id, space_id)
+
+
+	async def _sync_all_tenants_and_spaces(self):
+		async for tenant in self.TenantService.iterate():
+			space_id = self._kibana_space_id_from_tenant_id(tenant["_id"])
+			await self._create_or_update_kibana_space(tenant, space_id)
+
+
+	async def _create_or_update_kibana_space(self, tenant: str | dict, space_id: str = None):
+		"""
+		Create a Kibana space for specified tenant or update its metadata if necessary.
+		Also create a read-only and a read-write Kibana role for that space.
+		"""
+		if isinstance(tenant, str):
+			tenant_id = tenant
+			tenant = await self.TenantService.get_tenant(tenant_id)
+		else:
+			tenant_id = tenant["_id"]
+
+		if not space_id:
 			space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-			if space_id in space_ids:
-				# Tenant space already exists
-				continue
-			await self._create_kibana_space(tenant_id, space_id)
-			await self._create_kibana_role(tenant_id, space_id, "read")
-			await self._create_kibana_role(tenant_id, space_id, "all")
-
-
-
-	async def _create_kibana_space(self, tenant_id: str, space_id: str):
-		tenant = self.TenantService.get_tenant(tenant_id)
-		space_id = self._kibana_space_id_from_tenant_id(tenant)
-		space = {
-			"id": tenant_id,  # TODO: Space ID cannot contain "." while tenant_id can!
-			"name": tenant.get("label", tenant_id)
-		}
-		if "description" in tenant:
-			space["description"] = tenant["description"]
 
 		try:
 			async with self._elasticsearch_session() as session:
-				async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space) as resp:
-					if resp.status // 100 != 2:
+				async with session.get("{}/api/spaces/space/{}".format(self.KibanaUrl, space_id)) as resp:
+					if resp.status == 404:
+						existing_space = None
+					elif resp.status == 200:
+						existing_space = await resp.json()
+					else:
 						text = await resp.text()
-						L.error("Failed to create Kibana space {!r}:\n{}".format(space_id, text[:1000]))
+						L.error(
+							"Failed to fetch Kibana tenant space (Server responded with {}):\n{}".format(
+								resp.status, text[:1000]),
+							struct_data={"space_id": space_id, "tenant_id": tenant_id}
+						)
 						return
-		except Exception as e:
-			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Failed to fetch Kibana tenant space (Connection error): {}".format(str(e)), struct_data={
+				"space_id": space_id, "tenant_id": tenant_id})
 			return
 
-		L.log(asab.LOG_NOTICE, "Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
+		space_update = {}
+		if existing_space:
+			name = tenant.get("label", tenant_id)
+			if existing_space.get("name") != name:
+				space_update["name"] = name
+			description = tenant.get("description")
+			if existing_space.get("description") != description:
+				space_update["description"] = description
+			if len(space_update) > 0:
+				space_update["id"] = space_id
+		else:
+			space_update = {
+				"id": space_id,
+				"name": tenant.get("label", tenant_id)
+			}
+			if "description" in tenant:
+				space_update["description"] = tenant["description"]
+
+		if not space_update:
+			# No changes
+			L.debug("Kibana space metadata up to date", struct_data={
+				"space_id": space_id, "tenant_id": tenant_id})
+			return
+
+		elif existing_space:
+			# Update existing space
+			try:
+				async with self._elasticsearch_session() as session:
+					async with session.put(
+						"{}/api/spaces/space/{}".format(self.KibanaUrl, space_id), json=space_update
+					) as resp:
+						if not (200 <= resp.status < 300):
+							text = await resp.text()
+							L.error(
+								"Failed to update Kibana tenant space (Server responded with {}):\n{}".format(
+									resp.status, text[:1000]),
+								struct_data={"space_id": space_id, "tenant_id": tenant_id}
+							)
+			except aiohttp.client_exceptions.ClientConnectionError as e:
+				L.error("Failed to update Kibana tenant space (Connection error): {}".format(str(e)), struct_data={
+					"space_id": space_id, "tenant_id": tenant_id})
+			L.log(asab.LOG_NOTICE, "Kibana space updated", struct_data={"id": space_id, "tenant": tenant_id})
+			return
+
+		else:
+			# Create new space
+			try:
+				async with self._elasticsearch_session() as session:
+					async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space_update) as resp:
+						if not (200 <= resp.status < 300):
+							text = await resp.text()
+							L.error(
+								"Failed to create Kibana tenant space (Server responded with {}):\n{}".format(
+									resp.status, text[:1000]),
+								struct_data={"space_id": space_id, "tenant_id": tenant_id}
+							)
+							return
+			except Exception as e:
+				L.error("Failed to create Kibana tenant space (Connection error): {}".format(str(e)), struct_data={
+					"space_id": space_id, "tenant_id": tenant_id})
+				return
+			L.log(asab.LOG_NOTICE, "Kibana space created", struct_data={"id": space_id, "tenant": tenant_id})
+
+			# Create roles for space access
+			await self._create_kibana_role(tenant_id, space_id, "read")
+			await self._create_kibana_role(tenant_id, space_id, "all")
 
 
 	async def _create_kibana_role(self, tenant_id: str, space_id: str, privileges: str= "read"):
@@ -355,5 +422,10 @@ class ELKIntegration(asab.config.Configurable):
 		return "tenant_{}_{}".format(tenant, privileges)
 
 
-	def _kibana_space_id_from_tenant_id(self, tenant: str):
-		return tenant.replace(".", "-")
+	def _kibana_space_id_from_tenant_id(self, tenant_id: str):
+		if tenant_id == "default":
+			# "default" is a reserved space name in Kibana
+			return "seacat-default"
+		# Replace forbidden characters with "--"
+		# NOTE: Tenant ID can contain "." while space ID can not
+		return re.sub("[^a-z0-9_-]", "--", tenant_id)
