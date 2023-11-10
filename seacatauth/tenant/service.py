@@ -49,6 +49,16 @@ class TenantService(asab.Service):
 		return result
 
 
+	async def iterate(self):
+		"""
+		Iterate over all tenants
+		"""
+		# TODO: Limit, page, filter
+		provider = self.get_provider()
+		async for tenant in provider.iterate():
+			yield tenant
+
+
 	async def get_tenant(self, tenant_id: str):
 		return await self.TenantsProvider.get(tenant_id)
 
