@@ -23,13 +23,16 @@ L = logging.getLogger(__name__)
 # TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
 
 
-class ELKIntegration(asab.config.Configurable):
+class KibanaIntegration(asab.config.Configurable):
 	"""
 	Kibana / ElasticSearch user push compomnent
 	"""
 
 	ConfigDefaults = {
 		"url": "http://localhost:9200",
+
+		# Enables automatic synchronization of Kibana spaces with Seacat tenants
+		# Space and role sync is disabled if kibana_url is empty.
 		"kibana_url": "http://localhost:5601",
 
 		# Basic credentials / API key (mutually exclusive)
@@ -47,9 +50,6 @@ class ELKIntegration(asab.config.Configurable):
 		# This role 'flags' users in ElasticSearch/Kibana that is managed by Seacat Auth
 		# There should be a role created in the ElasticSearch that grants no rights
 		"seacat_user_flag": "seacat_managed",
-
-		# Enable automatic synchronization of Kibana spaces with Seacat tenants
-		"enable_space_sync": True
 	}
 
 	EssentialKibanaResources = {
@@ -73,8 +73,15 @@ class ELKIntegration(asab.config.Configurable):
 	}
 
 
-	def __init__(self, batman_svc, config_section_name="batman:elk", config=None):
+	def __init__(self, batman_svc, config_section_name="batman:kibana", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
+
+		if "batman:elk" in asab.Config:
+			asab.LogObsolete.warning(
+				"Config section 'batman:elk' has been renamed to 'batman:kibana'. Please update your config.",
+				struct_data={"eol": "2024-05-31"})
+			self.Config.update(asab.Config["batman:elk"])
+
 		self.BatmanService = batman_svc
 		self.App = self.BatmanService.App
 		self.CredentialsService = self.App.get_service("seacatauth.CredentialsService")
@@ -82,8 +89,9 @@ class ELKIntegration(asab.config.Configurable):
 		self.RoleService = self.App.get_service("seacatauth.RoleService")
 		self.ResourceService = self.App.get_service("seacatauth.ResourceService")
 
-		self.EnableSpaceSync = self.Config.getboolean("enable_space_sync")
 		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
+		if len(self.KibanaUrl) == 0:
+			self.KibanaUrl = None
 		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
 		self.Headers = {"kbn-xsrf": "kibana"}
 
@@ -169,7 +177,7 @@ class ELKIntegration(asab.config.Configurable):
 		Create a Kibana space for specified tenant or update its metadata if necessary.
 		Also create a read-only and a read-write Kibana role for that space.
 		"""
-		if not self.EnableSpaceSync:
+		if self.KibanaUrl is None:
 			return
 
 		if isinstance(tenant, str):
@@ -269,7 +277,7 @@ class ELKIntegration(asab.config.Configurable):
 			await self._create_kibana_role(tenant_id, space_id, "all")
 
 
-	async def _create_kibana_role(self, tenant_id: str, space_id: str, privileges: str= "read"):
+	async def _create_kibana_role(self, tenant_id: str, space_id: str, privileges: str = "read"):
 		assert privileges in {"read", "all"}
 		role_name = self._elastic_role_from_tenant(tenant_id, privileges)
 		role = {
