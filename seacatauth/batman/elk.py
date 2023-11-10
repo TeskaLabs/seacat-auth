@@ -47,6 +47,9 @@ class ELKIntegration(asab.config.Configurable):
 		# This role 'flags' users in ElasticSearch/Kibana that is managed by Seacat Auth
 		# There should be a role created in the ElasticSearch that grants no rights
 		"seacat_user_flag": "seacat_managed",
+
+		# Enable automatic synchronization of Kibana spaces with Seacat tenants
+		"enable_space_sync": True
 	}
 
 	EssentialKibanaResources = {
@@ -79,6 +82,7 @@ class ELKIntegration(asab.config.Configurable):
 		self.RoleService = self.App.get_service("seacatauth.RoleService")
 		self.ResourceService = self.App.get_service("seacatauth.ResourceService")
 
+		self.EnableSpaceSync = self.Config.getboolean("enable_space_sync")
 		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
 		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
 		self.Headers = {"kbn-xsrf": "kibana"}
@@ -163,6 +167,9 @@ class ELKIntegration(asab.config.Configurable):
 		Create a Kibana space for specified tenant or update its metadata if necessary.
 		Also create a read-only and a read-write Kibana role for that space.
 		"""
+		if not self.EnableSpaceSync:
+			return
+
 		if isinstance(tenant, str):
 			tenant_id = tenant
 			tenant = await self.TenantService.get_tenant(tenant_id)
