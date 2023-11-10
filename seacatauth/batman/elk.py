@@ -118,6 +118,8 @@ class ELKIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Role.assigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Role.unassigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Role.updated!", self._on_authz_change)
+		self.App.PubSub.subscribe("Tenant.assigned!", self._on_authz_change)
+		self.App.PubSub.subscribe("Tenant.unassigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
