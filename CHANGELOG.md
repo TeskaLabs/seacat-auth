@@ -8,6 +8,9 @@
 
 ### Breaking changes
 - Dropped support for authorize query params `ldid` and `expiration` (#296, PLUM Sprint 231006)
+- Batman for Kibana now also requires `kibana_url` (#281, PLUM Sprint 231027)
+- Batman does no longer create Seacat resources from all Kibana roles (#281, PLUM Sprint 231027)
+- Config section 'batman:elk' renamed to 'batman:kibana' (#281, PLUM Sprint 231027)
 
 ### Fix
 - Handle missing webauthn data in login request (#314, INDIGO Sprint 231027, `v23.44-alpha4`)
@@ -21,6 +24,7 @@
 - External login registration webhook (#286, PLUM Sprint 231006)
 - OAuth Authorize ignores all unknown parameters (#296, PLUM Sprint 231006)
 - Log failure reasons in introspection and authorization flow (#315, INDIGO Sprint 231027)
+- Kibana spaces and roles are now synchronized with Seacat tenants (#281, PLUM Sprint 231027)
 
 ### Refactoring
 - Do not log "unhappy flow" as errors (#315, INDIGO Sprint 231027)
