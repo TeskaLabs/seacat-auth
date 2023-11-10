@@ -294,7 +294,7 @@ class ELKIntegration(asab.config.Configurable):
 		try:
 			async with self._elasticsearch_session() as session:
 				async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
-					if resp.status // 100 != 2:
+					if resp.status != 200:
 						text = await resp.text()
 						L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
 						return
@@ -414,7 +414,7 @@ class ELKIntegration(asab.config.Configurable):
 			"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
 			json=elastic_user
 		) as resp:
-			if resp.status // 100 == 2:
+			if 200 <= resp.status < 300:
 				# Everything is alright here
 				pass
 			else:
