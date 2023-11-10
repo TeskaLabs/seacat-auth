@@ -143,30 +143,35 @@ class ELKIntegration(asab.config.Configurable):
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
-		space_id = await self._create_kibana_space(tenant_id)
+		space_id = self._kibana_space_id_from_tenant_id(tenant_id)
+		await self._create_kibana_space(tenant_id, space_id)
 		await self._create_kibana_role(tenant_id, space_id, "read")
 		await self._create_kibana_role(tenant_id, space_id, "all")
 
 
 	async def _sync_tenants_and_spaces(self):
-		tenants = await self.TenantService.list_tenant_ids()
-		spaces = {
+		space_ids = {
 			space["id"] for space in
-			await self._get_kibana_spaces()
+			(await self._get_kibana_spaces()) or {}
 		}
+		if not space_ids:
+			# TODO: Retry later
+			return
+		tenants = await self.TenantService.list_tenant_ids()
 		for tenant_id in tenants:
-			if tenant_id in spaces:
+			space_id = self._kibana_space_id_from_tenant_id(tenant_id)
+			if space_id in space_ids:
 				# Tenant space already exists
 				continue
-			space_id = await self._create_kibana_space(tenant_id)
+			await self._create_kibana_space(tenant_id, space_id)
 			await self._create_kibana_role(tenant_id, space_id, "read")
 			await self._create_kibana_role(tenant_id, space_id, "all")
 
 
 
-	async def _create_kibana_space(self, tenant_id):
+	async def _create_kibana_space(self, tenant_id: str, space_id: str):
 		tenant = self.TenantService.get_tenant(tenant_id)
-		space_id = self._kibana_space_id_from_tenant(tenant)
+		space_id = self._kibana_space_id_from_tenant_id(tenant)
 		space = {
 			"id": tenant_id,  # TODO: Space ID cannot contain "." while tenant_id can!
 			"name": tenant.get("label", tenant_id)
@@ -186,7 +191,6 @@ class ELKIntegration(asab.config.Configurable):
 			return
 
 		L.log(asab.LOG_NOTICE, "Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
-		return space_id
 
 
 	async def _create_kibana_role(self, tenant_id: str, space_id: str, privileges: str= "read"):
@@ -237,15 +241,14 @@ class ELKIntegration(asab.config.Configurable):
 		Create Seacat Auth resources that grant access to ElasticSearch roles
 		"""
 		# Create core resources that don't exist yet
-		for resource_id, resource in self.EssentialKibanaResources:
+		for resource_id, resource in self.EssentialKibanaResources.items():
 			try:
 				await self.ResourceService.get(resource_id)
 			except KeyError:
-				continue
-			await self.ResourceService.create(
-				resource_id,
-				description=resource.get("description")
-			)
+				await self.ResourceService.create(
+					resource_id,
+					description=resource.get("description")
+				)
 
 	async def sync_all_credentials(self):
 		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
@@ -318,7 +321,7 @@ class ELKIntegration(asab.config.Configurable):
 				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "all"))
 
 		# Globally authorized resources grant privileges across all Kibana spaces
-		global_authz = authz.get("*", frozenset())
+		global_authz = frozenset(authz.get("*", frozenset()))
 		if "authz:superuser" in global_authz:
 			elk_roles.add(self.EssentialKibanaResources["authz:superuser"]["role_name"])
 		if "kibana:admin" in global_authz:
@@ -352,5 +355,5 @@ class ELKIntegration(asab.config.Configurable):
 		return "tenant_{}_{}".format(tenant, privileges)
 
 
-	def _kibana_space_id_from_tenant(self, tenant: str):
+	def _kibana_space_id_from_tenant_id(self, tenant: str):
 		return tenant.replace(".", "-")
