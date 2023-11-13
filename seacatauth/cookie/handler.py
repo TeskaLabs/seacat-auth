@@ -455,7 +455,7 @@ class CookieHandler(object):
 		Locate session by request cookie
 		"""
 		try:
-			session = await self.CookieService.get_session_by_request_cookie(request)
+			session = await self.CookieService.get_session_by_request_cookie(request, client_id)
 		except exceptions.NoCookieError:
 			L.log(asab.LOG_NOTICE, "No client cookie found in request", struct_data={"client_id": client_id})
 			return None
