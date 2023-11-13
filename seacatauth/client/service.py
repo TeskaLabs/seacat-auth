@@ -50,7 +50,7 @@ CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
 		"type": "string",
-		"pattern": "^[-_a-zA-Z0-9]{8,64}$",
+		"pattern": "^[-_a-zA-Z0-9]{4,64}$",
 		"description": "(Non-canonical) Preferred client ID."},
 	"client_name": {  # Can have language tags (e.g. "client_name#cs")
 		"type": "string",
