@@ -3,6 +3,7 @@
 ## v23.44 (release candidate)
 
 ### Pre-releases
+- `v23.44-alpha5`
 - `v23.44-alpha4`
 - `v23.44-alpha3`
 
@@ -10,6 +11,7 @@
 - Dropped support for authorize query params `ldid` and `expiration` (#296, PLUM Sprint 231006)
 
 ### Fix
+- Fix client cookie introspection (#322, INDIGO Sprint 231110, `v23.44-alpha5`)
 - Handle missing webauthn data in login request (#314, INDIGO Sprint 231027, `v23.44-alpha4`)
 - Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
 
