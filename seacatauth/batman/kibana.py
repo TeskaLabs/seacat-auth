@@ -442,7 +442,7 @@ class KibanaIntegration(asab.config.Configurable):
 	def _kibana_space_id_from_tenant_id(self, tenant_id: str):
 		if tenant_id == "default":
 			# "default" is a reserved space name in Kibana
-			return "seacat-default"
+			return "tenant-default"
 		# Replace forbidden characters with "--"
 		# NOTE: Tenant ID can contain "." while space ID can not
 		return re.sub("[^a-z0-9_-]", "--", tenant_id)
