@@ -3,6 +3,7 @@
 ## v23.44 (release candidate)
 
 ### Pre-releases
+- `v23.44-alpha5`
 - `v23.44-alpha4`
 - `v23.44-alpha3`
 
@@ -13,10 +14,12 @@
 - Config section 'batman:elk' renamed to 'batman:kibana' (#281, PLUM Sprint 231027)
 
 ### Fix
+- Fix client cookie introspection (#322, INDIGO Sprint 231110, `v23.44-alpha5`)
 - Handle missing webauthn data in login request (#314, INDIGO Sprint 231027, `v23.44-alpha4`)
 - Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
 
 ### Features
+- Lower client ID length limit (#322, INDIGO Sprint 231110, `v23.44-alpha5`)
 - Include client ID and scope in session detail (#318, INDIGO Sprint 231027, `v23.44-alpha4`)
 - Reduce grafana sync frequency (#317, INDIGO Sprint 231027, `v23.44-alpha3`)
 - Authorization for websocket requests (#300, PLUM Sprint 231006)
