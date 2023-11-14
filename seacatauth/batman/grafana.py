@@ -85,6 +85,9 @@ class GrafanaIntegration(asab.config.Configurable):
 
 	async def initialize(self):
 		await self._initialize_resources()
+		# Ensure sync on startup even if housekeeping does not happen; prevent syncing twice
+		if not asab.Config.getboolean("housekeeping", "run_at_startup"):
+			await self.sync_all()
 
 
 	async def sync_all(self):
