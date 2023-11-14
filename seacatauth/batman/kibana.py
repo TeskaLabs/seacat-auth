@@ -142,6 +142,10 @@ class KibanaIntegration(asab.config.Configurable):
 
 	async def _on_init(self, event_name):
 		await self._initialize_resources()
+		# Ensure sync on startup even if housekeeping does not happen; prevent syncing twice
+		if not asab.Config.getboolean("housekeeping", "run_at_startup"):
+			await self._sync_all_tenants_and_spaces()
+			await self.sync_all_credentials()
 
 
 	async def _on_housekeeping(self, event_name):
