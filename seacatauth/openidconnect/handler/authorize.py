@@ -13,7 +13,6 @@ from ... import client, generic
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
-from ...generic import urlparse, urlunparse
 
 #
 
@@ -307,10 +306,7 @@ class AuthorizeHandler(object):
 			raise RedirectUriError(redirect_uri, client_id) from e
 
 		# Extract request source
-		from_info = [request.remote]
-		ff = request.headers.get("X-Forwarded-For")
-		if ff is not None:
-			from_info.extend(ff.split(", "))
+		from_info = generic.get_request_access_ips(request)
 
 		# Decide whether this is an openid or cookie request
 		try:
@@ -546,7 +542,8 @@ class AuthorizeHandler(object):
 		return await self.reply_with_successful_response(
 			new_session, scope, redirect_uri, state,
 			code_challenge=code_challenge,
-			code_challenge_method=code_challenge_method)
+			code_challenge_method=code_challenge_method,
+			from_info=from_info)
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
 		"""
@@ -643,7 +640,8 @@ class AuthorizeHandler(object):
 		self, session, scope: list, redirect_uri: str,
 		state: str = None,
 		code_challenge: str = None,
-		code_challenge_method: str = None
+		code_challenge_method: str = None,
+		from_info: list = None
 	):
 		"""
 		https://openid.net/specs/openid-connect-core-1_0.html
@@ -692,6 +690,13 @@ class AuthorizeHandler(object):
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
 
+		L.log(asab.LOG_NOTICE, "Authorization successful", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"scope": " ".join(scope),
+			"from_info": from_info,
+			"redirect_uri": redirect_uri})
 		return response
 
 
@@ -902,21 +907,21 @@ class AuthorizeHandler(object):
 		if login_uri is None:
 			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
 
-		parsed = urlparse(login_uri)
+		parsed = generic.urlparse(login_uri)
 		if parsed["fragment"] != "":
 			# If the Login URI contains fragment, add the login params into the fragment query
-			fragment_parsed = urlparse(parsed["fragment"])
+			fragment_parsed = generic.urlparse(parsed["fragment"])
 			query = urllib.parse.parse_qs(fragment_parsed["query"])
 			query.update(login_query_params)
 			fragment_parsed["query"] = urllib.parse.urlencode(query)
-			parsed["fragment"] = urlunparse(**fragment_parsed)
+			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
 		else:
 			# If the Login URI contains no fragment, add the login params into the regular URL query
 			query = urllib.parse.parse_qs(parsed["query"])
 			query.update(login_query_params)
 			parsed["query"] = urllib.parse.urlencode(query)
 
-		return urlunparse(**parsed)
+		return generic.urlunparse(**parsed)
 
 
 	def _validate_request_parameters(self, request_parameters):

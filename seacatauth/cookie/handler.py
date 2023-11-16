@@ -7,7 +7,7 @@ import asab.web.rest
 import asab.exceptions
 
 from .. import exceptions
-from ..generic import nginx_introspection, get_bearer_token_value
+from .. import generic
 from .utils import set_cookie, delete_cookie
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
@@ -164,7 +164,7 @@ class CookieHandler(object):
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
-				response = await nginx_introspection(request, session, self.App)
+				response = await generic.nginx_introspection(request, session, self.App)
 			except Exception as e:
 				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
@@ -249,7 +249,7 @@ class CookieHandler(object):
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
-				response = await nginx_introspection(request, session, self.App)
+				response = await generic.nginx_introspection(request, session, self.App)
 			except Exception as e:
 				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
@@ -399,7 +399,7 @@ class CookieHandler(object):
 			except exceptions.NoCookieError:
 				old_session = None
 
-			token_value = get_bearer_token_value(request)
+			token_value = generic.get_bearer_token_value(request)
 			if old_session is None and token_value is not None:
 				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
@@ -447,6 +447,13 @@ class CookieHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
+		L.log(asab.LOG_NOTICE, "Cookie request granted", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"from_info": generic.get_request_access_ips(request),
+			"redirect_uri": redirect_uri})
+
 		return response
 
 
@@ -455,7 +462,7 @@ class CookieHandler(object):
 		Locate session by request cookie
 		"""
 		try:
-			session = await self.CookieService.get_session_by_request_cookie(request)
+			session = await self.CookieService.get_session_by_request_cookie(request, client_id)
 		except exceptions.NoCookieError:
 			L.log(asab.LOG_NOTICE, "No client cookie found in request", struct_data={"client_id": client_id})
 			return None
