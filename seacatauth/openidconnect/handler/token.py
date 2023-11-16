@@ -15,7 +15,7 @@ import json
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
 from ... import exceptions
-from ...generic import get_bearer_token_value
+from ... import generic
 
 #
 
@@ -147,7 +147,7 @@ class TokenHandler(object):
 			new_session = await self.SessionService.inherit_track_id_from_root(new_session)
 		if new_session.TrackId is None:
 			# Obtain the old session by request access token or cookie
-			token_value = get_bearer_token_value(request)
+			token_value = generic.get_bearer_token_value(request)
 			if token_value is not None:
 				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
@@ -188,6 +188,12 @@ class TokenHandler(object):
 		if new_session.Session.Expiration:
 			data["expires_in"] = int(
 				(new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+
+		L.log(asab.LOG_NOTICE, "Token request granted", struct_data={
+			"cid": new_session.Credentials.Id,
+			"sid": new_session.Id,
+			"client_id": new_session.OAuth2.ClientId,
+			"from_info": generic.get_request_access_ips(request)})
 
 		return asab.web.rest.json_response(request, data, headers=headers)
 
