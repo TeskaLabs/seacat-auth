@@ -150,8 +150,6 @@ class CookieHandler(object):
 					Authorization failed because of the End-User's or the Client's insufficient permissions.
 		"""
 		client_id = request.query.get("client_id")
-		if client_id is None:
-			raise ValueError("No 'client_id' parameter specified in cookie introspection query.")
 
 		# TODO: Also check query for scope and validate it
 
