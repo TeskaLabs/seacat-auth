@@ -38,10 +38,9 @@ class CredentialsHandler(object):
 
 		web_app.router.add_get("/admin/credentials", self.list_credentials)
 		web_app.router.add_put("/admin/idents", self.get_idents_from_ids)
-		web_app.router.add_put("/admin/usernames", self.get_idents_from_ids)  # TODO: Back compat, Remove once UI adapts
 		web_app.router.add_get("/admin/locate", self.locate_credentials)
 		web_app.router.add_get("/admin/credentials/{credentials_id}", self.get_credentials)
-		web_app.router.add_get("/admin/last_login/{credentials_id}", self.get_last_login_data)
+		web_app.router.add_get("/admin/last-login/{credentials_id}", self.get_last_login_data)
 
 		web_app.router.add_post("/admin/credentials/{provider}", self.create_credentials)
 		web_app.router.add_put("/admin/credentials/{credentials_id}", self.update_credentials)
@@ -53,7 +52,7 @@ class CredentialsHandler(object):
 
 		web_app.router.add_get("/account/provider", self.get_my_provider_info)
 		web_app.router.add_put("/account/credentials", self.update_my_credentials)
-		web_app.router.add_get("/account/last_login", self.get_my_last_login_data)
+		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
 
 
 	@access_control("seacat:credentials:access")

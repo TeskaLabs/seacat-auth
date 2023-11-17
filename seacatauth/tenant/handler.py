@@ -36,15 +36,15 @@ class TenantHandler(object):
 		web_app.router.add_post("/admin/tenant", self.create)
 		web_app.router.add_delete("/admin/tenant/{tenant}", self.delete)
 
-		web_app.router.add_get("/admin/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
-		web_app.router.add_put("/admin/tenant_assign/{credentials_id}", self.set_tenants)
-		web_app.router.add_post("/admin/tenant_assign/{credentials_id}/{tenant}", self.assign_tenant)
-		web_app.router.add_delete("/admin/tenant_assign/{credentials_id}/{tenant}", self.unassign_tenant)
+		web_app.router.add_get("/admin/tenant-assign/{credentials_id}", self.get_tenants_by_credentials)
+		web_app.router.add_put("/admin/tenant-assign/{credentials_id}", self.set_tenants)
+		web_app.router.add_post("/admin/tenant-assign/{credentials_id}/{tenant}", self.assign_tenant)
+		web_app.router.add_delete("/admin/tenant-assign/{credentials_id}/{tenant}", self.unassign_tenant)
 
-		web_app.router.add_put("/admin/tenant_assign_many", self.bulk_assign_tenants)
-		web_app.router.add_put("/admin/tenant_unassign_many", self.bulk_unassign_tenants)
+		web_app.router.add_put("/admin/tenant-assign-many", self.bulk_assign_tenants)
+		web_app.router.add_put("/admin/tenant-unassign-many", self.bulk_unassign_tenants)
 
-		web_app.router.add_get("/admin/tenant_propose", self.propose_tenant_name)
+		web_app.router.add_get("/admin/tenant-propose", self.propose_tenant_name)
 
 
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service

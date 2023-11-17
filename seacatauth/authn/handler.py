@@ -43,7 +43,7 @@ class AuthenticationHandler(object):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app.router.add_put("/public/login-prologue", self.login_prologue)
 		web_app.router.add_put("/public/login/{lsid}", self.login)
 		web_app.router.add_put("/public/login/{lsid}/smslogin", self.smslogin)
 		web_app.router.add_put("/public/login/{lsid}/webauthn", self.webauthn_login)
