@@ -30,7 +30,7 @@ class ClientHandler(object):
 		web_app.router.add_get("/admin/client/features", self.features)
 		web_app.router.add_get("/admin/client/{client_id}", self.get)
 		web_app.router.add_post("/admin/client", self.register)
-		web_app.router.add_post("/admin/client/{client_id}/reset_secret", self.reset_secret)
+		web_app.router.add_post("/admin/client/{client_id}/reset-secret", self.reset_secret)
 		web_app.router.add_put("/admin/client/{client_id}", self.update)
 		web_app.router.add_delete("/admin/client/{client_id}", self.delete)
 
