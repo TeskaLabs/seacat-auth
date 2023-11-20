@@ -3,6 +3,9 @@ import abc
 
 class LoginFactorABC(abc.ABC):
 	Type = None
+	# Authentication Method Reference
+	# https://www.rfc-editor.org/rfc/rfc8176.html
+	AMRValue = None
 
 	def __init__(self, authn_service, config):
 		self.AuthenticationService = authn_service

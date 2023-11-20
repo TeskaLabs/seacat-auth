@@ -12,6 +12,7 @@ L = logging.getLogger(__name__)
 
 class SMSCodeFactor(LoginFactorABC):
 	Type = "smscode"
+	AMRValue = "sms"
 
 	async def is_eligible(self, login_data) -> bool:
 		cred_svc = self.AuthenticationService.CredentialsService
