@@ -1,6 +1,9 @@
+import typing
+
+
 async def build_credentials_authz(
-	tenant_service, role_service, credentials_id,
-	tenants=None, exclude_resources=None
+	tenant_service, role_service, credentials_id: str,
+	tenants: typing.Iterable = None, exclude_resources: typing.Iterable = None
 ):
 	"""
 	Creates a nested 'authz' dict with tenant:resource structure:
