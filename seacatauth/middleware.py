@@ -61,10 +61,12 @@ def private_auth_middleware_factory(app):
 		if request.path.startswith("/public/"):
 			return await handler(request)
 
+		# OpenAPI with Swagger UI
+		if request.path in ("/doc", "/oauth2-redirect.html", "/asab/v1/openapi"):
+			return await handler(request)
+
 		# ASAB API can be protected with a pre-configured static bearer token
-		if asab_api_required_bearer_token and (
-			request.path.startswith("/asab/v1") or request.path in ("/doc", "/oauth2-redirect.html")
-		) and request.method == "GET":
+		if asab_api_required_bearer_token and request.path.startswith("/asab/v1") and request.method == "GET":
 			if request.headers.get("Authorization") == "Bearer {}".format(asab_api_required_bearer_token):
 				return await handler(request)
 			else:
