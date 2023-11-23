@@ -136,13 +136,13 @@ class KibanaIntegration(asab.config.Configurable):
 				await self._sync_all_tenants_and_spaces()
 			except aiohttp.client_exceptions.ClientConnectionError as e:
 				L.error("Cannot connect to Kibana: {}".format(str(e)))
-				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 				return
 			try:
 				await self.sync_all_credentials()
 			except aiohttp.client_exceptions.ClientConnectionError as e:
 				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
-				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 				return
 
 	async def _on_housekeeping(self, event_name):
@@ -150,13 +150,13 @@ class KibanaIntegration(asab.config.Configurable):
 			await self._sync_all_tenants_and_spaces()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 		try:
 			await self.sync_all_credentials()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 
@@ -168,13 +168,11 @@ class KibanaIntegration(asab.config.Configurable):
 			await self._sync_all_tenants_and_spaces()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 		try:
 			await self.sync_all_credentials()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
@@ -185,7 +183,7 @@ class KibanaIntegration(asab.config.Configurable):
 				await self.sync_all_credentials()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 
@@ -195,7 +193,7 @@ class KibanaIntegration(asab.config.Configurable):
 			await self._create_or_update_kibana_space(tenant_id, space_id)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 
@@ -205,7 +203,7 @@ class KibanaIntegration(asab.config.Configurable):
 			await self._create_or_update_kibana_space(tenant_id, space_id)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 
