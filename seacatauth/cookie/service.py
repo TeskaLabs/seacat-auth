@@ -4,7 +4,6 @@ import hashlib
 import re
 import logging
 
-import aiohttp
 import asab
 import asab.storage
 import asab.exceptions
