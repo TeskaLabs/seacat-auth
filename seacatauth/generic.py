@@ -1,5 +1,6 @@
 import random
 import logging
+import re
 import urllib.parse
 import aiohttp.web
 import asab
@@ -139,9 +140,14 @@ async def nginx_introspection(
 
 	# Delete SeaCat cookie from header unless "keepcookie" param is passed in query
 	cookie_string = request.headers.get(aiohttp.hdrs.COOKIE, "")
-	if request.query.get("keepcookie") is None:
-		cookie_string = cookie_service.CookiePattern.sub("", cookie_string)
-	headers[aiohttp.hdrs.COOKIE] = cookie_string
+	if not request.query.get("keepcookie"):
+		headers[aiohttp.hdrs.COOKIE] = cookie_service.remove_seacat_cookies_from_request(cookie_string)
+	else:
+		headers[aiohttp.hdrs.COOKIE] = cookie_string
+
+	ws_prorocol = headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
+	if ws_prorocol:
+		headers[aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL] = re.sub(r"access_token_[^ ]+ ?", "", ws_prorocol)
 
 	# Add headers
 	headers = await add_to_header(
