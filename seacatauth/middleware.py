@@ -141,8 +141,6 @@ def private_auth_middleware_factory(app):
 
 def public_auth_middleware_factory(app):
 	cookie_service = app.get_service("seacatauth.CookieService")
-	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
-	_allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 
 	@aiohttp.web.middleware
 	async def public_auth_middleware(request, handler):
@@ -151,32 +149,15 @@ def public_auth_middleware_factory(app):
 		"""
 		request.Session = None
 
-		# If Bearer token exists, authorize using Bearer token and ignore cookie
-		token_value = get_bearer_token_value(request)
-		if token_value is not None:
-			try:
-				request.Session = await oidc_service.get_session_by_id_token(token_value)
-			except ValueError:
-				# If the token cannot be parsed as ID token, it may be an Access token
-				# OIDC endpoints allow authorization via Access token
-				if request.path.startswith("/openidconnect/"):
-					request.Session = await oidc_service.get_session_by_access_token(token_value)
-				# Allow authorization via Access token on all public endpoints if enabled in config
-				elif _allow_access_token_auth:
-					request.Session = await oidc_service.get_session_by_access_token(token_value)
-				else:
-					L.log(asab.LOG_NOTICE, "Invalid bearer token")
-					return aiohttp.web.HTTPUnauthorized()
-		else:
-			# No Bearer token exists, authorize using cookie
-			try:
-				request.Session = await cookie_service.get_session_by_request_cookie(request)
-			except exceptions.NoCookieError:
-				L.info("No root cookie found in request")
-				request.Session = None
-			except exceptions.SessionNotFoundError:
-				L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
-				request.Session = None
+		# Optional authorization by root cookie
+		try:
+			request.Session = await cookie_service.get_session_by_request_cookie(request)
+		except exceptions.NoCookieError:
+			L.info("No root cookie found in request")
+			request.Session = None
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
+			request.Session = None
 
 		return await handler(request)
 

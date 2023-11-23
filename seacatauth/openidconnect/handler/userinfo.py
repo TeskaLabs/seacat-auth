@@ -4,6 +4,8 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
+from ... import generic
+
 #
 
 L = logging.getLogger(__name__)
@@ -39,14 +41,20 @@ class UserInfoHandler(object):
 
 		OpenID Connect Core 1.0, chapter 5.3. UserInfo Endpoint
 		"""
-
-		session = request.Session
-
-		if session is None:
-			L.log(asab.LOG_NOTICE, "Authentication required")
-			return self.error_response("invalid_token", "Access token or cookie is invalid.")
-
-		# # if authorized get provider for this identity
+		token_value = generic.get_bearer_token_value(request)
+		if token_value is not None:
+			try:
+				session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
+			except ValueError:
+				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+			if session is None:
+				L.log(asab.LOG_NOTICE, "Authentication required: Bearer token is invalid")
+				return self.error_response("invalid_token", "Bearer token is invalid")
+		elif request.Session is None:
+			L.log(asab.LOG_NOTICE, "Authentication required: Invalid or no cookie in request")
+			return self.error_response("invalid_token", "Invalid or no cookie in request")
+		else:
+			session = request.Session
 
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
