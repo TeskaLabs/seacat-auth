@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v23.44 (release candidate)
+## v23.44-beta
 
 ### Pre-releases
 - `v23.44-alpha6`
