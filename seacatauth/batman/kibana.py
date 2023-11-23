@@ -337,8 +337,7 @@ class KibanaIntegration(asab.config.Configurable):
 
 
 	async def initialize(self):
-		await self._initialize_resources()
-		await self.sync_all_credentials()
+		pass
 
 
 	async def _initialize_resources(self):
