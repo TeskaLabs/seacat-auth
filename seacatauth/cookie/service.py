@@ -4,6 +4,7 @@ import hashlib
 import re
 import logging
 
+import aiohttp
 import asab
 import asab.storage
 import asab.exceptions
@@ -72,6 +73,10 @@ class CookieService(asab.Service):
 		else:
 			cookie_name = self.CookieName
 		return cookie_name
+
+
+	def remove_seacat_cookies_from_request(self, cookie_string):
+		return self.CookiePattern.sub("", cookie_string)
 
 
 	@staticmethod
