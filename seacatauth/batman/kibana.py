@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import re
 import ssl
 import logging
@@ -107,6 +108,8 @@ class KibanaIntegration(asab.config.Configurable):
 		else:
 			self.SSLContext = None
 
+		self.RetrySyncAll: datetime.datetime | None = None
+
 		self.App.PubSub.subscribe("Application.init!", self._on_init)
 		self.App.PubSub.subscribe("Role.assigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Role.unassigned!", self._on_authz_change)
@@ -116,6 +119,7 @@ class KibanaIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+		self.App.PubSub.subscribe("Application.tick/10!", self._retry_sync)
 
 	@contextlib.asynccontextmanager
 	async def _elasticsearch_session(self):
@@ -132,21 +136,46 @@ class KibanaIntegration(asab.config.Configurable):
 				await self._sync_all_tenants_and_spaces()
 			except aiohttp.client_exceptions.ClientConnectionError as e:
 				L.error("Cannot connect to Kibana: {}".format(str(e)))
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+				return
 			try:
 				await self.sync_all_credentials()
 			except aiohttp.client_exceptions.ClientConnectionError as e:
 				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+				return
 
 	async def _on_housekeeping(self, event_name):
 		try:
 			await self._sync_all_tenants_and_spaces()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			return
 		try:
 			await self.sync_all_credentials()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			return
 
+
+	async def _retry_sync(self, event_name):
+		if not self.RetrySyncAll or datetime.datetime.now(datetime.UTC) < self.RetrySyncAll:
+			return
+		self.RetrySyncAll = None
+		try:
+			await self._sync_all_tenants_and_spaces()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+			return
+		try:
+			await self.sync_all_credentials()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+			return
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
 		try:
@@ -156,6 +185,8 @@ class KibanaIntegration(asab.config.Configurable):
 				await self.sync_all_credentials()
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			return
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
@@ -164,6 +195,8 @@ class KibanaIntegration(asab.config.Configurable):
 			await self._create_or_update_kibana_space(tenant_id, space_id)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			return
 
 
 	async def _on_tenant_updated(self, event_name, tenant_id):
@@ -172,6 +205,8 @@ class KibanaIntegration(asab.config.Configurable):
 			await self._create_or_update_kibana_space(tenant_id, space_id)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
+			return
 
 
 	async def _sync_all_tenants_and_spaces(self):
