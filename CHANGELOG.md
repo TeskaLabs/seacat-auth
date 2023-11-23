@@ -3,6 +3,7 @@
 ## v23.44 (release candidate)
 
 ### Pre-releases
+- `v23.44-alpha6`
 - `v23.44-alpha5`
 - `v23.44-alpha4`
 - `v23.44-alpha3`
@@ -19,6 +20,7 @@
 - Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
 
 ### Features
+- Log successful authorization requests (#323, INDIGO Sprint 231110, `v23.44-alpha6`)
 - Lower client ID length limit (#322, INDIGO Sprint 231110, `v23.44-alpha5`)
 - Include client ID and scope in session detail (#318, INDIGO Sprint 231027, `v23.44-alpha4`)
 - Reduce grafana sync frequency (#317, INDIGO Sprint 231027, `v23.44-alpha3`)
