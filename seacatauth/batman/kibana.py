@@ -93,28 +93,13 @@ class KibanaIntegration(asab.config.Configurable):
 		if len(self.KibanaUrl) == 0:
 			self.KibanaUrl = None
 		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
-		self.Headers = {"kbn-xsrf": "kibana"}
-
-		username = self.Config.get("username")
-		password = self.Config.get("password")
-		api_key = self.Config.get("api_key")
-		if username != "" and api_key != "":
-			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
-		if username != "":
-			self.Headers["Authorization"] = aiohttp.BasicAuth(username, password).encode()
-		elif api_key != "":
-			self.Headers["Authorization"] = "ApiKey {}".format(api_key)
+		self.Headers = self._prepare_session_headers()
 
 		self.ResourcePrefix = "kibana:"
 		self.DeprecatedResourcePrefix = "elk:"
 		self.DeprecatedResourceRegex = re.compile("^elk:")
-
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
-
-		# Users that will not be synchronized to avoid conflicts with ELK system users
-		ignore_usernames = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
-		ignore_usernames.append(username)
-		self.IgnoreUsernames = frozenset(ignore_usernames)
+		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
 		self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 		if self.ElasticSearchUrl.startswith("https://"):
@@ -132,7 +117,6 @@ class KibanaIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
-
 	@contextlib.asynccontextmanager
 	async def _elasticsearch_session(self):
 		async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
@@ -144,30 +128,50 @@ class KibanaIntegration(asab.config.Configurable):
 		await self._initialize_resources()
 		# Ensure sync on startup even if housekeeping does not happen; prevent syncing twice
 		if not asab.Config.getboolean("housekeeping", "run_at_startup"):
-			await self._sync_all_tenants_and_spaces()
-			await self.sync_all_credentials()
-
+			try:
+				await self._sync_all_tenants_and_spaces()
+			except aiohttp.client_exceptions.ClientConnectionError as e:
+				L.error("Cannot connect to Kibana: {}".format(str(e)))
+			try:
+				await self.sync_all_credentials()
+			except aiohttp.client_exceptions.ClientConnectionError as e:
+				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 
 	async def _on_housekeeping(self, event_name):
-		await self._sync_all_tenants_and_spaces()
-		await self.sync_all_credentials()
+		try:
+			await self._sync_all_tenants_and_spaces()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Kibana: {}".format(str(e)))
+		try:
+			await self.sync_all_credentials()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
-		if credentials_id:
-			await self.sync_credentials(credentials_id)
-		else:
-			await self.sync_all_credentials()
+		try:
+			if credentials_id:
+				await self.sync_credentials(credentials_id)
+			else:
+				await self.sync_all_credentials()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
 		space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-		await self._create_or_update_kibana_space(tenant_id, space_id)
+		try:
+			await self._create_or_update_kibana_space(tenant_id, space_id)
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Kibana: {}".format(str(e)))
 
 
 	async def _on_tenant_updated(self, event_name, tenant_id):
 		space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-		await self._create_or_update_kibana_space(tenant_id, space_id)
+		try:
+			await self._create_or_update_kibana_space(tenant_id, space_id)
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Kibana: {}".format(str(e)))
 
 
 	async def _sync_all_tenants_and_spaces(self):
@@ -193,25 +197,20 @@ class KibanaIntegration(asab.config.Configurable):
 		if not space_id:
 			space_id = self._kibana_space_id_from_tenant_id(tenant_id)
 
-		try:
-			async with self._elasticsearch_session() as session:
-				async with session.get("{}/api/spaces/space/{}".format(self.KibanaUrl, space_id)) as resp:
-					if resp.status == 404:
-						existing_space = None
-					elif resp.status == 200:
-						existing_space = await resp.json()
-					else:
-						text = await resp.text()
-						L.error(
-							"Failed to fetch Kibana tenant space (Server responded with {}):\n{}".format(
-								resp.status, text[:1000]),
-							struct_data={"space_id": space_id, "tenant_id": tenant_id}
-						)
-						return
-		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Failed to fetch Kibana tenant space (Connection error): {}".format(str(e)), struct_data={
-				"space_id": space_id, "tenant_id": tenant_id})
-			return
+		async with self._elasticsearch_session() as session:
+			async with session.get("{}/api/spaces/space/{}".format(self.KibanaUrl, space_id)) as resp:
+				if resp.status == 404:
+					existing_space = None
+				elif resp.status == 200:
+					existing_space = await resp.json()
+				else:
+					text = await resp.text()
+					L.error(
+						"Failed to fetch Kibana tenant space (Server responded with {}):\n{}".format(
+							resp.status, text[:1000]),
+						struct_data={"space_id": space_id, "tenant_id": tenant_id}
+					)
+					return
 
 		space_update = {}
 		if existing_space:
@@ -239,41 +238,33 @@ class KibanaIntegration(asab.config.Configurable):
 
 		elif existing_space:
 			# Update existing space
-			try:
-				async with self._elasticsearch_session() as session:
-					async with session.put(
-						"{}/api/spaces/space/{}".format(self.KibanaUrl, space_id), json=space_update
-					) as resp:
-						if not (200 <= resp.status < 300):
-							text = await resp.text()
-							L.error(
-								"Failed to update Kibana tenant space (Server responded with {}):\n{}".format(
-									resp.status, text[:1000]),
-								struct_data={"space_id": space_id, "tenant_id": tenant_id}
-							)
-			except aiohttp.client_exceptions.ClientConnectionError as e:
-				L.error("Failed to update Kibana tenant space (Connection error): {}".format(str(e)), struct_data={
-					"space_id": space_id, "tenant_id": tenant_id})
+			async with self._elasticsearch_session() as session:
+				async with session.put(
+					"{}/api/spaces/space/{}".format(self.KibanaUrl, space_id), json=space_update
+				) as resp:
+					if not (200 <= resp.status < 300):
+						text = await resp.text()
+						L.error(
+							"Failed to update Kibana tenant space (Server responded with {}):\n{}".format(
+								resp.status, text[:1000]),
+							struct_data={"space_id": space_id, "tenant_id": tenant_id}
+						)
 			L.log(asab.LOG_NOTICE, "Kibana space updated", struct_data={"id": space_id, "tenant": tenant_id})
 			return
 
 		else:
 			# Create new space
-			try:
-				async with self._elasticsearch_session() as session:
-					async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space_update) as resp:
-						if not (200 <= resp.status < 300):
-							text = await resp.text()
-							L.error(
-								"Failed to create Kibana tenant space (Server responded with {}):\n{}".format(
-									resp.status, text[:1000]),
-								struct_data={"space_id": space_id, "tenant_id": tenant_id}
-							)
-							return
-			except Exception as e:
-				L.error("Failed to create Kibana tenant space (Connection error): {}".format(str(e)), struct_data={
-					"space_id": space_id, "tenant_id": tenant_id})
-				return
+			async with self._elasticsearch_session() as session:
+				async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space_update) as resp:
+					if not (200 <= resp.status < 300):
+						text = await resp.text()
+						L.error(
+							"Failed to create Kibana tenant space (Server responded with {}):\n{}".format(
+								resp.status, text[:1000]),
+							struct_data={"space_id": space_id, "tenant_id": tenant_id}
+						)
+						return
+
 			L.log(asab.LOG_NOTICE, "Kibana space created", struct_data={"id": space_id, "tenant": tenant_id})
 
 			# Create roles for space access
@@ -289,33 +280,26 @@ class KibanaIntegration(asab.config.Configurable):
 			"kibana": [{"spaces": [space_id], "base": [privileges]}]
 		}
 
-		try:
-			async with self._elasticsearch_session() as session:
-				async with session.put(
-					"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
-				) as resp:
-					if resp.status // 100 != 2:
-						text = await resp.text()
-						L.error("Failed to create Kibana role {!r}:\n{}".format(role_name, text[:1000]))
-						return
-		except Exception as e:
-			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
-			return
+		async with self._elasticsearch_session() as session:
+			async with session.put(
+				"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
+			) as resp:
+				if resp.status // 100 != 2:
+					text = await resp.text()
+					L.error("Failed to create Kibana role {!r}:\n{}".format(role_name, text[:1000]))
+					return
+
 		L.log(asab.LOG_NOTICE, "Kibana role created.", struct_data={"name": role_name})
 
 
 	async def _get_kibana_spaces(self):
-		try:
-			async with self._elasticsearch_session() as session:
-				async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
-					if resp.status != 200:
-						text = await resp.text()
-						L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
-						return
-					spaces = await resp.json()
-		except Exception as e:
-			L.error("Communication with Kibana produced {}: {}".format(type(e).__name__, str(e)))
-			return
+		async with self._elasticsearch_session() as session:
+			async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
+				if resp.status != 200:
+					text = await resp.text()
+					L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
+					return
+				spaces = await resp.json()
 		return spaces
 
 
@@ -344,12 +328,9 @@ class KibanaIntegration(asab.config.Configurable):
 			resource["_id"]
 			for resource in elk_resources["data"]
 		)
-		try:
-			async with self._elasticsearch_session() as session:
-				async for cred in self.CredentialsService.iterate():
-					await self._sync_credentials(session, cred, elk_resources)
-		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
+		async with self._elasticsearch_session() as session:
+			async for cred in self.CredentialsService.iterate():
+				await self._sync_credentials(session, cred, elk_resources)
 
 
 	async def sync_credentials(self, credentials_id: str):
@@ -360,11 +341,9 @@ class KibanaIntegration(asab.config.Configurable):
 		)
 		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
 		credentials = await cred_svc.get(credentials_id)
-		try:
-			async with self._elasticsearch_session() as session:
-				await self._sync_credentials(session, credentials, elk_resources)
-		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Elasticsearch/Kibana: {}".format(str(e)))
+		async with self._elasticsearch_session() as session:
+			await self._sync_credentials(session, credentials, elk_resources)
+
 
 	async def _sync_credentials(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
 		username = cred.get("username")
@@ -450,3 +429,25 @@ class KibanaIntegration(asab.config.Configurable):
 		# Replace forbidden characters with "--"
 		# NOTE: Tenant ID can contain "." while space ID can not
 		return re.sub("[^a-z0-9_-]", "--", tenant_id)
+
+	def _prepare_ignored_usernames(self):
+		"""
+		Load usernames that will not be synchronized to avoid conflicts with ELK system users
+		"""
+		ignore_usernames = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
+		if self.Config.get("username"):
+			ignore_usernames.append(self.Config.get("username"))
+		return frozenset(ignore_usernames)
+
+	def _prepare_session_headers(self):
+		headers = {"kbn-xsrf": "kibana"}
+		username = self.Config.get("username")
+		password = self.Config.get("password")
+		api_key = self.Config.get("api_key")
+		if username != "" and api_key != "":
+			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
+		if username != "":
+			headers["Authorization"] = aiohttp.BasicAuth(username, password).encode()
+		elif api_key != "":
+			headers["Authorization"] = "ApiKey {}".format(api_key)
+		return headers
