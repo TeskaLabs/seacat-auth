@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v23.47
+
+### Pre-releases
+- `v23.47-alpha`
+
+### Breaking changes
+- Batman for Kibana now also requires `kibana_url` (#281, `v23.47-alpha`)
+- Batman does no longer create Seacat resources from all Kibana roles (#281, `v23.47-alpha`)
+- Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)
+
+### Features
+- Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
+
+---
+
+
 ## v23.44-beta
 
 ### Pre-releases

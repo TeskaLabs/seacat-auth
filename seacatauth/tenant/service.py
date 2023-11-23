@@ -37,6 +37,28 @@ class TenantService(asab.Service):
 		self.TenantsProvider = provider
 
 
+	async def list_tenant_ids(self):
+		"""
+		List all registered tenant IDs
+		"""
+		# TODO: This has to be cached agressivelly
+		provider = self.get_provider()
+		result = []
+		async for tenant in provider.iterate():
+			result.append(tenant["_id"])
+		return result
+
+
+	async def iterate(self):
+		"""
+		Iterate over all tenants
+		"""
+		# TODO: Limit, page, filter
+		provider = self.get_provider()
+		async for tenant in provider.iterate():
+			yield tenant
+
+
 	async def get_tenant(self, tenant_id: str):
 		return await self.TenantsProvider.get(tenant_id)
 
@@ -61,11 +83,16 @@ class TenantService(asab.Service):
 			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
 			raise asab.exceptions.Conflict(value=tenant_id)
 
+		self.App.PubSub.publish("Tenant.created!", tenant_id=tenant_id)
+
 		return tenant_id
 
 
 	async def update_tenant(self, tenant_id: str, **kwargs):
 		result = await self.TenantsProvider.update(tenant_id, **kwargs)
+
+		self.App.PubSub.publish("Tenant.updated!", tenant_id=tenant_id)
+
 		return {"result": result}
 
 
@@ -91,6 +118,8 @@ class TenantService(asab.Service):
 
 		# Delete tenant from provider
 		await self.TenantsProvider.delete(tenant_id)
+
+		self.App.PubSub.publish("Tenant.deleted!", tenant_id=tenant_id)
 
 		# Delete sessions that have the tenant in scope
 		await session_service.delete_sessions_by_tenant_in_scope(tenant_id)
@@ -225,6 +254,7 @@ class TenantService(asab.Service):
 			"cid": credentials_id,
 			"tenant": tenant,
 		})
+		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
@@ -243,6 +273,7 @@ class TenantService(asab.Service):
 		)
 
 		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
+		self.App.PubSub.publish("Tenant.unassigned!", credentials_id=credentials_id, tenant_id=tenant)
 
 
 	def is_enabled(self):

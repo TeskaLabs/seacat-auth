@@ -28,10 +28,10 @@ class BatmanService(asab.Service):
 			# TODO: There should be no hardcoded encryption password
 			self.Key = b"12345678901234567890123456789012"
 
-		if "batman:elk" in asab.Config.sections():
-			from .elk import ELKIntegration
+		if "batman:kibana" in asab.Config.sections() or "batman:elk" in asab.Config.sections():
+			from .kibana import KibanaIntegration
 			self.Integrations.append(
-				ELKIntegration(self)
+				KibanaIntegration(self)
 			)
 
 		if "batman:grafana" in asab.Config.sections():
