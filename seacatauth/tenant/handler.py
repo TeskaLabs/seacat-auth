@@ -52,11 +52,7 @@ class TenantHandler(object):
 		"""
 		List all registered tenant IDs
 		"""
-		# TODO: This has to be cached agressivelly
-		provider = self.TenantService.get_provider()
-		result = []
-		async for tenant in provider.iterate():
-			result.append(tenant["_id"])
+		result = await self.TenantService.list_tenant_ids()
 		return asab.web.rest.json_response(request, data=result)
 
 

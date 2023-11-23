@@ -181,7 +181,7 @@ class ResourceService(asab.Service):
 			await upsertor.execute(event_type=EventTypes.RESOURCE_CREATED)
 		except asab.storage.exceptions.DuplicateError as e:
 			if e.KeyValue is not None:
-				key, value = e.KeyValue
+				key, value = e.KeyValue.popitem()
 				raise asab.exceptions.Conflict(key=key, value=value)
 			else:
 				raise asab.exceptions.Conflict()
