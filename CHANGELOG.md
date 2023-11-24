@@ -1,6 +1,24 @@
 # CHANGELOG
 
-## v23.44 (release candidate)
+## v23.47
+
+### Pre-releases
+- `v23.47-alpha`
+- `v23.47-alpha2`
+
+### Breaking changes
+- Remove access token from websocket protocol header during introspection (#324, `v23.47-alpha2`)
+- Batman for Kibana now also requires `kibana_url` (#281, `v23.47-alpha`)
+- Batman does no longer create Seacat resources from all Kibana roles (#281, `v23.47-alpha`)
+- Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)
+
+### Features
+- Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
+
+---
+
+
+## v23.44-beta
 
 ### Pre-releases
 - `v23.44-alpha6`
