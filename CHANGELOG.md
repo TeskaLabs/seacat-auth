@@ -4,8 +4,10 @@
 
 ### Pre-releases
 - `v23.47-alpha`
+- `v23.47-alpha2`
 
 ### Breaking changes
+- Remove access token from websocket protocol header during introspection (#324, `v23.47-alpha2`)
 - Batman for Kibana now also requires `kibana_url` (#281, `v23.47-alpha`)
 - Batman does no longer create Seacat resources from all Kibana roles (#281, `v23.47-alpha`)
 - Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)
