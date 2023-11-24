@@ -29,7 +29,7 @@ def get_bearer_token_value(request):
 
 def get_access_token_value_from_websocket(request):
 	token_prefix = "access_token_"
-	ws_protocol_header: str = request.headers.get("Sec-WebSocket-Protocol")
+	ws_protocol_header: str = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
 	if ws_protocol_header is None:
 		L.info("Request has no 'Sec-WebSocket-Protocol' header")
 		return None
@@ -145,9 +145,9 @@ async def nginx_introspection(
 	else:
 		headers[aiohttp.hdrs.COOKIE] = cookie_string
 
-	ws_prorocol = headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
+	ws_prorocol = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
 	if ws_prorocol:
-		headers[aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL] = re.sub(r"access_token_[^ ]+ ?", "", ws_prorocol)
+		headers[aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL] = re.sub(r"access_token_[^ ,]+(, )?", "", ws_prorocol)
 
 	# Add headers
 	headers = await add_to_header(
