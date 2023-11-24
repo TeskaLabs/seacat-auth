@@ -46,7 +46,9 @@ class CookieService(asab.Service):
 		# Configure root cookie
 		self.CookieName = asab.Config.get("seacatauth:cookie", "name")
 		self.CookiePattern = re.compile(
-			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieName)
+			"(^{cookie}({client_suffix})?=[^;]*; ?"
+			"|; ?{cookie}({client_suffix})?=[^;]*"
+			"|^{cookie}({client_suffix})?=[^;]*)".format(cookie=self.CookieName, client_suffix=r"_[A-Z8-9]+")
 		)
 		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
 		self.RootCookieDomain = asab.Config.get("seacatauth:cookie", "domain") or None
@@ -70,6 +72,10 @@ class CookieService(asab.Service):
 		else:
 			cookie_name = self.CookieName
 		return cookie_name
+
+
+	def remove_seacat_cookies_from_request(self, cookie_string):
+		return self.CookiePattern.sub("", cookie_string)
 
 
 	@staticmethod
