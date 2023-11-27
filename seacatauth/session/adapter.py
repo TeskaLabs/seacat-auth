@@ -41,6 +41,7 @@ class AuthenticationData:
 	TOTPSet: str
 	ExternalLoginOptions: typing.Optional[list]
 	LoginDescriptor: typing.Optional[dict]
+	LoginFactors: typing.Optional[dict]
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
 	IsAnonymous: typing.Optional[bool]
@@ -122,6 +123,7 @@ class SessionAdapter:
 			TOTPSet = "an_ts"
 			ExternalLoginOptions = "an_ex"
 			LoginDescriptor = "an_ld"
+			LoginFactors = "an_lf"
 			AvailableFactors = "an_af"
 			LastLogin = "an_ll"
 			IsAnonymous = "an_ano"
@@ -229,6 +231,7 @@ class SessionAdapter:
 			session_dict.update({
 				self.FN.Authentication.LastLogin: self.Authentication.LastLogin,
 				self.FN.Authentication.LoginDescriptor: self.Authentication.LoginDescriptor,
+				self.FN.Authentication.LoginFactors: self.Authentication.LoginFactors,
 				self.FN.Authentication.AvailableFactors: self.Authentication.AvailableFactors,
 				self.FN.Authentication.TOTPSet: self.Authentication.TOTPSet,
 				self.FN.Authentication.IsAnonymous: self.Authentication.IsAnonymous,
@@ -329,13 +332,11 @@ class SessionAdapter:
 	@classmethod
 	def _deserialize_authentication_data(cls, session_dict):
 		return AuthenticationData(
-			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None)
-			or session_dict.pop("TS", None),
+			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None),
 			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
-			LoginDescriptor=session_dict.pop(cls.FN.Authentication.LoginDescriptor, None)
-			or session_dict.pop("LD", None),
-			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None)
-			or session_dict.pop("AF", None),
+			LoginDescriptor=session_dict.pop(cls.FN.Authentication.LoginDescriptor, None),
+			LoginFactors=session_dict.pop(cls.FN.Authentication.LoginFactors, None),
+			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None),
 			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
 			IsAnonymous=session_dict.pop(cls.FN.Authentication.IsAnonymous, None),
 			ImpersonatorCredentialsId=session_dict.pop(cls.FN.Authentication.ImpersonatorCredentialsId, None),

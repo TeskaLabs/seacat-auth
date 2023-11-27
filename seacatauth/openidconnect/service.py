@@ -407,12 +407,9 @@ class OpenIdConnectService(asab.Service):
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
 
 		if session.Authentication.LoginDescriptor is not None:
-			userinfo["ldid"] = session.Authentication.LoginDescriptor["id"]
-			userinfo["factors"] = [
-				factor["type"]
-				for factor
-				in session.Authentication.LoginDescriptor["factors"]
-			]
+			userinfo["ldid"] = session.Authentication.LoginDescriptor
+		if session.Authentication.LoginFactors is not None:
+			userinfo["factors"] = session.Authentication.LoginFactors
 
 		# List enabled external login providers
 		if session.Authentication.ExternalLoginOptions is not None:
