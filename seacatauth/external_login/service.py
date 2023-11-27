@@ -44,6 +44,9 @@ class ExternalLoginService(asab.Service):
 		self.AddExternalLoginPath = "/public/ext-login-add/{ext_login_provider}"
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
+		self.AcrValues: typing.Dict[str, GenericOAuth2Login] = {
+			provider.acr_value(): provider
+			for provider in self.Providers.values()}
 
 
 	def _prepare_providers(self):
@@ -61,6 +64,14 @@ class ExternalLoginService(asab.Service):
 
 	def get_provider(self, provider_type: str) -> GenericOAuth2Login:
 		return self.Providers.get(provider_type)
+
+
+	def acr_values_supported(self) -> frozenset:
+		return frozenset(self.AcrValues.keys())
+
+
+	def get_provider_by_acr(self, acr_value: str) -> GenericOAuth2Login:
+		return self.AcrValues.get(acr_value)
 
 
 	async def initialize(self, app):

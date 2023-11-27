@@ -120,6 +120,18 @@ class GenericOAuth2Login(asab.Configurable):
 	async def initialize(self, app):
 		await self._prepare_jwks()
 
+
+	def acr_value(self) -> str:
+		"""
+		Authentication Context Class Reference (ACR)
+		https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+
+		OpenID Connect clients may use an ACR value in the authorization request to specifically request which external
+		login provider should be used for End-User authentication.
+		"""
+		return "ext:{}".format(self.Type)
+
+
 	async def _prepare_jwks(self, speculative=True):
 		if not self.JwksUri:
 			return
