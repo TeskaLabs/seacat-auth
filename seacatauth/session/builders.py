@@ -62,7 +62,9 @@ async def authz_session_builder(
 
 def login_descriptor_session_builder(login_descriptor):
 	if login_descriptor is not None:
-		yield (SessionAdapter.FN.Authentication.LoginDescriptor, login_descriptor)
+		yield (SessionAdapter.FN.Authentication.LoginDescriptor, login_descriptor["id"])
+		yield (SessionAdapter.FN.Authentication.LoginFactors, [
+			factor["type"] for factor in login_descriptor["factors"]])
 
 
 async def available_factors_session_builder(authentication_service, credentials_id):
