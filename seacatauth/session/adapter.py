@@ -40,8 +40,8 @@ class CredentialsData:
 class AuthenticationData:
 	TOTPSet: str
 	ExternalLoginOptions: typing.Optional[list]
-	LoginDescriptor: typing.Optional[dict]
-	LoginFactors: typing.Optional[dict]
+	LoginDescriptor: typing.Optional[str]
+	LoginFactors: typing.Optional[list]
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
 	IsAnonymous: typing.Optional[bool]
@@ -313,7 +313,7 @@ class SessionAdapter:
 
 	@classmethod
 	def _deserialize_credentials_data(cls, session_dict):
-		credentials_id = session_dict.pop(cls.FN.Credentials.Id, None) or session_dict.pop("Cid", None)
+		credentials_id = session_dict.pop(cls.FN.Credentials.Id, None)
 		if credentials_id is None:
 			return
 		return CredentialsData(
@@ -326,15 +326,16 @@ class SessionAdapter:
 			CustomData=session_dict.pop(cls.FN.Credentials.CustomData, None),
 		)
 
-	# TODO: The following methods contain BACK-COMPAT fallbacks (the or-sections)
-	#   Remove the fallbacks in December 2022
-
 	@classmethod
 	def _deserialize_authentication_data(cls, session_dict):
+		# BACK COMPAT for existing sessions with old login descriptor
+		login_descriptor = session_dict.pop(cls.FN.Authentication.LoginDescriptor, None)
+		if isinstance(login_descriptor, dict):
+			login_descriptor = login_descriptor["id"]
 		return AuthenticationData(
 			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None),
 			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
-			LoginDescriptor=session_dict.pop(cls.FN.Authentication.LoginDescriptor, None),
+			LoginDescriptor=login_descriptor,
 			LoginFactors=session_dict.pop(cls.FN.Authentication.LoginFactors, None),
 			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None),
 			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
@@ -345,16 +346,15 @@ class SessionAdapter:
 
 	@classmethod
 	def _deserialize_authorization_data(cls, session_dict):
-		authz = session_dict.pop(cls.FN.Authorization.Authz, None) or session_dict.pop("Authz", None)
+		authz = session_dict.pop(cls.FN.Authorization.Authz, None)
 		return AuthorizationData(
 			Authz=authz,
-			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
+			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None),
 		)
 
 	@classmethod
 	def _deserialize_oauth2_data(cls, session_dict):
-		oa2_data = session_dict.pop("oa", {})  # BACK COMPAT
-		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
+		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None)
 		if id_token is not None:
 			try:
 				id_token = id_token.decode("ascii")
@@ -362,12 +362,12 @@ class SessionAdapter:
 				# Probably old ID token, encoded differently
 				L.error("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
-		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
+		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None)
 		if access_token is not None:
 			# Base64-encode the tokens for OIDC service convenience
 			access_token = base64.urlsafe_b64encode(access_token).decode("ascii")
 
-		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken, None) or oa2_data.pop("Tr", None)
+		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken, None)
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
 
@@ -375,14 +375,14 @@ class SessionAdapter:
 			IDToken=id_token,
 			AccessToken=access_token,
 			RefreshToken=refresh_token,
-			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
+			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
 			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
 		)
 
 	@classmethod
 	def _deserialize_cookie_data(cls, session_dict):
-		sci = session_dict.pop(cls.FN.Cookie.Id, None) or session_dict.pop("SCI", None)
+		sci = session_dict.pop(cls.FN.Cookie.Id, None)
 		if sci is None:
 			return None
 		return CookieData(
@@ -411,7 +411,7 @@ def rest_get(session_dict):
 		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
-		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),  # BACK COMPAT
+		"login_factors": session_dict.get(SessionAdapter.FN.Authentication.LoginFactors),
 		"tenants": session_dict.get(SessionAdapter.FN.Authorization.Tenants),
 		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
 		"track_id": session_dict.get(SessionAdapter.FN.Session.TrackId),
