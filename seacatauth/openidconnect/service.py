@@ -264,6 +264,7 @@ class OpenIdConnectService(asab.Service):
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
 				(
 					SessionAdapter.FN.Authentication.ExternalLoginOptions,
@@ -407,12 +408,9 @@ class OpenIdConnectService(asab.Service):
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
 
 		if session.Authentication.LoginDescriptor is not None:
-			userinfo["ldid"] = session.Authentication.LoginDescriptor["id"]
-			userinfo["factors"] = [
-				factor["type"]
-				for factor
-				in session.Authentication.LoginDescriptor["factors"]
-			]
+			userinfo["ldid"] = session.Authentication.LoginDescriptor
+		if session.Authentication.LoginFactors is not None:
+			userinfo["factors"] = session.Authentication.LoginFactors
 
 		# List enabled external login providers
 		if session.Authentication.ExternalLoginOptions is not None:
