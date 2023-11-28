@@ -73,18 +73,13 @@ async def add_to_header(headers, attributes_to_add, session, requested_tenant=No
 
 	# Obtain login factors from session object
 	if "factors" in attributes_to_add:
-		if session.Authentication.LoginDescriptor is not None:
-			factors = [
-				factor["id"]
-				for factor
-				in session.Authentication.LoginDescriptor["factors"]
-			]
-			headers["X-Login-Factors"] = " ".join(factors)
+		if session.Authentication.LoginFactors is not None:
+			headers["X-Login-Factors"] = " ".join(session.Authentication.LoginFactors)
 
 	# Obtain login descriptor IDs from session object
 	if "ldid" in attributes_to_add:
 		if session.Authentication.LoginDescriptor is not None:
-			headers["X-Login-Descriptor"] = session.Authentication.LoginDescriptor["id"]
+			headers["X-Login-Descriptor"] = session.Authentication.LoginDescriptor
 
 	return headers
 
