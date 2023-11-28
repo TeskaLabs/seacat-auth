@@ -287,12 +287,12 @@ class AuthorizeHandler(object):
 		scope: str,
 		client_id: str,
 		redirect_uri: str,
-		state: str = None,
-		nonce: str = None,
-		prompt: str = None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
-		acr_values: str = None,
+		state: str | None = None,
+		nonce: str | None = None,
+		prompt: str | None = None,
+		code_challenge: str | None = None,
+		code_challenge_method: str | None = None,
+		acr_values: str | None = None,
 		**kwargs
 	):
 		"""
@@ -301,7 +301,7 @@ class AuthorizeHandler(object):
 		Authentication Code Flow
 		"""
 		scope = scope.split(" ")
-		acr_values = acr_values.split(" ")
+		acr_values = acr_values.split(" ") if acr_values else None
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
