@@ -13,6 +13,7 @@ from ... import client, generic
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
+from ...session import SessionAdapter
 
 #
 
@@ -187,6 +188,15 @@ class AuthorizeHandler(object):
 			schema:
 				type: string
 				enum: ["S256", "plain"]
+		-	name: acr_values
+			in: query
+			required: false
+			description:
+				Requested Authentication Context Class Reference values. Space-separated string that specifies the
+				acr values that the Authorization Server is being requested to use for processing this Authentication
+				Request, with the values appearing in order of preference.
+			schema:
+				type: string
 		"""
 		access_ips = generic.get_request_access_ips(request)
 		# Authorization Servers SHOULD ignore unrecognized request parameters [RFC6749]
@@ -282,6 +292,7 @@ class AuthorizeHandler(object):
 		prompt: str = None,
 		code_challenge: str = None,
 		code_challenge_method: str = None,
+		acr_values: str = None,
 		**kwargs
 	):
 		"""
@@ -290,6 +301,7 @@ class AuthorizeHandler(object):
 		Authentication Code Flow
 		"""
 		scope = scope.split(" ")
+		acr_values = acr_values.split(" ")
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
@@ -368,62 +380,22 @@ class AuthorizeHandler(object):
 		session_expiration = client_dict.get("session_expiration")
 
 		# Check if we need to redirect to login and authenticate
-		if authenticated:
-			if prompt == "login":
-				# Delete current session and redirect to login
-				await self.SessionService.delete(root_session.SessionId)
-				L.log(asab.LOG_NOTICE, "Login prompt requested by client", struct_data={"client_id": client_id})
-				return await self.reply_with_redirect_to_login(
-					scope=scope,
-					client_id=client_id,
-					redirect_uri=redirect_uri,
-					state=state,
-					nonce=nonce,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					**kwargs)
-			elif prompt == "select_account":
-				# Redirect to login without deleting current session
-				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client", struct_data={
-					"client_id": client_id})
-				return await self.reply_with_redirect_to_login(
-					scope=scope,
-					client_id=client_id,
-					redirect_uri=redirect_uri,
-					state=state,
-					nonce=nonce,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					**kwargs)
-
-		elif allow_anonymous:
-			# Create anonymous session or redirect to login if requested
-			if prompt == "login" or prompt == "select_account":
-				L.log(asab.LOG_NOTICE, "Account selection or login prompt requested by client", struct_data={
-					"client_id": client_id})
-				return await self.reply_with_redirect_to_login(
-					scope=scope,
-					client_id=client_id,
-					redirect_uri=redirect_uri,
-					state=state,
-					nonce=nonce,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					**kwargs)
-
-		else:  # NOT authenticated and NOT allowing anonymous access
-			# Redirect to login unless prompt=none requested
+		if self._is_login_required(root_session, allow_anonymous, prompt, acr_values):
 			if prompt == "none":
+				# Client allows no login prompt to be displayed - respond with error
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.LoginRequired, client_id,
 					redirect_uri=redirect_uri,
 					state=state)
-			L.log(asab.LOG_NOTICE, "Login required", struct_data={
-				"client_id": client_id})
-			return await self.reply_with_redirect_to_login(
+			elif prompt == "login":
+				# Delete the old session if login is explicitly requested
+				await self.SessionService.delete(root_session.SessionId)
+			return await self.redirect_to_login(
 				scope=scope,
 				client_id=client_id,
 				redirect_uri=redirect_uri,
+				prompt=prompt,
+				acr_values=acr_values,
 				state=state,
 				nonce=nonce,
 				code_challenge=code_challenge,
@@ -700,12 +672,14 @@ class AuthorizeHandler(object):
 		return response
 
 
-	async def reply_with_redirect_to_login(
+	async def redirect_to_login(
 		self,
 		client_id: str,
 		response_type: str,
 		scope: list,
 		redirect_uri: str,
+		prompt: str,
+		acr_values: list,
 		**authorize_params
 	):
 		"""
@@ -993,3 +967,30 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state)
 			L.info("Prompt {!r} requested.".format(prompt))
+
+
+	def _is_login_required(
+		self,
+		root_session: SessionAdapter | None = None,
+		allow_anonymous: bool = False,
+		prompt: str | None = None,
+		acr_values: list | None = None,
+	) -> bool:
+		if prompt == "login":
+			L.log(asab.LOG_NOTICE, "Client requested 'login' prompt")
+			return True
+		elif prompt == "select_account":
+			L.log(asab.LOG_NOTICE, "Client requested 'select_account' prompt")
+			return True
+		elif root_session is None or root_session.is_anonymous():
+			if allow_anonymous:
+				return False
+			else:
+				L.log(asab.LOG_NOTICE, "Client does not allow anonymous access")
+				return True
+		elif not self.AuthenticationService.authentication_preferences_satisfied(root_session, acr_values):
+			L.log(asab.LOG_NOTICE, "Client requested a different authentication class", struct_data={
+				"acr_values": acr_values})
+			return True
+		else:
+			return False
