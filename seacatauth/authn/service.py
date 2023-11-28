@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 import re
-
 import asab
 
 from .login_descriptor import LoginDescriptor
@@ -58,7 +57,6 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 
 
 class AuthenticationService(asab.Service):
-	# TODO: Introduce configurable LoginSession provider (MongoDB x in-memory dict)
 	LoginSessionCollection = "ls"
 
 	def __init__(self, app, service_name="seacatauth.AuthenticationService"):
@@ -464,3 +462,36 @@ class AuthenticationService(asab.Service):
 		)
 
 		return session
+
+
+	def acr_values_supported(self) -> list:
+		"""
+		List supported OpenID Connect authentication preferences (ACR values)
+		"""
+		acr_values = []
+		# TODO: Add options for other login types/descriptors (2fa, mfa, basic...)
+
+		# Add external login options
+		ext_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+		acr_values.extend(ext_login_service.acr_values_supported())
+		return acr_values
+
+
+	def authentication_preferences_satisfied(self, session: SessionAdapter | None, acr_values: list) -> bool:
+		"""
+		Verify if the session's authentication satisfies requested preferences (OIDC ACR values)
+		"""
+		if session is None or not session.Authentication.LoginFactors:
+			# Session is missing or has no authentication data
+			return False
+
+		if not acr_values:
+			# No authentication preferences specified
+			return True
+
+		# At least one authentication preference must be satisfied
+		for acr_value in acr_values:
+			if acr_value.startswith("ext:") and acr_value in session.Authentication.LoginFactors:
+				return True
+
+		return False
