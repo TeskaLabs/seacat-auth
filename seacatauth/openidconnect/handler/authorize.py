@@ -391,16 +391,9 @@ class AuthorizeHandler(object):
 				# Delete the old session if login is explicitly requested
 				await self.SessionService.delete(root_session.SessionId)
 			return await self.redirect_to_login(
-				scope=scope,
+				original_request_query=request.query_string,
 				client_id=client_id,
-				redirect_uri=redirect_uri,
-				prompt=prompt,
-				acr_values=acr_values,
-				state=state,
-				nonce=nonce,
-				code_challenge=code_challenge,
-				code_challenge_method=code_challenge_method,
-				**kwargs)
+				acr_values=acr_values)
 
 		# Here the request must be authenticated or anonymous access must be allowed
 		assert authenticated or allow_anonymous
@@ -674,34 +667,24 @@ class AuthorizeHandler(object):
 
 	async def redirect_to_login(
 		self,
+		original_request_query: str,
 		client_id: str,
-		response_type: str,
-		scope: list,
-		redirect_uri: str,
-		prompt: str,
 		acr_values: list,
-		**authorize_params
 	):
 		"""
 		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
 		Pass on the query parameters.
 		"""
-		# Get client collection
+		# Get client settings
 		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 
-		# Build redirect uri
-		callback_uri = self.OpenIdConnectService.build_authorize_uri(
-			client_dict=client_dict,
-			client_id=client_id,
-			response_type=response_type,
-			scope=" ".join(scope),
-			redirect_uri=redirect_uri,
-			**authorize_params
-		)
+		# Build the authorization URL that will be called after successful login
+		authorization_uri = "{}{}?{}".format(
+			self.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath, original_request_query)
 
 		# Build login uri
 		login_query_params = [
-			("redirect_uri", callback_uri),
+			("redirect_uri", authorization_uri),
 			("client_id", client_id)]
 		login_url = self._build_login_uri(client_dict, login_query_params)
 		response = aiohttp.web.HTTPNotFound(
