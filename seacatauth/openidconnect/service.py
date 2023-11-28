@@ -264,6 +264,7 @@ class OpenIdConnectService(asab.Service):
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
 				(
 					SessionAdapter.FN.Authentication.ExternalLoginOptions,
