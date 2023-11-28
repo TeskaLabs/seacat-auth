@@ -3,8 +3,9 @@
 ## v23.47
 
 ### Pre-releases
-- `v23.47-alpha`
+- `v23.47-alpha3`
 - `v23.47-alpha2`
+- `v23.47-alpha`
 
 ### Breaking changes
 - Remove access token from websocket protocol header during introspection (#324, `v23.47-alpha2`)
@@ -14,6 +15,9 @@
 
 ### Features
 - Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
+
+### Refactoring
+- Separate login factors in session object (#325, `v23.47-alpha3`)
 
 ---
 

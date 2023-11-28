@@ -622,9 +622,9 @@ class AuthorizeHandler(object):
 		# Check if all the enforced factors are present in the session
 		if self.AuthenticationService.EnforceFactors is not None:
 			factors_to_setup = list(self.AuthenticationService.EnforceFactors)
-			for factor in session.Authentication.LoginDescriptor["factors"]:
-				if factor["type"] in factors_to_setup:
-					factors_to_setup.remove(factor["type"])
+			for factor in session.Authentication.LoginFactors:
+				if factor in factors_to_setup:
+					factors_to_setup.remove(factor)
 
 		# Check if there are additional factors to be reset
 		credentials = await self.CredentialsService.get(session.Credentials.Id)
