@@ -4,6 +4,7 @@ import aiohttp.web
 import asab
 import asab.web.rest
 import asab.exceptions
+import seacatauth.exceptions
 
 from ....decorators import access_control
 
@@ -123,10 +124,30 @@ class RolesHandler(object):
 					status=403
 				)
 
-		await self.RoleService.assign_role(
-			credentials_id=request.match_info["credentials_id"],
-			role_id=role_id
-		)
+		credentials_id = request.match_info["credentials_id"]
+		try:
+			await self.RoleService.assign_role(credentials_id, role_id)
+		except seacatauth.exceptions.TenantNotAssignedError:
+			L.log(asab.LOG_NOTICE, "Failed to assign role: Tenant not assigned", struct_data={
+				"tenant": tenant, "cid": credentials_id})
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "FAILED",
+				"message": "Tenant not assigned",
+			})
+		except seacatauth.exceptions.CredentialsNotFoundError:
+			L.log(asab.LOG_NOTICE, "Failed to assign role: Credentials not found", struct_data={
+				"cid": credentials_id})
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "NOT-FOUND",
+				"message": "Credentials not found",
+			})
+		except seacatauth.exceptions.RoleNotFoundError as e:
+			L.log(asab.LOG_NOTICE, "Failed to assign role: Role not found", struct_data={
+				"role_id": role_id})
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "NOT-FOUND",
+				"message": "Role not found",
+			})
 
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
