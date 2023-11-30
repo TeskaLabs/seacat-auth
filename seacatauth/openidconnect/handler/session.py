@@ -2,7 +2,7 @@ import logging
 import aiohttp
 import aiohttp.web
 
-from ...generic import get_bearer_token_value
+from ... import generic
 
 #
 
@@ -37,7 +37,7 @@ class SessionHandler(object):
 		"""
 		OAuth 2.0 Session Logout
 		"""
-		token_value = get_bearer_token_value(request)
+		token_value = generic.get_bearer_token_value(request)
 		if token_value is None:
 			L.warning("Invalid or missing Bearer token")
 			return aiohttp.web.HTTPBadRequest()

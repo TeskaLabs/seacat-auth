@@ -36,31 +36,23 @@ class CredentialsHandler(object):
 
 		web_app = app.WebContainer.WebApp
 
-		web_app.router.add_get("/credentials", self.list_credentials)
-		web_app.router.add_put("/idents", self.get_idents_from_ids)
-		web_app.router.add_put("/usernames", self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
-		web_app.router.add_get("/locate", self.locate_credentials)
-		web_app.router.add_get("/credentials/{credentials_id}", self.get_credentials)
-		web_app.router.add_get("/last_login/{credentials_id}", self.get_last_login_data)
+		web_app.router.add_get("/admin/credentials", self.list_credentials)
+		web_app.router.add_put("/admin/idents", self.get_idents_from_ids)
+		web_app.router.add_get("/admin/locate", self.locate_credentials)
+		web_app.router.add_get("/admin/credentials/{credentials_id}", self.get_credentials)
+		web_app.router.add_get("/admin/last-login/{credentials_id}", self.get_last_login_data)
 
-		web_app.router.add_post("/credentials/{provider}", self.create_credentials)
-		web_app.router.add_put("/credentials/{credentials_id}", self.update_credentials)
-		web_app.router.add_delete("/credentials/{credentials_id}", self.delete_credentials)
+		web_app.router.add_post("/admin/credentials/{provider}", self.create_credentials)
+		web_app.router.add_put("/admin/credentials/{credentials_id}", self.update_credentials)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}", self.delete_credentials)
 
-		web_app.router.add_put("/public/credentials", self.update_my_credentials)
-		web_app.router.add_get("/public/last_login", self.get_my_last_login_data)
+		web_app.router.add_get("/admin/provider/{provider_id}", self.get_provider_info)
+		web_app.router.add_get("/admin/providers", self.list_providers)
+		web_app.router.add_put("/admin/enforce-factors/{credentials_id}", self.enforce_factors)
 
-		# Providers
-		web_app.router.add_get("/provider/{provider_id}", self.get_provider_info)
-		web_app.router.add_get("/providers", self.list_providers)
-		web_app.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app.router.add_put("/enforce-factors/{credentials_id}", self.enforce_factors)
-
-		# Public endpoints
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put("/public/credentials", self.update_my_credentials)
-		web_app_public.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app_public.router.add_get("/public/last_login", self.get_my_last_login_data)
+		web_app.router.add_get("/account/provider", self.get_my_provider_info)
+		web_app.router.add_put("/account/credentials", self.update_my_credentials)
+		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
 
 
 	@access_control("seacat:credentials:access")

@@ -148,6 +148,18 @@ class ProvisioningService(asab.Service):
 				"'admin_ui_url' not specified in provisioning config. Defaulting to '{}'.".format(admin_ui_url)
 			)
 
+		# TODO: Account UI should use a separate client eventually
+		account_ui_url = self.Config["account_ui_url"].rstrip("/") or None
+		if account_ui_url is None:
+			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			url = urllib.parse.urlparse(auth_webui_base_url)
+			# Use the base URL without path by default, to fit all common deployments
+			account_ui_url = url._replace(path="/auth", fragment="", query="", params="").geturl()
+			L.log(
+				asab.LOG_NOTICE,
+				"'account_ui_url' not specified in provisioning config. Defaulting to '{}'.".format(account_ui_url)
+			)
+
 		try:
 			client = await self.ClientService.get(admin_ui_client_id)
 		except KeyError:
@@ -167,6 +179,9 @@ class ProvisioningService(asab.Service):
 
 		if admin_ui_url not in redirect_uris:
 			redirect_uris.add(admin_ui_url)
+			update["redirect_uris"] = list(redirect_uris)
+		if account_ui_url not in redirect_uris:
+			redirect_uris.add(account_ui_url)
 			update["redirect_uris"] = list(redirect_uris)
 
 		update["client_uri"] = admin_ui_url

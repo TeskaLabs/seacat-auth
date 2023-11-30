@@ -26,7 +26,7 @@ class AuditHandler(object):
 		self.AuditService = audit_service
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/audit/prune", self.prune_old_audit_entries)
+		web_app.router.add_put("/admin/audit/prune", self.prune_old_audit_entries)
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
