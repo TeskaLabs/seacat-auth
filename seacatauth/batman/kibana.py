@@ -85,9 +85,9 @@ class KibanaIntegration(asab.config.Configurable):
 				"Config section 'batman:elk' has been renamed to 'batman:kibana'. Please update your config.",
 				struct_data={"eol": "2024-05-31"})
 			self.Config.update(asab.Config["batman:elk"])
-			section_id = 'elk'
-		else:
-			section_id = 'kibana'
+		# ES connection parameters should be specified in a config section [elasticsearch]
+		if "elasticsearch" in asab.Config:
+			self.Config.update(asab.Config["elasticsearch"])
 
 		self.BatmanService = batman_svc
 		self.App = self.BatmanService.App
@@ -100,25 +100,15 @@ class KibanaIntegration(asab.config.Configurable):
 		if len(self.KibanaUrl) == 0:
 			self.KibanaUrl = None
 
-		# url can also be specified in a new configuration section [elasticsearch]
-		self.ElasticSearchUrl = asab.Config.getmultiline('batman:{}'.format(section_id), 'url', fallback='')
-		if len(self.ElasticSearchUrl) == 0:
-			self.ElasticSearchUrl = asab.Config.getmultiline('elasticsearch', 'url', fallback='')
-		self.NodeUrls = get_url_list(self.ElasticSearchUrl)
-
-		if len(self.NodeUrls) == 0:
+		self.ElasticSearchUrl = self.Config.get('url')
+		self.ElasticSearchNodesUrls = get_url_list(self.ElasticSearchUrl)
+		if len(self.ElasticSearchNodesUrls) == 0:
 			raise RuntimeError("No ElasticSearch URL has been provided.")
 
 		# Authorization: username + password or API-key
 		username = self.Config.get("username")
-		if len(username) == 0:
-			username = asab.Config.get('elasticsearch', 'username', fallback='')
 		password = self.Config.get("password")
-		if len(password) == 0:
-			password = asab.Config.get('elasticsearch', 'password', fallback='')
 		api_key = self.Config.get("api_key")
-		if len(api_key) == 0:
-			api_key = asab.Config.get('elasticsearch', 'api_key', fallback='')
 
 		self.Headers = self._prepare_session_headers(username, password, api_key)
 
@@ -126,14 +116,18 @@ class KibanaIntegration(asab.config.Configurable):
 		self.DeprecatedResourcePrefix = "elk:"
 		self.DeprecatedResourceRegex = re.compile("^elk:")
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
-		self.IgnoreUsernames = self._prepare_ignored_usernames(username)
+		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
-		if self.NodeUrls[0].startswith('https://'):
-			# TODO: improve this condition: not just cafile, other options as well
-			if asab.Config.has_option('batman:{}'.format(section_id), 'cafile'):
-				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name='batman:{}'.format(section_id))
+		if self.ElasticSearchNodesUrls[0].startswith('https://'):
+			# SSLContextBuilder is looking at existing config sections
+			# TODO: improvement needed: not just 'cafile', there are other options as well
+			# TODO: delete the 1st condition when [batman:elk] is obsolete
+			if asab.Config.has_option('batman:elk', 'cafile'):
+				self.SSLContextBuilder = asab.tls.SSLContextBuilder('batman:elk')
+			elif asab.Config.has_option(config_section_name, 'cafile'):
+				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 			else:
-				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name='elasticsearch')
+				self.SSLContextBuilder = asab.tls.SSLContextBuilder('elasticsearch')
 			self.SSLContext = self.SSLContextBuilder.build(ssl.PROTOCOL_TLS_CLIENT)
 		else:
 			self.SSLContext = None
@@ -469,7 +463,7 @@ class KibanaIntegration(asab.config.Configurable):
 		elastic_user["roles"] = list(elk_roles)
 
 		async with session.post(
-			"{}_xpack/security/user/{}".format(random.choice(self.NodeUrls), username),
+			"{}_xpack/security/user/{}".format(random.choice(self.ElasticSearchNodesUrls), username),
 			json=elastic_user
 		) as resp:
 			if 200 <= resp.status < 300:
@@ -496,13 +490,13 @@ class KibanaIntegration(asab.config.Configurable):
 		return re.sub("[^a-z0-9_-]", "--", tenant_id)
 
 
-	def _prepare_ignored_usernames(self, username):
+	def _prepare_ignored_usernames(self):
 		"""
 		Load usernames that will not be synchronized to avoid conflicts with ELK system users
 		"""
 		ignore_usernames = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
-		if username:
-			ignore_usernames.append(username)
+		if self.Config.get("username"):
+			ignore_usernames.append(self.Config.get("username"))
 		return frozenset(ignore_usernames)
 
 
@@ -520,15 +514,29 @@ class KibanaIntegration(asab.config.Configurable):
 		return headers
 
 
-def get_url_list(urls):
-	server_urls = []
-	for url in urls:
-		scheme, netloc, path = parse_url(url)
+def getmultiline(url_string):
+	"""
+	URL can be a multiline with lines / items devided by spaces
+	url=https://localhost:9200 https://localhost:9200 https://localhost:9200
+	"""
+	return [item.strip() for item in re.split(r"\s+", url_string) if len(item) > 0]
 
-		server_urls += [
-			urllib.parse.urlunparse((scheme, netloc, path, None, None, None))
-			for netloc in netloc.split(';')
-		]
+
+def get_url_list(urls):
+	"""
+	URLs can devided by a semicolon
+	url=https://localhost:9200;localhost:9200;localhost:9200
+	"""
+	server_urls = []
+	if len(urls) > 0:
+		urls = getmultiline(urls)
+		for url in urls:
+			scheme, netloc, path = parse_url(url)
+
+			server_urls += [
+				urllib.parse.urlunparse((scheme, netloc, path, None, None, None))
+				for netloc in netloc.split(';')
+			]
 
 	return server_urls
 
