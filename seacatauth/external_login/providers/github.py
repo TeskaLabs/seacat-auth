@@ -36,7 +36,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		assert self.UserInfoEndpoint not in (None, "")
 		self.UserEmailsURI = self.Config.get("user_emails_endpoint")
 
-	async def _get_user_info(self, authorize_data, redirect_uri):
+	async def get_user_info(self, authorize_data):
 		"""
 		User info is not contained in token response,
 		call to https://api.github.com/user is needed.
@@ -48,7 +48,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 				"query": dict(authorize_data)})
 			return None
 
-		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
+		async with self.token_request(code, redirect_uri=self.CallbackUri) as resp:
 			response_text = await resp.text()
 
 		params = urllib.parse.parse_qs(response_text)

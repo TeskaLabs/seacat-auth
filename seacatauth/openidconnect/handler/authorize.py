@@ -387,10 +387,8 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.LoginRequired, client_id,
 					redirect_uri=redirect_uri,
 					state=state)
-			elif prompt == "login":
-				# Delete the old session if login is explicitly requested
-				await self.SessionService.delete(root_session.SessionId)
 			return await self.redirect_to_login(
+				root_session=root_session,
 				original_request_query=request.query_string,
 				client_id=client_id,
 				acr_values=acr_values)
@@ -667,6 +665,7 @@ class AuthorizeHandler(object):
 
 	async def redirect_to_login(
 		self,
+		root_session: SessionAdapter | None,
 		original_request_query: str,
 		client_id: str,
 		acr_values: list,
@@ -683,10 +682,8 @@ class AuthorizeHandler(object):
 			self.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath, original_request_query)
 
 		# Build login uri
-		login_query_params = [
-			("redirect_uri", authorization_uri),
-			("client_id", client_id)]
-		login_url = self._build_login_uri(client_dict, login_query_params)
+		login_url = await self.AuthenticationService.prepare_login_uri(
+			root_session, client_dict, authorization_uri, acr_values)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
 				"Location": login_url,

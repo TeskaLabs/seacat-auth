@@ -30,22 +30,16 @@ class ExternalLoginHandler(object):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
-		web_app.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
-		web_app.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
-		web_app.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
-		web_app.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
+		web_app.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.login_callback)
+		web_app.router.add_delete("/public/ext-login/{ext_login_provider}", self.unregister_external_login)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
-		web_app_public.router.add_post(self.ExternalLoginService.ExternalLoginPath, self.login)
-		web_app_public.router.add_get(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
-		web_app_public.router.add_post(self.ExternalLoginService.AddExternalLoginPath, self.register_external_login)
-		web_app_public.router.add_delete(self.ExternalLoginService.ExternalLoginPath, self.unregister_external_login)
+		web_app_public.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.login_callback)
+		web_app_public.router.add_delete("/public/ext-login/{ext_login_provider}", self.unregister_external_login)
 
 
-	async def login(self, request):
+	async def login_callback(self, request):
 		"""
 		Log in with a registered external provider account
 		"""
@@ -70,7 +64,7 @@ class ExternalLoginHandler(object):
 		state = None
 
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.do_external_login(authorize_data)
+		user_info = await provider.get_user_info(authorize_data)
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
@@ -161,99 +155,6 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def register_external_login(self, request: aiohttp.web.Request, *, credentials_id):
-		"""
-		Register a new external login provider account
-		"""
-		login_provider_type = request.match_info["ext_login_provider"]
-
-		if request.method == "POST":
-			authorize_data: dict = dict(await request.post())
-		else:
-			authorize_data = dict(request.query)
-
-		if not authorize_data:
-			L.error("External login provider returned no data in authorize callback.", struct_data={
-				"provider": login_provider_type})
-
-		# TODO: Implement state parameter for XSRF prevention
-		# if state is None:
-		# 	L.error("State parameter not provided in external login response")
-		state = authorize_data.get("state")
-
-		# Check if the credentials don't have this login type enabled already
-		login_exists = False
-
-		try:
-			await self.ExternalLoginService.get_sub(credentials_id, login_provider_type)
-			login_exists = True
-		except KeyError:
-			pass
-
-		if login_exists:
-			L.error("External login of this type already exists for credentials", struct_data={
-				"cid": credentials_id,
-				"type": login_provider_type
-			})
-			response = self._my_account_redirect_response(state=state, error="external_login_already_activated")
-			return response
-
-		login_provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await login_provider.add_external_login(authorize_data)
-		if user_info is None:
-			L.error("Cannot obtain user info from external login provider")
-			return self._my_account_redirect_response(state=state, error="external_login_failed")
-
-		sub = user_info.get("sub")
-		if sub is None:
-			L.error("Cannot obtain 'sub' field from external login provider", struct_data={
-				"cid": credentials_id,
-				"type": login_provider_type
-			})
-			return self._my_account_redirect_response(state=state, error="external_login_failed")
-
-		sub = str(sub)
-
-		# Check if the sub is not already registered with different credentials
-		already_used = False
-		try:
-			await self.ExternalLoginService.get(login_provider_type, sub)
-			already_used = True
-		except KeyError:
-			pass
-
-		if already_used:
-			L.error("External login already used by different credentials", struct_data={
-				"request_cid": credentials_id,
-				"type": login_provider_type,
-				"sub": sub,
-			})
-			response = self._my_account_redirect_response(state=state, error="external_login_not_activated")
-			return response
-
-		# Update credentials
-		try:
-			await self.ExternalLoginService.create(
-				credentials_id, login_provider_type, sub, user_info.get("email"), user_info.get("ident"))
-		except Exception as e:
-			L.error("{} when creating external login credentials: {}".format(type(e).__name__, str(e)), struct_data={
-				"cid": credentials_id,
-				"type": login_provider_type,
-				"sub": sub,
-			})
-			response = self._my_account_redirect_response(state=state, error="external_login_not_activated")
-			return response
-
-		L.log(asab.LOG_NOTICE, "External login successfully added", struct_data={
-			"cid": credentials_id,
-			"login_type": login_provider_type
-		})
-
-		# Redirect to home screen
-		return self._my_account_redirect_response(state=state, result="external_login_activated")
-
-
-	@access_control()
 	async def unregister_external_login(self, request, *, credentials_id):
 		"""
 		Unregister an external login provider account
@@ -269,70 +170,3 @@ class ExternalLoginHandler(object):
 
 		response = {"result": "OK"}
 		return asab.web.rest.json_response(request, response)
-
-
-	def _login_redirect_response(self, state=None, error=None):
-		# TODO: Revise with custom per-client login URIs
-		if state is not None:
-			query = "?state={}".format(state)
-		else:
-			query = ""
-
-		if error is not None:
-			fragment_query = "?error={}".format(error)
-		else:
-			fragment_query = ""
-
-		redirect_uri = "{}{}#{}{}".format(
-			self.ExternalLoginService.AuthUiBaseUrl,
-			query,
-			self.ExternalLoginService.LoginUiFragmentPath,
-			fragment_query,
-		)
-
-		response = aiohttp.web.HTTPFound(
-			redirect_uri,
-			headers={
-				# TODO: Specify location
-				"Refresh": "0;url={}".format(redirect_uri),
-			},
-			content_type="text/html",
-			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
-		)
-		return response
-
-
-	def _my_account_redirect_response(self, state=None, error=None, result=None):
-		# TODO: Revise with custom per-client login URIs
-		if state is not None:
-			query = "?state={}".format(state)
-		else:
-			query = ""
-
-		fragment_query_params = []
-		if error is not None:
-			fragment_query_params.append(("error", error))
-		if result is not None:
-			fragment_query_params.append(("result", result))
-		if len(fragment_query_params) > 0:
-			hash_query = "?{}".format(urllib.parse.urlencode(fragment_query_params))
-		else:
-			hash_query = ""
-
-		redirect_uri = "{}{}#{}{}".format(
-			self.ExternalLoginService.AuthUiBaseUrl,
-			query,
-			self.ExternalLoginService.HomeUiFragmentPath,
-			hash_query,
-		)
-
-		response = aiohttp.web.HTTPFound(
-			redirect_uri,
-			headers={
-				# TODO: Specify location
-				"Refresh": "0;url={}".format(redirect_uri),
-			},
-			content_type="text/html",
-			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
-		)
-		return response

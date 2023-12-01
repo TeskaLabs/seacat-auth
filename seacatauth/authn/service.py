@@ -2,12 +2,14 @@ import datetime
 import json
 import logging
 import re
+import urllib.parse
+
 import asab
 
 from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
-from .. import exceptions
+from .. import exceptions, generic
 from ..audit import AuditCode
 from ..authz import build_credentials_authz
 
@@ -495,3 +497,46 @@ class AuthenticationService(asab.Service):
 				return True
 
 		return False
+
+
+	async def prepare_login_uri(
+		self,
+		root_session: SessionAdapter | None,
+		client_dict: dict,
+		authorization_uri: str,
+		acr_values: list
+	):
+		"""
+		Check if the client has a registered login URI. If not, use the default.
+		Extend the URI with query parameters.
+		"""
+		ext_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+		if acr_values:
+			# At the moment, ACR values are used only for external login preferences
+			login_uri = await ext_login_service.prepare_external_login_uri(acr_values, root_session, authorization_uri)
+			if login_uri:
+				return login_uri
+
+		login_query_params = [
+			("redirect_uri", authorization_uri),
+			("client_id", client_dict["_id"])]
+		login_uri = client_dict.get("login_uri")
+		if login_uri is None:
+			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
+
+		parsed = generic.urlparse(login_uri)
+		if parsed["fragment"] != "":
+			# If the Login URI contains fragment, add the login params into the fragment query
+			fragment_parsed = generic.urlparse(parsed["fragment"])
+			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query.update(login_query_params)
+			fragment_parsed["query"] = urllib.parse.urlencode(query)
+			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
+		else:
+			# If the Login URI contains no fragment, add the login params into the regular URL query
+			query = urllib.parse.parse_qs(parsed["query"])
+			query.update(login_query_params)
+			parsed["query"] = urllib.parse.urlencode(query)
+
+		return generic.urlunparse(**parsed)
+

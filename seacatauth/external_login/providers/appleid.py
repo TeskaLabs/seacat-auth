@@ -42,7 +42,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		super().__init__(external_login_svc, config_section_name, config)
 		self.Scope = self.Config.get("scope")
 
-	def _get_authorize_uri(
+	def get_authorize_uri(
 		self, redirect_uri: str,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
@@ -63,7 +63,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data: dict, redirect_uri: str) -> typing.Optional[dict]:
+	async def get_user_info(self, authorize_data: dict) -> typing.Optional[dict]:
 		auth_error = authorize_data.get('error')
 		if auth_error is not None:
 			if auth_error == 'user_cancelled_authorize':

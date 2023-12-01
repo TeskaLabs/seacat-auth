@@ -100,22 +100,10 @@ class GenericOAuth2Login(asab.Configurable):
 		self.Label = self.Config.get("label")
 		assert self.Label is not None
 
-		# Base URL under which the external login endpoint are available
-		public_api_base_url = self.Config.get("public_api_base_url")
-		if public_api_base_url is None:
-			# Fallback to general public_api_base_url
-			public_api_base_url = asab.Config.get("general", "public_api_base_url")
-
 		self.JwkSet = None
 
-		self.LoginURI = "{}{}".format(
-			public_api_base_url.rstrip("/"),
-			external_login_svc.ExternalLoginPath.format(ext_login_provider=self.Type)
-		)
-		self.AddExternalLoginURI = "{}{}".format(
-			public_api_base_url.rstrip("/"),
-			external_login_svc.AddExternalLoginPath.format(ext_login_provider=self.Type)
-		)
+		self.CallbackUri = external_login_svc.CallbackUriAbsolute
+
 
 	async def initialize(self, app):
 		await self._prepare_jwks()
@@ -153,7 +141,7 @@ class GenericOAuth2Login(asab.Configurable):
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
 		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
-	def _get_authorize_uri(
+	def get_authorize_uri(
 		self, redirect_uri: str,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
@@ -204,7 +192,7 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def _get_user_info(self, authorize_data: dict, redirect_uri: str):
+	async def get_user_info(self, authorize_data: dict):
 		"""
 		Obtain the authenticated user's profile info, with the claims normalized to be in line with
 		OpenID UserInfo response.
@@ -225,7 +213,7 @@ class GenericOAuth2Login(asab.Configurable):
 				"query": dict(authorize_data)})
 			return None
 
-		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
+		async with self.token_request(code, redirect_uri=self.CallbackUri) as resp:
 			if resp is None:
 				return None
 			token_data = await resp.json()
@@ -268,15 +256,3 @@ class GenericOAuth2Login(asab.Configurable):
 				"provider": self.Type, "error": str(e)})
 			return None
 		return claims
-
-	def get_login_authorize_uri(self, state: typing.Optional[str] = None):
-		return self._get_authorize_uri(self.LoginURI, state)
-
-	def get_addlogin_authorize_uri(self, state: typing.Optional[str] = None):
-		return self._get_authorize_uri(self.AddExternalLoginURI, state)
-
-	async def do_external_login(self, authorize_data: dict):
-		return await self._get_user_info(authorize_data, redirect_uri=self.LoginURI)
-
-	async def add_external_login(self, authorize_data: dict):
-		return await self._get_user_info(authorize_data, redirect_uri=self.AddExternalLoginURI)

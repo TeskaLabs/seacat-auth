@@ -44,7 +44,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		self.Fields = self.Config.get("fields")
 		assert self.UserInfoEndpoint not in (None, "")
 
-	def _get_authorize_uri(
+	def get_authorize_uri(
 		self, redirect_uri: str,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None

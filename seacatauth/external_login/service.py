@@ -1,4 +1,6 @@
 import logging
+import secrets
+
 import aiohttp
 import typing
 import pymongo
@@ -8,6 +10,7 @@ import asab.web.rest
 
 from .providers import create_provider, GenericOAuth2Login
 from ..events import EventTypes
+from ..session import SessionAdapter
 
 #
 
@@ -26,6 +29,7 @@ asab.Config.add_defaults({
 class ExternalLoginService(asab.Service):
 
 	ExternalLoginCollection = "el"
+	ExternalLoginStateCollection = "els"
 
 	def __init__(self, app, service_name="seacatauth.ExternalLoginService"):
 		super().__init__(app, service_name)
@@ -37,11 +41,13 @@ class ExternalLoginService(asab.Service):
 
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
-		self.AuthUiBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
-		self.HomeUiFragmentPath = "/"
-		self.LoginUiFragmentPath = "/login"
-		self.ExternalLoginPath = "/public/ext-login/{ext_login_provider}"
-		self.AddExternalLoginPath = "/public/ext-login-add/{ext_login_provider}"
+		self.CallbackEndpointPath = "/public/ext-login"
+
+		public_api_base_url = asab.Config.get("general", "public_api_base_url")
+		self.CallbackUriAbsolute = "{}{}".format(
+			public_api_base_url.rstrip("/"),
+			self.CallbackEndpointPath
+		)
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
 		self.AcrValues: typing.Dict[str, GenericOAuth2Login] = {
@@ -72,6 +78,24 @@ class ExternalLoginService(asab.Service):
 
 	def get_provider_by_acr(self, acr_value: str) -> GenericOAuth2Login:
 		return self.AcrValues.get(acr_value)
+
+
+	async def prepare_external_login_uri(
+		self,
+		acr_values: list,
+		root_session: SessionAdapter | None,
+		authorization_uri: str
+	):
+		# Pick the first valid provider
+		for acr_value in acr_values:
+			provider = self.get_provider_by_acr(acr_value)
+			if provider is not None:
+				break
+		else:
+			return None
+
+		state_id, nonce = await self._store_authorization_state(root_session, authorization_uri, provider.Type)
+		return provider.get_authorize_uri(self.CallbackUriAbsolute, state_id, nonce)
 
 
 	async def initialize(self, app):
@@ -201,3 +225,32 @@ class ExternalLoginService(asab.Service):
 			email=user_info.get("email"))
 
 		return credentials_id
+
+
+	async def _store_authorization_state(
+		self,
+		root_session: SessionAdapter | None,
+		authorization_uri: str,
+		provider_type: str
+	) -> (str, str):
+		state_id = secrets.token_urlsafe(10)
+		nonce = secrets.token_urlsafe(10)
+		upsertor = self.StorageService.upsertor(self.ExternalLoginStateCollection, obj_id=state_id)
+		upsertor.set("uri", authorization_uri)
+		upsertor.set("type", provider_type)
+		upsertor.set("nonce", nonce)
+		if root_session:
+			upsertor.set("sid", root_session.SessionId)
+			upsertor.set("cid", root_session.Credentials.Id)
+			await upsertor.execute()
+		return state_id, nonce
+
+
+	async def _pop_authorization_state(self, state_id: str) -> dict:
+		coll = await self.StorageService.collection(self.ExternalLoginCollection)
+		return await coll.find_one_and_delete({"_id": state_id})
+
+
+	async def _delete_old_authorization_states(self) -> dict:
+		# TODO: On housekeeping, delete all whose _c < now - 5 mins
+		pass
