@@ -380,7 +380,9 @@ class AuthorizeHandler(object):
 		session_expiration = client_dict.get("session_expiration")
 
 		# Check if we need to redirect to login and authenticate
-		if self._is_login_required(root_session, allow_anonymous, prompt, acr_values):
+		if self.OpenIdConnectService.Authentication.is_login_required(
+			root_session, allow_anonymous, prompt, acr_values
+		):
 			if prompt == "none":
 				# Client allows no login prompt to be displayed - respond with error
 				raise OAuthAuthorizeError(
@@ -389,7 +391,7 @@ class AuthorizeHandler(object):
 					state=state)
 			return await self.redirect_to_login(
 				root_session=root_session,
-				original_request_query=request.query_string,
+				authorization_query=dict(request.query),
 				client_id=client_id,
 				acr_values=acr_values)
 
@@ -666,7 +668,7 @@ class AuthorizeHandler(object):
 	async def redirect_to_login(
 		self,
 		root_session: SessionAdapter | None,
-		original_request_query: str,
+		authorization_query: dict,
 		client_id: str,
 		acr_values: list,
 	):
@@ -674,16 +676,9 @@ class AuthorizeHandler(object):
 		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
 		Pass on the query parameters.
 		"""
-		# Get client settings
-		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-
-		# Build the authorization URL that will be called after successful login
-		authorization_uri = "{}{}?{}".format(
-			self.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath, original_request_query)
-
 		# Build login uri
-		login_url = await self.AuthenticationService.prepare_login_uri(
-			root_session, client_dict, authorization_uri, acr_values)
+		login_url = await self.OpenIdConnectService.Authentication.prepare_login_uri(
+			root_session, client_id, authorization_query, acr_values)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
 				"Location": login_url,
@@ -852,32 +847,6 @@ class AuthorizeHandler(object):
 		return tenants
 
 
-	def _build_login_uri(self, client_dict, login_query_params):
-		"""
-		Check if the client has a registered login URI. If not, use the default.
-		Extend the URI with query parameters.
-		"""
-		login_uri = client_dict.get("login_uri")
-		if login_uri is None:
-			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
-
-		parsed = generic.urlparse(login_uri)
-		if parsed["fragment"] != "":
-			# If the Login URI contains fragment, add the login params into the fragment query
-			fragment_parsed = generic.urlparse(parsed["fragment"])
-			query = urllib.parse.parse_qs(fragment_parsed["query"])
-			query.update(login_query_params)
-			fragment_parsed["query"] = urllib.parse.urlencode(query)
-			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
-		else:
-			# If the Login URI contains no fragment, add the login params into the regular URL query
-			query = urllib.parse.parse_qs(parsed["query"])
-			query.update(login_query_params)
-			parsed["query"] = urllib.parse.urlencode(query)
-
-		return generic.urlunparse(**parsed)
-
-
 	def _validate_request_parameters(self, request_parameters):
 		"""
 		Verify the presence of required parameters.
@@ -947,30 +916,3 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state)
 			L.info("Prompt {!r} requested.".format(prompt))
-
-
-	def _is_login_required(
-		self,
-		root_session: SessionAdapter | None = None,
-		allow_anonymous: bool = False,
-		prompt: str | None = None,
-		acr_values: list | None = None,
-	) -> bool:
-		if prompt == "login":
-			L.log(asab.LOG_NOTICE, "Client requested 'login' prompt")
-			return True
-		elif prompt == "select_account":
-			L.log(asab.LOG_NOTICE, "Client requested 'select_account' prompt")
-			return True
-		elif root_session is None or root_session.is_anonymous():
-			if allow_anonymous:
-				return False
-			else:
-				L.log(asab.LOG_NOTICE, "Client does not allow anonymous access")
-				return True
-		elif not self.AuthenticationService.authentication_preferences_satisfied(root_session, acr_values):
-			L.log(asab.LOG_NOTICE, "Client requested a different authentication class", struct_data={
-				"acr_values": acr_values})
-			return True
-		else:
-			return False

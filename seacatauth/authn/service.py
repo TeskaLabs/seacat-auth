@@ -466,60 +466,32 @@ class AuthenticationService(asab.Service):
 		return session
 
 
-	def acr_values_supported(self) -> list:
+	async def prepare_seacat_login_url(self, client_id: str, authorization_query: dict):
 		"""
-		List supported OpenID Connect authentication preferences (ACR values)
+		Build login URI of Seacat Auth login page with callback to authorization request
 		"""
-		acr_values = []
-		# TODO: Add options for other login types/descriptors (2fa, mfa, basic...)
+		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		client_dict = await client_svc.get(client_id)
 
-		# Add external login options
-		ext_login_service = self.App.get_service("seacatauth.ExternalLoginService")
-		acr_values.extend(ext_login_service.acr_values_supported())
-		return acr_values
+		# Remove "prompt" and "acr_values" from callback
+		prompt = authorization_query.pop("prompt", None)
+		acr_values = authorization_query.pop("acr_values", None)
 
+		# Build callback authorization URL
+		authorization_uri = "{}?{}".format(
+			oidc_svc.authorization_endpoint_url(),
+			urllib.parse.urlencode(authorization_query))
 
-	def authentication_preferences_satisfied(self, session: SessionAdapter | None, acr_values: list) -> bool:
-		"""
-		Verify if the session's authentication satisfies requested preferences (OIDC ACR values)
-		"""
-		if session is None or not session.Authentication.LoginFactors:
-			# Session is missing or has no authentication data
-			return False
-
-		if not acr_values:
-			# No authentication preferences specified
-			return True
-
-		# At least one authentication preference must be satisfied
-		for acr_value in acr_values:
-			if acr_value.startswith("ext:") and acr_value in session.Authentication.LoginFactors:
-				return True
-
-		return False
-
-
-	async def prepare_login_uri(
-		self,
-		root_session: SessionAdapter | None,
-		client_dict: dict,
-		authorization_uri: str,
-		acr_values: list
-	):
-		"""
-		Check if the client has a registered login URI. If not, use the default.
-		Extend the URI with query parameters.
-		"""
-		ext_login_service = self.App.get_service("seacatauth.ExternalLoginService")
-		if acr_values:
-			# At the moment, ACR values are used only for external login preferences
-			login_uri = await ext_login_service.prepare_external_login_uri(acr_values, root_session, authorization_uri)
-			if login_uri:
-				return login_uri
-
+		# Prepare login params
 		login_query_params = [
 			("redirect_uri", authorization_uri),
-			("client_id", client_dict["_id"])]
+			("client_id", client_id)]
+		if prompt:
+			login_query_params.append(("prompt", prompt))
+		if acr_values:
+			login_query_params.append(("acr_values", acr_values))
+
 		login_uri = client_dict.get("login_uri")
 		if login_uri is None:
 			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
@@ -539,4 +511,3 @@ class AuthenticationService(asab.Service):
 			parsed["query"] = urllib.parse.urlencode(query)
 
 		return generic.urlunparse(**parsed)
-
