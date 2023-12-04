@@ -80,21 +80,17 @@ class ExternalLoginService(asab.Service):
 		return self.AcrValues.get(acr_value)
 
 
-	async def prepare_external_login_uri(
+	async def prepare_external_login_url(
 		self,
-		acr_values: list,
+		acr_value: str,
 		root_session: SessionAdapter | None,
-		authorization_uri: str
+		authorization_query: dict
 	):
-		# Pick the first valid provider
-		for acr_value in acr_values:
-			provider = self.get_provider_by_acr(acr_value)
-			if provider is not None:
-				break
-		else:
+		provider = self.get_provider_by_acr(acr_value)
+		if not provider:
 			return None
 
-		state_id, nonce = await self._store_authorization_state(root_session, authorization_uri, provider.Type)
+		state_id, nonce = await self._store_authorization_state(root_session, authorization_query, provider.Type)
 		return provider.get_authorize_uri(self.CallbackUriAbsolute, state_id, nonce)
 
 
@@ -230,13 +226,13 @@ class ExternalLoginService(asab.Service):
 	async def _store_authorization_state(
 		self,
 		root_session: SessionAdapter | None,
-		authorization_uri: str,
+		authorization_query: dict,
 		provider_type: str
 	) -> (str, str):
 		state_id = secrets.token_urlsafe(10)
 		nonce = secrets.token_urlsafe(10)
 		upsertor = self.StorageService.upsertor(self.ExternalLoginStateCollection, obj_id=state_id)
-		upsertor.set("uri", authorization_uri)
+		upsertor.set("oauth_query", authorization_query)
 		upsertor.set("type", provider_type)
 		upsertor.set("nonce", nonce)
 		if root_session:
@@ -246,9 +242,12 @@ class ExternalLoginService(asab.Service):
 		return state_id, nonce
 
 
-	async def _pop_authorization_state(self, state_id: str) -> dict:
+	async def pop_authorization_state(self, state_id: str) -> dict:
 		coll = await self.StorageService.collection(self.ExternalLoginCollection)
-		return await coll.find_one_and_delete({"_id": state_id})
+		state = await coll.find_one_and_delete({"_id": state_id})
+		if state is None:
+			raise KeyError("State ID not found: {}".format(state_id))
+		return state
 
 
 	async def _delete_old_authorization_states(self) -> dict:

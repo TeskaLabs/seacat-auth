@@ -46,22 +46,22 @@ class ExternalLoginHandler(object):
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
 
-		login_provider_type = request.match_info["ext_login_provider"]
-
 		if request.method == "POST":
 			authorize_data: dict = dict(await request.post())
 		else:
 			authorize_data = dict(request.query)
-
 		if not authorize_data:
-			L.error("External login provider returned no data in authorize callback.", struct_data={
-				"provider": login_provider_type})
+			L.error("External login provider returned no data in authorize callback")
 
-		# TODO: Implement state parameter for XSRF prevention
-		# state = authorize_data.get("state")
-		# if state is None:
-		# 	L.error("State parameter not provided in external login response")
-		state = None
+		state_id = authorize_data.get("state")
+		try:
+			state = await self.ExternalLoginService.pop_authorization_state(state_id)
+		except KeyError:
+			L.log(asab.LOG_NOTICE, "External login authorization state not found", struct_data={
+				"state_id": state_id})
+			# TODO: Where to redirect in case of failure?
+			return
+		login_provider_type = state["type"]
 
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
 		user_info = await provider.get_user_info(authorize_data)

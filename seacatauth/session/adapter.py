@@ -63,6 +63,8 @@ class OAuth2Data:
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
 	Nonce: typing.Optional[str]
+	ACR: typing.Optional[list]
+	AMR: typing.Optional[list]
 
 
 @dataclasses.dataclass
@@ -138,6 +140,8 @@ class SessionAdapter:
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
 			Nonce = "oa_no"
+			ACR = "oa_acr"
+			AMR = "oa_amr"
 
 		class Cookie:
 			_prefix = "ck"
@@ -258,14 +262,15 @@ class SessionAdapter:
 				self.FN.OAuth2.RefreshToken: self.OAuth2.RefreshToken,
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
+				self.FN.OAuth2.Nonce: self.OAuth2.Nonce,
+				self.FN.OAuth2.ACR: self.OAuth2.ACR,
+				self.FN.OAuth2.AMR: self.OAuth2.AMR,
 			})
 
 		if self.Batman is not None:
 			session_dict.update({
 				self.FN.Batman.Token: self.Batman.Token,
 			})
-
-		# TODO: encrypt sensitive fields
 
 		return {k: v for k, v in session_dict.items() if v is not None}
 
@@ -378,6 +383,8 @@ class SessionAdapter:
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
 			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
+			ACR=session_dict.pop(cls.FN.OAuth2.ACR, None),
+			AMR=session_dict.pop(cls.FN.OAuth2.AMR, None),
 		)
 
 	@classmethod
