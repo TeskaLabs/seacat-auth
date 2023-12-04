@@ -23,7 +23,7 @@ from ..session import (
 from .session import oauth2_session_builder
 from ..audit import AuditCode
 from .. import exceptions
-from . import pkce
+from . import pkce, authentication
 
 from ..events import EventTypes
 
@@ -59,7 +59,8 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.AuditService = app.get_service("seacatauth.AuditService")
-		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
+		self.PKCE = pkce.PKCE()
+		self.Authentication = authentication.Authentication(app)
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		if public_api_base_url.endswith("/"):
@@ -103,6 +104,10 @@ class OpenIdConnectService(asab.Service):
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_authorization_codes()
+
+
+	async def initialize(self, app):
+		await self.Authentication.initialize(app)
 
 
 	async def generate_authorization_code(
@@ -516,7 +521,7 @@ class OpenIdConnectService(asab.Service):
 		# TODO: This should be removed. There must be only one authorize endpoint.
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
-			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+			authorize_uri = self.authorization_endpoint_url()
 		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
@@ -527,3 +532,13 @@ class OpenIdConnectService(asab.Service):
 		session: SessionAdapter = await self.get_session_by_access_token(token)
 		if session is not None:
 			await self.SessionService.delete(session.SessionId)
+
+
+	def authorization_endpoint_url(self):
+		return "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+
+	def token_endpoint_url(self):
+		return "{}{}".format(self.PublicApiBaseUrl, self.TokenPath)
+
+	def userinfo_endpoint_url(self):
+		return "{}{}".format(self.PublicApiBaseUrl, self.UserInfoPath)

@@ -49,10 +49,8 @@ class DiscoveryHandler(object):
 		data = {
 			# REQUIRED
 			"issuer": self.OpenIdConnectService.Issuer,
-			"authorization_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath),
-			"token_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenPath),
+			"authorization_endpoint":  self.OpenIdConnectService.authorization_endpoint_url(),
+			"token_endpoint":  self.OpenIdConnectService.token_endpoint_url(),
 			# TODO: The algorithm RS256 MUST be included.
 			#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
 			"id_token_signing_alg_values_supported": ["ES256"],
@@ -62,8 +60,7 @@ class DiscoveryHandler(object):
 			"subject_types_supported": ["public"],
 
 			# RECOMMENDED
-			"userinfo_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.UserInfoPath),
+			"userinfo_endpoint": self.OpenIdConnectService.userinfo_endpoint_url(),
 			# "registration_endpoint": "{}/public/client/register",  # TODO: Implement a PUBLIC client registration API
 			"scopes_supported": [
 				"openid", "profile", "email", "phone",
