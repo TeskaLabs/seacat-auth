@@ -22,77 +22,19 @@ asab.Config.add_defaults({
 
 class AuditService(asab.Service):
 
-	AuditCollection = "a"
 	LastCredentialsEventCollection = "lce"
-	LastCredentialsEventCodes = frozenset([
-		AuditCode.LOGIN_SUCCESS,
-		AuditCode.LOGIN_FAILED,
-		AuditCode.PASSWORD_CHANGE_SUCCESS,
-		AuditCode.PASSWORD_CHANGE_FAILED,
-		AuditCode.AUTHORIZE_SUCCESS])
 
 	def __init__(self, app, service_name="seacatauth.AuditService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
-		self.IsAnonymousLoggingEnabled = asab.Config.getboolean("seacatauth:audit", "log_anonymous_sessions")
 
 
-	async def append(
-		self, code: AuditCode, *,
-		credentials_id: str = None,
-		client_id: str = None,
-		session_id: str = None,
-		tenant: str = None,
-		**kwargs
-	):
-		"""
-		Records a new audit entry.
-		"""
-		assert (isinstance(code, AuditCode))
-
-		# Do not audit anonymous sessions if desired (performance reasons)
-		if not self.IsAnonymousLoggingEnabled and code == AuditCode.ANONYMOUS_SESSION_CREATED:
-			return
-
-		# Do not use upsertor because it can trigger webhook
-		now = datetime.datetime.now(datetime.timezone.utc)
-		entry = {
-			"_c": now,
-			"c": code.name
-		}
-		if credentials_id is not None:
-			entry["cid"] = credentials_id
-		if client_id is not None:
-			entry["clid"] = client_id
-		if session_id is not None:
-			entry["sid"] = session_id
-		if tenant is not None:
-			entry["t"] = tenant
-		entry.update(kwargs)
-
-		coll = await self.StorageService.collection(self.AuditCollection)
-		await coll.insert_one(entry)
-
-		if code in self.LastCredentialsEventCodes:
-			await self._upsert_last_credentials_event(code, credentials_id, **kwargs)
-
-
-	async def _upsert_last_credentials_event(self, code: AuditCode, credentials_id: str, **kwargs):
+	async def upsert_last_credentials_event(self, code: AuditCode, credentials_id: str, **kwargs):
 		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
 
 		# Do not use upsertor because it can trigger webhook
 		coll = await self.StorageService.collection(self.LastCredentialsEventCollection)
 		await coll.update_one({"_id": credentials_id}, {"$set": {code.name: kwargs}}, upsert=True)
-
-
-	async def delete_old_entries(self, before_datetime: datetime.datetime):
-		coll = await self.StorageService.collection(self.AuditCollection)
-		result = await coll.delete_many({"_c": {"$lt": before_datetime}})
-		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Old audit entries deleted.", struct_data={
-				"count": result.deleted_count
-			})
-		return result.deleted_count
 
 
 	async def get_last_logins(self, credentials_id: str) -> dict:
