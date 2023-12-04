@@ -11,6 +11,7 @@ import urllib.parse
 import jwcrypto.jwk
 
 from .. import exceptions, AuditLog, generic
+from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
@@ -210,12 +211,14 @@ class AuthenticationHandler(object):
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			AuditLog.log(asab.LOG_NOTICE, "Login failed: authentication failed", struct_data={
+			AuditLog.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+				"cid": login_session.CredentialsId,
 				"lsid": lsid,
 				"ident": login_session.Ident,
-				"cid": login_session.CredentialsId,
 				"from_ip": access_ips
 			})
+			self.AuthenticationService.AuditService.upsert_last_credentials_event(
+				AuditCode.LOGIN_FAILED, login_session.CredentialsId, from_ip=access_ips)
 
 			self.AuthenticationService.LoginCounter.add('failed', 1)
 
@@ -503,7 +506,7 @@ class AuthenticationHandler(object):
 			})
 			return aiohttp.web.HTTPForbidden()
 		except Exception as e:
-			AuditLog.exception("Impersonation failed: Unexpected error: {}".format(e), struct_data={
+			AuditLog.exception("Impersonation failed: Unexpected error ({})".format(e), struct_data={
 				"impersonator_cid": impersonator_cid,
 				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,

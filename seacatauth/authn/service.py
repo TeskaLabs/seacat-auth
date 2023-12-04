@@ -9,6 +9,7 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from .. import exceptions
+from .. import AuditLog
 from ..audit import AuditCode
 from ..authz import build_credentials_authz
 
@@ -335,22 +336,14 @@ class AuthenticationService(asab.Service):
 			session_type="root",
 			session_builders=session_builders,
 		)
-		L.log(
-			asab.LOG_NOTICE,
-			"Authentication/login successful.",
-			struct_data={
-				"cid": login_session.CredentialsId,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
-			}
-		)
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.LOGIN_SUCCESS,
-			credentials_id=login_session.CredentialsId,
-			session_id=str(session.Session.Id),
-			fi=from_info)
+		AuditLog.log(asab.LOG_NOTICE, "Authentication success", struct_data={
+			"cid": login_session.CredentialsId,
+			"lsid": login_session.Id,
+			"sid": str(session.Session.Id),
+			"from_ip": from_info,
+		})
+		await self.AuditService.upsert_last_credentials_event(
+			AuditCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
@@ -393,23 +386,12 @@ class AuthenticationService(asab.Service):
 			expiration=session_expiration,
 			session_builders=session_builders,
 		)
-		L.log(
-			asab.LOG_NOTICE,
-			"M2M authentication successful.",
-			struct_data={
-				"cid": credentials_id,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
-			}
-		)
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.M2M_AUTHENTICATION_SUCCESSFUL,
-			credentials_id=credentials_id,
-			session_id=str(session.Session.Id),
-			fi=from_info
-		)
+		AuditLog.log(asab.LOG_NOTICE, "Authentication success", struct_data={
+			"cid": credentials_id,
+			"sid": str(session.Session.Id),
+			"fi": from_info,
+			"m2m": True,
+		})
 
 		return session
 
