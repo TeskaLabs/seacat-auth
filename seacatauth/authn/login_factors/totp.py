@@ -12,7 +12,6 @@ L = logging.getLogger(__name__)
 
 class TOTPFactor(LoginFactorABC):
 	Type = "totp"
-	AMRValue = "otp"
 
 	async def is_eligible(self, login_data: dict) -> bool:
 		"""

@@ -3,7 +3,6 @@ from .abc import LoginFactorABC
 
 class PasswordFactor(LoginFactorABC):
 	Type = "password"
-	AMRValue = "pwd"
 
 	async def is_eligible(self, login_data: dict) -> bool:
 		"""

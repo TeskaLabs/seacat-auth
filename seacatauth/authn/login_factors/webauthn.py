@@ -13,7 +13,6 @@ L = logging.getLogger(__name__)
 
 class WebAuthnFactor(LoginFactorABC):
 	Type = "webauthn"
-	AMRValue = "hwk"
 
 	async def is_eligible(self, login_data) -> bool:
 		"""
