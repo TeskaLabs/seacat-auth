@@ -10,9 +10,7 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
-import seacatauth.exceptions
-from .. import exceptions
-from ..audit import AuditCode
+from .. import exceptions, AuditLog, generic
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
@@ -38,7 +36,6 @@ class AuthenticationHandler(object):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CookieService = app.get_service("seacatauth.CookieService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.BatmanService = app.BatmanService
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 
@@ -208,24 +205,16 @@ class AuthenticationHandler(object):
 
 		request_data["request_headers"] = request.headers
 
-		access_ips = [request.remote]
-		ff = request.headers.get('X-Forwarded-For')
-		if ff is not None:
-			access_ips.extend(ff.split(', '))
+		access_ips = generic.get_request_access_ips(request)
 
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			await self.AuditService.append(
-				AuditCode.LOGIN_FAILED,
-				credentials_id=login_session.CredentialsId,
-				ips=access_ips
-			)
-
-			L.warning("Login failed: authentication failed", struct_data={
+			AuditLog.log(asab.LOG_NOTICE, "Login failed: authentication failed", struct_data={
 				"lsid": lsid,
 				"ident": login_session.Ident,
-				"cid": login_session.CredentialsId
+				"cid": login_session.CredentialsId,
+				"from_ip": access_ips
 			})
 
 			self.AuthenticationService.LoginCounter.add('failed', 1)
@@ -505,44 +494,28 @@ class AuthenticationHandler(object):
 		try:
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)
-		except seacatauth.exceptions.AccessDeniedError:
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_FAILED,
-				credentials_id=impersonator_cid,
-				session_id=impersonator_root_session.SessionId,
-				target_cid=target_cid,
-				fi=impersonator_from_info
-			)
-			L.warning("Impersonation failed: Access denied", struct_data={
-				"impersonator_cid": impersonator_cid, "target_cid": target_cid, "from_info": impersonator_from_info})
+		except exceptions.AccessDeniedError:
+			AuditLog.warning("Impersonation failed: Access denied", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"from_ip": impersonator_from_info,
+			})
 			return aiohttp.web.HTTPForbidden()
 		except Exception as e:
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_FAILED,
-				credentials_id=impersonator_cid,
-				session_id=impersonator_root_session.SessionId,
-				target_cid=target_cid,
-				fi=impersonator_from_info
-			)
-			raise e
+			AuditLog.exception("Impersonation failed: Unexpected error: {}".format(e), struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"from_ip": impersonator_from_info,
+			})
+			return aiohttp.web.HTTPForbidden()
 		else:
-			L.log(
-				asab.LOG_NOTICE,
-				"Impersonation successful.",
-				struct_data={
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": str(session.Session.Id),
-					"from_info": impersonator_from_info,
-				}
-			)
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_SUCCESSFUL,
-				credentials_id=impersonator_cid,
-				session_id=impersonator_root_session.SessionId,
-				target_cid=target_cid,
-				target_sid=session.Session.Id,
-				fi=impersonator_from_info
-			)
+			AuditLog.log(asab.LOG_NOTICE, "Impersonation successful", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"target_sid": str(session.Session.Id),
+				"from_ip": impersonator_from_info,
+			})
 		return session
