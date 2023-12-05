@@ -75,6 +75,9 @@ class AuthenticationService(asab.Service):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
 
+		auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
+		self.LoginUrl = "{}/#/login".format(auth_webui_base_url)
+
 		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
 		if self.CustomLoginParameters != "":
 			self.CustomLoginParameters = frozenset(re.split(r"\s+", self.CustomLoginParameters))
@@ -479,24 +482,24 @@ class AuthenticationService(asab.Service):
 		acr_values = authorization_query.pop("acr_values", None)
 
 		# Build callback authorization URL
-		authorization_uri = "{}?{}".format(
+		authorization_url = "{}?{}".format(
 			oidc_svc.authorization_endpoint_url(),
 			urllib.parse.urlencode(authorization_query))
 
 		# Prepare login params
 		login_query_params = [
-			("redirect_uri", authorization_uri),
+			("redirect_uri", authorization_url),
 			("client_id", client_id)]
 		if prompt:
 			login_query_params.append(("prompt", prompt))
 		if acr_values:
 			login_query_params.append(("acr_values", acr_values))
 
-		login_uri = client_dict.get("login_uri")
-		if login_uri is None:
-			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
+		login_url = client_dict.get("login_uri")
+		if login_url is None:
+			login_url = self.LoginUrl
 
-		parsed = generic.urlparse(login_uri)
+		parsed = generic.urlparse(login_url)
 		if parsed["fragment"] != "":
 			# If the Login URI contains fragment, add the login params into the fragment query
 			fragment_parsed = generic.urlparse(parsed["fragment"])

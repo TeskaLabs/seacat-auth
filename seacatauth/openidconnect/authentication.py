@@ -71,7 +71,11 @@ class Authentication:
 		allow_anonymous: bool = False,
 		prompt: str | None = None,
 		acr_values: list | None = None,
+		max_age: float | None = None,
 	) -> bool:
+		"""
+		Check if all authentication requirements pass. If not, login is required.
+		"""
 		if prompt == "login":
 			L.log(asab.LOG_NOTICE, "Client requested 'login' prompt")
 			return True
@@ -100,15 +104,17 @@ class Authentication:
 		# TODO: Add options for other login types/descriptors (2fa, mfa, basic...)
 
 		# Add external login options
-		acr_values.extend(self.ExternalLoginService.acr_values_supported())
+		for provider in self.ExternalLoginService.Providers:
+			acr_values.append("ext:{}".format(provider.Type))
+
 		return acr_values
 
 
-	def are_acr_preferences_satisfied(self, session: SessionAdapter | None, acr_values: list) -> bool:
+	def are_acr_preferences_satisfied(self, session: SessionAdapter | None, acr_values: list | None) -> bool:
 		"""
 		Verify if the session's authentication satisfies requested preferences (OIDC ACR values)
 		"""
-		if session is None or not session.OAuth2.ACR:
+		if session is None or not session.Authentication.LoginFactors:
 			# Session is missing or has no authentication data
 			return False
 
@@ -119,7 +125,7 @@ class Authentication:
 		# At least one authentication preference must be satisfied
 		for acr_value in acr_values:
 			# Only the "ext"-prefixed values are supported for now
-			if acr_value.startswith("ext:") and acr_value in session.OAuth2.ACR:
+			if acr_value.startswith("ext:") and acr_value in session.Authentication.LoginFactors:
 				return True
 
 		return False

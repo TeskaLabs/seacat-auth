@@ -1,9 +1,9 @@
 import logging
 import secrets
-
 import aiohttp
 import typing
 import pymongo
+import urllib.parse
 
 import asab
 import asab.web.rest
@@ -86,6 +86,9 @@ class ExternalLoginService(asab.Service):
 		root_session: SessionAdapter | None,
 		authorization_query: dict
 	):
+		"""
+		Prepare the authorization URL of the requested external login provider
+		"""
 		provider = self.get_provider_by_acr(acr_value)
 		if not provider:
 			return None
