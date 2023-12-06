@@ -50,20 +50,20 @@ class DiscoveryHandler(object):
 			# REQUIRED
 			"issuer": self.OpenIdConnectService.Issuer,
 			"authorization_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath),
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.AuthorizePath.lstrip("/")),
 			"token_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenPath),
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenPath.lstrip("/")),
 			# TODO: The algorithm RS256 MUST be included.
 			#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
 			"id_token_signing_alg_values_supported": ["ES256"],
 			"jwks_uri": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath),
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath.lstrip("/")),
 			"response_types_supported": ["code"],
 			"subject_types_supported": ["public"],
 
 			# RECOMMENDED
 			"userinfo_endpoint": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.UserInfoPath),
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.UserInfoPath.lstrip("/")),
 			# "registration_endpoint": "{}/public/client/register",  # TODO: Implement a PUBLIC client registration API
 			"scopes_supported": [
 				"openid", "profile", "email", "phone",

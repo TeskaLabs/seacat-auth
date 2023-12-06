@@ -48,7 +48,7 @@ class WebAuthnService(asab.Service):
 
 		self.Origin = asab.Config.get("seacatauth:webauthn", "origin", fallback=None)
 		if self.Origin is None:
-			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			auth_webui_base_url = app.AuthWebUiUrl.rstrip("/")
 			parsed = urllib.parse.urlparse(auth_webui_base_url)
 			self.Origin = "{}://{}".format(parsed.scheme, parsed.netloc)
 

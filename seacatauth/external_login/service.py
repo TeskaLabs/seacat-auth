@@ -37,7 +37,7 @@ class ExternalLoginService(asab.Service):
 
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
-		self.AuthUiBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
+		self.AuthUiBaseUrl = app.AuthWebUiUrl
 		self.HomeUiFragmentPath = "/"
 		self.LoginUiFragmentPath = "/login"
 		self.ExternalLoginPath = "/public/ext-login/{ext_login_provider}"

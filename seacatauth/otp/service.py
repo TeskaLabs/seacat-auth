@@ -28,7 +28,7 @@ class OTPService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.Issuer = asab.Config.get("seacatauth:otp", "issuer")
 		if len(self.Issuer) == 0:
-			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			auth_webui_base_url = app.AuthWebUiUrl.rstrip("/")
 			self.Issuer = str(urllib.parse.urlparse(auth_webui_base_url).hostname)
 		self.RegistrationTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("seacatauth:otp", "registration_timeout")

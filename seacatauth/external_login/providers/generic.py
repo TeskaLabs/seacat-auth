@@ -104,7 +104,7 @@ class GenericOAuth2Login(asab.Configurable):
 		public_api_base_url = self.Config.get("public_api_base_url")
 		if public_api_base_url is None:
 			# Fallback to general public_api_base_url
-			public_api_base_url = asab.Config.get("general", "public_api_base_url")
+			public_api_base_url = external_login_svc.App.PublicSeacatAuthApiUrl
 
 		self.JwkSet = None
 
