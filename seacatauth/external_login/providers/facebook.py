@@ -55,6 +55,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			("scope", self.Scope),
 			("redirect_uri", redirect_uri or self.CallbackUri),
 		]
+		# "nonce" is not supported
 		if state is not None:
 			query_params.append(("state", state))
 		return "{authorize_uri}?{query_string}".format(
@@ -62,7 +63,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data, redirect_uri):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Info is not contained in token response, call to userinfo_endpoint is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
@@ -74,7 +75,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 				"query": dict(authorize_data)})
 			return None
 
-		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
+		async with self.token_request(code) as resp:
 			token_data = await resp.json()
 
 		if "access_token" not in token_data:

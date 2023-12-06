@@ -163,7 +163,7 @@ class GenericOAuth2Login(asab.Configurable):
 		)
 
 	@contextlib.asynccontextmanager
-	async def token_request(self, code: str, redirect_uri: str):
+	async def token_request(self, code: str, redirect_uri: str | None = None):
 		"""
 		Send auth code to token request endpoint and return access token
 		"""
@@ -171,7 +171,7 @@ class GenericOAuth2Login(asab.Configurable):
 			("grant_type", "authorization_code"),
 			("code", code),
 			("client_id", self.ClientId),
-			("redirect_uri", redirect_uri)]
+			("redirect_uri", redirect_uri or self.CallbackUri)]
 		if self.ClientSecret:
 			request_params.append(("client_secret", self.ClientSecret))
 		query_string = urllib.parse.urlencode(request_params)
@@ -192,7 +192,7 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def get_user_info(self, authorize_data: dict):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None):
 		"""
 		Obtain the authenticated user's profile info, with the claims normalized to be in line with
 		OpenID UserInfo response.
@@ -226,7 +226,7 @@ class GenericOAuth2Login(asab.Configurable):
 		id_token = token_data["id_token"]
 		await self._prepare_jwks()
 
-		id_token_claims = self._get_verified_claims(id_token)
+		id_token_claims = self._get_verified_claims(id_token, expected_nonce)
 		user_info = await self._user_data_from_id_token_claims(id_token_claims)
 		return user_info
 
@@ -241,9 +241,13 @@ class GenericOAuth2Login(asab.Configurable):
 		}
 		return user_info
 
-	def _get_verified_claims(self, id_token):
+	def _get_verified_claims(self, id_token, expected_nonce: str | None = None):
+		if expected_nonce:
+			check_claims = {"nonce": expected_nonce, **self.IDClaimsToVerify}
+		else:
+			check_claims = self.IDClaimsToVerify
 		try:
-			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=self.IDClaimsToVerify)
+			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=check_claims)
 			claims = json.loads(id_token.claims)
 		except jwcrypto.jws.InvalidJWSSignature:
 			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})

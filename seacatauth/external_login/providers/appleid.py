@@ -63,7 +63,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def get_user_info(self, authorize_data: dict) -> typing.Optional[dict]:
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		auth_error = authorize_data.get('error')
 		if auth_error is not None:
 			if auth_error == 'user_cancelled_authorize':
@@ -80,7 +80,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 				return None
 
 		id_token = authorize_data.get("id_token")
-		verified_claims = self._get_verified_claims(id_token)
+		verified_claims = self._get_verified_claims(id_token, expected_nonce)
 		if not verified_claims:
 			return None
 
