@@ -3,7 +3,6 @@ import secrets
 import aiohttp
 import typing
 import pymongo
-import urllib.parse
 
 import asab
 import asab.web.rest
@@ -44,9 +43,9 @@ class ExternalLoginService(asab.Service):
 		self.CallbackEndpointPath = "/public/ext-login"
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
-		self.CallbackUriAbsolute = "{}{}".format(
-			public_api_base_url.rstrip("/"),
-			self.CallbackEndpointPath
+		self.CallbackUriAbsolute = "{}/seacat-auth/{}".format(
+			public_api_base_url,
+			self.CallbackEndpointPath.lstrip("/")
 		)
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
@@ -72,24 +71,16 @@ class ExternalLoginService(asab.Service):
 		return self.Providers.get(provider_type)
 
 
-	def acr_values_supported(self) -> frozenset:
-		return frozenset(self.AcrValues.keys())
-
-
-	def get_provider_by_acr(self, acr_value: str) -> GenericOAuth2Login:
-		return self.AcrValues.get(acr_value)
-
-
 	async def prepare_external_login_url(
 		self,
-		acr_value: str,
+		provider_type: str,
 		root_session: SessionAdapter | None,
 		authorization_query: dict
 	):
 		"""
 		Prepare the authorization URL of the requested external login provider
 		"""
-		provider = self.get_provider_by_acr(acr_value)
+		provider = self.get_provider(provider_type)
 		if not provider:
 			return None
 
@@ -241,12 +232,13 @@ class ExternalLoginService(asab.Service):
 		if root_session:
 			upsertor.set("sid", root_session.SessionId)
 			upsertor.set("cid", root_session.Credentials.Id)
-			await upsertor.execute()
+
+		await upsertor.execute()
 		return state_id, nonce
 
 
 	async def pop_authorization_state(self, state_id: str) -> dict:
-		coll = await self.StorageService.collection(self.ExternalLoginCollection)
+		coll = await self.StorageService.collection(self.ExternalLoginStateCollection)
 		state = await coll.find_one_and_delete({"_id": state_id})
 		if state is None:
 			raise KeyError("State ID not found: {}".format(state_id))

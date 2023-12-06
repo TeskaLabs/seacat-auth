@@ -56,8 +56,9 @@ class Authentication:
 				# Return the first valid URL
 				# At the moment, ACR values are used only for external login preferences
 				if acr_value.startswith("ext:"):
+					provider_type = acr_value[4:]
 					login_uri = await self.ExternalLoginService.prepare_external_login_url(
-						acr_value, root_session, authorization_query)
+						provider_type, root_session, authorization_query)
 					if login_uri:
 						return login_uri
 
@@ -93,6 +94,7 @@ class Authentication:
 				"acr_values": acr_values})
 			return True
 		else:
+			# TODO: Check max_age (max authentication age)
 			return False
 
 

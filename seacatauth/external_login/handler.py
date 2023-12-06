@@ -6,6 +6,7 @@ import asab
 import asab.web.rest
 
 from .service import ExternalLoginService
+from .. import generic
 from ..decorators import access_control
 from ..cookie.utils import set_cookie, delete_cookie
 
@@ -64,7 +65,7 @@ class ExternalLoginHandler(object):
 		login_provider_type = state["type"]
 
 		provider = self.ExternalLoginService.get_provider(login_provider_type)
-		user_info = await provider.get_user_info(authorize_data)
+		user_info = await provider.get_user_info(authorize_data, expected_nonce=state.get("nonce"))
 
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
@@ -170,3 +171,11 @@ class ExternalLoginHandler(object):
 
 		response = {"result": "OK"}
 		return asab.web.rest.json_response(request, response)
+
+
+	async def _redirect_to_authorization(self, oauth_query: dict):
+		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+		authorization_uri = "{}?{}".format(
+			oidc_service.authorization_endpoint_url(),
+			urllib.parse.urlencode(oauth_query))
+		return aiohttp.web.HTTPFound(location=authorization_uri)
