@@ -119,12 +119,12 @@ class KibanaIntegration(asab.config.Configurable):
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
 		if self.ElasticSearchNodesUrls[0].startswith('https://'):
-			# SSLContextBuilder is looking at existing config sections
-			# TODO: improvement needed: not just 'cafile', there are other options as well
+			# use one of the old sections if it has SSL data or default to the [elasticsearch] section
 			# TODO: delete the 1st condition when [batman:elk] is obsolete
-			if asab.Config.has_option('batman:elk', 'cafile'):
+			if asab.Config.has_section('batman:elk') and section_has_ssl_option('batman:elk'):
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder('batman:elk')
-			elif asab.Config.has_option(config_section_name, 'cafile'):
+			# TODO: when [batman:elk] is obsolete there is no need to check if the section exists / remove
+			elif asab.Config.has_section(config_section_name) and section_has_ssl_option(config_section_name):
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 			else:
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder('elasticsearch')
@@ -548,3 +548,13 @@ def parse_url(url):
 		url_path += "/"
 
 	return parsed_url.scheme, parsed_url.netloc, url_path
+
+
+def section_has_ssl_option(config_section_name):
+	"""
+	Checks if cert, key, cafile, capath, cadata etc. appears in a section's items
+	"""
+	for item in asab.Config.options(config_section_name):
+		if item in asab.tls.SSLContextBuilder.ConfigDefaults:
+			return True
+	return False
