@@ -384,7 +384,7 @@ class CookieHandler(object):
 			redirect_uri = parameters["redirect_uri"]
 		else:
 			# Fallback to client URI or Auth UI
-			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl
+			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl.rstrip("/")
 
 		# Set track ID if not set yet
 		if session.TrackId is None:

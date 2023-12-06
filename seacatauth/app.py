@@ -352,8 +352,8 @@ class SeaCatAuthApplication(asab.Application):
 				"with 'https://' or 'http://' ({!r}). Please supply a full absolute URL.".format(self.PublicServerUrl))
 		if self.PublicServerUrl.startswith("http://"):
 			L.warning(
-				"Seacat Auth public interface is running on plain (insecure) HTTP. "
-				"This may limit the functionality of certain components.")
+				"Seacat Auth public interface is running on plain insecure HTTP ({!r}). "
+				"This may limit the functionality of certain components.".format(self.PublicServerUrl))
 
 		# Public base URL of Seacat Auth API
 		#   Canonically, this is "https://${SERVER_NAME}/api/seacat-auth",

@@ -61,11 +61,7 @@ class OpenIdConnectService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
-		public_api_base_url = asab.Config.get("general", "public_api_base_url")
-		if public_api_base_url.endswith("/"):
-			self.PublicApiBaseUrl = public_api_base_url[:-1]
-		else:
-			self.PublicApiBaseUrl = public_api_base_url
+		self.PublicApiBaseUrl = app.PublicOpenIdConnectApiUrl
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
 
@@ -81,7 +77,7 @@ class OpenIdConnectService(asab.Service):
 					"and has no query or fragment components.")
 		else:
 			# Default fallback option
-			self.Issuer = self.PublicApiBaseUrl
+			self.Issuer = self.PublicApiBaseUrl.rstrip("/")
 
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
@@ -516,7 +512,7 @@ class OpenIdConnectService(asab.Service):
 		# TODO: This should be removed. There must be only one authorize endpoint.
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
-			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
 		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
