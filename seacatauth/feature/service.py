@@ -31,7 +31,7 @@ class FeatureService(asab.Service):
 		do_external_login_uris = [
 			{
 				"type": provider.Type,
-				"authorize_uri": "https://TODO.TODO/TODO",
+				"authorize_uri": provider.get_authorize_uri(),
 				"label": provider.Label
 			}
 			for provider in self.ExternalLoginService.Providers.values()
@@ -49,8 +49,8 @@ class FeatureService(asab.Service):
 		add_external_login_uris = [
 			{
 				"type": provider.Type,
-				"authorize_uri": "https://TODO.TODO/TODO",
-				"label": provider.Label  # TODO: Separate label for adding the login
+				"authorize_uri": provider.get_authorize_uri(),
+				"label": provider.Label
 			}
 			for provider in self.ExternalLoginService.Providers.values()
 		]

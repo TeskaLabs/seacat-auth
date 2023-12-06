@@ -142,7 +142,7 @@ class GenericOAuth2Login(asab.Configurable):
 		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
 	def get_authorize_uri(
-		self, redirect_uri: str,
+		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	):
@@ -150,7 +150,7 @@ class GenericOAuth2Login(asab.Configurable):
 			("response_type", "code"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri),
+			("redirect_uri", redirect_uri or self.CallbackUri),
 			("prompt", "select_account"),
 		]
 		if state is not None:
