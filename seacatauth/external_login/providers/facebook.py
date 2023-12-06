@@ -45,7 +45,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		assert self.UserInfoEndpoint not in (None, "")
 
 	def get_authorize_uri(
-		self, redirect_uri: str,
+		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	):
@@ -53,7 +53,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			("client_id", self.ClientId),
 			("response_type", self.ResponseType),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri),
+			("redirect_uri", redirect_uri or self.CallbackUri),
 		]
 		if state is not None:
 			query_params.append(("state", state))

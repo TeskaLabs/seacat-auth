@@ -43,7 +43,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		self.Scope = self.Config.get("scope")
 
 	def get_authorize_uri(
-		self, redirect_uri: str,
+		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	) -> str:
@@ -52,7 +52,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			("response_type", "code id_token"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri),
+			("redirect_uri", redirect_uri or self.CallbackUri),
 		]
 		if state is not None:
 			query_params.append(("state", state))
