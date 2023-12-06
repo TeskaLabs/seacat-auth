@@ -356,7 +356,7 @@ class SeaCatAuthApplication(asab.Application):
 				"This may limit the functionality of certain components.".format(self.PublicServerUrl))
 
 		# Public base URL of Seacat Auth API
-		#   Canonically, this is "https://${SERVER_NAME}/api/seacat-auth",
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/seacat-auth/",
 		#   yielding for example "https://example.com/api/seacat-auth/public/features"
 		self.PublicSeacatAuthApiUrl = asab.Config.get(
 			"general", "public_seacat_auth_api_prefix").rstrip("/") + "/"
@@ -368,7 +368,7 @@ class SeaCatAuthApplication(asab.Application):
 			self.PublicSeacatAuthApiUrl = urllib.parse.urljoin(self.PublicServerUrl, self.PublicSeacatAuthApiUrl)
 
 		# Public base URL of OpenID Connect API
-		#   Canonically, this is "https://${SERVER_NAME}/api/openidconnect",
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/openidconnect/",
 		#   yielding for example "https://example.com/api/openidconnect/authorize"
 		self.PublicOpenIdConnectApiUrl = asab.Config.get(
 			"general", "public_openidconnect_api_prefix").rstrip("/") + "/"
@@ -380,7 +380,7 @@ class SeaCatAuthApplication(asab.Application):
 			self.PublicOpenIdConnectApiUrl = urllib.parse.urljoin(self.PublicServerUrl, self.PublicOpenIdConnectApiUrl)
 
 		# Seacat Auth WebUI URL
-		#   Canonically, this is "https://${SERVER_NAME}/auth",
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/auth/",
 		#   yielding for example "https://example.com/auth/#/login"
 		self.AuthWebUiUrl = asab.Config.get(
 			"general", "auth_webui_base_url").rstrip("/") + "/"
