@@ -10,7 +10,7 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
-from .. import exceptions, AuditLog, generic
+from .. import exceptions, AuditLogger, generic
 from ..audit import AuditCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
@@ -211,7 +211,7 @@ class AuthenticationHandler(object):
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			AuditLog.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
 				"cid": login_session.CredentialsId,
 				"lsid": lsid,
 				"ident": login_session.Ident,
@@ -498,7 +498,7 @@ class AuthenticationHandler(object):
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)
 		except exceptions.AccessDeniedError:
-			AuditLog.warning("Impersonation failed: Access denied", struct_data={
+			AuditLogger.warning("Impersonation failed: Access denied", struct_data={
 				"impersonator_cid": impersonator_cid,
 				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,
@@ -506,7 +506,7 @@ class AuthenticationHandler(object):
 			})
 			return aiohttp.web.HTTPForbidden()
 		except Exception as e:
-			AuditLog.exception("Impersonation failed: Unexpected error ({})".format(e), struct_data={
+			AuditLogger.exception("Impersonation failed: Unexpected error ({})".format(e), struct_data={
 				"impersonator_cid": impersonator_cid,
 				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,
@@ -514,7 +514,7 @@ class AuthenticationHandler(object):
 			})
 			return aiohttp.web.HTTPForbidden()
 		else:
-			AuditLog.log(asab.LOG_NOTICE, "Impersonation successful", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Impersonation successful", struct_data={
 				"impersonator_cid": impersonator_cid,
 				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,

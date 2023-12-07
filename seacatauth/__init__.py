@@ -181,7 +181,7 @@ asab.Config.add_defaults({
 	},
 })
 
-AuditLog = logging.getLogger("AUDIT")
+AuditLogger = logging.getLogger("AUDIT")
 
 __all__ = [
 	"SeaCatAuthApplication"

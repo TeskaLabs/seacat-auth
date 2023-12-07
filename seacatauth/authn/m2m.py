@@ -4,6 +4,7 @@ import logging
 import aiohttp.web
 import asab
 
+from .. import AuditLogger, generic
 from ..generic import nginx_introspection
 from ..session import SessionAdapter
 
@@ -101,9 +102,18 @@ class M2MIntrospectHandler(object):
 				session_expiration=None,  # TODO: Short expiration
 				from_info=access_ips
 			)
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+				"cid": credentials_id,
+				"sid": str(session.Session.Id),
+				"fi": generic.get_request_access_ips(request),
+				"m2m": True,
+			})
+
 		if session is None:
-			L.warning("M2M login failed", struct_data={
-				"cid": credentials_id
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+				"cid": credentials_id,
+				"fi": generic.get_request_access_ips(request),
+				"m2m": True,
 			})
 			return None
 
