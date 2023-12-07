@@ -236,9 +236,15 @@ class AuthenticationHandler(object):
 				status=401
 			)
 
+		# If there already is a root session with the same credentials ID, refresh it instead of creating a new one
+		if request.Session is not None and request.Session.Credentials.Id == login_session.CredentialsId:
+			root_session = request.Session
+		else:
+			root_session = None
+
 		# Do the actual login
 		session = await self.AuthenticationService.login(
-			login_session, root_session=request.Session, from_info=access_ips)
+			login_session, root_session=root_session, from_info=access_ips)
 
 		# TODO: Note the last successful login time
 		# TODO: Log also the IP address
