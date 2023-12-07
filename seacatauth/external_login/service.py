@@ -43,10 +43,12 @@ class ExternalLoginService(asab.Service):
 		self.CallbackEndpointPath = "/public/ext-login"
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
-		self.CallbackUriAbsolute = "{}/seacat-auth/{}".format(
+		self.CallbackUrl = "{}/seacat-auth/{}".format(
 			public_api_base_url,
 			self.CallbackEndpointPath.lstrip("/")
 		)
+		auth_webui_url = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
+		self.MyAccountPageUrl = "{}/#/".format(auth_webui_url)
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
 		self.AcrValues: typing.Dict[str, GenericOAuth2Login] = {
@@ -85,7 +87,7 @@ class ExternalLoginService(asab.Service):
 			return None
 
 		state_id, nonce = await self._store_authorization_state(root_session, authorization_query, provider.Type)
-		return provider.get_authorize_uri(self.CallbackUriAbsolute, state_id, nonce)
+		return provider.get_authorize_uri(self.CallbackUrl, state_id, nonce)
 
 
 	async def initialize(self, app):
@@ -99,19 +101,30 @@ class ExternalLoginService(asab.Service):
 		)
 
 
-	async def create(self, credentials_id: str, provider_type: str, sub: str, email: str = None, ident: str = None):
-		sub = str(sub)
+	async def create(self, credentials_id: str, provider_type: str, user_info: dict | None = None):
+		"""
+		Assign an external credential to Seacat Auth credentials
+		"""
+		sub = str(user_info["sub"])
 		upsertor = self.StorageService.upsertor(
 			self.ExternalLoginCollection,
 			obj_id=self._make_id(provider_type, sub)
 		)
-		upsertor.set("t", provider_type)
-		upsertor.set("s", sub)
+		upsertor.set("type", provider_type)
+		upsertor.set("sub", sub)
 		upsertor.set("cid", credentials_id)
+
+		email = user_info.get("email")
 		if email is not None:
-			upsertor.set("e", email)
-		if ident is not None:
-			upsertor.set("i", ident)
+			upsertor.set("email", email)
+
+		phone = user_info.get("phone_number")
+		if phone is not None:
+			upsertor.set("phone", phone)
+
+		username = user_info.get("preferred_username")
+		if username is not None:
+			upsertor.set("username", username)
 
 		elcid = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_CREATED)
 		L.log(asab.LOG_NOTICE, "External login credential created", struct_data={
@@ -121,6 +134,9 @@ class ExternalLoginService(asab.Service):
 
 
 	async def list(self, credentials_id: str):
+		"""
+		List external credentials assigned with Seacat Auth credentials ID
+		"""
 		collection = self.StorageService.Database[self.ExternalLoginCollection]
 
 		query_filter = {"cid": credentials_id}
@@ -136,10 +152,24 @@ class ExternalLoginService(asab.Service):
 
 
 	async def get(self, provider_type: str, sub: str):
-		return await self.StorageService.get(self.ExternalLoginCollection, self._make_id(provider_type, sub))
+		"""
+		Get external login credential
+		"""
+		cred = await self.StorageService.get(self.ExternalLoginCollection, self._make_id(provider_type, sub))
+		# Back compat fields
+		if "e" in cred and "email" not in cred:
+			cred["email"] = cred["e"]
+		if "s" in cred and "sub" not in cred:
+			cred["sub"] = cred["s"]
+		if "t" in cred and "type" not in cred:
+			cred["type"] = cred["t"]
+		return cred
 
 
-	async def get_sub(self, credentials_id: str, provider_type: str):
+	async def get_by_cid(self, credentials_id: str, provider_type: str):
+		"""
+		Get external login credential by Seacat Auth credentials ID
+		"""
 		collection = self.StorageService.Database[self.ExternalLoginCollection]
 		query_filter = {"cid": credentials_id, "t": provider_type}
 		result = await collection.find_one(query_filter)
@@ -153,6 +183,9 @@ class ExternalLoginService(asab.Service):
 
 
 	async def delete(self, provider_type: str, sub: str, credentials_id: str = None):
+		"""
+		Remove external login credential
+		"""
 		if credentials_id is not None:
 			el_credential = await self.get(provider_type, sub)
 			if credentials_id != el_credential["cid"]:
