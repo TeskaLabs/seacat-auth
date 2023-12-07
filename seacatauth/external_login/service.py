@@ -315,7 +315,7 @@ class ExternalLoginService(asab.Service):
 		provider_type,
 		credentials_id,
 		root_session: SessionAdapter | None = None,
-		from_ip: list | None = None
+		from_ip: typing.Iterable | None = None
 	) -> dict:
 		# Create a placeholder login session
 		login_descriptors = []

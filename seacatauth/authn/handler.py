@@ -237,7 +237,8 @@ class AuthenticationHandler(object):
 			)
 
 		# Do the actual login
-		session = await self.AuthenticationService.login(login_session, from_info=access_ips)
+		session = await self.AuthenticationService.login(
+			login_session, root_session=request.Session, from_info=access_ips)
 
 		# TODO: Note the last successful login time
 		# TODO: Log also the IP address

@@ -263,13 +263,16 @@ class OpenIdConnectService(asab.Service):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 				exclude_resources=exclude_resources,
+			),
+			(
+				(SessionAdapter.FN.Authentication.AuthenticatedAt, root_session.Authentication.AuthenticatedAt),
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 			)
 		]
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
 				(
 					SessionAdapter.FN.Authentication.ExternalLoginOptions,
@@ -412,6 +415,8 @@ class OpenIdConnectService(asab.Service):
 		if session.Authentication.AvailableFactors is not None:
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
 
+		if session.Authentication.AuthenticatedAt is not None:
+			userinfo["auth_time"] = session.Authentication.AuthenticatedAt
 		if session.Authentication.LoginDescriptor is not None:
 			userinfo["ldid"] = session.Authentication.LoginDescriptor
 		if session.Authentication.LoginFactors is not None:
