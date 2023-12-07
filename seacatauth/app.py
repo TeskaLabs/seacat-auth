@@ -29,7 +29,7 @@ class SeaCatAuthApplication(asab.Application):
 		self._check_encryption_config()
 		self.PrivateKey = self._load_private_key()
 
-		self.PublicServerUrl = None
+		self.PublicUrl = None
 		self.PublicSeacatAuthApiUrl = None
 		self.PublicOpenIdConnectApiUrl = None
 		self.AuthWebUiUrl = None
@@ -323,37 +323,37 @@ class SeaCatAuthApplication(asab.Application):
 
 
 	def _prepare_public_urls(self):
-		self.PublicServerUrl = asab.Config.get("general", "public_server_url")
-		if not self.PublicServerUrl:
+		self.PublicUrl = asab.Config.get("general", "public_url")
+		if not self.PublicUrl:
 			# Check deprecated option (backward compatibility)
 			public_api_base_url = asab.Config.get("general", "public_api_base_url", fallback=None)
 			if public_api_base_url:
 				asab.LogObsolete.warning(
 					"Config option 'public_api_base_url' in the 'general' section is deprecated. "
-					"Please use the 'PUBLIC_SERVER_URL' environment variable "
-					"or the 'public_server_url' option in the 'general' config section.",
+					"Please use the 'PUBLIC_URL' environment variable "
+					"or the 'public_url' option in the 'general' config section.",
 					struct_data={"eol": "2024-05-31"}
 				)
-				self.PublicServerUrl = public_api_base_url
-		if not self.PublicServerUrl:
+				self.PublicUrl = public_api_base_url
+		if not self.PublicUrl:
 			# Try to load config from env variable
-			env_public_server_url = os.getenv("PUBLIC_SERVER_URL")
-			if env_public_server_url:
-				self.PublicServerUrl = env_public_server_url
+			env_public_url = os.getenv("PUBLIC_URL")
+			if env_public_url:
+				self.PublicUrl = env_public_url
 			else:
-				self.PublicServerUrl = "http://localhost"
-				L.log(asab.LOG_NOTICE, "No public server URL configured. Falling back to {!r}.".format(self.PublicServerUrl))
+				self.PublicUrl = "http://localhost"
+				L.log(asab.LOG_NOTICE, "No public server URL configured. Falling back to {!r}.".format(self.PublicUrl))
 
 		# Ensure that the URL ends with a slash
-		self.PublicServerUrl = self.PublicServerUrl.rstrip("/") + "/"
-		if not (self.PublicServerUrl.startswith("https://") or self.PublicServerUrl.startswith("http://")):
+		self.PublicUrl = self.PublicUrl.rstrip("/") + "/"
+		if not (self.PublicUrl.startswith("https://") or self.PublicUrl.startswith("http://")):
 			raise ValueError(
 				"The value of 'public_base_url' in 'general' config section does not start "
-				"with 'https://' or 'http://' ({!r}). Please supply a full absolute URL.".format(self.PublicServerUrl))
-		if self.PublicServerUrl.startswith("http://"):
+				"with 'https://' or 'http://' ({!r}). Please supply a full absolute URL.".format(self.PublicUrl))
+		if self.PublicUrl.startswith("http://"):
 			L.warning(
 				"Seacat Auth public interface is running on plain insecure HTTP ({!r}). "
-				"This may limit the functionality of certain components.".format(self.PublicServerUrl))
+				"This may limit the functionality of certain components.".format(self.PublicUrl))
 
 		# Public base URL of Seacat Auth API
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/seacat-auth/",
@@ -365,7 +365,7 @@ class SeaCatAuthApplication(asab.Application):
 			or self.PublicSeacatAuthApiUrl.startswith("http://")
 		):
 			# Relative URL: Append to PublicBaseUrl
-			self.PublicSeacatAuthApiUrl = urllib.parse.urljoin(self.PublicServerUrl, self.PublicSeacatAuthApiUrl)
+			self.PublicSeacatAuthApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicSeacatAuthApiUrl)
 
 		# Public base URL of OpenID Connect API
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/openidconnect/",
@@ -377,7 +377,7 @@ class SeaCatAuthApplication(asab.Application):
 			or self.PublicOpenIdConnectApiUrl.startswith("http://")
 		):
 			# Relative URL: Append to PublicBaseUrl
-			self.PublicOpenIdConnectApiUrl = urllib.parse.urljoin(self.PublicServerUrl, self.PublicOpenIdConnectApiUrl)
+			self.PublicOpenIdConnectApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicOpenIdConnectApiUrl)
 
 		# Seacat Auth WebUI URL
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/auth/",
@@ -389,4 +389,4 @@ class SeaCatAuthApplication(asab.Application):
 			or self.AuthWebUiUrl.startswith("http://")
 		):
 			# Relative URL: Append to PublicBaseUrl
-			self.AuthWebUiUrl = urllib.parse.urljoin(self.PublicServerUrl, self.AuthWebUiUrl)
+			self.AuthWebUiUrl = urllib.parse.urljoin(self.PublicUrl, self.AuthWebUiUrl)
