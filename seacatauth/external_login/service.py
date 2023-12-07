@@ -1,3 +1,4 @@
+import datetime
 import logging
 import secrets
 import aiohttp
@@ -22,6 +23,7 @@ asab.Config.add_defaults({
 	"seacatauth:external_login": {
 		# URI for the external registration of unknown accounts from external identity providers.
 		"registration_webhook_uri": "",
+		"state_expiration": "10m"
 	}})
 
 
@@ -38,6 +40,8 @@ class ExternalLoginService(asab.Service):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
+		self.StateExpiration = datetime.timedelta(seconds=asab.Config.getseconds(
+			"seacatauth:external_login", "state_expiration"))
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
 		self.CallbackEndpointPath = "/public/ext-login"
@@ -54,6 +58,12 @@ class ExternalLoginService(asab.Service):
 		self.AcrValues: typing.Dict[str, GenericOAuth2Login] = {
 			provider.acr_value(): provider
 			for provider in self.Providers.values()}
+
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	async def _on_housekeeping(self, event_name):
+		await self._delete_old_authorization_states()
 
 
 	def _prepare_providers(self):
@@ -197,6 +207,19 @@ class ExternalLoginService(asab.Service):
 		})
 
 
+	async def register_new_credentials(
+		self,
+		provider_type: str,
+		user_info: dict,
+		authorization_data: dict,
+	) -> str | None:
+		# TODO: Attempt registration with local credential providers if enabled
+		if self.RegistrationWebhookUri:
+			credentials_id = await self.ExternalLoginService.register_credentials_via_webhook(
+				provider_type, authorization_data, user_info)
+		return credentials_id
+
+
 	async def register_credentials_via_webhook(
 		self,
 		provider_type: str,
@@ -240,12 +263,11 @@ class ExternalLoginService(asab.Service):
 			L.error("Returned credential ID not found.", struct_data={"response_data": response_data})
 			return None
 
-		# Link the credentials ID to the external identity provider subject ID
+		# Assign the external subject ID to Seacat Auth credentials ID
 		await self.create(
 			credentials_id=credentials_id,
 			provider_type=provider_type,
-			sub=user_info["sub"],
-			email=user_info.get("email"))
+			user_info=user_info)
 
 		return credentials_id
 
@@ -262,7 +284,7 @@ class ExternalLoginService(asab.Service):
 		upsertor.set("oauth_query", authorization_query)
 		upsertor.set("type", provider_type)
 		upsertor.set("nonce", nonce)
-		if root_session:
+		if root_session and not root_session.is_anonymous():
 			upsertor.set("sid", root_session.SessionId)
 			upsertor.set("cid", root_session.Credentials.Id)
 
@@ -278,6 +300,48 @@ class ExternalLoginService(asab.Service):
 		return state
 
 
-	async def _delete_old_authorization_states(self) -> dict:
-		# TODO: On housekeeping, delete all whose _c < now - 5 mins
-		pass
+	async def _delete_old_authorization_states(self):
+		collection = self.StorageService.Database[self.ExternalLoginStateCollection]
+		query_filter = {"_c": {"$lt": datetime.datetime.now(datetime.timezone.utc) - self.StateExpiration}}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.info("Expired external login states deleted", struct_data={
+				"count": result.deleted_count
+			})
+
+
+	async def login(
+		self,
+		provider_type,
+		credentials_id,
+		root_session: SessionAdapter | None = None,
+		from_ip: list | None = None
+	) -> dict:
+		# Create a placeholder login session
+		login_descriptors = []
+		login_session = await self.AuthenticationService.create_login_session(
+			credentials_id=credentials_id,
+			client_public_key=None,
+			login_descriptors=login_descriptors,
+			ident=None
+		)
+
+		# Create ad-hoc login descriptor
+		login_factor = "ext:{}".format(provider_type)
+		login_session.AuthenticatedVia = {
+			"id": "!external",
+			"label": "Login via {}".format(provider_type),
+			"factors": [
+				{"id": login_factor, "type": login_factor}
+			]
+		}
+
+		# Finish login and create session
+		# TODO: If there is a valid non-anonymous root session, update it instead of creating a new one
+		new_session = await self.AuthenticationService.login(login_session, from_info=from_ip)
+		L.log(asab.LOG_NOTICE, "External login successful", struct_data={
+			"cid": credentials_id,
+			"login_type": provider_type
+		})
+
+		return new_session
