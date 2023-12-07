@@ -94,7 +94,8 @@ class Authentication:
 				"acr_values": acr_values})
 			return True
 		else:
-			# TODO: Check max_age (max authentication age)
+			# TODO: OPs MUST support enforcing a maximum authentication age via the max_age parameter
+			#  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 			return False
 
 
