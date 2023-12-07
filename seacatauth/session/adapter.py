@@ -38,6 +38,7 @@ class CredentialsData:
 
 @dataclasses.dataclass
 class AuthenticationData:
+	AuthenticatedAt: datetime.datetime
 	TOTPSet: str
 	ExternalLoginOptions: typing.Optional[list]
 	LoginDescriptor: typing.Optional[str]
@@ -63,8 +64,6 @@ class OAuth2Data:
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
 	Nonce: typing.Optional[str]
-	ACR: typing.Optional[list]
-	AMR: typing.Optional[list]
 
 
 @dataclasses.dataclass
@@ -122,6 +121,7 @@ class SessionAdapter:
 
 		class Authentication:
 			_prefix = "an"
+			AuthenticatedAt = "an_t"
 			TOTPSet = "an_ts"
 			ExternalLoginOptions = "an_ex"
 			LoginDescriptor = "an_ld"
@@ -140,8 +140,6 @@ class SessionAdapter:
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
 			Nonce = "oa_no"
-			ACR = "oa_acr"
-			AMR = "oa_amr"
 
 		class Cookie:
 			_prefix = "ck"
@@ -233,6 +231,7 @@ class SessionAdapter:
 
 		if self.Authentication is not None:
 			session_dict.update({
+				self.FN.Authentication.AuthenticatedAt: self.Authentication.AuthenticatedAt,
 				self.FN.Authentication.LastLogin: self.Authentication.LastLogin,
 				self.FN.Authentication.LoginDescriptor: self.Authentication.LoginDescriptor,
 				self.FN.Authentication.LoginFactors: self.Authentication.LoginFactors,
@@ -263,8 +262,6 @@ class SessionAdapter:
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
 				self.FN.OAuth2.Nonce: self.OAuth2.Nonce,
-				self.FN.OAuth2.ACR: self.OAuth2.ACR,
-				self.FN.OAuth2.AMR: self.OAuth2.AMR,
 			})
 
 		if self.Batman is not None:
@@ -338,6 +335,7 @@ class SessionAdapter:
 		if isinstance(login_descriptor, dict):
 			login_descriptor = login_descriptor["id"]
 		return AuthenticationData(
+			AuthenticatedAt=session_dict.pop(cls.FN.Authentication.AuthenticatedAt),
 			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None),
 			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
 			LoginDescriptor=login_descriptor,
@@ -383,8 +381,6 @@ class SessionAdapter:
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
 			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
-			ACR=session_dict.pop(cls.FN.OAuth2.ACR, None),
-			AMR=session_dict.pop(cls.FN.OAuth2.AMR, None),
 		)
 
 	@classmethod
@@ -417,6 +413,7 @@ def rest_get(session_dict):
 		"expiration": session_dict.get(SessionAdapter.FN.Session.Expiration),
 		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
+		"authenticated_at": session_dict.get(SessionAdapter.FN.Authentication.AuthenticatedAt),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
 		"login_factors": session_dict.get(SessionAdapter.FN.Authentication.LoginFactors),
 		"tenants": session_dict.get(SessionAdapter.FN.Authorization.Tenants),
