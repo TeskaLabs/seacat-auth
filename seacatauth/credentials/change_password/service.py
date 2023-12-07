@@ -144,7 +144,7 @@ class ChangePasswordService(asab.Service):
 				"Failed to send password reset link.", credentials_id=credentials_id)
 
 
-	async def do_change_password(self, credentials_id: str, new_password: str):
+	async def change_password(self, credentials_id: str, new_password: str):
 		provider = self.CredentialsService.get_provider(credentials_id)
 
 		# Remove "password" from enforced factors
