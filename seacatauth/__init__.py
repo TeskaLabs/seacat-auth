@@ -8,20 +8,20 @@ asab.Config.add_defaults({
 		# Used for deriving callback URLs, issuer IDs (OAuth, WebAuthn, ...).
 		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
 		# Defaults to "http://localhost", which can be overwritten by PUBLIC_SERVER_URL environment variable.
-		"public_server_url": "",
+		"public_url": "",
 
 		# URL prefix of public Seacat Auth API
-		# The URL can be either absolute, or relative to the "public_server_url" above.
+		# The URL can be either absolute, or relative to the "public_url" above.
 		"public_seacat_auth_api_prefix": "api/seacat-auth/",
 
 		# URL prefix of public OpenID Connect API
-		# The URL can be either absolute, or relative to the "public_server_url" above.
+		# The URL can be either absolute, or relative to the "public_url" above.
 		"public_openidconnect_api_prefix": "api/",
 
 		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
 		# It is used for building login and password reset URIs.
 		# The domain name is extracted for cookie and authentication purposes.
-		# The URL can be either absolute, or relative to the "public_server_url" above.
+		# The URL can be either absolute, or relative to the "public_url" above.
 		"auth_webui_base_url": "auth/",
 	},
 
