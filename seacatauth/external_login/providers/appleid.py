@@ -52,7 +52,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			("response_type", "code id_token"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri or self.CallbackUri),
+			("redirect_uri", redirect_uri or self.CallbackUrl),
 		]
 		if state is not None:
 			query_params.append(("state", state))

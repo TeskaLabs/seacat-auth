@@ -48,7 +48,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 				"query": dict(authorize_data)})
 			return None
 
-		async with self.token_request(code, redirect_uri=self.CallbackUri) as resp:
+		async with self.token_request(code) as resp:
 			response_text = await resp.text()
 
 		params = urllib.parse.parse_qs(response_text)

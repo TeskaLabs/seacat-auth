@@ -102,7 +102,7 @@ class GenericOAuth2Login(asab.Configurable):
 
 		self.JwkSet = None
 
-		self.CallbackUri = external_login_svc.CallbackUriAbsolute
+		self.CallbackUrl = external_login_svc.CallbackUrl
 
 
 	async def initialize(self, app):
@@ -150,7 +150,7 @@ class GenericOAuth2Login(asab.Configurable):
 			("response_type", "code"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri or self.CallbackUri),
+			("redirect_uri", redirect_uri or self.CallbackUrl),
 			("prompt", "select_account"),
 		]
 		if state is not None:
@@ -171,7 +171,7 @@ class GenericOAuth2Login(asab.Configurable):
 			("grant_type", "authorization_code"),
 			("code", code),
 			("client_id", self.ClientId),
-			("redirect_uri", redirect_uri or self.CallbackUri)]
+			("redirect_uri", redirect_uri or self.CallbackUrl)]
 		if self.ClientSecret:
 			request_params.append(("client_secret", self.ClientSecret))
 		query_string = urllib.parse.urlencode(request_params)
@@ -213,7 +213,7 @@ class GenericOAuth2Login(asab.Configurable):
 				"query": dict(authorize_data)})
 			return None
 
-		async with self.token_request(code, redirect_uri=self.CallbackUri) as resp:
+		async with self.token_request(code) as resp:
 			if resp is None:
 				return None
 			token_data = await resp.json()

@@ -53,7 +53,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			("client_id", self.ClientId),
 			("response_type", self.ResponseType),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri or self.CallbackUri),
+			("redirect_uri", redirect_uri or self.CallbackUrl),
 		]
 		# "nonce" is not supported
 		if state is not None:
