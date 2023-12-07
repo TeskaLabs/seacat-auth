@@ -17,7 +17,7 @@ from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
 	cookie_session_builder,
-	login_descriptor_session_builder,
+	authentication_session_builder,
 	available_factors_session_builder,
 	external_login_session_builder, SessionAdapter,
 )
@@ -328,8 +328,7 @@ class AuthenticationService(asab.Service):
 				credentials_id=login_session.CredentialsId,
 				tenants=None  # Root session is tenant-agnostic
 			),
-			login_descriptor_session_builder(login_session.AuthenticatedVia),
-			cookie_session_builder(),
+			authentication_session_builder(login_session.AuthenticatedVia),
 			await available_factors_session_builder(self, login_session.CredentialsId),
 			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
 		]
@@ -387,7 +386,7 @@ class AuthenticationService(asab.Service):
 				credentials_id=credentials_id,
 				tenants=tenants,
 			),
-			login_descriptor_session_builder(login_descriptor),
+			authentication_session_builder(login_descriptor),
 			await available_factors_session_builder(self, credentials_id)
 		]
 

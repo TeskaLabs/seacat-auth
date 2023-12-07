@@ -335,7 +335,7 @@ class SessionAdapter:
 		if isinstance(login_descriptor, dict):
 			login_descriptor = login_descriptor["id"]
 		return AuthenticationData(
-			AuthenticatedAt=session_dict.pop(cls.FN.Authentication.AuthenticatedAt),
+			AuthenticatedAt=session_dict.pop(cls.FN.Authentication.AuthenticatedAt, None),
 			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None),
 			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
 			LoginDescriptor=login_descriptor,
