@@ -17,6 +17,10 @@ L = logging.getLogger(__name__)
 #
 
 
+class InvalidPasswordResetTokenError(ValueError):
+	pass
+
+
 class ChangePasswordService(asab.Service):
 
 	ChangePasswordCollection = "p"
@@ -87,15 +91,18 @@ class ChangePasswordService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"pwd_token": request_id})
 		return request_id
 
+
 	async def delete_pwdreset_token(self, pwdreset_id: str):
 		await self.StorageService.delete(self.ChangePasswordCollection, pwdreset_id)
 		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={"pwd_token": pwdreset_id})
 
-	async def get_pwdreset_token(self, pwdreset_id: str):
-		token = await self.StorageService.get(self.ChangePasswordCollection, pwdreset_id)
+
+	async def get_password_reset_token_credentials_id(self, password_reset_token: str):
+		token = await self.StorageService.get(self.ChangePasswordCollection, password_reset_token)
 		if token["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Password reset token expired.")
 		return token
+
 
 	async def init_password_change(self, credentials_id: str, is_new_user: bool = False, expiration: float = None):
 		'''
@@ -119,7 +126,7 @@ class ChangePasswordService(asab.Service):
 
 		await self.create_pwdreset_token(pwd_change_id, pwd_change_builders)
 
-		# Sent the message
+		# Send the message
 		email = creds.get("email")
 		username = creds.get("username")
 		phone = creds.get("phone")
@@ -136,14 +143,9 @@ class ChangePasswordService(asab.Service):
 			raise exceptions.CommunicationError(
 				"Failed to send password reset link.", credentials_id=credentials_id)
 
-	async def _do_change_password(self, credentials_id, new_password: str):
-		try:
-			provider = self.CredentialsService.get_provider(credentials_id)
-		except KeyError:
-			L.error("Provider not found", struct_data={'cid': credentials_id})
-			return "FAILED"
 
-		assert (provider is not None)
+	async def do_change_password(self, credentials_id: str, new_password: str):
+		provider = self.CredentialsService.get_provider(credentials_id)
 
 		# Remove "password" from enforced factors
 		credentials = await self.CredentialsService.get(credentials_id)
@@ -152,77 +154,7 @@ class ChangePasswordService(asab.Service):
 			enforce_factors.remove("password")
 
 		# Update password in DB
-		try:
-			await provider.update(credentials_id, {
-				"password": new_password,
-				"enforce_factors": list(enforce_factors)
-			})
-		except Exception as e:
-			L.exception("Password change failed: {}".format(e), struct_data={'cid': credentials_id})
-			return "FAILED"
-
-		L.log(asab.LOG_NOTICE, "Password changed", struct_data={'cid': credentials_id})
-
-		# Record the change in audit
-		await self.AuditService.append(
-			AuditCode.PASSWORD_CHANGE_SUCCESS,
-			credentials_id=credentials_id
-		)
-
-		return "OK"
-
-	async def change_password_by_pwdreset_id(self, pwdreset_id: str, new_password: str):
-		await asyncio.sleep(5)  # Safety timeout
-
-		if pwdreset_id is None:
-			L.error("No pwdreset_id provided")
-			raise ValueError("No pwdreset_id provided")
-
-		# Get password change object from the storage and extract credentials_id from it
-		try:
-			pwdreset_dict = await self.get_pwdreset_token(pwdreset_id)
-		except KeyError:
-			L.warning("Password reset request not found", struct_data={'id': pwdreset_id})
-			return "INVALID-CODE"
-		credentials_id = pwdreset_dict.get('cid')
-
-		# Set new password
-		result = await self._do_change_password(credentials_id, new_password)
-
-		#
-		if result != "OK":
-			await self.AuditService.append(
-				AuditCode.PASSWORD_CHANGE_FAILED,
-				credentials_id=credentials_id
-			)
-
-		# Delete ALL pwdreset requests with this credentials id
-		try:
-			await self.delete_pwdreset_tokens_by_cid(cid=credentials_id)
-		except Exception as e:
-			L.error(
-				"Unable to remove old password change requests: {} ({})".format(type(e), e),
-				struct_data={'cid': credentials_id}
-			)
-
-		return result
-
-	async def change_password(self, session, old_password: str, new_password: str):
-		# TODO: authenticate() could be problematic here, we may introduce another call for this specific purpose
-		valid = await self.CredentialsService.authenticate(session.Credentials.Id, {"password": old_password})
-		if not valid:
-			L.log(
-				asab.LOG_NOTICE,
-				"Password change failed, old password doesn't match.",
-				struct_data={"cid": session.Credentials.Id}
-			)
-			result = "UNAUTHORIZED"
-		else:
-			result = await self._do_change_password(session.Credentials.Id, new_password)
-
-		if result != "OK":
-			await self.AuditService.append(
-				AuditCode.PASSWORD_CHANGE_FAILED,
-				credentials_id=session.Credentials.Id
-			)
-		return result
+		await provider.update(credentials_id, {
+			"password": new_password,
+			"enforce_factors": list(enforce_factors)
+		})
