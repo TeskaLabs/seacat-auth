@@ -364,7 +364,7 @@ class SeaCatAuthApplication(asab.Application):
 			self.PublicSeacatAuthApiUrl.startswith("https://")
 			or self.PublicSeacatAuthApiUrl.startswith("http://")
 		):
-			# Relative URL: Append to PublicBaseUrl
+			# Relative URL: Append to PublicUrl
 			self.PublicSeacatAuthApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicSeacatAuthApiUrl)
 
 		# Public base URL of OpenID Connect API
@@ -376,7 +376,7 @@ class SeaCatAuthApplication(asab.Application):
 			self.PublicOpenIdConnectApiUrl.startswith("https://")
 			or self.PublicOpenIdConnectApiUrl.startswith("http://")
 		):
-			# Relative URL: Append to PublicBaseUrl
+			# Relative URL: Append to PublicUrl
 			self.PublicOpenIdConnectApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicOpenIdConnectApiUrl)
 
 		# Seacat Auth WebUI URL
@@ -388,5 +388,5 @@ class SeaCatAuthApplication(asab.Application):
 			self.AuthWebUiUrl.startswith("https://")
 			or self.AuthWebUiUrl.startswith("http://")
 		):
-			# Relative URL: Append to PublicBaseUrl
+			# Relative URL: Append to PublicUrl
 			self.AuthWebUiUrl = urllib.parse.urljoin(self.PublicUrl, self.AuthWebUiUrl)
