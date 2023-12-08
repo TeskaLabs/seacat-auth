@@ -59,7 +59,7 @@ class ExternalLoginHandler(object):
 		if not authorization_data:
 			# Authorization flow broken
 			L.error("External login provider returned no data in authorize callback")
-			return self._redirect_to_auth_webui()
+			return self._error_redirect()
 
 		state_id = authorization_data.get("state")
 		try:
@@ -68,7 +68,7 @@ class ExternalLoginHandler(object):
 			# Authorization flow broken
 			L.error(asab.LOG_NOTICE, "External login authorization state not found", struct_data={
 				"state_id": state_id})
-			return self._redirect_to_auth_webui()
+			return self._error_redirect()
 
 		provider_type = state["type"]
 		provider = self.ExternalLoginService.get_provider(provider_type)
@@ -77,13 +77,13 @@ class ExternalLoginHandler(object):
 		if user_info is None:
 			# Authorization flow broken
 			L.error("Cannot obtain user info from external login provider")
-			return self._redirect_to_auth_webui()
+			return self._error_redirect()
 
 		subject = user_info.get("sub")
 		if subject is None:
 			# Authorization flow broken
 			L.error("Cannot obtain subject ID from external login provider")
-			return self._redirect_to_auth_webui()
+			return self._error_redirect()
 		subject = str(subject)  # Sometimes sub is an integer
 
 		# Try to find Seacat Auth credentials associated with the subject ID
@@ -172,8 +172,15 @@ class ExternalLoginHandler(object):
 		return aiohttp.web.HTTPFound(location=authorization_uri)
 
 
-	def _redirect_to_auth_webui(self):
+	def _error_redirect(self):
 		"""
-		Error response when the original authorization flow cannot be resumed: redirect to Seacat Auth webui
+		Error redirection when the original authorization flow cannot be resumed
+		"""
+		return aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)
+
+
+	def _redirect_to_account_settings(self):
+		"""
+		Redirect to Seacat Account webui
 		"""
 		return aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)

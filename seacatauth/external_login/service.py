@@ -23,7 +23,8 @@ asab.Config.add_defaults({
 	"seacatauth:external_login": {
 		# URI for the external registration of unknown accounts from external identity providers.
 		"registration_webhook_uri": "",
-		"state_expiration": "10m"
+		"state_expiration": "10m",
+		"error_redirect_url": ""
 	}})
 
 
@@ -54,6 +55,9 @@ class ExternalLoginService(asab.Service):
 		)
 		auth_webui_url = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
 		self.MyAccountPageUrl = "{}/#/".format(auth_webui_url)
+		self.ErrorRedirectUrl = asab.Config.get("seacatauth:external_login", "error_redirect_url")
+		if not self.ErrorRedirectUrl:
+			self.ErrorRedirectUrl = self.MyAccountPageUrl
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
 		self.AcrValues: typing.Dict[str, GenericOAuth2Login] = {
