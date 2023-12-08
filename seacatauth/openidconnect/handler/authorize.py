@@ -687,7 +687,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-		delete_cookie(self.App, response)
 		return response
 
 	async def reply_with_factor_setup_redirect(

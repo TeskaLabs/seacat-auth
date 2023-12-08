@@ -47,6 +47,7 @@ class ExternalLoginService(asab.Service):
 		self.CallbackEndpointPath = "/public/ext-login"
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
+		# TODO: This path must be configurable
 		self.CallbackUrl = "{}/seacat-auth/{}".format(
 			public_api_base_url,
 			self.CallbackEndpointPath.lstrip("/")
@@ -207,16 +208,39 @@ class ExternalLoginService(asab.Service):
 		})
 
 
-	async def register_new_credentials(
+	async def create_new_seacat_auth_credentials(
 		self,
 		provider_type: str,
 		user_info: dict,
 		authorization_data: dict,
 	) -> str | None:
-		# TODO: Attempt registration with local credential providers if enabled
-		if self.RegistrationWebhookUri:
-			credentials_id = await self.ExternalLoginService.register_credentials_via_webhook(
+		"""
+		Attempt to create new Seacat Auth credentials for external user.
+		"""
+		credentials_id = None
+		# TODO: Attempt registration with local credential providers if registration is enabled
+		try:
+			cred_data = {
+				"username": user_info.get("preferred_username"),
+				"email": user_info.get("email"),
+				"phone": user_info.get("phone_number"),
+			}
+			result = await self.CredentialsService.create_credentials("ext", cred_data)
+			credentials_id = result.get("credentials_id")
+		except Exception as e:
+			L.error(e)
+
+		# Register external user via webhook
+		if not credentials_id and self.RegistrationWebhookUri:
+			credentials_id = await self.register_credentials_via_webhook(
 				provider_type, authorization_data, user_info)
+
+		if credentials_id:
+			await self.create(
+				credentials_id=credentials_id,
+				provider_type=provider_type,
+				user_info=user_info)
+
 		return credentials_id
 
 
@@ -263,12 +287,6 @@ class ExternalLoginService(asab.Service):
 			L.error("Returned credential ID not found.", struct_data={"response_data": response_data})
 			return None
 
-		# Assign the external subject ID to Seacat Auth credentials ID
-		await self.create(
-			credentials_id=credentials_id,
-			provider_type=provider_type,
-			user_info=user_info)
-
 		return credentials_id
 
 
@@ -312,11 +330,14 @@ class ExternalLoginService(asab.Service):
 
 	async def login(
 		self,
-		provider_type,
-		credentials_id,
+		provider_type: str,
+		subject: str,
 		root_session: SessionAdapter | None = None,
 		from_ip: typing.Iterable | None = None
 	) -> dict:
+		ext_credentials = await self.get(provider_type, subject)
+		credentials_id = ext_credentials["cid"]
+
 		# Create a placeholder login session
 		login_descriptors = []
 		login_session = await self.AuthenticationService.create_login_session(
@@ -338,7 +359,7 @@ class ExternalLoginService(asab.Service):
 
 		# Finish login and create session
 		# TODO: If there is a valid non-anonymous root session, update it instead of creating a new one
-		new_session = await self.AuthenticationService.login(login_session, from_info=from_ip)
+		new_session = await self.AuthenticationService.login(login_session, root_session, from_info=from_ip)
 		L.log(asab.LOG_NOTICE, "External login successful", struct_data={
 			"cid": credentials_id,
 			"login_type": provider_type

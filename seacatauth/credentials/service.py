@@ -206,7 +206,7 @@ class CredentialsService(asab.Service):
 		try:
 			provider_type, provider_id, credentials_subid = credentials_id.split(':', 3)
 		except ValueError:
-			raise KeyError("Provider not found because credentials_id format is incorrect.")
+			raise KeyError("Unsupported credentials ID format: {!r}".format(credentials_id))
 		provider = self.CredentialProviders.get(provider_id)
 		if provider is None:
 			raise KeyError("Provider not found")

@@ -36,7 +36,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		assert self.UserInfoEndpoint not in (None, "")
 		self.UserEmailsURI = self.Config.get("user_emails_endpoint")
 
-	async def get_user_info(self, authorize_data):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None):
 		"""
 		User info is not contained in token response,
 		call to https://api.github.com/user is needed.
@@ -81,7 +81,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		if email:
 			user_info["email"] = email
 		if "login" in user_data:
-			user_info["login"] = user_data["login"]
+			user_info["preferred_username"] = user_data["login"]
 		if "name" in user_data:
 			user_info["name"] = user_data["name"]
 

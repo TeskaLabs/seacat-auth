@@ -89,7 +89,7 @@ class ExternalLoginHandler(object):
 		# Try to find Seacat Auth credentials associated with the subject ID
 		try:
 			external_credentials = await self.ExternalLoginService.get(provider_type, subject)
-			external_cid = external_credentials["cid"]
+			external_cid = external_credentials.get("cid")
 		except KeyError:
 			external_cid = None
 		subject_known = external_cid is not None
@@ -104,6 +104,7 @@ class ExternalLoginHandler(object):
 
 		from_ip = generic.get_request_access_ips(request)
 
+		new_session = None
 		if subject_known:
 			# (Re)authentication successful - Create a new root session or update the existing one
 			new_session = await self.ExternalLoginService.login(
@@ -119,9 +120,12 @@ class ExternalLoginHandler(object):
 				"provider_type": provider.Type, "sub": subject})
 			# Do not send the authorization code
 			authorize_data_safe = {k: v for k, v in authorization_data.items() if k != "code"}
-			await self.ExternalLoginService.register_new_credentials(provider_type, user_info, authorize_data_safe)
-			new_session = await self.ExternalLoginService.login(
-				provider_type, subject, root_session=request.Session, from_ip=from_ip)
+			credentials_id = await self.ExternalLoginService.create_new_seacat_auth_credentials(
+				provider_type, user_info, authorize_data_safe)
+			if credentials_id:
+				# Credentials successfully created
+				new_session = await self.ExternalLoginService.login(
+					provider_type, subject, root_session=request.Session, from_ip=from_ip)
 
 		if new_session is None:
 			# Resume the authorization flow WITHOUT the acr_values parameter
@@ -157,7 +161,7 @@ class ExternalLoginHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	async def _redirect_to_authorization(self, oauth_query: dict):
+	def _redirect_to_authorization(self, oauth_query: dict):
 		"""
 		Resume the original authorization flow
 		"""
@@ -168,7 +172,7 @@ class ExternalLoginHandler(object):
 		return aiohttp.web.HTTPFound(location=authorization_uri)
 
 
-	async def _redirect_to_auth_webui(self):
+	def _redirect_to_auth_webui(self):
 		"""
 		Error response when the original authorization flow cannot be resumed: redirect to Seacat Auth webui
 		"""
