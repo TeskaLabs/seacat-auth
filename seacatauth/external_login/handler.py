@@ -8,7 +8,7 @@ import asab.web.rest
 from .service import ExternalLoginService
 from .. import generic
 from ..decorators import access_control
-from ..cookie.utils import set_cookie, delete_cookie
+from ..cookie.utils import set_cookie
 
 #
 

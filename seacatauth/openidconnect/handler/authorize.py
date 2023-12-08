@@ -8,7 +8,6 @@ import asab
 
 from ...audit import AuditCode
 from ...authz import build_credentials_authz
-from ...cookie.utils import delete_cookie
 from ... import client, generic
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
