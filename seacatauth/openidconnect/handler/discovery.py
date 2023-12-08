@@ -49,8 +49,8 @@ class DiscoveryHandler(object):
 		data = {
 			# REQUIRED
 			"issuer": self.OpenIdConnectService.Issuer,
-			"authorization_endpoint":  self.OpenIdConnectService.authorization_endpoint_url(),
-			"token_endpoint":  self.OpenIdConnectService.token_endpoint_url(),
+			"authorization_endpoint": self.OpenIdConnectService.authorization_endpoint_url(),
+			"token_endpoint": self.OpenIdConnectService.token_endpoint_url(),
 			# TODO: The algorithm RS256 MUST be included.
 			#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
 			"id_token_signing_alg_values_supported": ["ES256"],

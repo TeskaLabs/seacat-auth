@@ -13,7 +13,7 @@ import jwcrypto.jwk
 import seacatauth.exceptions
 from .. import exceptions
 from ..audit import AuditCode
-from ..cookie import set_cookie, delete_cookie
+from ..cookie import set_cookie
 from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 

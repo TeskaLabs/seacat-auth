@@ -1,6 +1,3 @@
-import base64
-import hashlib
-import re
 import logging
 import asab.exceptions
 
