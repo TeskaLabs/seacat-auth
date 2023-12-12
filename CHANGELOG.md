@@ -15,9 +15,11 @@
 
 ### Features
 - Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
+- Batman configuration for Kibana can be also loaded from the `[elasticsearch]` section, in addition to the `[batman:kibana]` section (#326).
 
 ### Refactoring
 - Separate login factors in session object (#325, `v23.47-alpha3`)
+- Multiple ElasticSearch node URLs are supported (#326).
 
 ---
 
