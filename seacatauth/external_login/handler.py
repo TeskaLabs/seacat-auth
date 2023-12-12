@@ -34,9 +34,9 @@ class ExternalLoginHandler(object):
 		web_app.router.add_get(
 			self.ExternalLoginService.CallbackEndpointPath, self.login_callback)
 		web_app.router.add_delete(
-			"/account/ext-login/{ext_login_provider}", self.remove_external_login_credential)
+			"/account/ext-login/{provider_type}", self.remove_external_login_credential)
 		web_app.router.add_delete(
-			"/account/ext-login/{ext_login_provider}/{sub}", self.remove_external_login_credential)
+			"/account/ext-login/{provider_type}/{sub}", self.remove_external_login_credential)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
@@ -52,13 +52,21 @@ class ExternalLoginHandler(object):
 		- if the user is logged in, assign the external credential to them.
 		Finally, redirect the user agent to the authorization endpoint and resume the authorization flow.
 		"""
+		provider_type = request.match_info["provider_type"]
+		try:
+			provider = self.ExternalLoginService.get_provider(provider_type)
+		except KeyError:
+			# Authorization flow broken
+			L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={"provider_type": provider_type})
+			return self._error_redirect()
+
 		if request.method == "POST":
 			authorization_data: dict = dict(await request.post())
 		else:
 			authorization_data = dict(request.query)
 		if not authorization_data:
 			# Authorization flow broken
-			L.error("External login provider returned no data in authorize callback")
+			L.log(asab.LOG_NOTICE, "External login provider returned no data in authorize callback")
 			return self._error_redirect()
 
 		state_id = authorization_data.get("state")
@@ -66,12 +74,9 @@ class ExternalLoginHandler(object):
 			state = await self.ExternalLoginService.pop_authorization_state(state_id)
 		except KeyError:
 			# Authorization flow broken
-			L.error(asab.LOG_NOTICE, "External login authorization state not found", struct_data={
+			L.log(asab.LOG_NOTICE, "External login authorization state not found", struct_data={
 				"state_id": state_id})
 			return self._error_redirect()
-
-		provider_type = state["type"]
-		provider = self.ExternalLoginService.get_provider(provider_type)
 
 		user_info = await provider.get_user_info(authorization_data, expected_nonce=state.get("nonce"))
 		if user_info is None:
@@ -145,7 +150,7 @@ class ExternalLoginHandler(object):
 		"""
 		Unregister an external login credential
 		"""
-		provider_type = request.match_info["ext_login_provider"]
+		provider_type = request.match_info["provider_type"]
 		sub = request.match_info.get("sub")
 		if not sub:
 			el_credentials = await self.ExternalLoginService.get_by_cid(credentials_id, provider_type)
@@ -176,7 +181,10 @@ class ExternalLoginHandler(object):
 		"""
 		Error redirection when the original authorization flow cannot be resumed
 		"""
-		return aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)
+		return aiohttp.web.HTTPNotFound(headers={
+			"Location": self.ExternalLoginService.MyAccountPageUrl,
+			"Refresh": "0;url=" + self.ExternalLoginService.MyAccountPageUrl,
+		})
 
 
 	def _redirect_to_account_settings(self):

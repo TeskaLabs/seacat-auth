@@ -45,7 +45,7 @@ class ExternalLoginService(asab.Service):
 			"seacatauth:external_login", "state_expiration"))
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
-		self.CallbackEndpointPath = "/public/ext-login"
+		self.CallbackEndpointPath = "/public/ext-login/{provider_type}"
 
 		public_api_base_url = asab.Config.get("general", "public_api_base_url")
 		# TODO: This path must be configurable

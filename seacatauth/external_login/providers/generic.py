@@ -102,7 +102,7 @@ class GenericOAuth2Login(asab.Configurable):
 
 		self.JwkSet = None
 
-		self.CallbackUrl = external_login_svc.CallbackUrl
+		self.CallbackUrl = external_login_svc.CallbackUrl.format(provider_type=self.Type)
 
 
 	async def initialize(self, app):
