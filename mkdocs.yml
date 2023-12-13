@@ -1,4 +1,4 @@
-site_name: "TeskaLabs documentation"
+site_name: "TeskaLabs SeaCat Auth"
 theme:
   name: 'material'
 
@@ -20,6 +20,8 @@ theme:
         name: Switch to light mode
 
   logo: images/teskalabs-logo.svg
+
+  favicon: images/teskalabs.png
 
 extra_css:
   - stylesheets/extra.css
@@ -46,3 +48,17 @@ extra:
     - icon: fontawesome/solid/paper-plane
       link: mailto:info@teskalabs.com
       name: info@teskalabs.com
+
+nav:
+  - index.md
+  - features/features.md
+  - Getting started:
+    - getting-started/quick-start.md
+    - getting-started/recommended-deployment.md
+  - Integrations:
+    - integrations/index.md
+    - integrations/elk.md
+  - Reference:
+    - reference/architecture.md
+    - reference/rbac.md
+    - reference/resources.md

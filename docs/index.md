@@ -1,11 +1,11 @@
 ---
-title: TeskaLabs SeaCat Auth
+title: About
 ---
 
-# TeskaLabs SeaCat Auth
+# About TeskaLabs SeaCat Auth
 
 _TeskaLabs SeaCat Auth_ is a [microservice](https://en.wikipedia.org/wiki/Microservices) that provides authentication, authorization, identity management, 
-session management [and other features](./features).
+session management [and other features](./features/features.md).
 It is designed to be used as an access control and/or Single Sign-on (SSO) for other microservices and [applications](./integrations).
 
 TeskaLabs SeaCat Auth is an open source project. 
