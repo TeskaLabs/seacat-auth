@@ -24,6 +24,16 @@ L = logging.getLogger(__name__)
 #
 
 
+JWK_PARAMS = {
+	"crv": {"type": "string"},
+	"ext": {"type": "boolean"},
+	"key_ops": {"type": "array"},
+	"kty": {"type": "string"},
+	"x": {"type": "string"},
+	"y": {"type": "string"}
+}
+
+
 class AuthenticationHandler(object):
 	"""
 	Login and authentication
@@ -61,9 +71,10 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put("/impersonate", self.impersonate)
 		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
 
+
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["ident"],
+		"required": ["ident", *JWK_PARAMS.keys()],
 		"properties": {
 			"ident": {
 				"type": "string",
@@ -73,7 +84,9 @@ class AuthenticationHandler(object):
 				"description":
 					"Optional extra parameters used for locating credentials. "
 					"Allowed parameter names must be listed in `[seacatauth:authentication] custom_login_parameters` "
-					"in the app configuration."}}
+					"in the app configuration."},
+			**JWK_PARAMS
+		}
 	})
 	async def login_prologue(self, request, *, json_data):
 		"""
@@ -86,6 +99,7 @@ class AuthenticationHandler(object):
 		- Store the login data in a new LoginSession object
 		- Respond with login session ID, encryption key and available login descriptors
 		"""
+		print(json_data)
 		key = jwcrypto.jwk.JWK.from_json(await request.read())
 		ident = json_data.get("ident")
 
@@ -108,57 +122,28 @@ class AuthenticationHandler(object):
 			# TODO: This option should be moved to client config or removed completely
 			login_preferences = query_dict.get("ldid")
 
-		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
-		if credentials_id is None or credentials_id == []:
-			L.log(asab.LOG_NOTICE, "Cannot locate credentials.", struct_data={"ident": ident})
-			# Empty credentials is used for creating a fake login session
-			credentials_id = ""
-
-		# Deny login to m2m credentials
-		if credentials_id != "":
-			cred_provider = self.CredentialsService.get_provider(credentials_id)
-			if cred_provider.Type == "m2m":
-				L.warning("Cannot login with machine credentials.", struct_data={"cid": credentials_id})
-				# Empty credentials is used for creating a fake login session
-				credentials_id = ""
-
-		# Prepare login descriptors
-		login_descriptors = None
-		if credentials_id != "":
-			login_descriptors = await self.AuthenticationService.prepare_login_descriptors(
-				credentials_id=credentials_id,
-				request_headers=request.headers,
-				login_preferences=login_preferences
-			)
-
-		if login_descriptors is None:
-			# Prepare fallback login descriptors for fake login session
-			credentials_id = ""
-			login_descriptors = await self.AuthenticationService.prepare_fallback_login_descriptors(
-				credentials_id=credentials_id,
-				request_headers=request.headers
-			)
-
-		login_session = await self.AuthenticationService.create_login_session(
-			credentials_id=credentials_id,
-			client_public_key=key.get_op_key("encrypt"),  # extract EC public key from JWT
-			login_descriptors=login_descriptors,
+		login_session = await self.AuthenticationService.prepare_seacat_login(
 			ident=ident,
+			client_public_key=key.get_op_key("encrypt"),
+			request_headers=request.headers,
+			login_dict=login_dict,
+			login_preferences=login_preferences
 		)
-
-		if login_session.CredentialsId == "":
-			L.log(asab.LOG_NOTICE, "Fake login session created.", struct_data={
-				"ident": ident, "lsid": login_session.Id})
+		if login_session is None:
+			login_session = await self.AuthenticationService.prepare_fake_login(
+				ident=ident,
+				client_public_key=key.get_op_key("encrypt")
+			)
 
 		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
 
 		response = {
 			'lsid': login_session.Id,
-			'lds': [descriptor.serialize() for descriptor in login_descriptors],
+			'lds': [descriptor.serialize() for descriptor in login_session.LoginDescriptors],
 			'key': key.export_public(as_dict=True),
 		}
 		return asab.web.rest.json_response(request, response)
+
 
 	async def login(self, request):
 		"""
@@ -275,6 +260,7 @@ class AuthenticationHandler(object):
 
 		return response
 
+
 	async def logout(self, request):
 		"""
 		Log out of the current session and all its subsessions
@@ -315,6 +301,7 @@ class AuthenticationHandler(object):
 
 		return response
 
+
 	async def smslogin(self, request):
 		"""
 		Generate a one-time passcode and send it via SMS
@@ -342,6 +329,7 @@ class AuthenticationHandler(object):
 
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
+
 
 	async def webauthn_login(self, request):
 		"""
@@ -387,6 +375,7 @@ class AuthenticationHandler(object):
 		except KeyError:
 			login_key = None
 		return login_key
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -502,6 +491,7 @@ class AuthenticationHandler(object):
 		)
 		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
 		return response
+
 
 	async def _impersonate(self, impersonator_root_session, impersonator_from_info, target_cid):
 		"""
