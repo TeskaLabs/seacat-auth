@@ -1,5 +1,5 @@
 ---
-title: Main features of TeskaLabs SeaCat Auth
+title: Features
 ---
 
 # Main features of TeskaLabs SeaCat Auth

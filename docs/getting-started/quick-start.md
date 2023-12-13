@@ -4,7 +4,7 @@ title: Quick start
 
 # Quick start
 
-This is a quick start guide for _TeskaLabs SeaCat Auth_, it should get you up to speed swiftly.
+This is a quick start guide for **TeskaLabs SeaCat Auth**, it should get you up to speed swiftly.
 
 
 ## Prerequisites

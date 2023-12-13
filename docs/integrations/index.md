@@ -1,5 +1,5 @@
 ---
-title: TeskaLabs SeaCat Auth Integrations
+title: Integrations
 ---
 
 # TeskaLabs SeaCat Auth Integrations
