@@ -541,6 +541,9 @@ class AuthenticationService(asab.Service):
 		login_dict: dict | None = None,
 		login_preferences: list | None = None,
 	):
+		"""
+		Set up login session with located credentials and prepare login options
+		"""
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
 
@@ -563,6 +566,7 @@ class AuthenticationService(asab.Service):
 				"cid": credentials_id, "ldid": login_preferences})
 			return None
 
+		# TODO: if login_session_id: Update session instead
 		login_session = await self.create_login_session(
 			credentials_id=credentials_id,
 			client_public_key=client_public_key,
@@ -572,8 +576,12 @@ class AuthenticationService(asab.Service):
 		return login_session
 
 
-	async def prepare_fake_login(self, ident:str, client_public_key):
+	async def prepare_fake_login(self, ident:str, client_public_key, login_session_id: str | None = None):
+		"""
+		Set up the login session so that the login call is guaranteed to fail
+		"""
 		login_descriptors = await self.prepare_fallback_login_descriptors(credentials_id="")
+		# TODO: if login_session_id: Update session instead
 		login_session = await self.create_login_session(
 			credentials_id="",
 			client_public_key=client_public_key,
