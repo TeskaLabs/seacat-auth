@@ -27,7 +27,6 @@ class RegistrationService(asab.Service):
 		self.RoleService = None
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
-		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = app.AuthWebUiUrl.rstrip("/")
@@ -114,11 +113,10 @@ class RegistrationService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict()
 
-		AuditLogger.log(asab.LOG_NOTICE, "TODO")
-		await self.LastActivityService.append(
-			EventCode.CREDENTIALS_CREATED,
-			credentials_id=credential_id,
-			by_cid=invited_by_cid)
+		AuditLogger.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+			"cid": credential_id,
+			"by_cid": invited_by_cid,
+		})
 
 		return credential_id, registration_code
 
@@ -237,10 +235,10 @@ class RegistrationService(asab.Service):
 			update_dict["invited_by"] = credentials["__registration"]["invited_by"]
 
 		await self.CredentialProvider.update(credentials["_id"], update_dict)
-		AuditLogger.log(asab.LOG_NOTICE, "TODO")
-		await self.LastActivityService.append(
-			EventCode.CREDENTIALS_REGISTERED_NEW,
-			credentials_id=credentials["_id"])
+
+		AuditLogger.log(asab.LOG_NOTICE, "Invitation accepted by a new user", struct_data={
+			"cid": credentials["_id"],
+		})
 
 
 	async def complete_registration_with_existing_credentials(self, registration_code: str, credentials_id: str):
@@ -262,18 +260,12 @@ class RegistrationService(asab.Service):
 		for role in reg_roles:
 			await self.RoleService.assign_role(credentials_id, role)
 		await self.CredentialsService.delete_credentials(reg_credential_id)
-		L.log(asab.LOG_NOTICE, "Credentials registered to a new tenant", struct_data={
+
+		AuditLogger.log(asab.LOG_NOTICE, "Invitation accepted by an existing user", struct_data={
 			"cid": credentials_id,
-			"reg_cid": reg_credential_id,
-			"tenants": ", ".join(reg_tenants),
-			"roles": ", ".join(reg_roles),
+			"t": reg_tenants,
+			"r": reg_roles,
 		})
-		AuditLogger.log(asab.LOG_NOTICE, "TODO")
-		await self.LastActivityService.append(
-			EventCode.CREDENTIALS_REGISTERED_EXISTING,
-			credentials_id=credentials_id,
-			tenants=reg_tenants,
-			roles=reg_roles)
 
 
 	def _get_provider(self, provider_id: str = None):

@@ -30,7 +30,6 @@ class ChangePasswordService(asab.Service):
 
 		self.CredentialsService = cred_service
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
-		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = app.AuthWebUiUrl.rstrip("/")
