@@ -68,7 +68,7 @@ class ChangePasswordHandler(object):
 		if not authenticated:
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: Authentication failed", struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
-			await self.LastActivityService.upsert_last_credentials_event(
+			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 
 		# Change the password
@@ -78,7 +78,7 @@ class ChangePasswordHandler(object):
 			L.exception("Password change failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
-			await self.LastActivityService.upsert_last_credentials_event(
+			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, code=401, data={"result": "FAILED"})
 
@@ -87,7 +87,7 @@ class ChangePasswordHandler(object):
 			asab.LOG_NOTICE, "Password change successful",
 			struct_data={"cid": credentials_id, "from_ip": from_ip}
 		)
-		self.LastActivityService.upsert_last_credentials_event(
+		await self.LastActivityService.update_last_activity(
 			EventCode.PASSWORD_CHANGE_SUCCESS, credentials_id=credentials_id, from_ip=from_ip)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
@@ -137,7 +137,7 @@ class ChangePasswordHandler(object):
 			L.exception("Password change failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
-			await self.LastActivityService.upsert_last_credentials_event(
+			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, code=401, data={"result": "FAILED"})
 
@@ -146,7 +146,7 @@ class ChangePasswordHandler(object):
 			asab.LOG_NOTICE, "Password change successful",
 			struct_data={"cid": credentials_id, "from_ip": from_ip}
 		)
-		self.LastActivityService.upsert_last_credentials_event(
+		await self.LastActivityService.update_last_activity(
 			EventCode.PASSWORD_CHANGE_SUCCESS, credentials_id=credentials_id, from_ip=from_ip)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})

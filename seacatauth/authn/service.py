@@ -342,7 +342,7 @@ class AuthenticationService(asab.Service):
 			"sid": str(session.Session.Id),
 			"from_ip": from_info,
 		})
-		await self.LastActivityService.upsert_last_credentials_event(
+		await self.LastActivityService.update_last_activity(
 			EventCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
 
 		# Delete login session
