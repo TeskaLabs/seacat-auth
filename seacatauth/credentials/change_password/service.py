@@ -33,7 +33,7 @@ class ChangePasswordService(asab.Service):
 		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.StorageService = app.get_service("asab.StorageService")
 
-		self.AuthWebUIBaseUrl = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
+		self.AuthWebUIBaseUrl = app.AuthWebUiUrl.rstrip("/")
 		self.Expiration = asab.Config.getseconds("seacatauth:password", "password_reset_expiration")
 
 		self.ResetPwdPath = "/#/reset-password"

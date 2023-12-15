@@ -54,7 +54,7 @@ class CookieService(asab.Service):
 		if self.RootCookieDomain is not None:
 			self.RootCookieDomain = self._validate_cookie_domain(self.RootCookieDomain)
 
-		self.AuthWebUiBaseUrl = asab.Config.get("general", "auth_webui_base_url")
+		self.AuthWebUiBaseUrl = app.AuthWebUiUrl.rstrip("/")
 
 
 	async def initialize(self, app):
