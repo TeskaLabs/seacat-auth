@@ -359,7 +359,7 @@ class SeaCatAuthApplication(asab.Application):
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/seacat-auth/",
 		#   yielding for example "https://example.com/api/seacat-auth/public/features"
 		self.PublicSeacatAuthApiUrl = asab.Config.get(
-			"general", "public_seacat_auth_api_prefix").rstrip("/") + "/"
+			"general", "public_seacat_auth_base_url").rstrip("/") + "/"
 		if not (
 			self.PublicSeacatAuthApiUrl.startswith("https://")
 			or self.PublicSeacatAuthApiUrl.startswith("http://")
@@ -371,7 +371,7 @@ class SeaCatAuthApplication(asab.Application):
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/openidconnect/",
 		#   yielding for example "https://example.com/api/openidconnect/authorize"
 		self.PublicOpenIdConnectApiUrl = asab.Config.get(
-			"general", "public_openidconnect_api_prefix").rstrip("/") + "/"
+			"general", "public_openidconnect_base_url").rstrip("/") + "/"
 		if not (
 			self.PublicOpenIdConnectApiUrl.startswith("https://")
 			or self.PublicOpenIdConnectApiUrl.startswith("http://")
