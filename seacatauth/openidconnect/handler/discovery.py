@@ -55,7 +55,7 @@ class DiscoveryHandler(object):
 			#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
 			"id_token_signing_alg_values_supported": ["ES256"],
 			"jwks_uri": "{}{}".format(
-				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath),
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath.lstrip("/")),
 			"response_types_supported": ["code"],
 			"subject_types_supported": ["public"],
 

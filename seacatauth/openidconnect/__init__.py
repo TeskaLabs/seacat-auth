@@ -19,8 +19,8 @@ class OpenIdConnectModule(asab.Module):
 	def __init__(self, app):
 		super().__init__(app)
 
-		public_api_base_url = asab.Config.get("general", "public_api_base_url")
-		auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+		public_api_base_url = app.PublicOpenIdConnectApiUrl
+		auth_webui_base_url = app.AuthWebUiUrl
 
 		self.OpenIdConnectService = OpenIdConnectService(app)
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")

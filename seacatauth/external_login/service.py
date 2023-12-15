@@ -47,14 +47,13 @@ class ExternalLoginService(asab.Service):
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
 		self.CallbackEndpointPath = "/public/ext-login/{provider_type}"
 
-		public_api_base_url = asab.Config.get("general", "public_api_base_url")
+		public_api_base_url = app.PublicSeacatAuthApiUrl
 		# TODO: This path must be configurable
-		self.CallbackUrl = "{}/seacat-auth/{}".format(
+		self.CallbackUrl = "{}{}".format(
 			public_api_base_url,
-			self.CallbackEndpointPath.lstrip("/")
+			self.CallbackEndpointPath
 		)
-		auth_webui_url = asab.Config.get("general", "auth_webui_base_url").rstrip("/")
-		self.MyAccountPageUrl = "{}/#/".format(auth_webui_url)
+		self.MyAccountPageUrl = "{}/#/".format(app.AuthWebUiUrl)
 		self.ErrorRedirectUrl = asab.Config.get("seacatauth:external_login", "error_redirect_url")
 		if not self.ErrorRedirectUrl:
 			self.ErrorRedirectUrl = self.MyAccountPageUrl

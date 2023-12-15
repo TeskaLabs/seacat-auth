@@ -62,11 +62,7 @@ class OpenIdConnectService(asab.Service):
 		self.PKCE = pkce.PKCE()
 		self.Authentication = authentication.Authentication(app)
 
-		public_api_base_url = asab.Config.get("general", "public_api_base_url")
-		if public_api_base_url.endswith("/"):
-			self.PublicApiBaseUrl = public_api_base_url[:-1]
-		else:
-			self.PublicApiBaseUrl = public_api_base_url
+		self.PublicApiBaseUrl = app.PublicOpenIdConnectApiUrl
 
 		self.BearerRealm = asab.Config.get("openidconnect", "bearer_realm")
 
@@ -82,7 +78,7 @@ class OpenIdConnectService(asab.Service):
 					"and has no query or fragment components.")
 		else:
 			# Default fallback option
-			self.Issuer = self.PublicApiBaseUrl
+			self.Issuer = self.PublicApiBaseUrl.rstrip("/")
 
 		self.AuthorizationCodeTimeout = datetime.timedelta(
 			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
@@ -540,10 +536,10 @@ class OpenIdConnectService(asab.Service):
 
 
 	def authorization_endpoint_url(self):
-		return "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath)
+		return "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
 
 	def token_endpoint_url(self):
-		return "{}{}".format(self.PublicApiBaseUrl, self.TokenPath)
+		return "{}{}".format(self.PublicApiBaseUrl, self.TokenPath.lstrip("/"))
 
 	def userinfo_endpoint_url(self):
-		return "{}{}".format(self.PublicApiBaseUrl, self.UserInfoPath)
+		return "{}{}".format(self.PublicApiBaseUrl, self.UserInfoPath.lstrip("/"))
