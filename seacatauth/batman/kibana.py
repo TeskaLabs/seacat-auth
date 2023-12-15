@@ -6,6 +6,9 @@ import logging
 import typing
 import aiohttp
 import aiohttp.client_exceptions
+import urllib.parse
+import random
+
 import asab.config
 import asab.tls
 
@@ -30,7 +33,7 @@ class KibanaIntegration(asab.config.Configurable):
 	"""
 
 	ConfigDefaults = {
-		"url": "http://localhost:9200",
+		"url": "",
 
 		# Enables automatic synchronization of Kibana spaces with Seacat tenants
 		# Space and role sync is disabled if kibana_url is empty.
@@ -82,6 +85,9 @@ class KibanaIntegration(asab.config.Configurable):
 				"Config section 'batman:elk' has been renamed to 'batman:kibana'. Please update your config.",
 				struct_data={"eol": "2024-05-31"})
 			self.Config.update(asab.Config["batman:elk"])
+		# ES connection parameters should be specified in a config section [elasticsearch]
+		if "elasticsearch" in asab.Config:
+			self.Config.update(asab.Config["elasticsearch"])
 
 		self.BatmanService = batman_svc
 		self.App = self.BatmanService.App
@@ -93,8 +99,18 @@ class KibanaIntegration(asab.config.Configurable):
 		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
 		if len(self.KibanaUrl) == 0:
 			self.KibanaUrl = None
-		self.ElasticSearchUrl = self.Config.get("url").rstrip("/")
-		self.Headers = self._prepare_session_headers()
+
+		self.ElasticSearchUrl = self.Config.get('url')
+		self.ElasticSearchNodesUrls = get_url_list(self.ElasticSearchUrl)
+		if len(self.ElasticSearchNodesUrls) == 0:
+			raise RuntimeError("No ElasticSearch URL has been provided.")
+
+		# Authorization: username + password or API-key
+		username = self.Config.get("username")
+		password = self.Config.get("password")
+		api_key = self.Config.get("api_key")
+
+		self.Headers = self._prepare_session_headers(username, password, api_key)
 
 		self.ResourcePrefix = "kibana:"
 		self.DeprecatedResourcePrefix = "elk:"
@@ -102,8 +118,16 @@ class KibanaIntegration(asab.config.Configurable):
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
-		self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
-		if self.ElasticSearchUrl.startswith("https://"):
+		if self.ElasticSearchNodesUrls[0].startswith('https://'):
+			# use one of the old sections if it has SSL data or default to the [elasticsearch] section
+			# TODO: delete the 1st condition when [batman:elk] is obsolete
+			if asab.Config.has_section('batman:elk') and section_has_ssl_option('batman:elk'):
+				self.SSLContextBuilder = asab.tls.SSLContextBuilder('batman:elk')
+			# TODO: when [batman:elk] is obsolete there is no need to check if the section exists / remove
+			elif asab.Config.has_section(config_section_name) and section_has_ssl_option(config_section_name):
+				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
+			else:
+				self.SSLContextBuilder = asab.tls.SSLContextBuilder('elasticsearch')
 			self.SSLContext = self.SSLContextBuilder.build(ssl.PROTOCOL_TLS_CLIENT)
 		else:
 			self.SSLContext = None
@@ -120,6 +144,7 @@ class KibanaIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 		self.App.PubSub.subscribe("Application.tick/10!", self._retry_sync)
+
 
 	@contextlib.asynccontextmanager
 	async def _elasticsearch_session(self):
@@ -144,6 +169,7 @@ class KibanaIntegration(asab.config.Configurable):
 				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 				return
+
 
 	async def _on_housekeeping(self, event_name):
 		try:
@@ -174,6 +200,7 @@ class KibanaIntegration(asab.config.Configurable):
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			return
+
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
 		try:
@@ -436,7 +463,7 @@ class KibanaIntegration(asab.config.Configurable):
 		elastic_user["roles"] = list(elk_roles)
 
 		async with session.post(
-			"{}/_xpack/security/user/{}".format(self.ElasticSearchUrl, username),
+			"{}_xpack/security/user/{}".format(random.choice(self.ElasticSearchNodesUrls), username),
 			json=elastic_user
 		) as resp:
 			if 200 <= resp.status < 300:
@@ -462,6 +489,7 @@ class KibanaIntegration(asab.config.Configurable):
 		# NOTE: Tenant ID can contain "." while space ID can not
 		return re.sub("[^a-z0-9_-]", "--", tenant_id)
 
+
 	def _prepare_ignored_usernames(self):
 		"""
 		Load usernames that will not be synchronized to avoid conflicts with ELK system users
@@ -471,15 +499,62 @@ class KibanaIntegration(asab.config.Configurable):
 			ignore_usernames.append(self.Config.get("username"))
 		return frozenset(ignore_usernames)
 
-	def _prepare_session_headers(self):
+
+	def _prepare_session_headers(self, username, password, api_key):
 		headers = {"kbn-xsrf": "kibana"}
-		username = self.Config.get("username")
-		password = self.Config.get("password")
-		api_key = self.Config.get("api_key")
+
 		if username != "" and api_key != "":
 			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
+
 		if username != "":
 			headers["Authorization"] = aiohttp.BasicAuth(username, password).encode()
 		elif api_key != "":
 			headers["Authorization"] = "ApiKey {}".format(api_key)
+
 		return headers
+
+
+def getmultiline(url_string):
+	"""
+	URL can be a multiline with lines / items devided by spaces
+	url=https://localhost:9200 https://localhost:9200 https://localhost:9200
+	"""
+	return [item.strip() for item in re.split(r"\s+", url_string) if len(item) > 0]
+
+
+def get_url_list(urls):
+	"""
+	URLs can devided by a semicolon
+	url=https://localhost:9200;localhost:9200;localhost:9200
+	"""
+	server_urls = []
+	if len(urls) > 0:
+		urls = getmultiline(urls)
+		for url in urls:
+			scheme, netloc, path = parse_url(url)
+
+			server_urls += [
+				urllib.parse.urlunparse((scheme, netloc, path, None, None, None))
+				for netloc in netloc.split(';')
+			]
+
+	return server_urls
+
+
+def parse_url(url):
+	parsed_url = urllib.parse.urlparse(url)
+	url_path = parsed_url.path
+	if not url_path.endswith("/"):
+		url_path += "/"
+
+	return parsed_url.scheme, parsed_url.netloc, url_path
+
+
+def section_has_ssl_option(config_section_name):
+	"""
+	Checks if cert, key, cafile, capath, cadata etc. appears in a section's items
+	"""
+	for item in asab.Config.options(config_section_name):
+		if item in asab.tls.SSLContextBuilder.ConfigDefaults:
+			return True
+	return False
