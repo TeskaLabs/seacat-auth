@@ -217,7 +217,7 @@ class AuthenticationHandler(object):
 				"ident": login_session.Ident,
 				"from_ip": access_ips
 			})
-			self.AuthenticationService.LastActivityService.upsert_last_credentials_event(
+			await self.AuthenticationService.LastActivityService.update_last_activity(
 				EventCode.LOGIN_FAILED, login_session.CredentialsId, from_ip=access_ips)
 
 			self.AuthenticationService.LoginCounter.add('failed', 1)

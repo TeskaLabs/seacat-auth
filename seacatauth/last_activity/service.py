@@ -29,7 +29,7 @@ class LastActivityService(asab.Service):
 		self.StorageService = app.get_service("asab.StorageService")
 
 
-	async def upsert_last_credentials_event(self, event_code: EventCode, credentials_id: str, **kwargs):
+	async def update_last_activity(self, event_code: EventCode, credentials_id: str, **kwargs):
 		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
 
 		# Do not use upsertor because it can trigger webhook
