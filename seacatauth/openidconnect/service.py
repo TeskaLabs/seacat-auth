@@ -21,8 +21,8 @@ from ..session import (
 	authz_session_builder,
 )
 from .session import oauth2_session_builder
-from ..audit import AuditCode
-from .. import exceptions
+from ..last_activity import EventCode
+from .. import exceptions, AuditLogger
 from . import pkce
 
 from ..events import EventTypes
@@ -58,7 +58,7 @@ class OpenIdConnectService(asab.Service):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
 		self.PublicApiBaseUrl = app.PublicOpenIdConnectApiUrl
@@ -318,8 +318,9 @@ class OpenIdConnectService(asab.Service):
 			"fi": from_info})
 
 		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.ANONYMOUS_SESSION_CREATED,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.ANONYMOUS_SESSION_CREATED,
 			credentials_id=anonymous_cid,
 			client_id=client_dict["_id"],
 			session_id=str(session.Session.Id),
@@ -496,8 +497,9 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def audit_authorize_error(self, client_id: str, error_message: str, credential_id: str = None, **kwargs):
-		await self.AuditService.append(
-			AuditCode.AUTHORIZE_ERROR,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.AUTHORIZE_ERROR,
 			credentials_id=credential_id,
 			client_id=client_id,
 			errmsg=error_message,

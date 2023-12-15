@@ -6,10 +6,10 @@ import aiohttp
 import aiohttp.web
 import asab
 
-from ...audit import AuditCode
+from ...last_activity import EventCode
 from ...authz import build_credentials_authz
 from ...cookie.utils import delete_cookie
-from ... import client, generic
+from ... import client, generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
@@ -523,14 +523,16 @@ class AuthorizeHandler(object):
 				raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
 
 			# Anonymous sessions need to be audited
-			await self.OpenIdConnectService.AuditService.append(
-				AuditCode.ANONYMOUS_SESSION_CREATED,
+			AuditLogger.log(asab.LOG_NOTICE, "TODO")
+			await self.OpenIdConnectService.LastActivityService.append(
+				EventCode.ANONYMOUS_SESSION_CREATED,
 				credentials_id=new_session.Credentials.Id,
 				client_id=client_id,
 				scope=scope,
 				session_id=str(new_session.SessionId),
 				fi=from_info)
 
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
 		await self.audit_authorize_success(new_session, from_info)
 		return await self.reply_with_successful_response(
 			new_session, scope, redirect_uri, state,
@@ -843,8 +845,8 @@ class AuthorizeHandler(object):
 		"""
 		Append an authorization success entry to the audit.
 		"""
-		await self.OpenIdConnectService.AuditService.append(
-			AuditCode.AUTHORIZE_SUCCESS,
+		await self.OpenIdConnectService.LastActivityService.append(
+			EventCode.AUTHORIZE_SUCCESS,
 			credentials_id=session.Credentials.Id,
 			client_id=session.OAuth2.ClientId,
 			session_id=str(session.Session.Id),
@@ -857,8 +859,8 @@ class AuthorizeHandler(object):
 		"""
 		Append an authorization error entry to the audit.
 		"""
-		await self.OpenIdConnectService.AuditService.append(
-			AuditCode.AUTHORIZE_ERROR,
+		await self.OpenIdConnectService.LastActivityService.append(
+			EventCode.AUTHORIZE_ERROR,
 			error=error.Error,
 			credentials_id=error.CredentialsId,
 			client_id=error.ClientId,

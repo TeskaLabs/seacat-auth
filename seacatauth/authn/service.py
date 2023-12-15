@@ -10,7 +10,7 @@ from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from .. import exceptions
 from .. import AuditLogger
-from ..audit import AuditCode
+from ..last_activity import EventCode
 from ..authz import build_credentials_authz
 
 from ..session import (
@@ -72,7 +72,7 @@ class AuthenticationService(asab.Service):
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
 
@@ -342,8 +342,8 @@ class AuthenticationService(asab.Service):
 			"sid": str(session.Session.Id),
 			"from_ip": from_info,
 		})
-		await self.AuditService.upsert_last_credentials_event(
-			AuditCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
+		await self.LastActivityService.upsert_last_credentials_event(
+			EventCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)

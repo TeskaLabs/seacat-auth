@@ -6,7 +6,8 @@ import asab
 import asab.storage.exceptions
 import asab.exceptions
 
-from ...audit import AuditCode
+from ... import AuditLogger
+from ...last_activity import EventCode
 
 #
 
@@ -26,7 +27,7 @@ class RegistrationService(asab.Service):
 		self.RoleService = None
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = app.AuthWebUiUrl.rstrip("/")
@@ -113,8 +114,9 @@ class RegistrationService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict()
 
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_CREATED,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.CREDENTIALS_CREATED,
 			credentials_id=credential_id,
 			by_cid=invited_by_cid)
 
@@ -235,8 +237,9 @@ class RegistrationService(asab.Service):
 			update_dict["invited_by"] = credentials["__registration"]["invited_by"]
 
 		await self.CredentialProvider.update(credentials["_id"], update_dict)
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_REGISTERED_NEW,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.CREDENTIALS_REGISTERED_NEW,
 			credentials_id=credentials["_id"])
 
 
@@ -265,8 +268,9 @@ class RegistrationService(asab.Service):
 			"tenants": ", ".join(reg_tenants),
 			"roles": ", ".join(reg_roles),
 		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_REGISTERED_EXISTING,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.CREDENTIALS_REGISTERED_EXISTING,
 			credentials_id=credentials_id,
 			tenants=reg_tenants,
 			roles=reg_roles)

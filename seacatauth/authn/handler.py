@@ -11,7 +11,7 @@ import urllib.parse
 import jwcrypto.jwk
 
 from .. import exceptions, AuditLogger, generic
-from ..audit import AuditCode
+from ..last_activity import EventCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
@@ -217,8 +217,8 @@ class AuthenticationHandler(object):
 				"ident": login_session.Ident,
 				"from_ip": access_ips
 			})
-			self.AuthenticationService.AuditService.upsert_last_credentials_event(
-				AuditCode.LOGIN_FAILED, login_session.CredentialsId, from_ip=access_ips)
+			self.AuthenticationService.LastActivityService.upsert_last_credentials_event(
+				EventCode.LOGIN_FAILED, login_session.CredentialsId, from_ip=access_ips)
 
 			self.AuthenticationService.LoginCounter.add('failed', 1)
 
