@@ -3,6 +3,7 @@
 ## v23.47
 
 ### Pre-releases
+- `v23.47-alpha4`
 - `v23.47-alpha3`
 - `v23.47-alpha2`
 - `v23.47-alpha`
@@ -15,9 +16,12 @@
 
 ### Features
 - Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
+- Batman configuration for Kibana can be also loaded from the `[elasticsearch]` section, in addition to the `[batman:kibana]` section (#326, `v23.47-alpha4`)
+- Public URL config now requires only one option in canonical deployments (#328, `v23.47-alpha4`)
 
 ### Refactoring
 - Separate login factors in session object (#325, `v23.47-alpha3`)
+- Multiple ElasticSearch node URLs are supported (#326, `v23.47-alpha4`)
 
 ---
 

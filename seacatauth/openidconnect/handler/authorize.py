@@ -79,18 +79,11 @@ class AuthorizeHandler(object):
 		self.OpenIdConnectService = oidc_svc
 		self.CredentialsService = credentials_svc
 
-		if public_api_base_url.endswith("/"):
-			self.PublicApiBaseUrl = public_api_base_url[:-1]
-		else:
-			self.PublicApiBaseUrl = public_api_base_url
+		self.PublicApiBaseUrl = public_api_base_url
+		self.AuthWebuiBaseUrl = auth_webui_base_url
 
-		if auth_webui_base_url.endswith("/"):
-			self.AuthWebuiBaseUrl = auth_webui_base_url[:-1]
-		else:
-			self.AuthWebuiBaseUrl = auth_webui_base_url
-
-		self.LoginPath = "/#/login"
-		self.HomePath = "/#/"
+		self.LoginPath = "#/login"
+		self.HomePath = "#/"
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.AuthorizePath, self.authorize_get)
