@@ -6,7 +6,7 @@ import asab
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
-from ...audit import AuditCode
+from ...last_activity import EventCode
 
 from ...events import EventTypes
 
@@ -30,7 +30,7 @@ class ChangePasswordService(asab.Service):
 
 		self.CredentialsService = cred_service
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.StorageService = app.get_service("asab.StorageService")
 
 		self.AuthWebUIBaseUrl = app.AuthWebUiUrl.rstrip("/")

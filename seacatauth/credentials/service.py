@@ -10,8 +10,9 @@ import typing
 
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
+from .. import AuditLogger
 from ..session import SessionAdapter
-from ..audit import AuditCode
+from ..last_activity import EventCode
 
 #
 
@@ -32,7 +33,7 @@ LOGIN_DESCRIPTOR_FAKE = [{
 class CredentialsService(asab.Service):
 	def __init__(self, app, service_name='seacatauth.CredentialsService', tenant_service=None):
 		super().__init__(app, service_name)
-		self.AuditService = self.App.get_service("seacatauth.AuditService")
+		self.LastActivityService = self.App.get_service("seacatauth.LastActivityService")
 		self.CredentialProviders: typing.Dict[str, CredentialsProviderABC] = collections.OrderedDict()
 		self.LoginDescriptorFake = LOGIN_DESCRIPTOR_FAKE
 
@@ -336,8 +337,9 @@ class CredentialsService(asab.Service):
 			"cid": credentials_id,
 			"by": agent_cid,
 		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_CREATED,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.CREDENTIALS_CREATED,
 			credentials_id=credentials_id,
 			by_cid=agent_cid)
 
@@ -453,8 +455,9 @@ class CredentialsService(asab.Service):
 			"cid": credentials_id,
 			"by": agent_cid,
 		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_UPDATED,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.CREDENTIALS_UPDATED,
 			credentials_id=credentials_id,
 			by_cid=agent_cid,
 			attributes=list(validated_data.keys()))
@@ -505,8 +508,9 @@ class CredentialsService(asab.Service):
 			"cid": credentials_id,
 			"by": agent_cid,
 		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_DELETED,
+		AuditLogger.log(asab.LOG_NOTICE, "TODO")
+		await self.LastActivityService.append(
+			EventCode.CREDENTIALS_DELETED,
 			credentials_id=credentials_id,
 			by_cid=agent_cid)
 
