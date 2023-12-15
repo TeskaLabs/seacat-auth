@@ -2,6 +2,7 @@ import os
 import logging
 import secrets
 import jwcrypto.jwk
+import urllib.parse
 
 import asab
 import asab.web
@@ -27,6 +28,12 @@ class SeaCatAuthApplication(asab.Application):
 		self.Provisioning = self._should_activate_provisioning()
 		self._check_encryption_config()
 		self.PrivateKey = self._load_private_key()
+
+		self.PublicUrl = None
+		self.PublicSeacatAuthApiUrl = None
+		self.PublicOpenIdConnectApiUrl = None
+		self.AuthWebUiUrl = None
+		self._prepare_public_urls()
 
 		# Load modules
 		self.add_module(asab.web.Module)
@@ -313,3 +320,73 @@ class SeaCatAuthApplication(asab.Application):
 		)
 		parser.add_argument("--provisioning", help="run SeaCat Auth in provisioning mode", action="store_true")
 		return parser
+
+
+	def _prepare_public_urls(self):
+		self.PublicUrl = asab.Config.get("general", "public_url")
+		if not self.PublicUrl:
+			# Check deprecated option (backward compatibility)
+			public_api_base_url = asab.Config.get("general", "public_api_base_url", fallback=None)
+			if public_api_base_url:
+				asab.LogObsolete.warning(
+					"Config option 'public_api_base_url' in the 'general' section is deprecated. "
+					"Please use the 'PUBLIC_URL' environment variable "
+					"or the 'public_url' option in the 'general' config section.",
+					struct_data={"eol": "2024-05-31"}
+				)
+				self.PublicUrl = public_api_base_url
+		if not self.PublicUrl:
+			# Try to load config from env variable
+			env_public_url = os.getenv("PUBLIC_URL")
+			if env_public_url:
+				self.PublicUrl = env_public_url
+			else:
+				self.PublicUrl = "http://localhost"
+				L.log(asab.LOG_NOTICE, "No public server URL configured. Falling back to {!r}.".format(self.PublicUrl))
+
+		# Ensure that the URL ends with a slash
+		self.PublicUrl = self.PublicUrl.rstrip("/") + "/"
+		if not (self.PublicUrl.startswith("https://") or self.PublicUrl.startswith("http://")):
+			raise ValueError(
+				"The value of 'public_base_url' in 'general' config section does not start "
+				"with 'https://' or 'http://' ({!r}). Please supply a full absolute URL.".format(self.PublicUrl))
+		if self.PublicUrl.startswith("http://"):
+			L.warning(
+				"Seacat Auth public interface is running on plain insecure HTTP ({!r}). "
+				"This may limit the functionality of certain components.".format(self.PublicUrl))
+
+		# Public base URL of Seacat Auth API
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/seacat-auth/",
+		#   yielding for example "https://example.com/api/seacat-auth/public/features"
+		self.PublicSeacatAuthApiUrl = asab.Config.get(
+			"general", "public_seacat_auth_api_prefix").rstrip("/") + "/"
+		if not (
+			self.PublicSeacatAuthApiUrl.startswith("https://")
+			or self.PublicSeacatAuthApiUrl.startswith("http://")
+		):
+			# Relative URL: Append to PublicUrl
+			self.PublicSeacatAuthApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicSeacatAuthApiUrl)
+
+		# Public base URL of OpenID Connect API
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/openidconnect/",
+		#   yielding for example "https://example.com/api/openidconnect/authorize"
+		self.PublicOpenIdConnectApiUrl = asab.Config.get(
+			"general", "public_openidconnect_api_prefix").rstrip("/") + "/"
+		if not (
+			self.PublicOpenIdConnectApiUrl.startswith("https://")
+			or self.PublicOpenIdConnectApiUrl.startswith("http://")
+		):
+			# Relative URL: Append to PublicUrl
+			self.PublicOpenIdConnectApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicOpenIdConnectApiUrl)
+
+		# Seacat Auth WebUI URL
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/auth/",
+		#   yielding for example "https://example.com/auth/#/login"
+		self.AuthWebUiUrl = asab.Config.get(
+			"general", "auth_webui_base_url").rstrip("/") + "/"
+		if not (
+			self.AuthWebUiUrl.startswith("https://")
+			or self.AuthWebUiUrl.startswith("http://")
+		):
+			# Relative URL: Append to PublicUrl
+			self.AuthWebUiUrl = urllib.parse.urljoin(self.PublicUrl, self.AuthWebUiUrl)
