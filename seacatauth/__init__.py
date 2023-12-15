@@ -4,16 +4,25 @@ import asab
 
 asab.Config.add_defaults({
 	"general": {
-		# Public API base URL lets the app know from what URL is its public API served.
-		# It is used by the OpenIDConnect authorize handler for generating loopback redirect URIs.
+		# Absolute URL of the server where Seacat Auth API is available.
+		# Used for deriving callback URLs, issuer IDs (OAuth, WebAuthn, ...).
 		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
-		"public_api_base_url": "http://localhost/auth/api",
+		# Defaults to "http://localhost", which can be overwritten by PUBLIC_SERVER_URL environment variable.
+		"public_url": "",
+
+		# URL prefix of public Seacat Auth API
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"public_seacat_auth_api_prefix": "api/seacat-auth/",
+
+		# URL prefix of public OpenID Connect API
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"public_openidconnect_api_prefix": "api/",
 
 		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
 		# It is used for building login and password reset URIs.
 		# The domain name is extracted for cookie and authentication purposes.
-		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
-		"auth_webui_base_url": "http://localhost/auth",
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"auth_webui_base_url": "auth/",
 	},
 
 	# Admin API (non-public)
