@@ -13,11 +13,12 @@
 - Batman for Kibana now also requires `kibana_url` (#281, `v23.47-alpha`)
 - Batman does no longer create Seacat resources from all Kibana roles (#281, `v23.47-alpha`)
 - Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)
+- Public URL config changed (#328, #330, `v23.47-alpha4`)
 
 ### Features
 - Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
 - Batman configuration for Kibana can be also loaded from the `[elasticsearch]` section, in addition to the `[batman:kibana]` section (#326, `v23.47-alpha4`)
-- Public URL config now requires only one option in canonical deployments (#328, `v23.47-alpha4`)
+- Public URL config now requires only one option in canonical deployments (#328, #330, `v23.47-alpha4`)
 
 ### Refactoring
 - Separate login factors in session object (#325, `v23.47-alpha3`)

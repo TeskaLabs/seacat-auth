@@ -324,16 +324,15 @@ class SeaCatAuthApplication(asab.Application):
 	def _prepare_public_urls(self):
 		self.PublicUrl = asab.Config.get("general", "public_url")
 		if not self.PublicUrl:
-			# Check deprecated option (backward compatibility)
+			# Check obsoleted option
 			public_api_base_url = asab.Config.get("general", "public_api_base_url", fallback=None)
 			if public_api_base_url:
-				asab.LogObsolete.warning(
-					"Config option 'public_api_base_url' in the 'general' section is deprecated. "
+				raise ValueError(
+					"Config option 'public_api_base_url' in the 'general' section is obsoleted. "
 					"Please use the 'PUBLIC_URL' environment variable "
-					"or the 'public_url' option in the 'general' config section.",
-					struct_data={"eol": "2024-05-31"}
+					"or the 'public_url' option in the 'general' config section. "
+					"See https://github.com/TeskaLabs/seacat-auth/pull/330 for details."
 				)
-				self.PublicUrl = public_api_base_url
 		if not self.PublicUrl:
 			# Try to load config from env variable
 			env_public_url = os.getenv("PUBLIC_URL")
@@ -358,7 +357,7 @@ class SeaCatAuthApplication(asab.Application):
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/seacat-auth/",
 		#   yielding for example "https://example.com/api/seacat-auth/public/features"
 		self.PublicSeacatAuthApiUrl = asab.Config.get(
-			"general", "public_seacat_auth_api_prefix").rstrip("/") + "/"
+			"general", "public_seacat_auth_base_url").rstrip("/") + "/"
 		if not (
 			self.PublicSeacatAuthApiUrl.startswith("https://")
 			or self.PublicSeacatAuthApiUrl.startswith("http://")
@@ -370,7 +369,7 @@ class SeaCatAuthApplication(asab.Application):
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/openidconnect/",
 		#   yielding for example "https://example.com/api/openidconnect/authorize"
 		self.PublicOpenIdConnectApiUrl = asab.Config.get(
-			"general", "public_openidconnect_api_prefix").rstrip("/") + "/"
+			"general", "public_openidconnect_base_url").rstrip("/") + "/"
 		if not (
 			self.PublicOpenIdConnectApiUrl.startswith("https://")
 			or self.PublicOpenIdConnectApiUrl.startswith("http://")
