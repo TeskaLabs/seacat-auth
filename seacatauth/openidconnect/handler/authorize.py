@@ -525,7 +525,7 @@ class AuthorizeHandler(object):
 			"psid": new_session.Session.ParentSessionId,
 			"sid": new_session.SessionId,
 			"cid": new_session.Credentials.Id,
-			"t": new_session.Authorization.Tenants,
+			"t": list(new_session.Authorization.Authz.keys()),
 			"client_id": client_id,
 			"anonymous": new_session.is_anonymous(),
 			"from_ip": from_info,
