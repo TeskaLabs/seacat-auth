@@ -150,11 +150,11 @@ class OpenIdConnectService(asab.Service):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 		data = await collection.find_one_and_delete(filter={"_id": code})
 		if data is None:
-			raise KeyError("Authorization code not found.")
+			raise exceptions.SessionNotFoundError("Authorization code not found")
 
 		exp = data["exp"]
 		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Authorization code expired.")
+			raise exceptions.SessionNotFoundError("Authorization code expired")
 
 		if "cc" in data:
 			self.PKCE.evaluate_code_challenge(
@@ -168,8 +168,8 @@ class OpenIdConnectService(asab.Service):
 			algo_token = self.StorageService.aes_decrypt(data["alt"])
 			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
 		else:
-			L.error("Unexpected authorization code object.", struct_data=data)
-			raise KeyError("Invalid authorization code.")
+			L.error("Unexpected authorization code object", struct_data=data)
+			raise exceptions.SessionNotFoundError("Invalid authorization code")
 
 
 	async def get_session_by_access_token(self, token_value):
