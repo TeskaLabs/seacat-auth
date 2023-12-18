@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import datetime
 
@@ -6,8 +5,6 @@ import asab
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
-from ...last_activity import EventCode
-
 from ...events import EventTypes
 
 #

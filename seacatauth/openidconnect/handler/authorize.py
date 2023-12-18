@@ -6,7 +6,6 @@ import aiohttp
 import aiohttp.web
 import asab
 
-from ...last_activity import EventCode
 from ...authz import build_credentials_authz
 from ...cookie.utils import delete_cookie
 from ... import client, generic, AuditLogger
