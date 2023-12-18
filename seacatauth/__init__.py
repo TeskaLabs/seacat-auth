@@ -14,11 +14,11 @@ asab.Config.add_defaults({
 
 		# URL prefix of public Seacat Auth API
 		# The URL can be either absolute, or relative to the "public_url" above.
-		"public_seacat_auth_api_prefix": "api/seacat-auth/",
+		"public_seacat_auth_base_url": "api/seacat-auth/",
 
 		# URL prefix of public OpenID Connect API
 		# The URL can be either absolute, or relative to the "public_url" above.
-		"public_openidconnect_api_prefix": "api/",
+		"public_openidconnect_base_url": "api/",
 
 		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
 		# It is used for building login and password reset URIs.
