@@ -95,7 +95,7 @@ class AlgorithmicSessionProvider:
 				"authz": authz
 			}
 
-		session_dict[SessionAdapter.FN.Authorization.AvailableTenants] = available_tenants
+		session_dict[SessionAdapter.FN.Authorization.AssignedTenants] = available_tenants
 		session_dict[SessionAdapter.FN.Authorization.Authz] = authz
 
 
