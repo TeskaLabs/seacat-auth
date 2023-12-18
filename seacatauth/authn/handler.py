@@ -298,6 +298,9 @@ class AuthenticationHandler(object):
 				else:
 					set_cookie(self.App, response, impersonator_session)
 
+		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
+			"cid": session.Credentials.Id, "sid": session.SessionId, "token_type": "cookie"})
+
 		return response
 
 	async def smslogin(self, request):
