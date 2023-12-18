@@ -13,7 +13,6 @@ async def build_credentials_authz(
 		'tenantB': ['resourceA', 'resourceB', 'resourceE', 'resourceD'],
 	}
 	"""
-	print(tenants)
 	exclude_resources = exclude_resources or frozenset()
 
 	# Add global roles and resources under "*"
