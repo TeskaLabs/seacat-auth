@@ -276,7 +276,7 @@ class SessionAdapter:
 		return self.SessionId == self.ALGORITHMIC_SESSION_ID
 
 	def is_anonymous(self):
-		return self.Authentication is not None and self.Authentication.IsAnonymous
+		return self.Authentication is not None and bool(self.Authentication.IsAnonymous)
 
 	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields
