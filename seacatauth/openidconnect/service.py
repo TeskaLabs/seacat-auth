@@ -402,8 +402,8 @@ class OpenIdConnectService(asab.Service):
 		if session.Authorization.Authz is not None:
 			userinfo["resources"] = session.Authorization.Authz
 
-		if session.Authorization.Tenants is not None:
-			userinfo["tenants"] = session.Authorization.Tenants
+		if session.Authorization.AvailableTenants is not None:
+			userinfo["tenants"] = session.Authorization.AvailableTenants
 
 		# TODO: Last password change
 
