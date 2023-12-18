@@ -671,7 +671,7 @@ class AuthorizeHandler(object):
 			url.fragment  # TODO: There should be no fragment in redirect URI
 		))
 
-		response = aiohttp.web.HTTPFound(
+		return aiohttp.web.HTTPFound(
 			url,
 			headers={
 				# TODO: The server SHOULD generate a Location header field
@@ -681,15 +681,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-
-		L.log(asab.LOG_NOTICE, "Authorization successful", struct_data={
-			"cid": session.Credentials.Id,
-			"sid": session.Id,
-			"client_id": session.OAuth2.ClientId,
-			"scope": " ".join(scope),
-			"from_info": from_info,
-			"redirect_uri": redirect_uri})
-		return response
 
 
 	async def reply_with_redirect_to_login(
