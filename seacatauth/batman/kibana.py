@@ -134,7 +134,7 @@ class KibanaIntegration(asab.config.Configurable):
 
 		self.RetrySyncAll: datetime.datetime | None = None
 
-		self.App.PubSub.subscribe("Application.init!", self._on_init)
+		self.App.PubSub.subscribe("Batman.initialized!", self._on_init)
 		self.App.PubSub.subscribe("Role.assigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Role.unassigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Role.updated!", self._on_authz_change)

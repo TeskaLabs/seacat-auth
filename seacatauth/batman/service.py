@@ -43,6 +43,10 @@ class BatmanService(asab.Service):
 		app.TaskService.schedule(*[i.initialize() for i in self.Integrations])
 
 
+	async def initialize(self, app):
+		app.PubSub.publish("Batman.initialized!", asynchronously=True)
+
+
 	def generate_password(self, credentials_id):
 		"""
 		Generate a basic auth password using credentials ID and configured batman key.
