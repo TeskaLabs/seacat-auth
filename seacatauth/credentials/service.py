@@ -12,7 +12,6 @@ from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger
 from ..session import SessionAdapter
-from ..last_activity import EventCode
 
 #
 

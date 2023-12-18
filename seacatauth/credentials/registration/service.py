@@ -7,7 +7,6 @@ import asab.storage.exceptions
 import asab.exceptions
 
 from ... import AuditLogger
-from ...last_activity import EventCode
 
 #
 
