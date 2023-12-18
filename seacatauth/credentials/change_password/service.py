@@ -1,7 +1,9 @@
+import hashlib
 import logging
 import datetime
 
 import asab
+import bson
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
@@ -37,64 +39,54 @@ class ChangePasswordService(asab.Service):
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 	async def _on_housekeeping(self, event_name):
-		await self._delete_expired_pwdreset_tokens()
+		await self._delete_expired_password_reset_tokens()
 
-	async def _delete_expired_pwdreset_tokens(self):
+	async def _delete_expired_password_reset_tokens(self):
 		collection = self.StorageService.Database[self.ChangePasswordCollection]
 		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Expired password reset tokens deleted.", struct_data={
+			L.log(asab.LOG_NOTICE, "Expired password reset tokens deleted", struct_data={
 				"count": result.deleted_count
 			})
 
-	async def delete_pwdreset_tokens_by_cid(self, cid):
-		expired = []
-		requests = await self.list_pwdreset_tokens()
-		for r in requests["data"]:
-			if r["cid"] == cid:
-				expired.append(r["_id"])
-		for pwd_id in expired:
-			await self.delete_pwdreset_token(pwdreset_id=pwd_id)
 
-	async def list_pwdreset_tokens(self, page: int = 0, limit: int = None):
+	async def delete_password_reset_tokens_by_cid(self, credentials_id: str):
 		collection = self.StorageService.Database[self.ChangePasswordCollection]
-
-		query_filter = {}
-		cursor = collection.find(query_filter)
-
-		cursor.sort('_c', -1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
-
-		requests = []
-		async for request_dict in cursor:
-			requests.append(request_dict)
-
-		return {
-			'data': requests,
-			'count': await collection.count_documents(query_filter)
-		}
-
-	async def create_pwdreset_token(self, pwd_change_id: str, request_builders: list):
-		upsertor = self.StorageService.upsertor(self.ChangePasswordCollection, obj_id=pwd_change_id)
-		for request_builder in request_builders:
-			for key, value in request_builder.items():
-				upsertor.set(key, value)
-		request_id = await upsertor.execute(event_type=EventTypes.PWD_RESET_TOKEN_CREATED)
-		assert pwd_change_id == request_id
-		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"pwd_token": request_id})
-		return request_id
+		query_filter = {"cid": credentials_id}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Password reset tokens deleted", struct_data={
+				"cid": credentials_id,
+				"count": result.deleted_count
+			})
 
 
-	async def delete_pwdreset_token(self, pwdreset_id: str):
-		await self.StorageService.delete(self.ChangePasswordCollection, pwdreset_id)
-		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={"pwd_token": pwdreset_id})
+	async def create_password_reset_token(self, credentials_id: str, expiration: int | None = None):
+		"""
+		Create a password reset object
+		"""
+		password_reset_token = generate_ergonomic_token(length=20)
+		token_id = await self._token_id_from_token_string(password_reset_token)
+		upsertor = self.StorageService.upsertor(self.ChangePasswordCollection, obj_id=token_id)
+		upsertor.set("cid", credentials_id)
+		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+			seconds=expiration if expiration is not None else self.Expiration))
+
+		await upsertor.execute(event_type=EventTypes.PWD_RESET_TOKEN_CREATED)
+		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"cid": credentials_id})
+		return password_reset_token
 
 
-	async def get_password_reset_token_credentials_id(self, password_reset_token: str):
-		token = await self.StorageService.get(self.ChangePasswordCollection, password_reset_token)
+	async def delete_password_reset_token(self, password_reset_token: str):
+		token_id = await self._token_id_from_token_string(password_reset_token)
+		await self.StorageService.delete(self.ChangePasswordCollection, token_id)
+		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={"pwd_token": password_reset_token})
+
+
+	async def get_password_reset_token_details(self, password_reset_token: str):
+		token_id = await self._token_id_from_token_string(password_reset_token)
+		token = await self.StorageService.get(self.ChangePasswordCollection, token_id)
 		if token["exp"] < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Password reset token expired.")
 		return token
@@ -112,21 +104,13 @@ class ChangePasswordService(asab.Service):
 			L.error("Cannot find credentials", struct_data={"cid": credentials_id})
 			return False
 
-		if expiration is None:
-			expiration = self.Expiration
-		pwd_change_id = generate_ergonomic_token(length=20)
-		pwd_change_builders = [{
-			"cid": credentials_id,
-			"exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
-		}]
-
-		await self.create_pwdreset_token(pwd_change_id, pwd_change_builders)
+		pwdreset_token = await self.create_password_reset_token(credentials_id=credentials_id, expiration=expiration)
 
 		# Send the message
 		email = creds.get("email")
 		username = creds.get("username")
 		phone = creds.get("phone")
-		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, pwd_change_id)
+		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, pwdreset_token)
 		successful = await self.CommunicationService.password_reset(
 			email=email, username=username, phone=phone, reset_url=reset_url, welcome=is_new_user
 		)
@@ -135,7 +119,7 @@ class ChangePasswordService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Password change initiated", struct_data={"cid": credentials_id})
 			return True
 		else:
-			await self.delete_pwdreset_token(pwd_change_id)
+			await self.delete_password_reset_token(pwdreset_token)
 			raise exceptions.CommunicationError(
 				"Failed to send password reset link.", credentials_id=credentials_id)
 
@@ -154,3 +138,7 @@ class ChangePasswordService(asab.Service):
 			"password": new_password,
 			"enforce_factors": list(enforce_factors)
 		})
+
+
+	async def _token_id_from_token_string(self, password_reset_token):
+		return bson.ObjectId(hashlib.sha256(password_reset_token.encode("ascii")).digest()[:12])

@@ -73,14 +73,14 @@ class ChangePasswordHandler(object):
 
 		# Change the password
 		try:
-			await self.ChangePasswordService.change_password(old_password, new_password)
+			await self.ChangePasswordService.change_password(credentials_id, new_password)
 		except Exception as e:
 			L.exception("Password change failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
-			return asab.web.rest.json_response(request, code=401, data={"result": "FAILED"})
+			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 
 		# Record the change in audit
 		AuditLogger.log(
@@ -122,28 +122,33 @@ class ChangePasswordHandler(object):
 
 		# "Authenticate" using the password reset token
 		try:
-			credentials_id = self.ChangePasswordService.get_password_reset_token_credentials_id(password_reset_token)
+			password_reset_details = await self.ChangePasswordService.get_password_reset_token_details(
+				password_reset_token)
+			credentials_id = password_reset_details["cid"]
 		except KeyError:
 			AuditLogger.log(
-				asab.LOG_NOTICE, "Password change failed: Invalid password reset token",
+				asab.LOG_NOTICE, "Password reset failed: Invalid password reset token",
 				struct_data={"from_ip": from_ip}
 			)
-			return asab.web.rest.json_response(request, code=401, data={"result": "FAILED"})
+			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 
 		# Change the password
 		try:
-			await self.ChangePasswordService.change_password_by_pwdreset_id(credentials_id, new_password)
+			await self.ChangePasswordService.change_password(credentials_id, new_password)
 		except Exception as e:
-			L.exception("Password change failed: {}".format(e))
-			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
+			L.exception("Password reset failed: {}".format(e))
+			AuditLogger.log(asab.LOG_NOTICE, "Password reset failed: {}".format(e.__class__.__name__), struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
-			return asab.web.rest.json_response(request, code=401, data={"result": "FAILED"})
+			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
+
+		# Delete all the credentials' tokens after a successful password change
+		await self.ChangePasswordService.delete_password_reset_tokens_by_cid(credentials_id)
 
 		# Record in audit
 		AuditLogger.log(
-			asab.LOG_NOTICE, "Password change successful",
+			asab.LOG_NOTICE, "Password reset successful",
 			struct_data={"cid": credentials_id, "from_ip": from_ip}
 		)
 		await self.LastActivityService.update_last_activity(
