@@ -141,4 +141,4 @@ class ChangePasswordService(asab.Service):
 
 
 	async def _token_id_from_token_string(self, password_reset_token):
-		return bson.ObjectId(hashlib.sha256(password_reset_token.encode("ascii")).digest()[:12])
+		return hashlib.sha256(password_reset_token.encode("ascii")).digest()
