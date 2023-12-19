@@ -3,7 +3,6 @@ import logging
 import datetime
 
 import asab
-import bson
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
