@@ -98,7 +98,8 @@ class TokenHandler(object):
 
 		# TODO: elif grant_type == "refresh_token"
 
-		L.error("Unsupported grant type: {}".format(grant_type))
+		AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type", struct_data={
+			"from_ip": generic.get_request_access_ips(request), "grant_type": grant_type})
 		return aiohttp.web.HTTPBadRequest()
 
 
