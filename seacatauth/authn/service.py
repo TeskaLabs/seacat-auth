@@ -75,7 +75,7 @@ class AuthenticationService(asab.Service):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
 
-		self.LoginUrl = "{}/#/login".format(app.AuthWebUIBaseUrl)
+		self.LoginUrl = "{}/#/login".format(self.App.AuthWebUiUrl)
 
 		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
 		if self.CustomLoginParameters != "":
