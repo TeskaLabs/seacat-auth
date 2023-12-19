@@ -266,6 +266,15 @@ class OpenIdConnectService(asab.Service):
 				),
 			])
 
+		if "batman" in scope:
+			batman_service = self.App.get_service("seacatauth.BatmanService")
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
 		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		# Obtain Track ID if there is any in the root session
