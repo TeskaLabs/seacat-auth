@@ -71,9 +71,8 @@ class SeaCatAuthApplication(asab.Application):
 			self.add_module(Module)
 			self.ApiService.initialize_zookeeper()
 
-		from .audit import AuditService, AuditHandler
-		self.AuditService = AuditService(self)
-		self.AuditHandler = AuditHandler(self, self.AuditService)
+		from .last_activity import LastActivityService
+		self.LastActivityService = LastActivityService(self)
 
 		# Load Resource service
 		from .authz import ResourceService, ResourceHandler

@@ -3,27 +3,34 @@
 ## v23.47
 
 ### Pre-releases
+- `v23.47-alpha5`
 - `v23.47-alpha4`
 - `v23.47-alpha3`
 - `v23.47-alpha2`
 - `v23.47-alpha`
 
 ### Breaking changes
+- Config section 'batman:elk' renamed to 'batman:elasticsearch' (#333, `v23.47-alpha5`)
+- Public URL config changed (#328, #330, `v23.47-alpha4`)
 - Remove access token from websocket protocol header during introspection (#324, `v23.47-alpha2`)
 - Batman for Kibana now also requires `kibana_url` (#281, `v23.47-alpha`)
 - Batman does no longer create Seacat resources from all Kibana roles (#281, `v23.47-alpha`)
-- Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)
-- Public URL config changed (#328, #330, `v23.47-alpha4`)
+- ~~Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)~~
+
+### Fix
+- Fixed Batman Kibana component initialization (#333, `v23.47-alpha5`)
 
 ### Features
-- Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
-- Batman configuration for Kibana can be also loaded from the `[elasticsearch]` section, in addition to the `[batman:kibana]` section (#326, `v23.47-alpha4`)
-- Public URL config now requires only one option in canonical deployments (#328, #330, `v23.47-alpha4`)
 - Access token Batman introspection (#333, `v23.47-alpha5`)
+- Replace audit service with audit logger (#329, `v23.47-alpha5`)
+- Hash password reset codes in the database (#329, `v23.47-alpha5`)
+- Batman configuration for Kibana can be also loaded from the `[elasticsearch]` section (#326, `v23.47-alpha4`)
+- Public URL config now requires only one option in canonical deployments (#328, #330, `v23.47-alpha4`)
+- Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
 
 ### Refactoring
-- Separate login factors in session object (#325, `v23.47-alpha3`)
 - Multiple ElasticSearch node URLs are supported (#326, `v23.47-alpha4`)
+- Separate login factors in session object (#325, `v23.47-alpha3`)
 
 ---
 
