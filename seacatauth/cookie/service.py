@@ -18,7 +18,7 @@ from ..session import (
 	cookie_session_builder
 )
 from ..openidconnect.session import oauth2_session_builder
-from ..audit import AuditCode
+from .. import AuditLogger
 
 #
 
@@ -39,7 +39,6 @@ class CookieService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.AuthenticationService = None
 		self.OpenIdConnectService = None
 
@@ -251,19 +250,11 @@ class CookieService(asab.Service):
 			Id=session_svc.Algorithmic.serialize(session),
 			Domain=client_dict.get("cookie_domain") or None)
 
-		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
+		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+			"anonymous": True,
 			"cid": anonymous_cid,
 			"client_id": client_dict["_id"],
 			"track_id": track_id,
 			"fi": from_info})
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.ANONYMOUS_SESSION_CREATED,
-			credentials_id=anonymous_cid,
-			client_id=client_dict["_id"],
-			session_id=str(session.Session.Id),
-			track_id=track_id,
-			fi=from_info)
 
 		return session

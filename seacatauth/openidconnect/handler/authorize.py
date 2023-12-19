@@ -6,9 +6,9 @@ import aiohttp
 import aiohttp.web
 import asab
 
-from ...audit import AuditCode
 from ...authz import build_credentials_authz
-from ... import client, generic
+from ...cookie.utils import delete_cookie
+from ... import client, generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
@@ -486,16 +486,16 @@ class AuthorizeHandler(object):
 			else:
 				raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
 
-			# Anonymous sessions need to be audited
-			await self.OpenIdConnectService.AuditService.append(
-				AuditCode.ANONYMOUS_SESSION_CREATED,
-				credentials_id=new_session.Credentials.Id,
-				client_id=client_id,
-				scope=scope,
-				session_id=str(new_session.SessionId),
-				fi=from_info)
-
-		await self.audit_authorize_success(new_session, from_info)
+		AuditLogger.log(asab.LOG_NOTICE, "Authorization successful", struct_data={
+			"psid": new_session.Session.ParentSessionId,
+			"sid": new_session.SessionId,
+			"cid": new_session.Credentials.Id,
+			"t": [t for t in new_session.Authorization.Authz if t != "*"],
+			"client_id": client_id,
+			"anonymous": new_session.is_anonymous(),
+			"from_ip": from_info,
+			"scope": scope,
+		})
 		return await self.reply_with_successful_response(
 			new_session, scope, redirect_uri, state,
 			code_challenge=code_challenge,
@@ -636,7 +636,7 @@ class AuthorizeHandler(object):
 			url.fragment  # TODO: There should be no fragment in redirect URI
 		))
 
-		response = aiohttp.web.HTTPFound(
+		return aiohttp.web.HTTPFound(
 			url,
 			headers={
 				# TODO: The server SHOULD generate a Location header field
@@ -646,15 +646,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-
-		L.log(asab.LOG_NOTICE, "Authorization successful", struct_data={
-			"cid": session.Credentials.Id,
-			"sid": session.Id,
-			"client_id": session.OAuth2.ClientId,
-			"scope": " ".join(scope),
-			"from_info": from_info,
-			"redirect_uri": redirect_uri})
-		return response
 
 
 	async def redirect_to_login(
@@ -786,31 +777,17 @@ class AuthorizeHandler(object):
 			)
 		return aiohttp.web.HTTPFound(redirect)
 
-	async def audit_authorize_success(self, session, from_info):
-		"""
-		Append an authorization success entry to the audit.
-		"""
-		await self.OpenIdConnectService.AuditService.append(
-			AuditCode.AUTHORIZE_SUCCESS,
-			credentials_id=session.Credentials.Id,
-			client_id=session.OAuth2.ClientId,
-			session_id=str(session.Session.Id),
-			scope=session.OAuth2.Scope,
-			tenants=[t for t in session.Authorization.Authz if t != "*"],
-			fi=from_info)
-
 
 	async def audit_authorize_error(self, error: OAuthAuthorizeError, access_ips: list = None):
 		"""
 		Append an authorization error entry to the audit.
 		"""
-		await self.OpenIdConnectService.AuditService.append(
-			AuditCode.AUTHORIZE_ERROR,
-			error=error.Error,
-			credentials_id=error.CredentialsId,
-			client_id=error.ClientId,
-			access_ips=access_ips,
-			**error.StructData)
+		AuditLogger.log(asab.LOG_NOTICE, "Authorization failed", struct_data={
+			"e": error.Error,
+			"cid": error.CredentialsId,
+			"client_id": error.ClientId,
+			**error.StructData
+		})
 
 
 	async def authorize_tenants_by_scope(self, scope, authz, credentials_id, client_id):

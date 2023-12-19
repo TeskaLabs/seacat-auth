@@ -14,7 +14,7 @@ import json
 
 from ..utils import TokenRequestErrorResponseCode
 from ..pkce import CodeChallengeFailedError
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ... import generic
 
 #
@@ -98,7 +98,8 @@ class TokenHandler(object):
 
 		# TODO: elif grant_type == "refresh_token"
 
-		L.error("Unsupported grant type: {}".format(grant_type))
+		AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type", struct_data={
+			"from_ip": generic.get_request_access_ips(request), "grant_type": grant_type})
 		return aiohttp.web.HTTPBadRequest()
 
 
@@ -112,11 +113,17 @@ class TokenHandler(object):
 		grant_type=authorization_code&code=foo-bar-code&redirect_uri=....
 
 		"""
+		from_ip = generic.get_request_access_ips(request)
+
+		# TODO: If client_id and redirect_uri is present in the query, verify that their values are the same
+		#  as those used in the authorization request
+		# TODO: Authenticate confidential clients with client_secret
 
 		# Ensure the Authorization Code was issued to the authenticated Client
 		authorization_code = qs_data.get("code", "")
 		if len(authorization_code) == 0:
-			L.error("Authorization Code not provided")
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: No authorization code in request", struct_data={
+				"from_ip": from_ip})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
@@ -125,11 +132,19 @@ class TokenHandler(object):
 			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(
 				authorization_code, qs_data.get("code_verifier"))
 		except KeyError:
-			L.error("Session not found.", struct_data={"code": authorization_code})
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Token request denied: Invalid or expired authorization code",
+				struct_data={"from_ip": from_ip, "code": authorization_code}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-		except CodeChallengeFailedError as e:
-			L.error("Code challenge failed.", struct_data={"reason": str(e)})
+		except CodeChallengeFailedError:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Token request denied: Code challenge failed",
+				struct_data={"from_ip": from_ip}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
@@ -151,7 +166,15 @@ class TokenHandler(object):
 			if token_value is not None:
 				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
-					L.log(asab.LOG_NOTICE, "Cannot transfer track ID: No source session found by access token")
+					AuditLogger.log(
+						asab.LOG_NOTICE,
+						"Token request denied: Track ID transfer failed because of invalid Authorization header",
+						struct_data={
+							"from_ip": from_ip,
+							"cid": new_session.Credentials.Id,
+							"client_id": new_session.OAuth2.ClientId,
+						}
+					)
 					return aiohttp.web.HTTPBadRequest()
 			else:
 				# Use cookie only if there is no access token
@@ -166,7 +189,15 @@ class TokenHandler(object):
 				new_session = await self.SessionService.inherit_or_generate_new_track_id(new_session, old_session)
 			except ValueError as e:
 				# Return 400 to prevent disclosure while keeping the stacktrace
-				L.error("Failed to produce session track ID")
+				AuditLogger.log(
+					asab.LOG_NOTICE,
+					"Token request denied: Failed to produce session track ID",
+					struct_data={
+						"from_ip": from_ip,
+						"cid": new_session.Credentials.Id,
+						"client_id": new_session.OAuth2.ClientId,
+					}
+				)
 				raise aiohttp.web.HTTPBadRequest() from e
 
 		headers = {
@@ -189,11 +220,11 @@ class TokenHandler(object):
 			data["expires_in"] = int(
 				(new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
 
-		L.log(asab.LOG_NOTICE, "Token request granted", struct_data={
+		AuditLogger.log(asab.LOG_NOTICE, "Token request granted", struct_data={
 			"cid": new_session.Credentials.Id,
 			"sid": new_session.Id,
 			"client_id": new_session.OAuth2.ClientId,
-			"from_info": generic.get_request_access_ips(request)})
+			"from_ip": from_ip})
 
 		return asab.web.rest.json_response(request, data, headers=headers)
 

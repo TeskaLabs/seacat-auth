@@ -21,7 +21,6 @@ from ..session import (
 	authz_session_builder,
 )
 from .session import oauth2_session_builder
-from ..audit import AuditCode
 from .. import exceptions
 from . import pkce, authentication
 
@@ -58,7 +57,6 @@ class OpenIdConnectService(asab.Service):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.PKCE = pkce.PKCE()
 		self.Authentication = authentication.Authentication(app)
 
@@ -157,11 +155,11 @@ class OpenIdConnectService(asab.Service):
 		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
 		data = await collection.find_one_and_delete(filter={"_id": code})
 		if data is None:
-			raise KeyError("Authorization code not found.")
+			raise exceptions.SessionNotFoundError("Authorization code not found")
 
 		exp = data["exp"]
 		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Authorization code expired.")
+			raise exceptions.SessionNotFoundError("Authorization code expired")
 
 		if "cc" in data:
 			self.PKCE.evaluate_code_challenge(
@@ -175,8 +173,8 @@ class OpenIdConnectService(asab.Service):
 			algo_token = self.StorageService.aes_decrypt(data["alt"])
 			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
 		else:
-			L.error("Unexpected authorization code object.", struct_data=data)
-			raise KeyError("Invalid authorization code.")
+			L.error("Unexpected authorization code object", struct_data=data)
+			raise exceptions.SessionNotFoundError("Invalid authorization code")
 
 
 	async def get_session_by_access_token(self, token_value):
@@ -276,6 +274,15 @@ class OpenIdConnectService(asab.Service):
 				),
 			])
 
+		if "batman" in scope:
+			batman_service = self.App.get_service("seacatauth.BatmanService")
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
 		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		# Obtain Track ID if there is any in the root session
@@ -318,21 +325,6 @@ class OpenIdConnectService(asab.Service):
 			scope=scope)
 
 		session.OAuth2.AccessToken = self.SessionService.Algorithmic.serialize(session)
-
-		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
-			"cid": anonymous_cid,
-			"client_id": client_dict["_id"],
-			"track_id": track_id,
-			"fi": from_info})
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.ANONYMOUS_SESSION_CREATED,
-			credentials_id=anonymous_cid,
-			client_id=client_dict["_id"],
-			session_id=str(session.Session.Id),
-			fi=from_info)
-
 		return session
 
 
@@ -429,8 +421,8 @@ class OpenIdConnectService(asab.Service):
 		if session.Authorization.Authz is not None:
 			userinfo["resources"] = session.Authorization.Authz
 
-		if session.Authorization.Tenants is not None:
-			userinfo["tenants"] = session.Authorization.Tenants
+		if session.Authorization.AssignedTenants is not None:
+			userinfo["tenants"] = session.Authorization.AssignedTenants
 
 		# TODO: Last password change
 
@@ -477,41 +469,15 @@ class OpenIdConnectService(asab.Service):
 				scope, session.Credentials.Id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
 			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
-			await self.audit_authorize_error(
-				client_id, "access_denied:tenant_not_found",
-				credential_id=session.Credentials.Id,
-				tenant=e.Tenant,
-				scope=scope
-			)
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.TenantAccessDeniedError as e:
 			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
-			await self.audit_authorize_error(
-				client_id, "access_denied:unauthorized_tenant",
-				credential_id=session.Credentials.Id,
-				tenant=e.Tenant,
-				scope=scope
-			)
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.NoTenantsError:
 			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
-			await self.audit_authorize_error(
-				client_id, "access_denied:user_has_no_tenant",
-				credential_id=session.Credentials.Id,
-				scope=scope
-			)
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 
 		return tenants
-
-
-	async def audit_authorize_error(self, client_id: str, error_message: str, credential_id: str = None, **kwargs):
-		await self.AuditService.append(
-			AuditCode.AUTHORIZE_ERROR,
-			credentials_id=credential_id,
-			client_id=client_id,
-			errmsg=error_message,
-			**kwargs)
 
 
 	def build_authorize_uri(self, client_dict: dict, **query_params):

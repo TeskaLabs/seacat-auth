@@ -59,7 +59,7 @@ async def authz_session_builder(
 	user_tenants = list(set(await tenant_service.get_tenants(credentials_id)).union(tenants))
 	return (
 		(SessionAdapter.FN.Authorization.Authz, authz),
-		(SessionAdapter.FN.Authorization.Tenants, user_tenants),
+		(SessionAdapter.FN.Authorization.AssignedTenants, user_tenants),
 	)
 
 
