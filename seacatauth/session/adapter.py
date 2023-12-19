@@ -52,7 +52,7 @@ class AuthenticationData:
 @dataclasses.dataclass
 class AuthorizationData:
 	Authz: dict
-	Tenants: list
+	AssignedTenants: list
 
 
 @dataclasses.dataclass
@@ -114,8 +114,7 @@ class SessionAdapter:
 
 		class Authorization:
 			_prefix = "az"
-			Tenants = "az_t"
-			Resources = "az_rs"
+			AssignedTenants = "az_t"
 			Authz = "az_az"
 
 		class Authentication:
@@ -242,7 +241,7 @@ class SessionAdapter:
 		if self.Authorization is not None:
 			session_dict.update({
 				self.FN.Authorization.Authz: self.Authorization.Authz,
-				self.FN.Authorization.Tenants: self.Authorization.Tenants,
+				self.FN.Authorization.AssignedTenants: self.Authorization.AssignedTenants,
 			})
 
 		if self.Cookie is not None:
@@ -277,7 +276,7 @@ class SessionAdapter:
 		return self.SessionId == self.ALGORITHMIC_SESSION_ID
 
 	def is_anonymous(self):
-		return self.Authentication is not None and self.Authentication.IsAnonymous
+		return self.Authentication is not None and bool(self.Authentication.IsAnonymous)
 
 	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields
@@ -349,7 +348,7 @@ class SessionAdapter:
 		authz = session_dict.pop(cls.FN.Authorization.Authz, None)
 		return AuthorizationData(
 			Authz=authz,
-			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None),
+			AssignedTenants=session_dict.pop(cls.FN.Authorization.AssignedTenants, None),
 		)
 
 	@classmethod
@@ -412,7 +411,7 @@ def rest_get(session_dict):
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
 		"login_factors": session_dict.get(SessionAdapter.FN.Authentication.LoginFactors),
-		"tenants": session_dict.get(SessionAdapter.FN.Authorization.Tenants),
+		"tenants": session_dict.get(SessionAdapter.FN.Authorization.AssignedTenants),
 		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
 		"track_id": session_dict.get(SessionAdapter.FN.Session.TrackId),
 	}

@@ -1,6 +1,8 @@
+import asab
+import logging
+
 from .app import SeaCatAuthApplication
 
-import asab
 
 asab.Config.add_defaults({
 	"general": {
@@ -188,6 +190,8 @@ asab.Config.add_defaults({
 	},
 })
 
+AuditLogger = logging.getLogger("AUDIT")
+
 __all__ = [
-	'SeaCatAuthApplication'
+	"SeaCatAuthApplication"
 ]
