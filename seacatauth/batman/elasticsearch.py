@@ -80,11 +80,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 	def __init__(self, batman_svc, config_section_name="batman:elasticsearch", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
 
-		if "batman:elk" in asab.Config:
-			asab.LogObsolete.warning(
-				"Config section 'batman:elk' has been renamed to 'batman:elasticsearch'. Please update your config.",
-				struct_data={"eol": "2024-05-31"})
-			self.Config.update(asab.Config["batman:elk"])
 		# ES connection parameters should be specified in a config section [elasticsearch]
 		if "elasticsearch" in asab.Config:
 			self.Config.update(asab.Config["elasticsearch"])
@@ -100,10 +95,10 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		if len(self.KibanaUrl) == 0:
 			self.KibanaUrl = None
 
-		self.ElasticSearchUrl = self.Config.get('url')
+		self.ElasticSearchUrl = self.Config.get("url")
 		self.ElasticSearchNodesUrls = get_url_list(self.ElasticSearchUrl)
 		if len(self.ElasticSearchNodesUrls) == 0:
-			raise RuntimeError("No ElasticSearch URL has been provided.")
+			raise ValueError("No ElasticSearch URL has been provided")
 
 		# Authorization: username + password or API-key
 		username = self.Config.get("username")
@@ -119,12 +114,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
 		if self.ElasticSearchNodesUrls[0].startswith("https://"):
-			# use one of the old sections if it has SSL data or default to the [elasticsearch] section
-			# TODO: delete the 1st condition when [batman:elk] is obsolete
-			if asab.Config.has_section("batman:elk") and section_has_ssl_option("batman:elk"):
-				self.SSLContextBuilder = asab.tls.SSLContextBuilder("batman:elk")
-			# TODO: when [batman:elk] is obsolete there is no need to check if the section exists / remove
-			elif asab.Config.has_section(config_section_name) and section_has_ssl_option(config_section_name):
+			# Try to build SSL context from either the default or the [elasticsearch] section,
+			#   whichever contains SSL config options
+			if section_has_ssl_option(config_section_name):
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 			else:
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder("elasticsearch")
