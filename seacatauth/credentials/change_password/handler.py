@@ -128,7 +128,7 @@ class ChangePasswordHandler(object):
 		except KeyError:
 			AuditLogger.log(
 				asab.LOG_NOTICE, "Password reset failed: Invalid password reset token",
-				struct_data={"from_ip": from_ip}
+				struct_data={"from_ip": from_ip, "token": password_reset_token}
 			)
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 

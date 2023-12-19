@@ -30,6 +30,7 @@ class LastActivityService(asab.Service):
 
 
 	async def update_last_activity(self, event_code: EventCode, credentials_id: str, **kwargs):
+		assert isinstance(credentials_id, str)
 		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
 
 		# Do not use upsertor because it can trigger webhook
