@@ -31,7 +31,6 @@ class RegistrationHandler(object):
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
