@@ -1,7 +1,9 @@
 import logging
 import aiohttp
 import aiohttp.web
+import asab
 
+from ... import AuditLogger
 from ...generic import get_bearer_token_value
 
 #
@@ -35,7 +37,9 @@ class SessionHandler(object):
 
 	async def session_logout(self, request):
 		"""
-		OAuth 2.0 Session Logout
+		OpenID Connect end session endpoint
+
+		https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 		"""
 		token_value = get_bearer_token_value(request)
 		if token_value is None:
@@ -57,15 +61,14 @@ class SessionHandler(object):
 		else:
 			parent_session = None
 
-		if parent_session is not None:
-			# Delete the root session which will also remove this session
-			await self.SessionService.delete(parent_session.Session.Id)
-		else:
-			# Back compat: This can occur with old sessions
-			L.warning("OIDC session has no parent session", struct_data={
-				"sid": session.Session.Id,
-				"parent_sid": session.Session.ParentSessionId,
-			})
-			await self.SessionService.delete(session.Session.Id)
+		# Delete the root session which will also remove this session
+		await self.SessionService.delete(parent_session.Session.Id)
+
+		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.SessionId,
+			"psid": parent_session.SessionId,
+			"token_type": "access_token"
+		})
 
 		return aiohttp.web.Response(text="", content_type="text/html")

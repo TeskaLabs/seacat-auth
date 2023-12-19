@@ -9,7 +9,8 @@ from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
 from .. import exceptions
-from ..audit import AuditCode
+from .. import AuditLogger
+from ..last_activity import EventCode
 from ..authz import build_credentials_authz
 
 from ..session import (
@@ -71,7 +72,7 @@ class AuthenticationService(asab.Service):
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
 
@@ -335,22 +336,14 @@ class AuthenticationService(asab.Service):
 			session_type="root",
 			session_builders=session_builders,
 		)
-		L.log(
-			asab.LOG_NOTICE,
-			"Authentication/login successful.",
-			struct_data={
-				"cid": login_session.CredentialsId,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
-			}
-		)
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.LOGIN_SUCCESS,
-			credentials_id=login_session.CredentialsId,
-			session_id=str(session.Session.Id),
-			fi=from_info)
+		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+			"cid": login_session.CredentialsId,
+			"lsid": login_session.Id,
+			"sid": str(session.Session.Id),
+			"from_ip": from_info,
+		})
+		await self.LastActivityService.update_last_activity(
+			EventCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
@@ -392,23 +385,6 @@ class AuthenticationService(asab.Service):
 			session_type="m2m",
 			expiration=session_expiration,
 			session_builders=session_builders,
-		)
-		L.log(
-			asab.LOG_NOTICE,
-			"M2M authentication successful.",
-			struct_data={
-				"cid": credentials_id,
-				"sid": str(session.Session.Id),
-				"fi": from_info,
-			}
-		)
-
-		# Add an audit entry
-		await self.AuditService.append(
-			AuditCode.M2M_AUTHENTICATION_SUCCESSFUL,
-			credentials_id=credentials_id,
-			session_id=str(session.Session.Id),
-			fi=from_info
 		)
 
 		return session
