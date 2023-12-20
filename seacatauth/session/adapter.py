@@ -38,6 +38,7 @@ class CredentialsData:
 
 @dataclasses.dataclass
 class AuthenticationData:
+	AuthnTime: datetime.datetime
 	TOTPSet: str
 	ExternalLoginOptions: typing.Optional[list]
 	LoginDescriptor: typing.Optional[str]
@@ -119,6 +120,7 @@ class SessionAdapter:
 
 		class Authentication:
 			_prefix = "an"
+			AuthnTime = "an_t"
 			TOTPSet = "an_ts"
 			ExternalLoginOptions = "an_ex"
 			LoginDescriptor = "an_ld"
@@ -228,6 +230,7 @@ class SessionAdapter:
 
 		if self.Authentication is not None:
 			session_dict.update({
+				self.FN.Authentication.AuthnTime: self.Authentication.AuthnTime,
 				self.FN.Authentication.LastLogin: self.Authentication.LastLogin,
 				self.FN.Authentication.LoginDescriptor: self.Authentication.LoginDescriptor,
 				self.FN.Authentication.LoginFactors: self.Authentication.LoginFactors,
@@ -257,14 +260,13 @@ class SessionAdapter:
 				self.FN.OAuth2.RefreshToken: self.OAuth2.RefreshToken,
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
+				self.FN.OAuth2.Nonce: self.OAuth2.Nonce,
 			})
 
 		if self.Batman is not None:
 			session_dict.update({
 				self.FN.Batman.Token: self.Batman.Token,
 			})
-
-		# TODO: encrypt sensitive fields
 
 		return {k: v for k, v in session_dict.items() if v is not None}
 
@@ -332,6 +334,7 @@ class SessionAdapter:
 		if isinstance(login_descriptor, dict):
 			login_descriptor = login_descriptor["id"]
 		return AuthenticationData(
+			AuthnTime=session_dict.pop(cls.FN.Authentication.AuthnTime, None),
 			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None),
 			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
 			LoginDescriptor=login_descriptor,
@@ -409,6 +412,7 @@ def rest_get(session_dict):
 		"expiration": session_dict.get(SessionAdapter.FN.Session.Expiration),
 		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
+		"authn_time": session_dict.get(SessionAdapter.FN.Authentication.AuthnTime),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
 		"login_factors": session_dict.get(SessionAdapter.FN.Authentication.LoginFactors),
 		"tenants": session_dict.get(SessionAdapter.FN.Authorization.AssignedTenants),
