@@ -1,5 +1,5 @@
 ---
-title: SeaCat Auth configuration
+title: Base configuration
 ---
 
 # SeaCat Auth configuration

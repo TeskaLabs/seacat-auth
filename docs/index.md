@@ -1,5 +1,5 @@
 ---
-title: About
+title: Welcome!
 ---
 
 # About TeskaLabs SeaCat Auth
