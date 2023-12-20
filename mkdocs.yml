@@ -51,14 +51,43 @@ extra:
 
 nav:
   - index.md
-  - features/features.md
+
   - Getting started:
     - getting-started/quick-start.md
     - getting-started/recommended-deployment.md
+    - config/provisioning.md
+
+  - Configuration:
+    - config/basic-configuration.md
+    - config/docker.md
+    - config/cookies.md
+    - config/external-login.md
+    - config/ldap.md
+    - config/oauth2-introspect.md
+    - config/mail.server.md
+    - config/bouncer.md
+    - Credentials:
+      - config/credentials/index.md
+      - config/credentials/credentials-policy.md
+      - config/credentials/providers.md
+
   - Integrations:
     - integrations/index.md
     - integrations/elk.md
+    - integrations/the-hive.md
+  
+  - Development:
+    - development/rest-api.md
+    - development/oauth2.md
+    - development/postman.md
+    - development/unit-test.md
+
   - Reference:
+    - features/features.md
     - reference/architecture.md
     - reference/rbac.md
     - reference/resources.md
+    
+  - User guide (UI):
+    - webui/key-terms.md
+    - webui/seacat-auth-web-ui.md

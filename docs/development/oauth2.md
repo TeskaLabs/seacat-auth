@@ -1,5 +1,5 @@
 ---
-title: OAuth 2.0 in SeaCat Auth
+title: OAuth 2.0
 ---
 
 # OAuth 2.0 in SeaCat Auth
