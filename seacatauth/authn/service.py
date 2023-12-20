@@ -2,14 +2,14 @@ import datetime
 import json
 import logging
 import re
+import urllib.parse
 
 import asab
 
 from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
-from .. import exceptions
-from .. import AuditLogger
+from .. import exceptions, generic, AuditLogger
 from ..last_activity import EventCode
 from ..authz import build_credentials_authz
 
@@ -17,7 +17,7 @@ from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
 	cookie_session_builder,
-	login_descriptor_session_builder,
+	authentication_session_builder,
 	available_factors_session_builder,
 	external_login_session_builder, SessionAdapter,
 )
@@ -59,7 +59,6 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 
 
 class AuthenticationService(asab.Service):
-	# TODO: Introduce configurable LoginSession provider (MongoDB x in-memory dict)
 	LoginSessionCollection = "ls"
 
 	def __init__(self, app, service_name="seacatauth.AuthenticationService"):
@@ -75,6 +74,8 @@ class AuthenticationService(asab.Service):
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
+
+		self.LoginUrl = "{}/#/login".format(self.App.AuthWebUiUrl)
 
 		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
 		if self.CustomLoginParameters != "":
@@ -220,7 +221,7 @@ class AuthenticationService(asab.Service):
 			login_preferences
 		)
 
-	async def prepare_fallback_login_descriptors(self, credentials_id, request_headers):
+	async def prepare_fallback_login_descriptors(self, credentials_id, request_headers=None):
 		login_descriptors = await self._prepare_login_descriptors(
 			self.LoginDescriptorFallback,
 			credentials_id,
@@ -231,11 +232,17 @@ class AuthenticationService(asab.Service):
 			raise Exception("Failed to prepare fallback login descriptors.")
 		return login_descriptors
 
-	async def _prepare_login_descriptors(self, login_descriptors, credentials_id, request_headers, login_preferences=None):
+	async def _prepare_login_descriptors(
+		self,
+		login_descriptors,
+		credentials_id,
+		request_headers=None,
+		login_preferences=None
+	):
 		ready_login_descriptors = []
 		login_data = {
 			"credentials_id": credentials_id,
-			"request_headers": request_headers
+			"request_headers": request_headers or {}
 		}
 		descriptor_factors = []
 		for descriptor in login_descriptors:
@@ -313,8 +320,10 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
-	async def login(self, login_session, from_info: list = None):
-		# TODO: Move this to LoginService
+	async def login(self, login_session, root_session: SessionAdapter | None = None, from_info: list = None):
+		"""
+		Build and create a root session
+		"""
 		scope = frozenset(["profile", "email", "phone"])
 
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
@@ -326,16 +335,25 @@ class AuthenticationService(asab.Service):
 				credentials_id=login_session.CredentialsId,
 				tenants=None  # Root session is tenant-agnostic
 			),
-			login_descriptor_session_builder(login_session.AuthenticatedVia),
-			cookie_session_builder(),
+			authentication_session_builder(login_session.AuthenticatedVia),
 			await available_factors_session_builder(self, login_session.CredentialsId),
 			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
 		]
 
-		session = await self.SessionService.create_session(
-			session_type="root",
-			session_builders=session_builders,
-		)
+		if root_session and not root_session.is_anonymous():
+			# Update existing root session
+			session = await self.SessionService.update_session(
+				root_session.SessionId,
+				session_builders=session_builders
+			)
+		else:
+			# Create a new root session
+			session_builders.append(cookie_session_builder())
+			session = await self.SessionService.create_session(
+				session_type="root",
+				session_builders=session_builders,
+			)
+
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"cid": login_session.CredentialsId,
 			"lsid": login_session.Id,
@@ -377,7 +395,7 @@ class AuthenticationService(asab.Service):
 				credentials_id=credentials_id,
 				tenants=tenants,
 			),
-			login_descriptor_session_builder(login_descriptor),
+			authentication_session_builder(login_descriptor),
 			await available_factors_session_builder(self, credentials_id)
 		]
 
@@ -440,3 +458,111 @@ class AuthenticationService(asab.Service):
 		)
 
 		return session
+
+
+	async def prepare_seacat_login_url(self, client_id: str, authorization_query: dict):
+		"""
+		Build login URI of Seacat Auth login page with callback to authorization request
+		"""
+		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		client_dict = await client_svc.get(client_id)
+
+		# Remove "prompt" and "acr_values" from callback
+		prompt = authorization_query.pop("prompt", None)
+		acr_values = authorization_query.pop("acr_values", None)
+
+		# Build callback authorization URL
+		authorization_url = "{}?{}".format(
+			oidc_svc.authorization_endpoint_url(),
+			urllib.parse.urlencode(authorization_query))
+
+		# Prepare login params
+		login_query_params = [
+			("redirect_uri", authorization_url),
+			("client_id", client_id)]
+		if prompt:
+			login_query_params.append(("prompt", prompt))
+		if acr_values:
+			login_query_params.append(("acr_values", acr_values))
+
+		login_url = client_dict.get("login_uri")
+		if login_url is None:
+			login_url = self.LoginUrl
+
+		parsed = generic.urlparse(login_url)
+		if parsed["fragment"] != "":
+			# If the Login URI contains fragment, add the login params into the fragment query
+			fragment_parsed = generic.urlparse(parsed["fragment"])
+			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query.update(login_query_params)
+			fragment_parsed["query"] = urllib.parse.urlencode(query)
+			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
+		else:
+			# If the Login URI contains no fragment, add the login params into the regular URL query
+			query = urllib.parse.parse_qs(parsed["query"])
+			query.update(login_query_params)
+			parsed["query"] = urllib.parse.urlencode(query)
+
+		return generic.urlunparse(**parsed)
+
+
+	async def prepare_seacat_login(
+		self,
+		ident: str,
+		client_public_key,
+		login_session_id: str | None = None,
+		request_headers: dict | None = None,
+		login_dict: dict | None = None,
+		login_preferences: list | None = None,
+	):
+		"""
+		Set up login session with located credentials and prepare login options
+		"""
+		# Locate credentials
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
+
+		if credentials_id is None or credentials_id == []:
+			L.log(asab.LOG_NOTICE, "Cannot locate credentials", struct_data={"ident": ident})
+			return None
+		elif credentials_id.startswith("m2m:"):
+			# Deny login to m2m credentials
+			L.log(asab.LOG_NOTICE, "Cannot login with machine credentials", struct_data={
+				"cid": credentials_id})
+			return None
+
+		login_descriptors = await self.prepare_login_descriptors(
+			credentials_id=credentials_id,
+			request_headers=request_headers,
+			login_preferences=login_preferences
+		)
+		if login_descriptors is None:
+			L.log(asab.LOG_NOTICE, "No suitable login descriptor", struct_data={
+				"cid": credentials_id, "ldid": login_preferences})
+			return None
+
+		# TODO: if login_session_id: Update session instead
+		login_session = await self.create_login_session(
+			credentials_id=credentials_id,
+			client_public_key=client_public_key,
+			login_descriptors=login_descriptors,
+			ident=ident,
+		)
+		return login_session
+
+
+	async def prepare_fake_login(self, ident:str, client_public_key, login_session_id: str | None = None):
+		"""
+		Set up the login session so that the login call is guaranteed to fail
+		"""
+		login_descriptors = await self.prepare_fallback_login_descriptors(credentials_id="")
+		# TODO: if login_session_id: Update session instead
+		login_session = await self.create_login_session(
+			credentials_id="",
+			client_public_key=client_public_key,
+			login_descriptors=login_descriptors,
+			ident=ident,
+		)
+		L.log(asab.LOG_NOTICE, "Fake login session created", struct_data={
+			"ident": ident, "id": login_session.Id})
+		return login_session

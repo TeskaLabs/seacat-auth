@@ -1,5 +1,6 @@
 import logging
 import secrets
+import datetime
 
 from .adapter import SessionAdapter
 from ..authz import build_credentials_authz
@@ -60,7 +61,8 @@ async def authz_session_builder(
 	)
 
 
-def login_descriptor_session_builder(login_descriptor):
+def authentication_session_builder(login_descriptor):
+	yield (SessionAdapter.FN.Authentication.AuthnTime, datetime.datetime.now(datetime.UTC))
 	if login_descriptor is not None:
 		yield (SessionAdapter.FN.Authentication.LoginDescriptor, login_descriptor["id"])
 		yield (SessionAdapter.FN.Authentication.LoginFactors, [
