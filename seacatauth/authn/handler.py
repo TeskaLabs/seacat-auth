@@ -97,9 +97,9 @@ class AuthenticationHandler(object):
 		- Store the login data in a new LoginSession object
 		- Respond with login session ID, encryption key and available login descriptors
 		"""
-		print(json_data)
 		key = jwcrypto.jwk.JWK.from_json(await request.read())
 		ident = json_data.get("ident")
+		login_session_id = json_data.get("lsid")
 
 		# Get arguments specified in login URL query
 		login_preferences = None
@@ -120,7 +120,15 @@ class AuthenticationHandler(object):
 			# TODO: This option should be moved to client config or removed completely
 			login_preferences = query_dict.get("ldid")
 
+		if login_session_id:
+			login_session = await self.AuthenticationService.get_login_session(login_session_id)
+		else:
+			login_session = await self.AuthenticationService.create_login_session()
+
+		print(login_session)
+
 		login_session = await self.AuthenticationService.prepare_seacat_login(
+			login_session=login_session,
 			ident=ident,
 			client_public_key=key.get_op_key("encrypt"),
 			request_headers=request.headers,
@@ -128,17 +136,22 @@ class AuthenticationHandler(object):
 			login_preferences=login_preferences
 		)
 		if login_session is None:
-			login_session = await self.AuthenticationService.prepare_fake_login(
+			login_session = await self.AuthenticationService.prepare_failed_seacat_login(
+				login_session=login_session,
 				ident=ident,
 				client_public_key=key.get_op_key("encrypt")
 			)
 
-		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
+		print(login_session)
+
+		key = jwcrypto.jwk.JWK.from_pyca(login_session.SeacatLogin.ServerPublicKey)
 
 		response = {
-			'lsid': login_session.Id,
-			'lds': [descriptor.serialize() for descriptor in login_session.LoginDescriptors],
-			'key': key.export_public(as_dict=True),
+			"lsid": login_session.Id,
+			"lds": [
+				descriptor.serialize()
+				for descriptor in login_session.SeacatLogin.LoginDescriptors],
+			"key": key.export_public(as_dict=True),
 		}
 		return asab.web.rest.json_response(request, response)
 
@@ -159,25 +172,25 @@ class AuthenticationHandler(object):
 		try:
 			login_session = await self.AuthenticationService.get_login_session(lsid)
 		except KeyError:
-			L.warning("Login failed: Invalid login session ID", struct_data={
+			L.log(asab.LOG_NOTICE, "Login failed: Invalid login session ID", struct_data={
 				"lsid": lsid
 			})
 			return asab.web.rest.json_response(
 				request,
-				data={'result': 'FAILED'},
+				data={"result": "FAILED"},
 				status=401
 			)
 
-		if login_session.RemainingLoginAttempts <= 0:
+		if login_session.SeacatLogin.LoginAttemptsLeft <= 0:
 			await self.AuthenticationService.delete_login_session(lsid)
-			L.warning("Login failed: no more attempts", struct_data={
+			L.log(asab.LOG_NOTICE, "Login failed: No more attempts", struct_data={
 				"lsid": lsid,
 				"ident": login_session.Ident,
 				"cid": login_session.CredentialsId
 			})
 			return asab.web.rest.json_response(
 				request,
-				data={'result': 'FAILED'},
+				data={"result": "FAILED"},
 				status=401
 			)
 
@@ -205,11 +218,11 @@ class AuthenticationHandler(object):
 			await self.AuthenticationService.LastActivityService.update_last_activity(
 				EventCode.LOGIN_FAILED, login_session.CredentialsId, from_ip=access_ips)
 
-			self.AuthenticationService.LoginCounter.add('failed', 1)
+			self.AuthenticationService.LoginCounter.add("failed", 1)
 
 			return asab.web.rest.json_response(
 				request,
-				data={'result': 'FAILED'},
+				data={"result": "FAILED"},
 				status=401
 			)
 

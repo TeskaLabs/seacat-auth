@@ -32,26 +32,26 @@ L = logging.getLogger(__name__)
 
 LOGIN_DESCRIPTOR_FALLBACK = [
 	{
-		'id': 'default',
-		'label': 'Use default login',
-		'factors': [
+		"id": "default",
+		"label": "Use default login",
+		"factors": [
 			# If TOTP is active, two-factor login should be required by default
 			[
-				{'id': 'password', 'type': 'password'},
-				{'id': 'totp', 'type': 'totp'}
+				{"id": "password", "type": "password"},
+				{"id": "totp", "type": "totp"}
 			],
 			[
-				{'id': 'password', 'type': 'password'}
+				{"id": "password", "type": "password"}
 			]
 		],
 	},
 	{
-		'id': 'webauthn',
-		'label': 'FIDO2/WebAuthn login',
-		'factors': [
+		"id": "webauthn",
+		"label": "FIDO2/WebAuthn login",
+		"factors": [
 			[
-				{'id': 'password', 'type': 'password'},
-				{'id': 'webauthn', 'type': 'webauthn'}
+				{"id": "password", "type": "password"},
+				{"id": "webauthn", "type": "webauthn"}
 			],
 		],
 	},
@@ -84,7 +84,8 @@ class AuthenticationService(asab.Service):
 			self.CustomLoginParameters = frozenset()
 
 		self.LoginAttempts = asab.Config.getint("seacatauth:authentication", "login_attempts")
-		self.LoginSessionExpiration = asab.Config.getseconds("seacatauth:authentication", "login_session_expiration")
+		self.LoginSessionExpiration = datetime.timedelta(
+			seconds=asab.Config.getseconds("seacatauth:authentication", "login_session_expiration"))
 
 		self.LoginFactors = {}
 		self.LoginDescriptors = None
@@ -138,37 +139,39 @@ class AuthenticationService(asab.Service):
 
 	async def create_login_session(
 		self,
-		credentials_id,
-		client_public_key,
-		ident,
-		login_descriptors=None,
-		data=None,
+		credentials_id=None,
+		session_id=None,
+		authorization_params=None,
 	):
-		# Prepare the login session
-		login_session = LoginSession.build(
-			client_login_key=client_public_key,
-			credentials_id=credentials_id,
-			ident=ident,
-			login_descriptors=login_descriptors,
-			login_attempts=self.LoginAttempts,
-			timeout=self.LoginSessionExpiration,
-			data=data,
+		login_session = LoginSession(
+			initiator_cid=credentials_id,
+			initiator_sid=session_id,
+			authorization_params=authorization_params,
 		)
-
-		upsertor = self.StorageService.upsertor(self.LoginSessionCollection, login_session.Id)
-
+		upsertor = self.StorageService.upsertor(
+			self.LoginSessionCollection,
+			login_session.Id)
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
-
-		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_CREATED)
-
+		await upsertor.execute()
 		return login_session
 
 
+	async def _upsert_login_session(self, login_session: LoginSession):
+		upsertor = self.StorageService.upsertor(
+			self.LoginSessionCollection,
+			login_session.Id,
+			version=login_session.Version)
+		for k, v in login_session.serialize().items():
+			upsertor.set(k, v, encrypt=k in LoginSession.EncryptedFields)
+		await upsertor.execute()
+
+
 	async def get_login_session(self, login_session_id):
-		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
+		ls_data = await self.StorageService.get(
+			self.LoginSessionCollection, login_session_id, decrypt=LoginSession.EncryptedFields)
 		login_session = LoginSession.deserialize(self, ls_data)
-		if login_session.ExpiresAt < datetime.datetime.now(datetime.timezone.utc):
+		if login_session.Created + self.LoginSessionExpiration < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Login session expired")
 		return login_session
 
@@ -509,16 +512,19 @@ class AuthenticationService(asab.Service):
 
 	async def prepare_seacat_login(
 		self,
+		login_session: str | LoginSession,
 		ident: str,
 		client_public_key,
-		login_session_id: str | None = None,
 		request_headers: dict | None = None,
 		login_dict: dict | None = None,
 		login_preferences: list | None = None,
-	):
+	) -> LoginSession:
 		"""
 		Set up login session with located credentials and prepare login options
 		"""
+		if isinstance(login_session, str):
+			login_session = await self.get_login_session(login_session)
+
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
 
@@ -541,28 +547,39 @@ class AuthenticationService(asab.Service):
 				"cid": credentials_id, "ldid": login_preferences})
 			return None
 
-		# TODO: if login_session_id: Update session instead
-		login_session = await self.create_login_session(
-			credentials_id=credentials_id,
-			client_public_key=client_public_key,
-			login_descriptors=login_descriptors,
+		login_session.initialize_seacat_login(
 			ident=ident,
+			credentials_id=credentials_id,
+			login_descriptors=login_descriptors,
+			login_attempts_left=self.LoginAttempts,
+			client_login_key=client_public_key
 		)
+		await self._upsert_login_session(login_session)
+		L.log(asab.LOG_NOTICE, "Login session prepared", struct_data={
+			"cid": credentials_id, "ident": ident, "id": login_session.Id})
 		return login_session
 
 
-	async def prepare_fake_login(self, ident:str, client_public_key, login_session_id: str | None = None):
+	async def prepare_failed_seacat_login(
+		self,
+		login_session: str | LoginSession,
+		ident: str, client_public_key
+	) -> LoginSession:
 		"""
 		Set up the login session so that the login call is guaranteed to fail
 		"""
+		if isinstance(login_session, str):
+			login_session = await self.get_login_session(login_session)
+
 		login_descriptors = await self.prepare_fallback_login_descriptors(credentials_id="")
-		# TODO: if login_session_id: Update session instead
-		login_session = await self.create_login_session(
-			credentials_id="",
-			client_public_key=client_public_key,
-			login_descriptors=login_descriptors,
+		login_session.initialize_seacat_login(
 			ident=ident,
+			credentials_id="",
+			login_descriptors=login_descriptors,
+			login_attempts_left=self.LoginAttempts,
+			client_login_key=client_public_key
 		)
-		L.log(asab.LOG_NOTICE, "Fake login session created", struct_data={
+		await self._upsert_login_session(login_session)
+		L.log(asab.LOG_NOTICE, "Failed login session prepared", struct_data={
 			"ident": ident, "id": login_session.Id})
 		return login_session
