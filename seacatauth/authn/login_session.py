@@ -93,18 +93,21 @@ class SeacatLogin:
 
 	@classmethod
 	def deserialize(cls, authn_svc, db_object: dict):
-		return cls(
-			shared_key=db_object["__sk"],
-			credentials_id=db_object["cid"],
-			ident=db_object["idt"],
-			login_descriptors=[
-				LoginDescriptor.deserialize(authn_svc, descriptor)
-				for descriptor in db_object["ld"]
-			],
-			login_attempts_left=db_object["la"],
-			server_public_key=cryptography.hazmat.primitives.serialization.load_pem_public_key(db_object["pk"]),
-			data=db_object["d"],
-		)
+		try:
+			return cls(
+				shared_key=db_object["__sk"],
+				credentials_id=db_object["cid"],
+				ident=db_object["idt"],
+				login_descriptors=[
+					LoginDescriptor.deserialize(authn_svc, descriptor)
+					for descriptor in db_object["ld"]
+				],
+				login_attempts_left=db_object["la"],
+				server_public_key=cryptography.hazmat.primitives.serialization.load_pem_public_key(db_object["pk"]),
+				data=db_object["d"],
+			)
+		except KeyError:
+			return None
 
 
 	def decrypt(self, ciphertext: bytes) -> dict:
@@ -166,10 +169,13 @@ class ExternalLogin:
 
 	@classmethod
 	def deserialize(cls, db_object: dict):
-		return cls(
-			provider_type=db_object["ep"],
-			nonce=db_object["en"],
-		)
+		try:
+			return cls(
+				provider_type=db_object["ep"],
+				nonce=db_object["en"],
+			)
+		except KeyError:
+			return None
 
 
 class LoginSession(object):

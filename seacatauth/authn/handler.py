@@ -171,7 +171,8 @@ class AuthenticationHandler(object):
 
 		try:
 			login_session = await self.AuthenticationService.get_login_session(lsid)
-		except KeyError:
+		except KeyError as e:
+			print(e)
 			L.log(asab.LOG_NOTICE, "Login failed: Invalid login session ID", struct_data={
 				"lsid": lsid
 			})
@@ -194,9 +195,9 @@ class AuthenticationHandler(object):
 				status=401
 			)
 
-		await self.AuthenticationService.update_login_session(
-			lsid,
-			remaining_login_attempts=login_session.RemainingLoginAttempts - 1
+		login_session = await self.AuthenticationService.update_login_session(
+			login_session,
+			login_attempts_left=login_session.SeacatLogin.LoginAttemptsLeft - 1
 		)
 
 		request_data = login_session.decrypt(await request.read())
@@ -370,7 +371,7 @@ class AuthenticationHandler(object):
 		login_data = login_session.Data
 		login_data["webauthn"] = authentication_options
 
-		await self.AuthenticationService.update_login_session(lsid, data=login_data)
+		login_session = await self.AuthenticationService.update_login_session(login_session, data=login_data)
 
 		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))
 

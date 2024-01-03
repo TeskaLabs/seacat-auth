@@ -41,12 +41,13 @@ class SMSCodeFactor(LoginFactorABC):
 				"token": generate_ergonomic_token(length=6)
 			}
 		token = login_session.Data[self.Type]["token"]
-		await self.AuthenticationService.update_login_session(login_session.Id, data=login_session.Data)
+		login_session = await self.AuthenticationService.update_login_session(login_session, data=login_session.Data)
 
 		# Get phone number
 		cred_svc = self.AuthenticationService.CredentialsService
 		credentials = await cred_svc.get(login_session.CredentialsId)
 		phone = credentials.get("phone")
+		assert phone is not None
 
 		# Send SMS
 		comm_svc = self.AuthenticationService.CommunicationService
