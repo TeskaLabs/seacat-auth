@@ -153,7 +153,8 @@ class AuthenticationService(asab.Service):
 			login_session.Id)
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
-		await upsertor.execute()
+		lsid = await upsertor.execute()
+		print("new", lsid)
 		return login_session
 
 
@@ -168,6 +169,7 @@ class AuthenticationService(asab.Service):
 
 
 	async def get_login_session(self, login_session_id):
+		print("get", login_session_id)
 		ls_data = await self.StorageService.get(
 			self.LoginSessionCollection, login_session_id, decrypt=LoginSession.EncryptedFields)
 		login_session = LoginSession.deserialize(self, ls_data)
@@ -176,26 +178,22 @@ class AuthenticationService(asab.Service):
 		return login_session
 
 
-	async def update_login_session(self, login_session_id, *, data=None, remaining_login_attempts=None):
-		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
-		if ls_data["exp"] < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Login session expired")
-
+	async def update_login_session(self, login_session, *, data=None, login_attempts_left=None):
 		upsertor = self.StorageService.upsertor(
 			self.LoginSessionCollection,
-			obj_id=login_session_id,
-			version=ls_data["_v"]
+			obj_id=login_session.Id,
+			version=login_session.Version
 		)
 		if data is not None:
 			upsertor.set("d", data)
-		if remaining_login_attempts is not None:
-			upsertor.set("la", remaining_login_attempts)
+		if login_attempts_left is not None:
+			upsertor.set("la", login_attempts_left)
 
 		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_UPDATED)
 		L.info("Login session updated", struct_data={
-			"lsid": login_session_id,
+			"lsid": login_session.Id,
 		})
-		return True
+		return await self.get_login_session(login_session.Id)
 
 
 	async def delete_login_session(self, login_session_id):
@@ -291,22 +289,24 @@ class AuthenticationService(asab.Service):
 		"""
 		Walk through factors in the requested login descriptor and try to authenticate in all of them.
 		"""
+		login = login_session.SeacatLogin
+
 		# Fail if we have a fake login session
-		if login_session.CredentialsId == "":
-			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login_session.Id})
+		if login.CredentialsId == "":
+			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login.Id})
 			return False
 
 		# First make sure that the user is not suspended
-		credentials = await self.CredentialsService.get(login_session.CredentialsId, include=frozenset(["suspended"]))
+		credentials = await self.CredentialsService.get(login.CredentialsId, include=frozenset(["suspended"]))
 		if credentials.get("suspended") is True:
 			L.warning(
 				"Login failed: User suspended",
-				struct_data={"cid": login_session.CredentialsId}
+				struct_data={"cid": login.CredentialsId}
 			)
 			return False
 
 		authenticated = False
-		for descriptor in login_session.LoginDescriptors:
+		for descriptor in login.LoginDescriptors:
 			# Find the descriptor that matches the one in request_data
 			if descriptor.ID != request_data["descriptor"]:
 				continue
@@ -314,11 +314,11 @@ class AuthenticationService(asab.Service):
 			# All factors in a descriptor must pass for the descriptor to pass
 			authenticated = await descriptor.authenticate(login_session, request_data)
 			if authenticated:
-				login_session.AuthenticatedVia = descriptor.serialize()
+				login.AuthenticatedVia = descriptor.serialize()
 				L.log(
 					asab.LOG_NOTICE,
 					"User authenticated by descriptor '{}'".format(descriptor.ID),
-					struct_data={"cid": login_session.CredentialsId}
+					struct_data={"cid": login.CredentialsId}
 				)
 				break
 		return authenticated
