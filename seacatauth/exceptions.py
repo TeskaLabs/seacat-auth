@@ -50,8 +50,8 @@ class NoTenantsError(AccessDeniedError):
 	Subject has access to no tenants.
 	"""
 	def __init__(self, subject=None, *args):
-		self.Subject = subject
-		super().__init__("Subject has access to no tenant.", *args)
+		super().__init__(
+			"Subject {!r} does not have access to any tenant".format(self.Subject), subject=subject, *args)
 
 
 class TenantNotFoundError(SeacatAuthError, KeyError):
@@ -60,7 +60,7 @@ class TenantNotFoundError(SeacatAuthError, KeyError):
 	"""
 	def __init__(self, tenant, *args):
 		self.Tenant = tenant
-		super().__init__("Tenant not found.", *args)
+		super().__init__("Tenant {!r} not found".format(self.Tenant), *args)
 
 
 class RoleNotFoundError(SeacatAuthError, KeyError):
@@ -69,7 +69,7 @@ class RoleNotFoundError(SeacatAuthError, KeyError):
 	"""
 	def __init__(self, role, *args):
 		self.Role = role
-		super().__init__("Role not found.", *args)
+		super().__init__("Role {!r} not found".format(self.Role), *args)
 
 
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
@@ -78,18 +78,31 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	"""
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
-		super().__init__("Credentials not found.", *args)
+		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
+
+
+class CredentialsSuspendedError(SeacatAuthError):
+	"""
+	Credentials not active
+	"""
+	def __init__(self, credentials_id, *args):
+		self.CredentialsId = credentials_id
+		super().__init__("Credentials {!r} suspended".format(self.CredentialsId), *args)
 
 
 class UnauthorizedTenantAccessError(AccessDeniedError):
 	"""
 	Session not authorized for the tenant.
 	"""
-	def __init__(self, session_id, tenant, credentials_id=None, *args):
-		self.SessionId = session_id
+	def __init__(self, session, tenant, credentials_id=None, *args):
+		self.Session = session
 		self.CredentialsId = credentials_id
 		self.Tenant = tenant
-		super().__init__("Credentials are not authorized under tenant.", *args)
+		super().__init__(
+			"{!r} is not authorized to access tenant {!r}".format(self.Session, self.Tenant),
+			subject=self.CredentialsId,
+			*args
+		)
 
 
 class TenantNotAssignedError(SeacatAuthError, KeyError):
