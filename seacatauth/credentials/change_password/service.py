@@ -126,8 +126,13 @@ class ChangePasswordService(asab.Service):
 	async def change_password(self, credentials_id: str, new_password: str):
 		provider = self.CredentialsService.get_provider(credentials_id)
 
-		# Remove "password" from enforced factors
 		credentials = await self.CredentialsService.get(credentials_id)
+
+		# Verify that the credentials are not suspended
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials_id)
+
+		# Remove "password" from enforced factors
 		enforce_factors = set(credentials.get("enforce_factors", []))
 		if "password" in enforce_factors:
 			enforce_factors.remove("password")

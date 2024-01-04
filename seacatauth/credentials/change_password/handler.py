@@ -74,6 +74,12 @@ class ChangePasswordHandler(object):
 		# Change the password
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
+		except exceptions.CredentialsSuspendedError:
+			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: Credentials suspended", struct_data={
+				"cid": credentials_id})
+			await self.LastActivityService.update_last_activity(
+				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 		except Exception as e:
 			L.exception("Password change failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
@@ -135,6 +141,12 @@ class ChangePasswordHandler(object):
 		# Change the password
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
+		except exceptions.CredentialsSuspendedError:
+			AuditLogger.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
+				"cid": credentials_id})
+			await self.LastActivityService.update_last_activity(
+				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 		except Exception as e:
 			L.exception("Password reset failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password reset failed: {}".format(e.__class__.__name__), struct_data={
@@ -181,7 +193,7 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		except exceptions.CredentialsSuspendedError:
-			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials are suspended", struct_data={
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		except exceptions.CommunicationError:
@@ -223,7 +235,7 @@ class ChangePasswordHandler(object):
 			L.error("Lost password reset denied: Credentials not found", struct_data={
 				"cid": credentials_id, "from": access_ips})
 		except exceptions.CredentialsSuspendedError:
-			L.error("Lost password reset denied: Credentials are suspended", struct_data={
+			L.error("Lost password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id, "from": access_ips})
 		except exceptions.CommunicationError:
 			L.error("Lost password reset failed: Failed to send password change link", struct_data={
