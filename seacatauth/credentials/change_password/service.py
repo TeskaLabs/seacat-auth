@@ -4,7 +4,7 @@ import datetime
 
 import asab
 
-from ... import exceptions, AuditLogger
+from ... import exceptions
 from ...generic import generate_ergonomic_token
 from ...events import EventTypes
 
