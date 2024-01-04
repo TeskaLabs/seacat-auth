@@ -113,12 +113,18 @@ class AuthenticationHandler(object):
 			# Empty credentials is used for creating a fake login session
 			credentials_id = ""
 
-		# Deny login to m2m credentials
 		if credentials_id != "":
+			# M2M credentials produce a fake login session
 			cred_provider = self.CredentialsService.get_provider(credentials_id)
 			if cred_provider.Type == "m2m":
 				L.warning("Cannot login with machine credentials.", struct_data={"cid": credentials_id})
 				# Empty credentials is used for creating a fake login session
+				credentials_id = ""
+
+			# Suspended credentials produce a fake login session
+			credentials = await self.CredentialsService.get(credentials_id)
+			if credentials.get("suspended") is True:
+				L.warning("Login denied to suspended credentials", struct_data={"cid": credentials_id})
 				credentials_id = ""
 
 		# Prepare login descriptors
