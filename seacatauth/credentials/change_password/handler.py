@@ -74,12 +74,6 @@ class ChangePasswordHandler(object):
 		# Change the password
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
-		except exceptions.CredentialsSuspendedError:
-			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: Credentials suspended", struct_data={
-				"cid": credentials_id})
-			await self.LastActivityService.update_last_activity(
-				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
-			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 		except Exception as e:
 			L.exception("Password change failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
