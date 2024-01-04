@@ -56,10 +56,6 @@ def private_auth_middleware_factory(app):
 			# Well-known endpoints use no authentication
 			return await handler(request)
 
-		elif request.path.startswith("/openidconnect/"):
-			# OpenID Connect endpoints use custom authentication
-			return await handler(request)
-
 		token_value = get_bearer_token_value(request)
 		if token_value is not None:
 			try:
