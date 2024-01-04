@@ -3,6 +3,8 @@
 ## v23.47
 
 ### Pre-releases
+- `v23.47-alpha6`
+- `v23.47-beta`
 - `v23.47-alpha5`
 - `v23.47-alpha4`
 - `v23.47-alpha3`
@@ -18,6 +20,7 @@
 - ~~Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)~~
 
 ### Fix
+- Check suspended credentials before login and password reset (#334, `v23.47-alpha6`)
 - Fixed Batman Kibana component initialization (#333, `v23.47-alpha5`)
 
 ### Features
