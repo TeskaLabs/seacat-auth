@@ -46,11 +46,20 @@ def private_auth_middleware_factory(app):
 		[asab:api:auth]
 		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-Z0
 		"""
-		if request.path.startswith("/nginx/") and request.method == "POST":
-			# NGINX introspection endpoints handle authorization on their own
+		request.Session = None
+
+		if request.path.startswith("/nginx/"):
+			# NGINX introspection endpoints handle authentication on their own
 			return await handler(request)
 
-		request.Session = None
+		elif request.path.startswith("/.well-known/"):
+			# Well-known endpoints use no authentication
+			return await handler(request)
+
+		elif request.path.startswith("/openidconnect/"):
+			# OpenID Connect endpoints use custom authentication
+			return await handler(request)
+
 		token_value = get_bearer_token_value(request)
 		if token_value is not None:
 			try:
