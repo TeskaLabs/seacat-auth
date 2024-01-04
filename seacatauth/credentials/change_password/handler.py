@@ -176,8 +176,17 @@ class ChangePasswordHandler(object):
 				credentials_id,
 				expiration=json_data.get("expiration")
 			)
+		except exceptions.CredentialsNotFoundError:
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found", struct_data={
+				"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+		except exceptions.CredentialsSuspendedError:
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials are suspended", struct_data={
+				"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		except exceptions.CommunicationError:
-			L.error("Failed to send password change link.", struct_data={"cid": credentials_id})
+			# TODO: If no communication provider is configured, return the link in the response
+			L.error("Failed to send password change link", struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
@@ -201,17 +210,24 @@ class ChangePasswordHandler(object):
 		ident = json_data["ident"]
 		credentials_id = await self.ChangePasswordService.CredentialsService.locate(ident, stop_at_first=True)
 		if credentials_id is None:
-			L.log(asab.LOG_NOTICE, "Ident matched no credentials.", struct_data={
+			L.log(asab.LOG_NOTICE, "Ident matched no credentials", struct_data={
 				"ident": ident, "from": access_ips})
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})
 
 		try:
 			await self.ChangePasswordService.init_password_change(credentials_id)
-		except exceptions.CommunicationError:
-			L.error("Failed to send password change link.", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Lost password reset initiated", struct_data={
 				"cid": credentials_id, "from": access_ips})
+		except exceptions.CredentialsNotFoundError:
+			L.error("Lost password reset denied: Credentials not found", struct_data={
+				"cid": credentials_id, "from": access_ips})
+		except exceptions.CredentialsSuspendedError:
+			L.error("Lost password reset denied: Credentials are suspended", struct_data={
+				"cid": credentials_id, "from": access_ips})
+		except exceptions.CommunicationError:
+			L.error("Lost password reset failed: Failed to send password change link", struct_data={
+				"cid": credentials_id, "from": access_ips})
+		finally:
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})
-
-		return asab.web.rest.json_response(request, {"result": "OK"})
