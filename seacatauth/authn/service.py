@@ -537,6 +537,12 @@ class AuthenticationService(asab.Service):
 				"cid": credentials_id})
 			return None
 
+		credentials = await self.CredentialsService.get(credentials_id)
+		if credentials.get("suspended") is True:
+			# Deny login to suspended credentials
+			L.warning("Login denied to suspended credentials", struct_data={"cid": credentials_id})
+			return None
+
 		login_descriptors = await self.prepare_login_descriptors(
 			credentials_id=credentials_id,
 			request_headers=request_headers,
