@@ -312,7 +312,7 @@ class AuthenticationService(asab.Service):
 				continue
 
 			# All factors in a descriptor must pass for the descriptor to pass
-			authenticated = await descriptor.authenticate(login_session, request_data)
+			authenticated = await descriptor.authenticate(login, request_data)
 			if authenticated:
 				login.AuthenticatedVia = descriptor.serialize()
 				L.log(
@@ -331,16 +331,16 @@ class AuthenticationService(asab.Service):
 
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId, scope),
+			await credentials_session_builder(self.CredentialsService, login_session.SeacatLogin.CredentialsId, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=login_session.CredentialsId,
+				credentials_id=login_session.SeacatLogin.CredentialsId,
 				tenants=None  # Root session is tenant-agnostic
 			),
-			authentication_session_builder(login_session.AuthenticatedVia),
-			await available_factors_session_builder(self, login_session.CredentialsId),
-			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
+			authentication_session_builder(login_session.SeacatLogin.AuthenticatedVia),
+			await available_factors_session_builder(self, login_session.SeacatLogin.CredentialsId),
+			await external_login_session_builder(ext_login_svc, login_session.SeacatLogin.CredentialsId),
 		]
 
 		if root_session and not root_session.is_anonymous():
@@ -358,13 +358,13 @@ class AuthenticationService(asab.Service):
 			)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
-			"cid": login_session.CredentialsId,
+			"cid": login_session.SeacatLogin.CredentialsId,
 			"lsid": login_session.Id,
 			"sid": str(session.Session.Id),
 			"from_ip": from_info,
 		})
 		await self.LastActivityService.update_last_activity(
-			EventCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
+			EventCode.LOGIN_SUCCESS, login_session.SeacatLogin.CredentialsId, from_ip=from_info)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
