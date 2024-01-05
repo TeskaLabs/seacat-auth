@@ -216,9 +216,9 @@ class LoginSession(object):
 	def serialize(self) -> dict:
 		db_object = {}
 		if self.InitiatorCredentialsId:
-			db_object["cid"] = self.InitiatorCredentialsId
+			db_object["icid"] = self.InitiatorCredentialsId
 		if self.InitiatorSessionId:
-			db_object["sid"] = self.InitiatorSessionId
+			db_object["isid"] = self.InitiatorSessionId
 		if self.AuthorizationParams:
 			db_object["ap"] = self.AuthorizationParams
 		if self.SeacatLogin:
