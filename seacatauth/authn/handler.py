@@ -241,16 +241,16 @@ class AuthenticationHandler(object):
 		# TODO: Log also the IP address
 		body = {
 			'result': 'OK',
-			'cid': login_session.CredentialsId,
+			'cid': login_session.SeacatLogin.CredentialsId,
 			'sid': str(session.Session.Id),
 		}
 
 		response = aiohttp.web.Response(
-			body=login_session.encrypt(body)
+			body=login_session.SeacatLogin.encrypt(body)
 		)
 
 		cookie_domain = None
-		if hasattr(login_session, "ClientId"):
+		if hasattr(login_session.SeacatLogin, "ClientId"):
 			client_svc = self.App.get_service("seacatauth.ClientService")
 			try:
 				client = await client_svc.get(login_session.ClientId)
