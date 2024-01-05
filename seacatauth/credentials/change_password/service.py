@@ -92,16 +92,17 @@ class ChangePasswordService(asab.Service):
 
 
 	async def init_password_change(self, credentials_id: str, is_new_user: bool = False, expiration: float = None):
-		'''
-		Parameter `new` states, if the user has been just created, so maybe a different email will be sent to him/her
-		Parameter `expires_in` is in seconds.
-		'''
-
-		# Verify if credentials exists
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Verify that credentials exists
 		creds = await self.CredentialsService.get(credentials_id)
 		if creds is None:
-			L.error("Cannot find credentials", struct_data={"cid": credentials_id})
-			return False
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		# Deny password reset to suspended credentials
+		if creds.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials_id)
 
 		pwdreset_token = await self.create_password_reset_token(credentials_id=credentials_id, expiration=expiration)
 
@@ -115,19 +116,23 @@ class ChangePasswordService(asab.Service):
 		)
 
 		if successful:
-			L.log(asab.LOG_NOTICE, "Password change initiated", struct_data={"cid": credentials_id})
-			return True
+			L.log(asab.LOG_NOTICE, "Password reset initiated", struct_data={"cid": credentials_id})
 		else:
 			await self.delete_password_reset_token(pwdreset_token)
 			raise exceptions.CommunicationError(
-				"Failed to send password reset link.", credentials_id=credentials_id)
+				"Failed to send password reset link", credentials_id=credentials_id)
 
 
 	async def change_password(self, credentials_id: str, new_password: str):
 		provider = self.CredentialsService.get_provider(credentials_id)
 
-		# Remove "password" from enforced factors
 		credentials = await self.CredentialsService.get(credentials_id)
+
+		# Verify that the credentials are not suspended
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials_id)
+
+		# Remove "password" from enforced factors
 		enforce_factors = set(credentials.get("enforce_factors", []))
 		if "password" in enforce_factors:
 			enforce_factors.remove("password")
