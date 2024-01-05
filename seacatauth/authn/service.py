@@ -154,7 +154,6 @@ class AuthenticationService(asab.Service):
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
 		lsid = await upsertor.execute()
-		print("new", lsid)
 		return login_session
 
 
@@ -169,7 +168,6 @@ class AuthenticationService(asab.Service):
 
 
 	async def get_login_session(self, login_session_id):
-		print("get", login_session_id)
 		ls_data = await self.StorageService.get(
 			self.LoginSessionCollection, login_session_id, decrypt=LoginSession.EncryptedFields)
 		login_session = LoginSession.deserialize(self, ls_data)
@@ -530,18 +528,18 @@ class AuthenticationService(asab.Service):
 
 		if credentials_id is None or credentials_id == []:
 			L.log(asab.LOG_NOTICE, "Cannot locate credentials", struct_data={"ident": ident})
-			return None
+			raise exceptions.LoginPrologueDeniedError("Unmatched ident")
 		elif credentials_id.startswith("m2m:"):
 			# Deny login to m2m credentials
 			L.log(asab.LOG_NOTICE, "Cannot login with machine credentials", struct_data={
 				"cid": credentials_id})
-			return None
+			raise exceptions.LoginPrologueDeniedError("Cannot login with M2M credentials")
 
 		credentials = await self.CredentialsService.get(credentials_id)
 		if credentials.get("suspended") is True:
 			# Deny login to suspended credentials
 			L.warning("Login denied to suspended credentials", struct_data={"cid": credentials_id})
-			return None
+			raise exceptions.LoginPrologueDeniedError("Cannot login with suspended credentials")
 
 		login_descriptors = await self.prepare_login_descriptors(
 			credentials_id=credentials_id,
@@ -551,7 +549,7 @@ class AuthenticationService(asab.Service):
 		if login_descriptors is None:
 			L.log(asab.LOG_NOTICE, "No suitable login descriptor", struct_data={
 				"cid": credentials_id, "ldid": login_preferences})
-			return None
+			raise exceptions.LoginPrologueDeniedError("No suitable login descriptor")
 
 		login_session.initialize_seacat_login(
 			ident=ident,

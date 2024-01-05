@@ -125,15 +125,16 @@ class AuthenticationHandler(object):
 		else:
 			login_session = await self.AuthenticationService.create_login_session()
 
-		login_session = await self.AuthenticationService.prepare_seacat_login(
-			login_session=login_session,
-			ident=ident,
-			client_public_key=key.get_op_key("encrypt"),
-			request_headers=request.headers,
-			login_dict=login_dict,
-			login_preferences=login_preferences
-		)
-		if login_session is None:
+		try:
+			login_session = await self.AuthenticationService.prepare_seacat_login(
+				login_session=login_session,
+				ident=ident,
+				client_public_key=key.get_op_key("encrypt"),
+				request_headers=request.headers,
+				login_dict=login_dict,
+				login_preferences=login_preferences
+			)
+		except exceptions.LoginPrologueDeniedError:
 			login_session = await self.AuthenticationService.prepare_failed_seacat_login(
 				login_session=login_session,
 				ident=ident,
@@ -207,13 +208,13 @@ class AuthenticationHandler(object):
 
 		if not authenticated:
 			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
-				"cid": login_session.CredentialsId,
+				"cid": login_session.SeacatLogin.CredentialsId,
 				"lsid": lsid,
-				"ident": login_session.Ident,
+				"ident": login_session.SeacatLogin.Ident,
 				"from_ip": access_ips
 			})
 			await self.AuthenticationService.LastActivityService.update_last_activity(
-				EventCode.LOGIN_FAILED, login_session.CredentialsId, from_ip=access_ips)
+				EventCode.LOGIN_FAILED, login_session.SeacatLogin.CredentialsId, from_ip=access_ips)
 
 			self.AuthenticationService.LoginCounter.add("failed", 1)
 
@@ -224,7 +225,7 @@ class AuthenticationHandler(object):
 			)
 
 		# If there already is a root session with the same credentials ID, refresh it instead of creating a new one
-		if request.Session is not None and request.Session.Credentials.Id == login_session.CredentialsId:
+		if request.Session is not None and request.Session.Credentials.Id == login_session.SeacatLogin.CredentialsId:
 			root_session = request.Session
 		else:
 			root_session = None
