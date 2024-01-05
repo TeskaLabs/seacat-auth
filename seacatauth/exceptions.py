@@ -81,6 +81,14 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
 
 
+class LoginPrologueDeniedError(SeacatAuthError):
+	"""
+	Seacat login prologue was denied
+	"""
+	def __init__(self, message, *args):
+		super().__init__(message, *args)
+
+
 class CredentialsSuspendedError(SeacatAuthError):
 	"""
 	Credentials not active
