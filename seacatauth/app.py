@@ -128,15 +128,9 @@ class SeaCatAuthApplication(asab.Application):
 		self.CookieService = CookieService(self)
 		self.CookieHandler = CookieHandler(self, self.CookieService, self.SessionService, self.CredentialService)
 
-		# Initialize Batman if requested so in config
-		self.BatmanService = None
-		self.BatmanHandler = None
-		for section in asab.Config.sections():
-			if section.startswith("batman"):
-				from .batman import BatmanService, BatmanHandler
-				self.BatmanService = BatmanService(self)
-				self.BatmanHandler = BatmanHandler(self, self.BatmanService)
-				break
+		from .batman import BatmanService, BatmanHandler
+		self.BatmanService = BatmanService(self)
+		self.BatmanHandler = BatmanHandler(self, self.BatmanService)
 
 		from .authn.webauthn import WebAuthnService, WebAuthnHandler
 		self.WebAuthnService = WebAuthnService(self)
