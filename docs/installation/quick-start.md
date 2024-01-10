@@ -103,3 +103,7 @@ openssl req -x509 -newkey rsa:4096 -keyout nginx-conf/key.pem -out nginx-conf/ce
 
 *Note that **self-signed certificates are not trusted**, and produce warnings on most devices.*
 *They should be only used for development purposes in local environments.*
+
+### Provisioning mode
+
+Next, move on to [provisioning mode](./provisioning.md).
