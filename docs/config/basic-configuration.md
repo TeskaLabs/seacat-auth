@@ -2,7 +2,7 @@
 title: Base configuration
 ---
 
-# SeaCat Auth configuration
+# Minimum required configuration
 
 SeaCat Auth is primarily configured via a `.conf` file.
 For general info about configuration (syntax etc.), refer to the respective 

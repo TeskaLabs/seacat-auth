@@ -19,6 +19,10 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 
+  features:
+    - navigation.tabs
+    - navigation.indexes
+
   logo: images/teskalabs-logo.svg
 
   favicon: images/teskalabs.png
@@ -36,6 +40,7 @@ markdown_extensions:
   - toc:
       permalink: True
       separator: "-"
+  - attr_list
 
 extra:
   social:
@@ -50,44 +55,56 @@ extra:
       name: info@teskalabs.com
 
 nav:
-  - index.md
+  - About:
+    - index.md
+    - reference/features.md
 
-  - Getting started:
-    - getting-started/quick-start.md
-    - getting-started/recommended-deployment.md
-    - config/provisioning.md
 
-  - Configuration:
-    - config/basic-configuration.md
-    - config/docker.md
-    - config/cookies.md
-    - config/external-login.md
-    - config/ldap.md
-    - config/oauth2-introspect.md
-    - config/mail.server.md
-    - config/bouncer.md
-    - Credentials:
-      - config/credentials/index.md
-      - config/credentials/credentials-policy.md
-      - config/credentials/providers.md
+  - Administration guide:
+    - admin/index.md
+    - Installation:
+      - installation/quick-start.md
+      - installation/provisioning.md
 
-  - Integrations:
-    - integrations/index.md
-    - integrations/elk.md
-    - integrations/the-hive.md
+    - Configuration:
+      - config/basic-configuration.md
+      - Credentials:
+        - config/credentials/index.md
+        - config/credentials/credentials-policy.md
+        - config/credentials/providers.md
+      - Authentication and login:
+        - config/external-login.md
+      - config/notifications-configuration.md
   
-  - Development:
-    - development/rest-api.md
-    - development/oauth2.md
-    - development/postman.md
-    - development/unit-test.md
+    - Integrating apps:
+      - integrations/index.md
+      - integrations/oauth2-introspect.md
+      - Connecting other apps:
+        - integrations/cookies.md
+        - integrations/elk.md     
+        - integrations/the-hive.md
+  
+    - Development:
+      - REST API:
+        - development/rest-api.md
+        - development/postman.md
+      - development/oauth2.md
+  
+    - Reference:
+      - reference/architecture.md
+      - reference/components.md
+      - reference/resources.md
+      - reference/clients.md
+      - reference/session.md
 
-  - Reference:
-    - features/features.md
-    - reference/architecture.md
-    - reference/rbac.md
-    - reference/resources.md
-    
+
   - User guide (UI):
-    - webui/key-terms.md
-    - webui/seacat-auth-web-ui.md
+      - user/index.md
+      - user/key-terms.md
+      - user/login.md
+      - user/credentials.md
+      - user/tenants.md
+      - user/resources.md      
+      - user/roles.md
+      - user/clients.md
+      - user/sessions.md
