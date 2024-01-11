@@ -153,7 +153,7 @@ class AuthenticationService(asab.Service):
 			login_session.Id)
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
-		lsid = await upsertor.execute()
+		await upsertor.execute()
 		return login_session
 
 
