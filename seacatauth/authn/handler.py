@@ -47,7 +47,7 @@ class AuthenticationHandler(object):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CookieService = app.get_service("seacatauth.CookieService")
-		self.BatmanService = app.BatmanService
+		self.BatmanService = app.get_service("seacatauth.BatmanService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 
 		web_app = app.WebContainer.WebApp
