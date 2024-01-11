@@ -34,18 +34,19 @@ class SMSCodeFactor(LoginFactorABC):
 		Generate one-time passcode and send it in an SMS.
 		Return True if the SMS delivery succeeds.
 		"""
+		login_data = login_session.SeacatLogin.Data
 		# If SMS Token is not present, generate it
 		# Otherwise just resend the existing one
-		if self.Type not in login_session.Data:
-			login_session.Data[self.Type] = {
-				"token": generate_ergonomic_token(length=6)
-			}
-		token = login_session.Data[self.Type]["token"]
-		login_session = await self.AuthenticationService.update_login_session(login_session, data=login_session.Data)
+		if self.Type not in login_data:
+			token = generate_ergonomic_token(length=6)
+			login_data[self.Type] = {"token": token}
+			login_session = await self.AuthenticationService.update_login_session(login_session, data=login_data)
+		else:
+			token = login_data["token"]
 
 		# Get phone number
 		cred_svc = self.AuthenticationService.CredentialsService
-		credentials = await cred_svc.get(login_session.CredentialsId)
+		credentials = await cred_svc.get(login_session.SeacatLogin.CredentialsId)
 		phone = credentials.get("phone")
 		assert phone is not None
 
@@ -54,7 +55,7 @@ class SMSCodeFactor(LoginFactorABC):
 		success = await comm_svc.sms_login(phone=phone, otp=token)
 		if not success:
 			L.error("Unable to send SMS login code.", struct_data={
-				"cid": login_session.CredentialsId,
+				"cid": login_session.SeacatLogin.CredentialsId,
 				"lsid": login_session.Id,
 				"phone": phone,
 			})

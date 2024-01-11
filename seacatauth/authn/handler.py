@@ -53,8 +53,8 @@ class AuthenticationHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_put(r"/public/login.prologue", self.login_prologue)
 		web_app.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
-		web_app.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
+		web_app.router.add_put(r"/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app.router.add_put(r"/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
 		web_app.router.add_put(r"/public/logout", self.logout)
 		web_app.router.add_put("/impersonate", self.impersonate)
 		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
@@ -63,8 +63,8 @@ class AuthenticationHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_put(r"/public/login.prologue", self.login_prologue)
 		web_app_public.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
-		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
+		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
 		web_app_public.router.add_put(r"/public/logout", self.logout)
 		web_app_public.router.add_put("/impersonate", self.impersonate)
 		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
@@ -308,15 +308,20 @@ class AuthenticationHandler(object):
 		return response
 
 
-	async def smslogin(self, request):
+	async def prepare_smslogin_challenge(self, request):
 		"""
 		Generate a one-time passcode and send it via SMS
 		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = await self.AuthenticationService.get_login_session(lsid)
-		if login_session is None:
+		try:
+			login_session = await self.AuthenticationService.get_login_session(lsid)
+		except KeyError:
 			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
+
+		if login_session.SeacatLogin is None:
+			L.log(asab.LOG_NOTICE, "Seacat login not initialized", struct_data={"lsid": lsid})
 			return aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
@@ -337,40 +342,48 @@ class AuthenticationHandler(object):
 		return aiohttp.web.Response(body=login_session.encrypt(body))
 
 
-	async def webauthn_login(self, request):
+	async def prepare_webauthn_login_challenge(self, request):
 		"""
 		Initialize WebAuthn challenge and return WebAuthn authentication options object
 		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = await self.AuthenticationService.get_login_session(lsid)
-		if login_session is None:
+		try:
+			login_session = await self.AuthenticationService.get_login_session(lsid)
+		except KeyError:
 			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
+
+		if login_session.SeacatLogin is None:
+			L.log(asab.LOG_NOTICE, "Seacat login not initialized", struct_data={"lsid": lsid})
 			return aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
 
-		# descriptor_id = json_body.get("descriptor_id")
 		factor_type = json_body.get("factor_type")
 		if factor_type != "webauthn":
 			body = {"result": "FAILED", "message": "Unsupported factor type."}
-			return aiohttp.web.Response(body=login_session.encrypt(body))
+			return aiohttp.web.Response(body=login_session.SeacatLogin.encrypt(body))
 
 		# Webauthn challenge timeout should be the same as the current login session timeout
-		timeout = (login_session.ExpiresAt - datetime.datetime.now(datetime.timezone.utc)).total_seconds() * 1000
+		timeout = (
+			login_session.Created
+			+ self.AuthenticationService.LoginSessionExpiration
+			- datetime.datetime.now(datetime.timezone.utc)
+		).total_seconds() * 1000
 
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
 		authentication_options = await webauthn_svc.get_authentication_options(
-			login_session.CredentialsId,
+			login_session.SeacatLogin.CredentialsId,
 			timeout
 		)
 
-		login_data = login_session.Data
+		login_data = login_session.SeacatLogin.Data
 		login_data["webauthn"] = authentication_options
 
 		login_session = await self.AuthenticationService.update_login_session(login_session, data=login_data)
 
-		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))
+		return aiohttp.web.Response(body=login_session.SeacatLogin.encrypt(authentication_options))
 
 
 	async def _get_client_login_key(self, client_id):
