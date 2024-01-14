@@ -1,11 +1,13 @@
 ---
-title: User guide
+title: Account help
 ---
 
-# User guide
+# Account help
 
-!!! note "What's in the **User guide?**"
-    Use the **User guide** if you want to:
+!!! note "Need help making changes in your account?"
+    You can manage your account in the SeaCat Auth app (UI).
     
-    * Make changes to your authorization settings (credentials, tenants, roles, etc.) within the SeaCat Auth app (web UI)
-    * Learn more about the terms and components used in the SeaCat Auth UI
+    * [Change your account details](./account-details.md)
+    * [Change your password](./change-password.md)
+    * [Add a hardware key](./hardware-keys.md) for logging in
+    * [Add an authenticator app](./otp.md) for security
