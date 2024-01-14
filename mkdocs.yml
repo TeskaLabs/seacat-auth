@@ -76,6 +76,16 @@ nav:
         - config/external-login.md
       - config/notifications-configuration.md
   
+    - Access control:
+      - access/index.md
+      - access/key-terms.md
+      - access/credentials.md
+      - access/tenants.md
+      - access/resources.md      
+      - access/roles.md
+      - access/clients.md
+      - access/sessions.md
+
     - Integrating apps:
       - integrations/index.md
       - integrations/oauth2-introspect.md
@@ -98,13 +108,10 @@ nav:
       - reference/session.md
 
 
-  - User guide (UI):
+  - Account help:
       - user/index.md
-      - user/key-terms.md
       - user/login.md
-      - user/credentials.md
-      - user/tenants.md
-      - user/resources.md      
-      - user/roles.md
-      - user/clients.md
-      - user/sessions.md
+      - user/account-details.md
+      - user/change-password.md
+      - user/otp.md
+      - user/hardware-keys.md

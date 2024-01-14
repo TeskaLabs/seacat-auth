@@ -11,9 +11,9 @@ _TeskaLabs SeaCat Auth_ is a [microservice](https://en.wikipedia.org/wiki/Micros
     Source code is available on [GitHub](https://github.com/TeskaLabs/seacat-auth).  
     SeaCat Auth is built on TeskaLabs [ASAB framework](https://github.com/TeskaLabs/asab).
 
-If you want to install, configure, or integrate SeaCat Auth, visit the [**Administration guide**](./admin/index.md).
+If you want to install, configure, or integrate SeaCat Auth, or manage user access, visit the [**Administration guide**](./admin/index.md).
 
-If you need help using SeaCat Auth (the web UI), visit the [**User guide**](./user/index.md).
+If you need help with your user account in SeaCat Auth, visit [**Account help**](./user/index.md).
 
 ## Made with ❤️ by TeskaLabs
 
