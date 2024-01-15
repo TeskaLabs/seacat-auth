@@ -179,7 +179,7 @@ class CookieService(asab.Service):
 				exclude_resources=exclude_resources,
 			),
 			(
-				(SessionAdapter.FN.Authentication.AuthenticatedAt, root_session.Authentication.AuthenticatedAt),
+				(SessionAdapter.FN.Authentication.AuthnTime, root_session.Authentication.AuthnTime),
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
 				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 			),
