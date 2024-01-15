@@ -5,6 +5,7 @@ import asab.web.rest
 import asab.web.webcrypto
 import asab.exceptions
 
+from .. import exceptions
 from ..decorators import access_control
 from .schemas import (
 	CREATE_CREDENTIALS,
@@ -32,7 +33,7 @@ class CredentialsHandler(object):
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 		web_app = app.WebContainer.WebApp
 
@@ -108,7 +109,7 @@ class CredentialsHandler(object):
 		Get the credentials' last successful/failed login data.
 		"""
 		credentials_id = request.match_info["credentials_id"]
-		data = await self.AuditService.get_last_logins(credentials_id)
+		data = await self.LastActivityService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -119,7 +120,7 @@ class CredentialsHandler(object):
 		"""
 		if request.Session.is_anonymous():
 			raise asab.exceptions.AccessDeniedError()
-		data = await self.AuditService.get_last_logins(credentials_id)
+		data = await self.LastActivityService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -372,7 +373,7 @@ class CredentialsHandler(object):
 		credentials = await provider.get(request.match_info["credentials_id"])
 
 		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
-			credentials["_ll"] = await self.AuditService.get_last_logins(credentials_id)
+			credentials["_ll"] = await self.LastActivityService.get_last_logins(credentials_id)
 
 		return asab.web.rest.json_response(request, credentials)
 
@@ -399,7 +400,11 @@ class CredentialsHandler(object):
 		if password_link:
 			# TODO: Separate password creation from password reset
 			crd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
-			await crd_svc.init_password_change(credentials_id, is_new_user=True)
+			try:
+				await crd_svc.init_password_change(credentials_id, is_new_user=True)
+			except exceptions.CommunicationError:
+				L.error("Password reset failed: Failed to send password change link", struct_data={
+					"cid": credentials_id})
 
 		return asab.web.rest.json_response(request, {
 			"status": "OK",
