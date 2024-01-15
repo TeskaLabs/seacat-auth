@@ -5,7 +5,7 @@ title: REST API
 # REST API
 
 The ASAB framework that Seacat Auth is built on provides an OpenAPI specs endpoint with Swagger UI 
-(read more in [ASAB documentation](https://asab.readthedocs.io/en/latest/asab/web/restapidocs.html)).
+(read more in [ASAB documentation](https://docs.teskalabs.com/asab/)).
 
 Swagger UI is available at the `/doc` path.
 
