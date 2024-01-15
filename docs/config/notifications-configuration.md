@@ -1,8 +1,8 @@
 ---
-title: Configure SeaCat Auth to send mails
+title: Sending notifications
 ---
 
-# Configure SeaCat Auth to send mails
+# Configuring SeaCat Auth to send emails
 
 SeaCat Auth can send mails respective emails to users, eg. when they forget password and so on.
 For this, outbound mailing server aka SMTP has to be configured.

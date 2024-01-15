@@ -1,8 +1,8 @@
 ---
-title: 🍪 HTTP Cookies 🍪
+title: HTTP Cookies
 ---
 
-# 🍪 HTTP Cookies 🍪
+# HTTP Cookies 🍪
 
 SeaCat Auth provides cookie-based authentication for applications that do not implement OAuth2.
 Different configuration is needed for [single-domain](#single-domain-setting) and 
