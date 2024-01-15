@@ -1,5 +1,5 @@
 ---
-title: Using SeaCat Auth with Postman
+title: Postman
 ---
 
 # Using SeaCat Auth with Postman

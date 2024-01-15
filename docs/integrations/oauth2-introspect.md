@@ -1,8 +1,8 @@
 ---
-title: OAuth2 introspection
+title: Connecting OAuth apps
 ---
 
-# OAuth2 introspection
+# Connecting OAuth apps
 
 
 ## Set up OAuth2 introspection for a web application
