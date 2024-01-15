@@ -3,6 +3,9 @@
 ## v23.47
 
 ### Pre-releases
+- `v23.47-alpha7`
+- `v23.47-alpha6`
+- `v23.47-beta`
 - `v23.47-alpha5`
 - `v23.47-alpha4`
 - `v23.47-alpha3`
@@ -18,6 +21,9 @@
 - ~~Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)~~
 
 ### Fix
+- Initialize batman service regardless of configuration (#337, `v23.47-alpha7`)
+- Well-known endpoints in the private container are available without auth (#335, `v23.47-alpha6`)
+- Check suspended credentials before login and password reset (#334, `v23.47-alpha6`)
 - Fixed Batman Kibana component initialization (#333, `v23.47-alpha5`)
 
 ### Features
@@ -29,6 +35,7 @@
 - Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
 
 ### Refactoring
+- Modular login session (#336, `v23.47-alpha7`)
 - Multiple ElasticSearch node URLs are supported (#326, `v23.47-alpha4`)
 - Separate login factors in session object (#325, `v23.47-alpha3`)
 

@@ -64,7 +64,7 @@ async def authz_session_builder(
 
 
 def authentication_session_builder(login_descriptor):
-	yield (SessionAdapter.FN.Authentication.AuthenticatedAt, datetime.datetime.now(datetime.UTC))
+	yield (SessionAdapter.FN.Authentication.AuthnTime, datetime.datetime.now(datetime.UTC))
 	if login_descriptor is not None:
 		yield (SessionAdapter.FN.Authentication.LoginDescriptor, login_descriptor["id"])
 		yield (SessionAdapter.FN.Authentication.LoginFactors, [

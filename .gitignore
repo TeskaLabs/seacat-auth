@@ -53,3 +53,6 @@ ENV/
 
 example/docker/log/*.log
 example/docker/mongo-data
+
+# mac ds_store files
+.DS_Store
