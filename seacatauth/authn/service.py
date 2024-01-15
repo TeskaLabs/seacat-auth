@@ -2,14 +2,14 @@ import datetime
 import json
 import logging
 import re
+import urllib.parse
 
 import asab
 
 from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
 from .login_session import LoginSession
-from .. import exceptions
-from .. import AuditLogger
+from .. import exceptions, generic, AuditLogger
 from ..last_activity import EventCode
 from ..authz import build_credentials_authz
 
@@ -17,7 +17,7 @@ from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
 	cookie_session_builder,
-	login_descriptor_session_builder,
+	authentication_session_builder,
 	available_factors_session_builder,
 	external_login_session_builder, SessionAdapter,
 )
@@ -32,26 +32,26 @@ L = logging.getLogger(__name__)
 
 LOGIN_DESCRIPTOR_FALLBACK = [
 	{
-		'id': 'default',
-		'label': 'Use default login',
-		'factors': [
+		"id": "default",
+		"label": "Use default login",
+		"factors": [
 			# If TOTP is active, two-factor login should be required by default
 			[
-				{'id': 'password', 'type': 'password'},
-				{'id': 'totp', 'type': 'totp'}
+				{"id": "password", "type": "password"},
+				{"id": "totp", "type": "totp"}
 			],
 			[
-				{'id': 'password', 'type': 'password'}
+				{"id": "password", "type": "password"}
 			]
 		],
 	},
 	{
-		'id': 'webauthn',
-		'label': 'FIDO2/WebAuthn login',
-		'factors': [
+		"id": "webauthn",
+		"label": "FIDO2/WebAuthn login",
+		"factors": [
 			[
-				{'id': 'password', 'type': 'password'},
-				{'id': 'webauthn', 'type': 'webauthn'}
+				{"id": "password", "type": "password"},
+				{"id": "webauthn", "type": "webauthn"}
 			],
 		],
 	},
@@ -59,7 +59,6 @@ LOGIN_DESCRIPTOR_FALLBACK = [
 
 
 class AuthenticationService(asab.Service):
-	# TODO: Introduce configurable LoginSession provider (MongoDB x in-memory dict)
 	LoginSessionCollection = "ls"
 
 	def __init__(self, app, service_name="seacatauth.AuthenticationService"):
@@ -76,6 +75,8 @@ class AuthenticationService(asab.Service):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
 
+		self.LoginUrl = "{}/#/login".format(self.App.AuthWebUiUrl)
+
 		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
 		if self.CustomLoginParameters != "":
 			self.CustomLoginParameters = frozenset(re.split(r"\s+", self.CustomLoginParameters))
@@ -83,7 +84,8 @@ class AuthenticationService(asab.Service):
 			self.CustomLoginParameters = frozenset()
 
 		self.LoginAttempts = asab.Config.getint("seacatauth:authentication", "login_attempts")
-		self.LoginSessionExpiration = asab.Config.getseconds("seacatauth:authentication", "login_session_expiration")
+		self.LoginSessionExpiration = datetime.timedelta(
+			seconds=asab.Config.getseconds("seacatauth:authentication", "login_session_expiration"))
 
 		self.LoginFactors = {}
 		self.LoginDescriptors = None
@@ -137,61 +139,59 @@ class AuthenticationService(asab.Service):
 
 	async def create_login_session(
 		self,
-		credentials_id,
-		client_public_key,
-		ident,
-		login_descriptors=None,
-		data=None,
+		credentials_id=None,
+		session_id=None,
+		authorization_params=None,
 	):
-		# Prepare the login session
-		login_session = LoginSession.build(
-			client_login_key=client_public_key,
-			credentials_id=credentials_id,
-			ident=ident,
-			login_descriptors=login_descriptors,
-			login_attempts=self.LoginAttempts,
-			timeout=self.LoginSessionExpiration,
-			data=data,
+		login_session = LoginSession(
+			initiator_cid=credentials_id,
+			initiator_sid=session_id,
+			authorization_params=authorization_params,
 		)
-
-		upsertor = self.StorageService.upsertor(self.LoginSessionCollection, login_session.Id)
-
+		upsertor = self.StorageService.upsertor(
+			self.LoginSessionCollection,
+			login_session.Id)
 		for k, v in login_session.serialize().items():
 			upsertor.set(k, v)
-
-		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_CREATED)
-
+		await upsertor.execute()
 		return login_session
+
+
+	async def _upsert_login_session(self, login_session: LoginSession):
+		upsertor = self.StorageService.upsertor(
+			self.LoginSessionCollection,
+			login_session.Id,
+			version=login_session.Version)
+		for k, v in login_session.serialize().items():
+			upsertor.set(k, v, encrypt=k in LoginSession.EncryptedFields)
+		await upsertor.execute()
 
 
 	async def get_login_session(self, login_session_id):
-		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
+		ls_data = await self.StorageService.get(
+			self.LoginSessionCollection, login_session_id, decrypt=LoginSession.EncryptedFields)
 		login_session = LoginSession.deserialize(self, ls_data)
-		if login_session.ExpiresAt < datetime.datetime.now(datetime.timezone.utc):
+		if login_session.Created + self.LoginSessionExpiration < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("Login session expired")
 		return login_session
 
 
-	async def update_login_session(self, login_session_id, *, data=None, remaining_login_attempts=None):
-		ls_data = await self.StorageService.get(self.LoginSessionCollection, login_session_id)
-		if ls_data["exp"] < datetime.datetime.now(datetime.timezone.utc):
-			raise KeyError("Login session expired")
-
+	async def update_login_session(self, login_session, *, data=None, login_attempts_left=None):
 		upsertor = self.StorageService.upsertor(
 			self.LoginSessionCollection,
-			obj_id=login_session_id,
-			version=ls_data["_v"]
+			obj_id=login_session.Id,
+			version=login_session.Version
 		)
 		if data is not None:
 			upsertor.set("d", data)
-		if remaining_login_attempts is not None:
-			upsertor.set("la", remaining_login_attempts)
+		if login_attempts_left is not None:
+			upsertor.set("la", login_attempts_left)
 
 		await upsertor.execute(event_type=EventTypes.LOGIN_SESSION_UPDATED)
 		L.info("Login session updated", struct_data={
-			"lsid": login_session_id,
+			"lsid": login_session.Id,
 		})
-		return True
+		return await self.get_login_session(login_session.Id)
 
 
 	async def delete_login_session(self, login_session_id):
@@ -220,7 +220,7 @@ class AuthenticationService(asab.Service):
 			login_preferences
 		)
 
-	async def prepare_fallback_login_descriptors(self, credentials_id, request_headers):
+	async def prepare_fallback_login_descriptors(self, credentials_id, request_headers=None):
 		login_descriptors = await self._prepare_login_descriptors(
 			self.LoginDescriptorFallback,
 			credentials_id,
@@ -231,11 +231,17 @@ class AuthenticationService(asab.Service):
 			raise Exception("Failed to prepare fallback login descriptors.")
 		return login_descriptors
 
-	async def _prepare_login_descriptors(self, login_descriptors, credentials_id, request_headers, login_preferences=None):
+	async def _prepare_login_descriptors(
+		self,
+		login_descriptors,
+		credentials_id,
+		request_headers=None,
+		login_preferences=None
+	):
 		ready_login_descriptors = []
 		login_data = {
 			"credentials_id": credentials_id,
-			"request_headers": request_headers
+			"request_headers": request_headers or {}
 		}
 		descriptor_factors = []
 		for descriptor in login_descriptors:
@@ -281,69 +287,82 @@ class AuthenticationService(asab.Service):
 		"""
 		Walk through factors in the requested login descriptor and try to authenticate in all of them.
 		"""
+		login = login_session.SeacatLogin
+
 		# Fail if we have a fake login session
-		if login_session.CredentialsId == "":
-			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login_session.Id})
+		if login.CredentialsId == "":
+			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login.Id})
 			return False
 
 		# First make sure that the user is not suspended
-		credentials = await self.CredentialsService.get(login_session.CredentialsId, include=frozenset(["suspended"]))
+		credentials = await self.CredentialsService.get(login.CredentialsId, include=frozenset(["suspended"]))
 		if credentials.get("suspended") is True:
 			L.warning(
 				"Login failed: User suspended",
-				struct_data={"cid": login_session.CredentialsId}
+				struct_data={"cid": login.CredentialsId}
 			)
 			return False
 
 		authenticated = False
-		for descriptor in login_session.LoginDescriptors:
+		for descriptor in login.LoginDescriptors:
 			# Find the descriptor that matches the one in request_data
 			if descriptor.ID != request_data["descriptor"]:
 				continue
 
 			# All factors in a descriptor must pass for the descriptor to pass
-			authenticated = await descriptor.authenticate(login_session, request_data)
+			authenticated = await descriptor.authenticate(login, request_data)
 			if authenticated:
-				login_session.AuthenticatedVia = descriptor.serialize()
+				login.AuthenticatedVia = descriptor.serialize()
 				L.log(
 					asab.LOG_NOTICE,
 					"User authenticated by descriptor '{}'".format(descriptor.ID),
-					struct_data={"cid": login_session.CredentialsId}
+					struct_data={"cid": login.CredentialsId}
 				)
 				break
 		return authenticated
 
-	async def login(self, login_session, from_info: list = None):
-		# TODO: Move this to LoginService
+	async def login(self, login_session, root_session: SessionAdapter | None = None, from_info: list = None):
+		"""
+		Build and create a root session
+		"""
 		scope = frozenset(["profile", "email", "phone"])
 
 		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		session_builders = [
-			await credentials_session_builder(self.CredentialsService, login_session.CredentialsId, scope),
+			await credentials_session_builder(self.CredentialsService, login_session.SeacatLogin.CredentialsId, scope),
 			await authz_session_builder(
 				tenant_service=self.TenantService,
 				role_service=self.RoleService,
-				credentials_id=login_session.CredentialsId,
+				credentials_id=login_session.SeacatLogin.CredentialsId,
 				tenants=None  # Root session is tenant-agnostic
 			),
-			login_descriptor_session_builder(login_session.AuthenticatedVia),
-			cookie_session_builder(),
-			await available_factors_session_builder(self, login_session.CredentialsId),
-			await external_login_session_builder(ext_login_svc, login_session.CredentialsId),
+			authentication_session_builder(login_session.SeacatLogin.AuthenticatedVia),
+			await available_factors_session_builder(self, login_session.SeacatLogin.CredentialsId),
+			await external_login_session_builder(ext_login_svc, login_session.SeacatLogin.CredentialsId),
 		]
 
-		session = await self.SessionService.create_session(
-			session_type="root",
-			session_builders=session_builders,
-		)
+		if root_session and not root_session.is_anonymous():
+			# Update existing root session
+			session = await self.SessionService.update_session(
+				root_session.SessionId,
+				session_builders=session_builders
+			)
+		else:
+			# Create a new root session
+			session_builders.append(cookie_session_builder())
+			session = await self.SessionService.create_session(
+				session_type="root",
+				session_builders=session_builders,
+			)
+
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
-			"cid": login_session.CredentialsId,
+			"cid": login_session.SeacatLogin.CredentialsId,
 			"lsid": login_session.Id,
 			"sid": str(session.Session.Id),
 			"from_ip": from_info,
 		})
 		await self.LastActivityService.update_last_activity(
-			EventCode.LOGIN_SUCCESS, login_session.CredentialsId, from_ip=from_info)
+			EventCode.LOGIN_SUCCESS, login_session.SeacatLogin.CredentialsId, from_ip=from_info)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
@@ -377,7 +396,7 @@ class AuthenticationService(asab.Service):
 				credentials_id=credentials_id,
 				tenants=tenants,
 			),
-			login_descriptor_session_builder(login_descriptor),
+			authentication_session_builder(login_descriptor),
 			await available_factors_session_builder(self, credentials_id)
 		]
 
@@ -440,3 +459,131 @@ class AuthenticationService(asab.Service):
 		)
 
 		return session
+
+
+	async def prepare_seacat_login_url(self, client_id: str, authorization_query: dict):
+		"""
+		Build login URI of Seacat Auth login page with callback to authorization request
+		"""
+		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		client_dict = await client_svc.get(client_id)
+
+		# Remove "prompt" and "acr_values" from callback
+		prompt = authorization_query.pop("prompt", None)
+		acr_values = authorization_query.pop("acr_values", None)
+
+		# Build callback authorization URL
+		authorization_url = "{}?{}".format(
+			oidc_svc.authorization_endpoint_url(),
+			urllib.parse.urlencode(authorization_query))
+
+		# Prepare login params
+		login_query_params = [
+			("redirect_uri", authorization_url),
+			("client_id", client_id)]
+		if prompt:
+			login_query_params.append(("prompt", prompt))
+		if acr_values:
+			login_query_params.append(("acr_values", acr_values))
+
+		login_url = client_dict.get("login_uri")
+		if login_url is None:
+			login_url = self.LoginUrl
+
+		parsed = generic.urlparse(login_url)
+		if parsed["fragment"] != "":
+			# If the Login URI contains fragment, add the login params into the fragment query
+			fragment_parsed = generic.urlparse(parsed["fragment"])
+			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query.update(login_query_params)
+			fragment_parsed["query"] = urllib.parse.urlencode(query)
+			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
+		else:
+			# If the Login URI contains no fragment, add the login params into the regular URL query
+			query = urllib.parse.parse_qs(parsed["query"])
+			query.update(login_query_params)
+			parsed["query"] = urllib.parse.urlencode(query)
+
+		return generic.urlunparse(**parsed)
+
+
+	async def prepare_seacat_login(
+		self,
+		login_session: str | LoginSession,
+		ident: str,
+		client_public_key,
+		request_headers: dict | None = None,
+		login_dict: dict | None = None,
+		login_preferences: list | None = None,
+	) -> LoginSession:
+		"""
+		Set up login session with located credentials and prepare login options
+		"""
+		if isinstance(login_session, str):
+			login_session = await self.get_login_session(login_session)
+
+		# Locate credentials
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
+
+		if credentials_id is None or credentials_id == []:
+			L.log(asab.LOG_NOTICE, "Cannot locate credentials", struct_data={"ident": ident})
+			raise exceptions.LoginPrologueDeniedError("Unmatched ident")
+		elif credentials_id.startswith("m2m:"):
+			# Deny login to m2m credentials
+			L.log(asab.LOG_NOTICE, "Cannot login with machine credentials", struct_data={
+				"cid": credentials_id})
+			raise exceptions.LoginPrologueDeniedError("Cannot login with M2M credentials")
+
+		credentials = await self.CredentialsService.get(credentials_id)
+		if credentials.get("suspended") is True:
+			# Deny login to suspended credentials
+			L.warning("Login denied to suspended credentials", struct_data={"cid": credentials_id})
+			raise exceptions.LoginPrologueDeniedError("Cannot login with suspended credentials")
+
+		login_descriptors = await self.prepare_login_descriptors(
+			credentials_id=credentials_id,
+			request_headers=request_headers,
+			login_preferences=login_preferences
+		)
+		if login_descriptors is None:
+			L.log(asab.LOG_NOTICE, "No suitable login descriptor", struct_data={
+				"cid": credentials_id, "ldid": login_preferences})
+			raise exceptions.LoginPrologueDeniedError("No suitable login descriptor")
+
+		login_session.initialize_seacat_login(
+			ident=ident,
+			credentials_id=credentials_id,
+			login_descriptors=login_descriptors,
+			login_attempts_left=self.LoginAttempts,
+			client_login_key=client_public_key
+		)
+		await self._upsert_login_session(login_session)
+		L.log(asab.LOG_NOTICE, "Login session prepared", struct_data={
+			"cid": credentials_id, "ident": ident, "id": login_session.Id})
+		return login_session
+
+
+	async def prepare_failed_seacat_login(
+		self,
+		login_session: str | LoginSession,
+		ident: str, client_public_key
+	) -> LoginSession:
+		"""
+		Set up the login session so that the login call is guaranteed to fail
+		"""
+		if isinstance(login_session, str):
+			login_session = await self.get_login_session(login_session)
+
+		login_descriptors = await self.prepare_fallback_login_descriptors(credentials_id="")
+		login_session.initialize_seacat_login(
+			ident=ident,
+			credentials_id="",
+			login_descriptors=login_descriptors,
+			login_attempts_left=self.LoginAttempts,
+			client_login_key=client_public_key
+		)
+		await self._upsert_login_session(login_session)
+		L.log(asab.LOG_NOTICE, "Failed login session prepared", struct_data={
+			"ident": ident, "id": login_session.Id})
+		return login_session

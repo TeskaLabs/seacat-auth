@@ -3,6 +3,7 @@
 ## v23.47
 
 ### Pre-releases
+- `v23.47-alpha7`
 - `v23.47-alpha6`
 - `v23.47-beta`
 - `v23.47-alpha5`
@@ -34,6 +35,7 @@
 - Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
 
 ### Refactoring
+- Modular login session (#336, `v23.47-alpha7`)
 - Multiple ElasticSearch node URLs are supported (#326, `v23.47-alpha4`)
 - Separate login factors in session object (#325, `v23.47-alpha3`)
 
