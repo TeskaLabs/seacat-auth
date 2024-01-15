@@ -139,7 +139,7 @@ class ProvisioningService(asab.Service):
 		admin_ui_client_id = self.Config["admin_ui_client_id"]
 		admin_ui_url = self.Config["admin_ui_url"].rstrip("/") or None
 		if admin_ui_url is None:
-			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			auth_webui_base_url = self.App.AuthWebUiUrl
 			url = urllib.parse.urlparse(auth_webui_base_url)
 			# Use the base URL without path by default, to fit all common deployments
 			admin_ui_url = url._replace(path="", fragment="", query="", params="").geturl()

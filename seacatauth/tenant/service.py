@@ -21,7 +21,7 @@ class TenantService(asab.Service):
 		super().__init__(app, service_name)
 		self.TenantsProvider = None
 		self.TenantNameRegex = re.compile("^{}$".format(self.TenantNamePattern))
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 
 	def create_provider(self, provider_id, config_section_name):
@@ -316,7 +316,7 @@ class TenantService(asab.Service):
 		if len(tenants) == 0 and "tenant" in scope:
 			last_tenants = [
 				tenant
-				for tenant in (await self.AuditService.get_last_authorized_tenants(credential_id) or [])
+				for tenant in (await self.LastActivityService.get_last_authorized_tenants(credential_id) or [])
 				if tenant in user_tenants
 			]
 			if last_tenants:

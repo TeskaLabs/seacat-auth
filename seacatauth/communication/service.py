@@ -55,7 +55,7 @@ class CommunicationService(asab.Service):
 		self.DefaultLocale = asab.Config.get("seacatauth:communication", "default_locale")
 		self.AppName = asab.Config.get("seacatauth:communication", "app_name", fallback=None)
 		if self.AppName is None:
-			auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+			auth_webui_base_url = app.AuthWebUiUrl
 			parsed = urllib.parse.urlparse(auth_webui_base_url)
 			self.AppName = parsed.netloc
 		self.CommunicationProviders: typing.Dict[str, CommunicationProviderABC] = {}

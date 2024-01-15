@@ -10,8 +10,8 @@ import typing
 
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
+from .. import AuditLogger
 from ..session import SessionAdapter
-from ..audit import AuditCode
 
 #
 
@@ -32,7 +32,6 @@ LOGIN_DESCRIPTOR_FAKE = [{
 class CredentialsService(asab.Service):
 	def __init__(self, app, service_name='seacatauth.CredentialsService', tenant_service=None):
 		super().__init__(app, service_name)
-		self.AuditService = self.App.get_service("seacatauth.AuditService")
 		self.CredentialProviders: typing.Dict[str, CredentialsProviderABC] = collections.OrderedDict()
 		self.LoginDescriptorFake = LOGIN_DESCRIPTOR_FAKE
 
@@ -331,16 +330,10 @@ class CredentialsService(asab.Service):
 				"message": "Cannot create credentials",
 			}
 
-		L.log(asab.LOG_NOTICE, "Credentials successfully created", struct_data={
-			"provider_id": provider.ProviderID,
+		AuditLogger.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"cid": credentials_id,
-			"by": agent_cid,
+			"by_cid": agent_cid,
 		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_CREATED,
-			credentials_id=credentials_id,
-			by_cid=agent_cid)
-
 		self.App.PubSub.publish("Credentials.created!", credentials_id=credentials_id)
 
 		return {
@@ -449,16 +442,12 @@ class CredentialsService(asab.Service):
 
 		# Update in provider
 		await provider.update(credentials_id, validated_data)
-		L.log(asab.LOG_NOTICE, "Credentials successfully updated", struct_data={
-			"cid": credentials_id,
-			"by": agent_cid,
-		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_UPDATED,
-			credentials_id=credentials_id,
-			by_cid=agent_cid,
-			attributes=list(validated_data.keys()))
 
+		AuditLogger.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+			"cid": credentials_id,
+			"by_cid": agent_cid,
+			"attributes": list(validated_data.keys()),
+		})
 		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials_id)
 
 		return {"status": "OK"}
@@ -501,14 +490,8 @@ class CredentialsService(asab.Service):
 		# Delete credentials in provider
 		result = await provider.delete(credentials_id)
 
-		L.log(asab.LOG_NOTICE, "Credentials successfully deleted", struct_data={
-			"cid": credentials_id,
-			"by": agent_cid,
-		})
-		await self.AuditService.append(
-			AuditCode.CREDENTIALS_DELETED,
-			credentials_id=credentials_id,
-			by_cid=agent_cid)
+		AuditLogger.log(asab.LOG_NOTICE, "Credentials deleted", struct_data={
+			"cid": credentials_id, "by_cid": agent_cid})
 
 		self.App.PubSub.publish("Credentials.deleted!", credentials_id=credentials_id)
 
