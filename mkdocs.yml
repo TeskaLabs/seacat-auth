@@ -1,4 +1,4 @@
-site_name: "TeskaLabs documentation"
+site_name: "TeskaLabs SeaCat Auth"
 theme:
   name: 'material'
 
@@ -19,7 +19,13 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 
+  features:
+    - navigation.tabs
+    - navigation.indexes
+
   logo: images/teskalabs-logo.svg
+
+  favicon: images/teskalabs.png
 
 extra_css:
   - stylesheets/extra.css
@@ -34,6 +40,7 @@ markdown_extensions:
   - toc:
       permalink: True
       separator: "-"
+  - attr_list
 
 extra:
   social:
@@ -46,3 +53,65 @@ extra:
     - icon: fontawesome/solid/paper-plane
       link: mailto:info@teskalabs.com
       name: info@teskalabs.com
+
+nav:
+  - About:
+    - index.md
+    - reference/features.md
+
+
+  - Administration guide:
+    - admin/index.md
+    - Installation:
+      - installation/quick-start.md
+      - installation/provisioning.md
+
+    - Configuration:
+      - config/basic-configuration.md
+      - Credentials:
+        - config/credentials/index.md
+        - config/credentials/credentials-policy.md
+        - config/credentials/providers.md
+      - Authentication and login:
+        - config/external-login.md
+      - config/notifications-configuration.md
+  
+    - Access control:
+      - access/index.md
+      - access/key-terms.md
+      - access/credentials.md
+      - access/tenants.md
+      - access/resources.md      
+      - access/roles.md
+      - access/clients.md
+      - access/sessions.md
+
+    - Integrating apps:
+      - integrations/index.md
+      - integrations/oauth2-introspect.md
+      - Connecting other apps:
+        - integrations/cookies.md
+        - integrations/elk.md     
+        - integrations/the-hive.md
+  
+    - Development:
+      - REST API:
+        - development/rest-api.md
+        - development/postman.md
+      - development/oauth2.md
+  
+    - Reference:
+      - reference/architecture.md
+      - reference/components.md
+      - reference/resources.md
+      - reference/clients.md
+      - reference/session.md
+
+
+  - Account help:
+      - user/index.md
+      - user/login.md
+      - user/account-details.md
+      - user/change-password.md
+      - user/otp.md
+      - user/hardware-keys.md
