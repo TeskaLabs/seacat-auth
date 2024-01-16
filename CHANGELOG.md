@@ -21,6 +21,7 @@
 - ~~Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)~~
 
 ### Fix
+- Impersonation error handling (#339, `v23.47-alpha7`)
 - Initialize batman service regardless of configuration (#337, `v23.47-alpha7`)
 - Well-known endpoints in the private container are available without auth (#335, `v23.47-alpha6`)
 - Check suspended credentials before login and password reset (#334, `v23.47-alpha6`)
