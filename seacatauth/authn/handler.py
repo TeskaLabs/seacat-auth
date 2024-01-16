@@ -431,7 +431,10 @@ class AuthenticationHandler(object):
 		else:
 			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
 
-		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		try:
+			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		except aiohttp.web.HTTPForbidden as e:
+			return e
 		response = asab.web.rest.json_response(request, {"result": "OK"})
 		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
 		return response
@@ -491,7 +494,10 @@ class AuthenticationHandler(object):
 		else:
 			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
 
-		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		try:
+			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		except aiohttp.web.HTTPForbidden as e:
+			return e
 
 		client_dict = await client_service.get(request_data["client_id"])
 		query = {
@@ -521,6 +527,14 @@ class AuthenticationHandler(object):
 		try:
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)
+		except exceptions.CredentialsNotFoundError:
+			AuditLogger.warning("Impersonation failed: Target credentials ID not found", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"from_ip": impersonator_from_info,
+			})
+			raise aiohttp.web.HTTPForbidden()
 		except exceptions.AccessDeniedError:
 			AuditLogger.warning("Impersonation failed: Access denied", struct_data={
 				"impersonator_cid": impersonator_cid,
@@ -528,7 +542,7 @@ class AuthenticationHandler(object):
 				"target_cid": target_cid,
 				"from_ip": impersonator_from_info,
 			})
-			return aiohttp.web.HTTPForbidden()
+			raise aiohttp.web.HTTPForbidden()
 		except Exception as e:
 			AuditLogger.exception("Impersonation failed: Unexpected error ({})".format(e), struct_data={
 				"impersonator_cid": impersonator_cid,
@@ -536,7 +550,7 @@ class AuthenticationHandler(object):
 				"target_cid": target_cid,
 				"from_ip": impersonator_from_info,
 			})
-			return aiohttp.web.HTTPForbidden()
+			raise aiohttp.web.HTTPForbidden()
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Impersonation successful", struct_data={
 				"impersonator_cid": impersonator_cid,
