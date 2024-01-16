@@ -123,7 +123,12 @@ class AuthenticationHandler(object):
 		if login_session_id:
 			login_session = await self.AuthenticationService.get_login_session(login_session_id)
 		else:
-			login_session = await self.AuthenticationService.create_login_session()
+			# Create a new login session with an optional link to the current root session
+			if request.Session is not None and request.Session.ParentSessionId is not None:
+				root_session = await self.SessionService.get(request.Session.ParentSessionId)
+			else:
+				root_session = request.Session
+			login_session = await self.AuthenticationService.create_login_session(root_session=root_session)
 
 		try:
 			login_session = await self.AuthenticationService.prepare_seacat_login(

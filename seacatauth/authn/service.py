@@ -139,15 +139,15 @@ class AuthenticationService(asab.Service):
 
 	async def create_login_session(
 		self,
-		credentials_id=None,
-		session_id=None,
-		authorization_params=None,
+		root_session: SessionAdapter = None,
+		authorization_params: dict = None,
 	):
-		login_session = LoginSession(
-			initiator_cid=credentials_id,
-			initiator_sid=session_id,
-			authorization_params=authorization_params,
-		)
+		if root_session:
+			login_session = LoginSession(
+				initiator_cid=root_session.Credentials.Id,
+				initiator_sid=root_session.SessionId,
+				authorization_params=authorization_params,
+			)
 		upsertor = self.StorageService.upsertor(
 			self.LoginSessionCollection,
 			login_session.Id)
