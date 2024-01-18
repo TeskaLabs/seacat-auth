@@ -148,36 +148,6 @@ class SeacatLogin:
 		return ciphertext
 
 
-class ExternalLogin:
-	def __init__(
-		self,
-		provider_type: str,
-		nonce: str,
-	):
-		self.ProviderType = provider_type
-		self.Nonce = nonce
-
-	def __repr__(self):
-		return "<ExternalLogin provider_type={!r}>".format(
-			self.ProviderType)
-
-	def serialize(self) -> dict:
-		return {
-			"ep": self.ProviderType,
-			"en": self.Nonce,
-		}
-
-	@classmethod
-	def deserialize(cls, db_object: dict):
-		try:
-			return cls(
-				provider_type=db_object["ep"],
-				nonce=db_object["en"],
-			)
-		except KeyError:
-			return None
-
-
 class LoginSession(object):
 
 	EncryptedFields = {"__sk"}
@@ -192,7 +162,7 @@ class LoginSession(object):
 		initiator_sid: str | None = None,
 		authorization_params: dict | None = None,
 		seacat_login: SeacatLogin | None = None,
-		external_login: ExternalLogin | None = None,
+		external_login: dict | None = None,
 	):
 		if id is None:
 			self.Id = secrets.token_urlsafe()
@@ -205,7 +175,7 @@ class LoginSession(object):
 		self.InitiatorSessionId = initiator_sid
 		self.AuthorizationParams = authorization_params
 		self.SeacatLogin = seacat_login
-		self.ExternalLogin = external_login
+		self.ExternalLogin: dict | None = external_login
 
 
 	def __repr__(self):
@@ -224,7 +194,7 @@ class LoginSession(object):
 		if self.SeacatLogin:
 			db_object.update(self.SeacatLogin.serialize())
 		if self.ExternalLogin:
-			db_object.update(self.ExternalLogin.serialize())
+			db_object.update(self.ExternalLogin)
 		return db_object
 
 
@@ -239,7 +209,7 @@ class LoginSession(object):
 			initiator_sid=db_object.get("isid"),
 			authorization_params=db_object.get("ap"),
 			seacat_login=SeacatLogin.deserialize(authn_svc, db_object),
-			external_login=ExternalLogin.deserialize(db_object),
+			external_login=db_object.get("ext"),
 		)
 
 
