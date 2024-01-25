@@ -194,7 +194,7 @@ class LoginSession(object):
 		if self.SeacatLogin:
 			db_object.update(self.SeacatLogin.serialize())
 		if self.ExternalLogin:
-			db_object.update(self.ExternalLogin)
+			db_object["ext"] = self.ExternalLogin
 		return db_object
 
 
