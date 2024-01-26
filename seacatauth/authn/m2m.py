@@ -107,6 +107,7 @@ class M2MIntrospectHandler(object):
 				"sid": str(session.Session.Id),
 				"fi": generic.get_request_access_ips(request),
 				"m2m": True,
+				"authn_by": login_descriptor,
 			})
 
 		if session is None:
