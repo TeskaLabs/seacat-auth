@@ -6,7 +6,7 @@ import asab
 import asab.web.rest
 
 from .service import ExternalLoginService
-from .. import generic
+from .. import generic, exceptions
 from ..decorators import access_control
 from ..cookie.utils import set_cookie
 
@@ -41,7 +41,25 @@ class ExternalLoginHandler(object):
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get(
+			"/public/ext-login/{provider_type}/initialize", self.initialize_login)
+		web_app_public.router.add_get(
 			self.ExternalLoginService.CallbackEndpointPath, self.login_callback)
+
+
+	async def initialize_login(self, request):
+		login_session_id = request.query.get("lsid")
+		provider_type = request.match_info["provider_type"]
+		try:
+			provider = self.ExternalLoginService.get_provider(provider_type)
+		except KeyError:
+			# Authorization flow broken
+			L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={
+				"provider_type": provider_type})
+			return self._error_redirect()
+
+		authorization_url = await self.ExternalLoginService.prepare_external_login_url(
+			provider, login_session_id, request.Session)
+		return aiohttp.web.HTTPFound(location=authorization_url)
 
 
 	async def login_callback(self, request):
@@ -57,7 +75,8 @@ class ExternalLoginHandler(object):
 			provider = self.ExternalLoginService.get_provider(provider_type)
 		except KeyError:
 			# Authorization flow broken
-			L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={"provider_type": provider_type})
+			L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={
+				"provider_type": provider_type})
 			return self._error_redirect()
 
 		if request.method == "POST":
@@ -69,16 +88,27 @@ class ExternalLoginHandler(object):
 			L.log(asab.LOG_NOTICE, "External login provider returned no data in authorize callback")
 			return self._error_redirect()
 
-		state_id = authorization_data.get("state")
+		login_session_id = authorization_data.get("state")
 		try:
-			state = await self.ExternalLoginService.pop_authorization_state(state_id)
+			login_session = await self.AuthenticationService.get_login_session(login_session_id)
 		except KeyError:
 			# Authorization flow broken
-			L.log(asab.LOG_NOTICE, "External login authorization state not found", struct_data={
-				"state_id": state_id})
+			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={
+				"lsid": login_session_id})
 			return self._error_redirect()
 
-		user_info = await provider.get_user_info(authorization_data, expected_nonce=state.get("nonce"))
+		try:
+			provider_data = login_session.ExternalLogin[provider_type]
+		except AttributeError:
+			L.error("External login not initialized", struct_data={
+				"lsid": login_session_id})
+			return self._error_redirect()
+		except KeyError:
+			L.error("External login not initialized", struct_data={
+				"lsid": login_session_id, "provider": provider_type})
+			return self._error_redirect()
+
+		user_info = await provider.get_user_info(authorization_data, expected_nonce=provider_data.get("nonce"))
 		if user_info is None:
 			# Authorization flow broken
 			L.error("Cannot obtain user info from external login provider")
@@ -87,7 +117,7 @@ class ExternalLoginHandler(object):
 		subject = user_info.get("sub")
 		if subject is None:
 			# Authorization flow broken
-			L.error("Cannot obtain subject ID from external login provider")
+			L.error("User info does not contain 'sub' (subject ID)")
 			return self._error_redirect()
 		subject = str(subject)  # Sometimes sub is an integer
 
@@ -103,8 +133,9 @@ class ExternalLoginHandler(object):
 		authenticated_cid = None
 		if request.Session and not request.Session.is_anonymous():
 			# Verify that the current session is the same as the one that initiated the external login
-			assert request.Session.Id == state.get("sid")
-			authenticated_cid = state.get("cid")
+			print(request.Session.Id, login_session.InitiatorSessionId)
+			assert request.Session.Id == login_session.InitiatorSessionId
+			authenticated_cid = login_session.InitiatorCredentialsId
 		signed_in = authenticated_cid is not None
 
 		from_ip = generic.get_request_access_ips(request)
@@ -113,12 +144,12 @@ class ExternalLoginHandler(object):
 		if subject_known:
 			# (Re)authentication successful - Create a new root session or update the existing one
 			new_session = await self.ExternalLoginService.login(
-				provider_type, subject, root_session=request.Session, from_ip=from_ip)
+				login_session, provider_type, subject, from_ip=from_ip)
 		elif signed_in:
 			# Assign subject ID to the current Seacat Auth credentials and update current root session
 			await self.ExternalLoginService.create(authenticated_cid, provider_type, user_info)
 			new_session = await self.ExternalLoginService.login(
-				provider_type, subject, root_session=request.Session, from_ip=from_ip)
+				login_session, provider_type, subject, from_ip=from_ip)
 		else:
 			# Register new Seacat Auth credentials
 			L.info("Unknown external login credential", struct_data={
@@ -130,17 +161,25 @@ class ExternalLoginHandler(object):
 			if credentials_id:
 				# Credentials successfully created
 				new_session = await self.ExternalLoginService.login(
-					provider_type, subject, root_session=request.Session, from_ip=from_ip)
+					login_session, provider_type, subject, from_ip=from_ip)
 
 		if new_session is None:
-			# Resume the authorization flow WITHOUT the acr_values parameter
-			# This will send the user agent to the Seacat Auth login page
-			oauth_query = {k: v for k, v in state["oauth_query"].items() if k != "acr_values"}
-			response = self._redirect_to_authorization(oauth_query)
-			return response
+			if login_session.AuthorizationParams:
+				# Resume the authorization flow WITHOUT the acr_values parameter
+				# This will send the user agent to the Seacat Auth login page
+				oauth_query = {k: v for k, v in login_session.AuthorizationParams.items() if k != "acr_values"}
+				return self._redirect_to_authorization(oauth_query)
+			else:
+				# The auth flow did not start at the authorization endpoint
+				return self._redirect_to_account_settings()
 
-		response = self._redirect_to_authorization(state["oauth_query"])
+		if login_session.AuthorizationParams:
+			response = self._redirect_to_authorization(login_session.AuthorizationParams["oauth_query"])
+		else:
+			response = self._redirect_to_account_settings()
+
 		set_cookie(self.App, response, new_session)
+		print(response, response.headers)
 
 		return response
 
@@ -174,21 +213,27 @@ class ExternalLoginHandler(object):
 		authorization_uri = "{}?{}".format(
 			oidc_service.authorization_endpoint_url(),
 			urllib.parse.urlencode(oauth_query))
-		return aiohttp.web.HTTPFound(location=authorization_uri)
+		response = aiohttp.web.HTTPFound(location=authorization_uri)
+		print(response, response.headers)
+		return response
 
 
 	def _error_redirect(self):
 		"""
 		Error redirection when the original authorization flow cannot be resumed
 		"""
-		return aiohttp.web.HTTPNotFound(headers={
+		response = aiohttp.web.HTTPNotFound(headers={
 			"Location": self.ExternalLoginService.MyAccountPageUrl,
 			"Refresh": "0;url=" + self.ExternalLoginService.MyAccountPageUrl,
 		})
+		print(response, response.headers)
+		return response
 
 
 	def _redirect_to_account_settings(self):
 		"""
 		Redirect to Seacat Account webui
 		"""
-		return aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)
+		response = aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)
+		print(response, response.headers)
+		return response

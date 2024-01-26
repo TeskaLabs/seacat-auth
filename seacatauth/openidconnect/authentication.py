@@ -43,23 +43,36 @@ class Authentication:
 		root_session: SessionAdapter | None,
 		client_id: dict,
 		authorization_query: dict,
-		acr_values: list
+		acr_values: list = None
 	):
 		"""
 		Build the URI of Seacat Auth login or external provider login page with callback to authorization request
 		"""
-		if acr_values:
-			for acr_value in acr_values:
-				# Return the first valid URL
-				# At the moment, ACR values are used only for external login preferences
-				if acr_value.startswith("ext:"):
-					provider_type = acr_value[4:]
-					login_uri = await self.ExternalLoginService.prepare_external_login_url(
-						provider_type, root_session, authorization_query)
-					if login_uri:
-						return login_uri
+		# Create bare login session
+		login_session = await self.AuthenticationService.create_login_session(root_session, authorization_query)
 
-		# Otherwise use standard Seacat Auth login
+		if not acr_values:
+			# Use standard Seacat Auth login by default
+			return await self.AuthenticationService.prepare_seacat_login_url(client_id, authorization_query)
+
+		for acr_value in acr_values:
+			# Return the first valid URL
+			# At the moment, ACR values are used only for external login preferences
+			if acr_value.startswith("ext:"):
+				# Prepare external login
+				provider_type = acr_value[4:]
+				try:
+					provider = self.ExternalLoginService.get_provider(provider_type)
+				except KeyError:
+					L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={
+						"provider_type": provider_type})
+					continue
+				return await self.ExternalLoginService.prepare_external_login_url(provider, login_session)
+			else:
+				# TODO: Support other ACR values ("2fa", "mfa"...)
+				pass
+
+		# Otherwise prepare standard Seacat Auth login
 		return await self.AuthenticationService.prepare_seacat_login_url(client_id, authorization_query)
 
 

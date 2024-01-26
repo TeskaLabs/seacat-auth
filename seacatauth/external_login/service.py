@@ -9,8 +9,18 @@ import asab
 import asab.web.rest
 
 from .providers import create_provider, GenericOAuth2Login
+from .. import exceptions, AuditLogger
 from ..events import EventTypes
-from ..session import SessionAdapter
+from ..last_activity import EventCode
+from ..session import (
+	credentials_session_builder,
+	authz_session_builder,
+	cookie_session_builder,
+	authentication_session_builder,
+	available_factors_session_builder,
+	external_login_session_builder,
+	SessionAdapter,
+)
 
 #
 
@@ -37,23 +47,27 @@ class ExternalLoginService(asab.Service):
 		super().__init__(app, service_name)
 
 		self.StorageService = app.get_service("asab.StorageService")
-		self.SessionService = app.get_service("seacatauth.SessionService")
-		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
-		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.SessionService = None
+		self.AuthenticationService = None
+		self.CredentialsService = None
+		self.TenantService = None
+		self.RoleService = None
+		self.LastActivityService = None
 
 		self.StateExpiration = datetime.timedelta(seconds=asab.Config.getseconds(
 			"seacatauth:external_login", "state_expiration"))
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
 		self.CallbackEndpointPath = "/public/ext-login/{provider_type}"
+		self.InitializeLoginEndpointPath = "/public/ext-login/{provider_type}/initialize"
 
 		public_api_base_url = app.PublicSeacatAuthApiUrl
 		# TODO: This path must be configurable
 		self.CallbackUrl = "{}{}".format(
 			public_api_base_url,
-			self.CallbackEndpointPath
+			self.CallbackEndpointPath.lstrip("/")
 		)
-		self.MyAccountPageUrl = "{}/#/".format(app.AuthWebUiUrl)
+		self.MyAccountPageUrl = "{}#/".format(app.AuthWebUiUrl)
 		self.ErrorRedirectUrl = asab.Config.get("seacatauth:external_login", "error_redirect_url")
 		if not self.ErrorRedirectUrl:
 			self.ErrorRedirectUrl = self.MyAccountPageUrl
@@ -64,6 +78,25 @@ class ExternalLoginService(asab.Service):
 			for provider in self.Providers.values()}
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	async def initialize(self, app):
+		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
+		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
+
+		for provider in self.Providers.values():
+			await provider.initialize(app)
+
+		coll = await self.StorageService.collection(self.ExternalLoginCollection)
+		await coll.create_index(
+			[
+				("cid", pymongo.ASCENDING),
+			],
+		)
 
 
 	async def _on_housekeeping(self, event_name):
@@ -89,30 +122,34 @@ class ExternalLoginService(asab.Service):
 
 	async def prepare_external_login_url(
 		self,
-		provider_type: str,
-		root_session: SessionAdapter | None,
-		authorization_query: dict
+		provider: GenericOAuth2Login,
+		login_session=None,
+		session=None,
 	):
 		"""
 		Prepare the authorization URL of the requested external login provider
 		"""
-		provider = self.get_provider(provider_type)
-		if not provider:
-			return None
+		print(login_session, session, session and session.Session.ParentSessionId)
+		if not login_session:
+			if session:
+				if session.Session.ParentSessionId:
+					root_session = await self.SessionService.get(session.Session.ParentSessionId)
+				else:
+					root_session = session
+			else:
+				root_session = None
+			login_session = await self.AuthenticationService.create_login_session(root_session)
 
-		state_id, nonce = await self._store_authorization_state(root_session, authorization_query, provider.Type)
-		return provider.get_authorize_uri(self.CallbackUrl, state_id, nonce)
+		nonce = secrets.token_urlsafe()
+		await self.AuthenticationService.initialize_external_login(
+			login_session, provider.Type, {"nonce": nonce})
 
-
-	async def initialize(self, app):
-		for provider in self.Providers.values():
-			await provider.initialize(app)
-		coll = await self.StorageService.collection(self.ExternalLoginCollection)
-		await coll.create_index(
-			[
-				("cid", pymongo.ASCENDING),
-			],
+		authorization_url = provider.get_authorize_uri(
+			redirect_uri=self.CallbackUrl.format(provider_type=provider.Type),
+			state=login_session.Id,
+			nonce=nonce
 		)
+		return authorization_url
 
 
 	async def create(self, credentials_id: str, provider_type: str, user_info: dict | None = None):
@@ -333,39 +370,66 @@ class ExternalLoginService(asab.Service):
 
 	async def login(
 		self,
+		login_session,
 		provider_type: str,
 		subject: str,
-		root_session: SessionAdapter | None = None,
 		from_ip: typing.Iterable | None = None
 	) -> dict:
 		ext_credentials = await self.get(provider_type, subject)
 		credentials_id = ext_credentials["cid"]
 
-		# Create a placeholder login session
-		login_descriptors = []
-		login_session = await self.AuthenticationService.create_login_session(
-			credentials_id=credentials_id,
-			client_public_key=None,
-			login_descriptors=login_descriptors,
-			ident=None
-		)
-
 		# Create ad-hoc login descriptor
-		login_factor = "ext:{}".format(provider_type)
-		login_session.AuthenticatedVia = {
+		login_descriptor = {
 			"id": "!external",
-			"label": "Login via {}".format(provider_type),
-			"factors": [
-				{"id": login_factor, "type": login_factor}
-			]
+			"factors": [{"type": "ext:{}".format(provider_type)}]
 		}
 
-		# Finish login and create session
-		# TODO: If there is a valid non-anonymous root session, update it instead of creating a new one
-		new_session = await self.AuthenticationService.login(login_session, root_session, from_info=from_ip)
-		L.log(asab.LOG_NOTICE, "External login successful", struct_data={
+		if login_session.InitiatorSessionId:
+			root_session = await self.SessionService.get(login_session.InitiatorSessionId)
+		else:
+			root_session = None
+
+		scope = frozenset(["profile", "email", "phone"])
+
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		session_builders = [
+			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=credentials_id,
+				tenants=None  # Root session is tenant-agnostic
+			),
+			authentication_session_builder(login_descriptor),
+			await available_factors_session_builder(self.AuthenticationService, credentials_id),
+			await external_login_session_builder(ext_login_svc, credentials_id),
+		]
+
+		if root_session and not root_session.is_anonymous():
+			# Update existing root session
+			new_session = await self.SessionService.update_session(
+				root_session.SessionId,
+				session_builders=session_builders
+			)
+		else:
+			# Create a new root session
+			session_builders.append(cookie_session_builder())
+			new_session = await self.SessionService.create_session(
+				session_type="root",
+				session_builders=session_builders,
+			)
+
+		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"cid": credentials_id,
-			"login_type": provider_type
+			"lsid": login_session.Id,
+			"sid": str(new_session.Session.Id),
+			"from_ip": from_ip,
+			"authn_by": login_descriptor,
 		})
+		await self.LastActivityService.update_last_activity(
+			EventCode.LOGIN_SUCCESS, credentials_id, from_ip=from_ip, authn_by=login_descriptor)
+
+		# Delete login session
+		await self.AuthenticationService.delete_login_session(login_session.Id)
 
 		return new_session

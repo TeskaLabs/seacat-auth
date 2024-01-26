@@ -75,7 +75,7 @@ class AuthenticationService(asab.Service):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 		self.MetricsService = app.get_service("asab.MetricsService")
 
-		self.LoginUrl = "{}/#/login".format(self.App.AuthWebUiUrl)
+		self.LoginUrl = "{}#/login".format(self.App.AuthWebUiUrl)
 
 		self.CustomLoginParameters = asab.Config.get("seacatauth:authentication", "custom_login_parameters")
 		if self.CustomLoginParameters != "":
@@ -139,8 +139,8 @@ class AuthenticationService(asab.Service):
 
 	async def create_login_session(
 		self,
-		root_session: SessionAdapter = None,
-		authorization_params: dict = None,
+		root_session: SessionAdapter | None = None,
+		authorization_params: dict | None = None,
 	):
 		if root_session:
 			login_session = LoginSession(
@@ -148,6 +148,11 @@ class AuthenticationService(asab.Service):
 				initiator_sid=root_session.SessionId,
 				authorization_params=authorization_params,
 			)
+		else:
+			login_session = LoginSession(
+				authorization_params=authorization_params,
+			)
+
 		upsertor = self.StorageService.upsertor(
 			self.LoginSessionCollection,
 			login_session.Id)
@@ -155,6 +160,13 @@ class AuthenticationService(asab.Service):
 			upsertor.set(k, v)
 		await upsertor.execute()
 		return login_session
+
+
+	async def initialize_external_login(self, login_session, provider_type, login_data):
+		if login_session.ExternalLogin is None:
+			login_session.ExternalLogin = {}
+		login_session.ExternalLogin[provider_type] = login_data
+		await self._upsert_login_session(login_session)
 
 
 	async def _upsert_login_session(self, login_session: LoginSession):
@@ -360,9 +372,14 @@ class AuthenticationService(asab.Service):
 			"lsid": login_session.Id,
 			"sid": str(session.Session.Id),
 			"from_ip": from_info,
+			"authn_by": login_session.SeacatLogin.AuthenticatedVia,
 		})
 		await self.LastActivityService.update_last_activity(
-			EventCode.LOGIN_SUCCESS, login_session.SeacatLogin.CredentialsId, from_ip=from_info)
+			EventCode.LOGIN_SUCCESS,
+			login_session.SeacatLogin.CredentialsId,
+			from_ip=from_info,
+			authn_by=login_session.SeacatLogin.AuthenticatedVia
+		)
 
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
@@ -559,8 +576,26 @@ class AuthenticationService(asab.Service):
 			client_login_key=client_public_key
 		)
 		await self._upsert_login_session(login_session)
-		L.log(asab.LOG_NOTICE, "Login session prepared", struct_data={
+		L.log(asab.LOG_NOTICE, "Seacat login prepared", struct_data={
 			"cid": credentials_id, "ident": ident, "id": login_session.Id})
+		return login_session
+
+
+	async def prepare_external_login(
+		self,
+		login_session: str | LoginSession,
+		provider_type: str,
+	) -> LoginSession:
+		"""
+		Set up login session with located credentials and prepare login options
+		"""
+		if isinstance(login_session, str):
+			login_session = await self.get_login_session(login_session)
+
+		login_session.initialize_external_login(provider_type)
+		await self._upsert_login_session(login_session)
+		L.log(asab.LOG_NOTICE, "External login prepared", struct_data={
+			"id": login_session.Id, "provider": provider_type, "cid": login_session.InitiatorCredentialsId})
 		return login_session
 
 
