@@ -133,7 +133,6 @@ class ExternalLoginHandler(object):
 		authenticated_cid = None
 		if request.Session and not request.Session.is_anonymous():
 			# Verify that the current session is the same as the one that initiated the external login
-			print(request.Session.Id, login_session.InitiatorSessionId)
 			assert request.Session.Id == login_session.InitiatorSessionId
 			authenticated_cid = login_session.InitiatorCredentialsId
 		signed_in = authenticated_cid is not None
@@ -147,6 +146,8 @@ class ExternalLoginHandler(object):
 				login_session, provider_type, subject, from_ip=from_ip)
 		elif signed_in:
 			# Assign subject ID to the current Seacat Auth credentials and update current root session
+			# TODO: Redirect the user to a page where they can confirm the action.
+			#   e.g. "Hey user ABC, do you want to use Google account "XYZ" to log in?"
 			await self.ExternalLoginService.create(authenticated_cid, provider_type, user_info)
 			new_session = await self.ExternalLoginService.login(
 				login_session, provider_type, subject, from_ip=from_ip)
@@ -164,6 +165,7 @@ class ExternalLoginHandler(object):
 					login_session, provider_type, subject, from_ip=from_ip)
 
 		if new_session is None:
+			# External login failed or was denied
 			if login_session.AuthorizationParams:
 				# Resume the authorization flow WITHOUT the acr_values parameter
 				# This will send the user agent to the Seacat Auth login page
@@ -174,12 +176,11 @@ class ExternalLoginHandler(object):
 				return self._redirect_to_account_settings()
 
 		if login_session.AuthorizationParams:
-			response = self._redirect_to_authorization(login_session.AuthorizationParams["oauth_query"])
+			response = self._redirect_to_authorization(login_session.AuthorizationParams)
 		else:
 			response = self._redirect_to_account_settings()
 
 		set_cookie(self.App, response, new_session)
-		print(response, response.headers)
 
 		return response
 
@@ -214,7 +215,6 @@ class ExternalLoginHandler(object):
 			oidc_service.authorization_endpoint_url(),
 			urllib.parse.urlencode(oauth_query))
 		response = aiohttp.web.HTTPFound(location=authorization_uri)
-		print(response, response.headers)
 		return response
 
 
@@ -226,7 +226,6 @@ class ExternalLoginHandler(object):
 			"Location": self.ExternalLoginService.MyAccountPageUrl,
 			"Refresh": "0;url=" + self.ExternalLoginService.MyAccountPageUrl,
 		})
-		print(response, response.headers)
 		return response
 
 
@@ -235,5 +234,4 @@ class ExternalLoginHandler(object):
 		Redirect to Seacat Account webui
 		"""
 		response = aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)
-		print(response, response.headers)
 		return response

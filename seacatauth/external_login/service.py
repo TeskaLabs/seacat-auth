@@ -129,7 +129,6 @@ class ExternalLoginService(asab.Service):
 		"""
 		Prepare the authorization URL of the requested external login provider
 		"""
-		print(login_session, session, session and session.Session.ParentSessionId)
 		if not login_session:
 			if session:
 				if session.Session.ParentSessionId:
