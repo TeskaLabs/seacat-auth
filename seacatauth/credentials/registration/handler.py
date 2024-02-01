@@ -65,6 +65,10 @@ class RegistrationHandler(object):
 		Common user request to invite a new user to join specified tenant and create an account
 		if they don't have one yet. The invited user gets a registration link in their email.
 		"""
+		if not self.RegistrationService.Enabled:
+			L.log(asab.LOG_NOTICE, "Registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
+
 		# TODO: Limit the number of requests
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
@@ -112,6 +116,10 @@ class RegistrationHandler(object):
 		Admin request to register a new user and invite them to the specified tenant.
 		Generate a registration code and send a registration link to the user's email.
 		"""
+		if not self.RegistrationService.Enabled:
+			L.log(asab.LOG_NOTICE, "Registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
+
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
 		forwarded_for = request.headers.get("X-Forwarded-For")
@@ -163,6 +171,10 @@ class RegistrationHandler(object):
 		"""
 		Resend invitation to an already invited user and extend the expiration of the invitation.
 		"""
+		if not self.RegistrationService.Enabled:
+			L.log(asab.LOG_NOTICE, "Registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
+
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
 
@@ -208,9 +220,8 @@ class RegistrationHandler(object):
 		Anonymous user request to register themself.
 		Generate a registration token and send a registration link to the user's email.
 		"""
-		# Disable this endpoint if self-registration is not enabled
-		if not self.RegistrationService.SelfRegistrationEnabled:
-			L.log(asab.LOG_NOTICE, "Self-registration is not enabled")
+		if not (self.RegistrationService.Enabled and self.RegistrationService.SelfRegistrationEnabled):
+			L.log(asab.LOG_NOTICE, "Public registration is not open")
 			return aiohttp.web.HTTPNotFound()
 
 		# Log IPs from which the request was made
@@ -240,6 +251,10 @@ class RegistrationHandler(object):
 		"""
 		Get credentials by registration handle
 		"""
+		if not self.RegistrationService.Enabled:
+			L.log(asab.LOG_NOTICE, "Registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
+
 		registration_code = request.match_info["registration_code"]
 		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
 
@@ -295,6 +310,10 @@ class RegistrationHandler(object):
 		"""
 		Update drafted credentials
 		"""
+		if not self.RegistrationService.Enabled:
+			L.log(asab.LOG_NOTICE, "Registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
+
 		registration_code = request.match_info["registration_code"]
 
 		request_data = await request.read()
@@ -318,6 +337,10 @@ class RegistrationHandler(object):
 		Complete the registration either by activating the draft credentials
 		or by transferring their tenants and roles to the currently authenticated user.
 		"""
+		if not self.RegistrationService.Enabled:
+			L.log(asab.LOG_NOTICE, "Registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
+
 		registration_code = request.match_info["registration_code"]
 
 		# TODO: Make sure that self-registered users create their new tenant
