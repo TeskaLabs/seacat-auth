@@ -50,8 +50,12 @@ class NoTenantsError(AccessDeniedError):
 	Subject has access to no tenants.
 	"""
 	def __init__(self, subject=None, *args):
-		super().__init__(
-			"Subject {!r} does not have access to any tenant".format(self.Subject), subject=subject, *args)
+		if subject:
+			super().__init__(
+				"Subject {!r} does not have access to any tenant".format(self.Subject), subject=subject, *args)
+		else:
+			super().__init__(
+				"Subject does not have access to any tenant", *args)
 
 
 class TenantNotFoundError(SeacatAuthError, KeyError):
