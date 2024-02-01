@@ -52,7 +52,7 @@ class NoTenantsError(AccessDeniedError):
 	def __init__(self, subject=None, *args):
 		if subject:
 			super().__init__(
-				"Subject {!r} does not have access to any tenant".format(self.Subject), subject=subject, *args)
+				"Subject {!r} does not have access to any tenant".format(subject), subject=subject, *args)
 		else:
 			super().__init__(
 				"Subject does not have access to any tenant", *args)
