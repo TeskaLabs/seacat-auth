@@ -176,3 +176,12 @@ class NoCookieError(SeacatAuthError):
 		else:
 			message = "Request contains no root session cookie"
 		super().__init__(message, *args)
+
+
+class CredentialsRegistrationError(SeacatAuthError):
+	"""
+	Failed to register new credentials
+	"""
+	def __init__(self, message, credentials_id=None, *args):
+		self.CredentialsId = credentials_id
+		super().__init__(message, *args)
