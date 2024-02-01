@@ -468,13 +468,13 @@ class OpenIdConnectService(asab.Service):
 			tenants = await self.TenantService.get_tenants_by_scope(
 				scope, session.Credentials.Id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			L.log(asab.LOG_NOTICE, "Tenant not found", struct_data={"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied: No accessible tenants", struct_data={"cid": session.Credentials.Id})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 
 		return tenants

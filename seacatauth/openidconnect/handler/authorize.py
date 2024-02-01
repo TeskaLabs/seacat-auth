@@ -418,7 +418,7 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+					struct_data={"reason": "tenant_not_found", "scope": " ".join(scope)})
 
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
@@ -469,7 +469,7 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+					struct_data={"reason": "tenant_not_found", "scope": " ".join(scope)})
 
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
@@ -804,13 +804,13 @@ class AuthorizeHandler(object):
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
 			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
+			raise exceptions.AccessDeniedError(subject=credentials_id, resource={"scope": scope})
 		except exceptions.TenantAccessDeniedError as e:
 			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
+			raise exceptions.AccessDeniedError(subject=credentials_id, resource={"scope": scope})
 		except exceptions.NoTenantsError:
 			L.error("Tenant access denied", struct_data={"cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
+			raise exceptions.AccessDeniedError(subject=credentials_id, resource={"scope": scope})
 
 		return tenants
 
