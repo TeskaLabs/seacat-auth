@@ -182,6 +182,7 @@ class CredentialsRegistrationError(SeacatAuthError):
 	"""
 	Failed to register new credentials
 	"""
-	def __init__(self, message, credentials_id=None, *args):
+	def __init__(self, message, credentials_id: str | None = None, credentials: dict | None = None, *args):
 		self.CredentialsId = credentials_id
+		self.Credentials = credentials
 		super().__init__(message, *args)

@@ -50,6 +50,7 @@ class ExternalLoginService(asab.Service):
 		self.SessionService = None
 		self.AuthenticationService = None
 		self.CredentialsService = None
+		self.RegistrationService = None
 		self.TenantService = None
 		self.RoleService = None
 		self.LastActivityService = None
@@ -84,6 +85,7 @@ class ExternalLoginService(asab.Service):
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.RegistrationService = app.get_service("seacatauth.RegistrationService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
@@ -247,6 +249,10 @@ class ExternalLoginService(asab.Service):
 		})
 
 
+	def can_register_new_credentials(self):
+		return self.RegistrationWebhookUri is not None or self.RegistrationService.SelfRegistrationEnabled
+
+
 	async def create_new_seacat_auth_credentials(
 		self,
 		provider_type: str,
@@ -256,30 +262,29 @@ class ExternalLoginService(asab.Service):
 		"""
 		Attempt to create new Seacat Auth credentials for external user.
 		"""
-		credentials_id = None
-		# TODO: Attempt registration with local credential providers if registration is enabled
-		try:
+		if self.RegistrationWebhookUri:
+			# Register external user via webhook
+			credentials_id = await self.register_credentials_via_webhook(
+				provider_type, authorization_data, user_info)
+		elif self.RegistrationService.SelfRegistrationEnabled:
+			# Attempt registration with local credential providers if registration is enabled
 			cred_data = {
 				"username": user_info.get("preferred_username"),
 				"email": user_info.get("email"),
 				"phone": user_info.get("phone_number"),
 			}
-			result = await self.CredentialsService.create_credentials("ext", cred_data)
-			credentials_id = result.get("credentials_id")
-		except Exception as e:
-			L.error(e)
+			try:
+				credentials_id = await self.RegistrationService.CredentialProvider.create(cred_data)
+			except Exception as e:
+				raise exceptions.CredentialsRegistrationError(
+					"Failed to register credentials: {}".format(e), credentials=cred_data)
+		else:
+			raise exceptions.CredentialsRegistrationError("New credential registration via external login is disabled")
 
-		# Register external user via webhook
-		if not credentials_id and self.RegistrationWebhookUri:
-			credentials_id = await self.register_credentials_via_webhook(
-				provider_type, authorization_data, user_info)
-
-		if credentials_id:
-			await self.create(
-				credentials_id=credentials_id,
-				provider_type=provider_type,
-				user_info=user_info)
-
+		await self.create(
+			credentials_id=credentials_id,
+			provider_type=provider_type,
+			user_info=user_info)
 		return credentials_id
 
 
@@ -295,8 +300,7 @@ class ExternalLoginService(asab.Service):
 		create an entry in the external login collection and return the credential ID.
 		Otherwise, return None.
 		"""
-		if self.RegistrationWebhookUri is None:
-			return None
+		assert self.RegistrationWebhookUri is not None
 
 		request_data = {
 			"provider_type": provider_type,
@@ -308,23 +312,23 @@ class ExternalLoginService(asab.Service):
 			async with session.post(self.RegistrationWebhookUri, json=request_data) as resp:
 				if resp.status not in frozenset([200, 201]):
 					text = await resp.text()
-					L.error("Webhook responded with error.", struct_data={
+					L.error("Webhook responded with error", struct_data={
 						"status": resp.status, "text": text, "url": self.RegistrationWebhookUri})
-					return None
+					raise exceptions.CredentialsRegistrationError("Webhook responded with error")
 				response_data = await resp.json()
 
 		credentials_id = response_data.get("credential_id")
 		if not credentials_id:
-			L.error("Webhook response does not contain valid 'credential_id'.", struct_data={
+			L.error("Webhook response does not contain valid 'credential_id'", struct_data={
 				"response_data": response_data})
-			return None
+			raise exceptions.CredentialsRegistrationError("Unexpected webhook response")
 
 		# Test if the ID is reachable
 		try:
 			await self.CredentialsService.get(credentials_id)
 		except KeyError:
-			L.error("Returned credential ID not found.", struct_data={"response_data": response_data})
-			return None
+			L.error("Returned credential ID not found", struct_data={"response_data": response_data})
+			raise exceptions.CredentialsRegistrationError("Returned credential ID not found")
 
 		return credentials_id
 
@@ -384,7 +388,15 @@ class ExternalLoginService(asab.Service):
 		}
 
 		if login_session.InitiatorSessionId:
-			root_session = await self.SessionService.get(login_session.InitiatorSessionId)
+			try:
+				root_session = await self.SessionService.get(login_session.InitiatorSessionId)
+			except exceptions.SessionNotFoundError as e:
+				L.log(
+					asab.LOG_NOTICE,
+					"The session that initiated the login session no longer exists",
+					struct_data={"sid": login_session.InitiatorSessionId, "lsid": login_session.Id}
+				)
+				root_session = None
 		else:
 			root_session = None
 

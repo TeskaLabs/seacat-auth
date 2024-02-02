@@ -134,6 +134,7 @@ class ExternalLoginHandler(object):
 		if request.Session and not request.Session.is_anonymous():
 			# Verify that the current session is the same as the one that initiated the external login
 			assert request.Session.Id == login_session.InitiatorSessionId
+			assert request.Session.Credentials.Id == login_session.InitiatorCredentialsId
 			authenticated_cid = login_session.InitiatorCredentialsId
 		signed_in = authenticated_cid is not None
 
@@ -144,6 +145,7 @@ class ExternalLoginHandler(object):
 			# (Re)authentication successful - Create a new root session or update the existing one
 			new_session = await self.ExternalLoginService.login(
 				login_session, provider_type, subject, from_ip=from_ip)
+
 		elif signed_in:
 			# Assign subject ID to the current Seacat Auth credentials and update current root session
 			# TODO: Redirect the user to a page where they can confirm the action.
@@ -151,32 +153,48 @@ class ExternalLoginHandler(object):
 			await self.ExternalLoginService.create(authenticated_cid, provider_type, user_info)
 			new_session = await self.ExternalLoginService.login(
 				login_session, provider_type, subject, from_ip=from_ip)
-		else:
-			# Register new Seacat Auth credentials
-			L.info("Unknown external login credential", struct_data={
-				"provider_type": provider.Type, "sub": subject})
+
+		elif self.ExternalLoginService.can_register_new_credentials():
+			# Register new Seacat Auth credentials, either directly or via webhook
 			# Do not send the authorization code
 			authorize_data_safe = {k: v for k, v in authorization_data.items() if k != "code"}
-			credentials_id = await self.ExternalLoginService.create_new_seacat_auth_credentials(
-				provider_type, user_info, authorize_data_safe)
-			if credentials_id:
-				# Credentials successfully created
+			try:
+				credentials_id = await self.ExternalLoginService.create_new_seacat_auth_credentials(
+					provider_type, user_info, authorize_data_safe)
 				new_session = await self.ExternalLoginService.login(
 					login_session, provider_type, subject, from_ip=from_ip)
+			except exceptions.CredentialsRegistrationError:
+				L.error("Failed to register credential from external login", struct_data={
+					"provider": provider.Type, "sub": subject})
+
+		else:
+			# TODO: Unknown user, cannot register
+			...
+
+		await self.AuthenticationService.delete_login_session(login_session_id)
 
 		if new_session is None:
 			# External login failed or was denied
 			if login_session.AuthorizationParams:
 				# Resume the authorization flow WITHOUT the acr_values parameter
 				# This will send the user agent to the Seacat Auth login page
-				oauth_query = {k: v for k, v in login_session.AuthorizationParams.items() if k != "acr_values"}
+				oauth_query = {
+					k: v
+					for k, v in login_session.AuthorizationParams.items()
+					if k not in {"acr_values", "prompt"}
+				}
 				return self._redirect_to_authorization(oauth_query)
 			else:
 				# The auth flow did not start at the authorization endpoint
 				return self._redirect_to_account_settings()
 
 		if login_session.AuthorizationParams:
-			response = self._redirect_to_authorization(login_session.AuthorizationParams)
+			oauth_query = {
+				k: v
+				for k, v in login_session.AuthorizationParams.items()
+				if k not in {"prompt"}
+			}
+			response = self._redirect_to_authorization(oauth_query)
 		else:
 			response = self._redirect_to_account_settings()
 
