@@ -41,7 +41,6 @@ asab.Config.add_defaults({
 class ExternalLoginService(asab.Service):
 
 	ExternalLoginCollection = "el"
-	ExternalLoginStateCollection = "els"
 
 	def __init__(self, app, service_name="seacatauth.ExternalLoginService"):
 		super().__init__(app, service_name)
@@ -78,8 +77,6 @@ class ExternalLoginService(asab.Service):
 			provider.acr_value(): provider
 			for provider in self.Providers.values()}
 
-		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
-
 
 	async def initialize(self, app):
 		self.SessionService = app.get_service("seacatauth.SessionService")
@@ -99,10 +96,6 @@ class ExternalLoginService(asab.Service):
 				("cid", pymongo.ASCENDING),
 			],
 		)
-
-
-	async def _on_housekeeping(self, event_name):
-		await self._delete_old_authorization_states()
 
 
 	def _prepare_providers(self):
@@ -331,44 +324,6 @@ class ExternalLoginService(asab.Service):
 			raise exceptions.CredentialsRegistrationError("Returned credential ID not found")
 
 		return credentials_id
-
-
-	async def _store_authorization_state(
-		self,
-		root_session: SessionAdapter | None,
-		authorization_query: dict,
-		provider_type: str
-	) -> (str, str):
-		state_id = secrets.token_urlsafe(10)
-		nonce = secrets.token_urlsafe(10)
-		upsertor = self.StorageService.upsertor(self.ExternalLoginStateCollection, obj_id=state_id)
-		upsertor.set("oauth_query", authorization_query)
-		upsertor.set("type", provider_type)
-		upsertor.set("nonce", nonce)
-		if root_session and not root_session.is_anonymous():
-			upsertor.set("sid", root_session.SessionId)
-			upsertor.set("cid", root_session.Credentials.Id)
-
-		await upsertor.execute()
-		return state_id, nonce
-
-
-	async def pop_authorization_state(self, state_id: str) -> dict:
-		coll = await self.StorageService.collection(self.ExternalLoginStateCollection)
-		state = await coll.find_one_and_delete({"_id": state_id})
-		if state is None:
-			raise KeyError("State ID not found: {}".format(state_id))
-		return state
-
-
-	async def _delete_old_authorization_states(self):
-		collection = self.StorageService.Database[self.ExternalLoginStateCollection]
-		query_filter = {"_c": {"$lt": datetime.datetime.now(datetime.timezone.utc) - self.StateExpiration}}
-		result = await collection.delete_many(query_filter)
-		if result.deleted_count > 0:
-			L.info("Expired external login states deleted", struct_data={
-				"count": result.deleted_count
-			})
 
 
 	async def login(
