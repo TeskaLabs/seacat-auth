@@ -53,7 +53,7 @@ class ExternalLoginHandler(object):
 			provider = self.ExternalLoginService.get_provider(provider_type)
 		except KeyError:
 			# Authorization flow broken
-			L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={
+			L.error("Unsupported external login provider type", struct_data={
 				"provider_type": provider_type})
 			return self._error_redirect()
 
@@ -75,7 +75,7 @@ class ExternalLoginHandler(object):
 			provider = self.ExternalLoginService.get_provider(provider_type)
 		except KeyError:
 			# Authorization flow broken
-			L.log(asab.LOG_NOTICE, "Unsupported external login provider type", struct_data={
+			L.error("Unsupported external login provider type", struct_data={
 				"provider_type": provider_type})
 			return self._error_redirect()
 
@@ -85,7 +85,7 @@ class ExternalLoginHandler(object):
 			authorization_data = dict(request.query)
 		if not authorization_data:
 			# Authorization flow broken
-			L.log(asab.LOG_NOTICE, "External login provider returned no data in authorize callback")
+			L.error("External login provider returned no data in authorize callback")
 			return self._error_redirect()
 
 		login_session_id = authorization_data.get("state")
@@ -93,7 +93,7 @@ class ExternalLoginHandler(object):
 			login_session = await self.AuthenticationService.get_login_session(login_session_id)
 		except KeyError:
 			# Authorization flow broken
-			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={
+			L.error("Login session not found", struct_data={
 				"lsid": login_session_id})
 			return self._error_redirect()
 
