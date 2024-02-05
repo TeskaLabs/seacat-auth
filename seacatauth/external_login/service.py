@@ -62,8 +62,7 @@ class ExternalLoginService(asab.Service):
 		self.InitializeLoginEndpointPath = "/public/ext-login/{provider_type}/initialize"
 
 		public_api_base_url = app.PublicSeacatAuthApiUrl
-		# TODO: This path must be configurable
-		self.CallbackUrl = "{}{}".format(
+		self.CallbackUrlTemplate = "{}{}".format(
 			public_api_base_url,
 			self.CallbackEndpointPath.lstrip("/")
 		)
@@ -139,7 +138,6 @@ class ExternalLoginService(asab.Service):
 			login_session, provider.Type, {"nonce": nonce})
 
 		authorization_url = provider.get_authorize_uri(
-			redirect_uri=self.CallbackUrl.format(provider_type=provider.Type),
 			state=login_session.Id,
 			nonce=nonce
 		)

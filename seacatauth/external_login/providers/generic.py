@@ -102,7 +102,12 @@ class GenericOAuth2Login(asab.Configurable):
 
 		self.JwkSet = None
 
-		self.CallbackUrl = external_login_svc.CallbackUrl.format(provider_type=self.Type)
+		# The URL to return to after successful external login
+		# Mostly for debugging purposes
+		if "_callback_url" in self.Config:
+			self.CallbackUrl = self.Config.get("_callback_url")
+		else:
+			self.CallbackUrl = external_login_svc.CallbackUrlTemplate.format(provider_type=self.Type)
 
 
 	async def initialize(self, app):
