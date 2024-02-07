@@ -131,16 +131,20 @@ class ExternalLoginHandler(object):
 
 		# Check if the request is authenticated (user is already signed in)
 		authenticated_cid = None
+		print("request.Sess", request.Session)
 		if request.Session and not request.Session.is_anonymous():
 			# Verify that the current session is the same as the one that initiated the external login
 			assert request.Session.Id == login_session.InitiatorSessionId
 			assert request.Session.Credentials.Id == login_session.InitiatorCredentialsId
+			print(request.Session.Id, login_session.InitiatorSessionId)
+			print(request.Session.Credentials.Id, login_session.InitiatorCredentialsId)
 			authenticated_cid = login_session.InitiatorCredentialsId
 		signed_in = authenticated_cid is not None
 
 		from_ip = generic.get_request_access_ips(request)
 
 		new_session = None
+		print(f"{subject_known=} {signed_in=} {external_cid=}")
 		if subject_known:
 			# (Re)authentication successful - Create a new root session or update the existing one
 			new_session = await self.ExternalLoginService.login(
@@ -170,8 +174,6 @@ class ExternalLoginHandler(object):
 		else:
 			# TODO: Unknown user, cannot register
 			...
-
-		await self.AuthenticationService.delete_login_session(login_session_id)
 
 		if new_session is None:
 			# External login failed or was denied
