@@ -12,6 +12,7 @@ from ... import client, generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
+from ...session import SessionAdapter
 
 #
 
@@ -179,6 +180,15 @@ class AuthorizeHandler(object):
 			schema:
 				type: string
 				enum: ["S256", "plain"]
+		-	name: acr_values
+			in: query
+			required: false
+			description:
+				Requested Authentication Context Class Reference values. Space-separated string that specifies the
+				acr values that the Authorization Server is being requested to use for processing this Authentication
+				Request, with the values appearing in order of preference.
+			schema:
+				type: string
 		"""
 		access_ips = generic.get_request_access_ips(request)
 		# Authorization Servers SHOULD ignore unrecognized request parameters [RFC6749]
@@ -269,11 +279,12 @@ class AuthorizeHandler(object):
 		scope: str,
 		client_id: str,
 		redirect_uri: str,
-		state: str = None,
-		nonce: str = None,
-		prompt: str = None,
-		code_challenge: str = None,
-		code_challenge_method: str = None,
+		state: str | None = None,
+		nonce: str | None = None,
+		prompt: str | None = None,
+		code_challenge: str | None = None,
+		code_challenge_method: str | None = None,
+		acr_values: str | None = None,
 		**kwargs
 	):
 		"""
@@ -282,6 +293,7 @@ class AuthorizeHandler(object):
 		Authentication Code Flow
 		"""
 		scope = scope.split(" ")
+		acr_values = acr_values.split(" ") if acr_values else None
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
@@ -360,67 +372,20 @@ class AuthorizeHandler(object):
 		session_expiration = client_dict.get("session_expiration")
 
 		# Check if we need to redirect to login and authenticate
-		if authenticated:
-			if prompt == "login":
-				# Delete current session and redirect to login
-				await self.SessionService.delete(root_session.SessionId)
-				L.log(asab.LOG_NOTICE, "Login prompt requested by client", struct_data={"client_id": client_id})
-				return await self.reply_with_redirect_to_login(
-					scope=scope,
-					client_id=client_id,
-					redirect_uri=redirect_uri,
-					state=state,
-					nonce=nonce,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					**kwargs)
-			elif prompt == "select_account":
-				# Redirect to login without deleting current session
-				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client", struct_data={
-					"client_id": client_id})
-				return await self.reply_with_redirect_to_login(
-					scope=scope,
-					client_id=client_id,
-					redirect_uri=redirect_uri,
-					state=state,
-					nonce=nonce,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					**kwargs)
-
-		elif allow_anonymous:
-			# Create anonymous session or redirect to login if requested
-			if prompt == "login" or prompt == "select_account":
-				L.log(asab.LOG_NOTICE, "Account selection or login prompt requested by client", struct_data={
-					"client_id": client_id})
-				return await self.reply_with_redirect_to_login(
-					scope=scope,
-					client_id=client_id,
-					redirect_uri=redirect_uri,
-					state=state,
-					nonce=nonce,
-					code_challenge=code_challenge,
-					code_challenge_method=code_challenge_method,
-					**kwargs)
-
-		else:  # NOT authenticated and NOT allowing anonymous access
-			# Redirect to login unless prompt=none requested
+		if self.OpenIdConnectService.Authentication.is_login_required(
+			root_session, allow_anonymous, prompt, acr_values
+		):
 			if prompt == "none":
+				# Client allows no login prompt to be displayed - respond with error
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.LoginRequired, client_id,
 					redirect_uri=redirect_uri,
 					state=state)
-			L.log(asab.LOG_NOTICE, "Login required", struct_data={
-				"client_id": client_id})
-			return await self.reply_with_redirect_to_login(
-				scope=scope,
+			return await self.redirect_to_login(
+				root_session=root_session,
+				authorization_query=dict(request.query),
 				client_id=client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				nonce=nonce,
-				code_challenge=code_challenge,
-				code_challenge_method=code_challenge_method,
-				**kwargs)
+				acr_values=acr_values)
 
 		# Here the request must be authenticated or anonymous access must be allowed
 		assert authenticated or allow_anonymous
@@ -453,7 +418,7 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+					struct_data={"reason": "tenant_not_found", "scope": " ".join(scope)})
 
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
@@ -504,7 +469,7 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+					struct_data={"reason": "tenant_not_found", "scope": " ".join(scope)})
 
 			if authorize_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
@@ -683,36 +648,20 @@ class AuthorizeHandler(object):
 		)
 
 
-	async def reply_with_redirect_to_login(
+	async def redirect_to_login(
 		self,
+		root_session: SessionAdapter | None,
+		authorization_query: dict,
 		client_id: str,
-		response_type: str,
-		scope: list,
-		redirect_uri: str,
-		**authorize_params
+		acr_values: list,
 	):
 		"""
 		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
 		Pass on the query parameters.
 		"""
-		# Get client collection
-		client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
-
-		# Build redirect uri
-		callback_uri = self.OpenIdConnectService.build_authorize_uri(
-			client_dict=client_dict,
-			client_id=client_id,
-			response_type=response_type,
-			scope=" ".join(scope),
-			redirect_uri=redirect_uri,
-			**authorize_params
-		)
-
 		# Build login uri
-		login_query_params = [
-			("redirect_uri", callback_uri),
-			("client_id", client_id)]
-		login_url = self._build_login_uri(client_dict, login_query_params)
+		login_url = await self.OpenIdConnectService.Authentication.prepare_login_uri(
+			root_session, client_id, authorization_query, acr_values)
 		response = aiohttp.web.HTTPNotFound(
 			headers={
 				"Location": login_url,
@@ -721,7 +670,6 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-		delete_cookie(self.App, response)
 		return response
 
 	async def reply_with_factor_setup_redirect(
@@ -856,41 +804,15 @@ class AuthorizeHandler(object):
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
 			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
+			raise exceptions.AccessDeniedError(subject=credentials_id, resource={"scope": scope})
 		except exceptions.TenantAccessDeniedError as e:
 			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
+			raise exceptions.AccessDeniedError(subject=credentials_id, resource={"scope": scope})
 		except exceptions.NoTenantsError:
 			L.error("Tenant access denied", struct_data={"cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
+			raise exceptions.AccessDeniedError(subject=credentials_id, resource={"scope": scope})
 
 		return tenants
-
-
-	def _build_login_uri(self, client_dict, login_query_params):
-		"""
-		Check if the client has a registered login URI. If not, use the default.
-		Extend the URI with query parameters.
-		"""
-		login_uri = client_dict.get("login_uri")
-		if login_uri is None:
-			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
-
-		parsed = generic.urlparse(login_uri)
-		if parsed["fragment"] != "":
-			# If the Login URI contains fragment, add the login params into the fragment query
-			fragment_parsed = generic.urlparse(parsed["fragment"])
-			query = urllib.parse.parse_qs(fragment_parsed["query"])
-			query.update(login_query_params)
-			fragment_parsed["query"] = urllib.parse.urlencode(query)
-			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
-		else:
-			# If the Login URI contains no fragment, add the login params into the regular URL query
-			query = urllib.parse.parse_qs(parsed["query"])
-			query.update(login_query_params)
-			parsed["query"] = urllib.parse.urlencode(query)
-
-		return generic.urlunparse(**parsed)
 
 
 	def _validate_request_parameters(self, request_parameters):

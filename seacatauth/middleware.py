@@ -152,8 +152,8 @@ def public_auth_middleware_factory(app):
 			except exceptions.NoCookieError:
 				L.info("No root cookie found in request")
 				request.Session = None
-			except exceptions.SessionNotFoundError:
-				L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
+			except exceptions.SessionNotFoundError as e:
+				L.info("Cannot locate session by root cookie: {}".format(e), struct_data={"filter": e.Query})
 				request.Session = None
 
 		return await handler(request)

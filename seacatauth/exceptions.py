@@ -50,8 +50,12 @@ class NoTenantsError(AccessDeniedError):
 	Subject has access to no tenants.
 	"""
 	def __init__(self, subject=None, *args):
-		super().__init__(
-			"Subject {!r} does not have access to any tenant".format(self.Subject), subject=subject, *args)
+		if subject:
+			super().__init__(
+				"Subject {!r} does not have access to any tenant".format(subject), subject=subject, *args)
+		else:
+			super().__init__(
+				"Subject does not have access to any tenant", *args)
 
 
 class TenantNotFoundError(SeacatAuthError, KeyError):
@@ -171,4 +175,14 @@ class NoCookieError(SeacatAuthError):
 			message = "Request contains no cookie of client {!r}".format(self.ClientId)
 		else:
 			message = "Request contains no root session cookie"
+		super().__init__(message, *args)
+
+
+class CredentialsRegistrationError(SeacatAuthError):
+	"""
+	Failed to register new credentials
+	"""
+	def __init__(self, message, credentials_id: str | None = None, credentials: dict | None = None, *args):
+		self.CredentialsId = credentials_id
+		self.Credentials = credentials
 		super().__init__(message, *args)

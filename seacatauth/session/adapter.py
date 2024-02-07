@@ -43,6 +43,12 @@ class AuthenticationData:
 	ExternalLoginOptions: typing.Optional[list]
 	LoginDescriptor: typing.Optional[str]
 	LoginFactors: typing.Optional[list]
+	# TODO: Store all used login factors with their last authn time, e.g.
+	#   {
+	#     "hwk": datetime(yesterday 8:05),
+	#     "pwd": datetime(yesterday 8:05),
+	#     "ext:google": datetime(just now),
+	#   }
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
 	IsAnonymous: typing.Optional[bool]

@@ -22,7 +22,7 @@ from ..session import (
 )
 from .session import oauth2_session_builder
 from .. import exceptions
-from . import pkce
+from . import pkce, authentication
 
 from ..events import EventTypes
 
@@ -57,7 +57,8 @@ class OpenIdConnectService(asab.Service):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
-		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
+		self.PKCE = pkce.PKCE()
+		self.Authentication = authentication.Authentication(app)
 
 		self.PublicApiBaseUrl = app.PublicOpenIdConnectApiUrl
 
@@ -97,6 +98,10 @@ class OpenIdConnectService(asab.Service):
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_authorization_codes()
+
+
+	async def initialize(self, app):
+		await self.Authentication.initialize(app)
 
 
 	async def generate_authorization_code(
@@ -252,13 +257,16 @@ class OpenIdConnectService(asab.Service):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 				exclude_resources=exclude_resources,
+			),
+			(
+				(SessionAdapter.FN.Authentication.AuthnTime, root_session.Authentication.AuthnTime),
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 			)
 		]
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
 				(
 					SessionAdapter.FN.Authentication.ExternalLoginOptions,
@@ -395,6 +403,8 @@ class OpenIdConnectService(asab.Service):
 		if session.Authentication.AvailableFactors is not None:
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
 
+		if session.Authentication.AuthnTime is not None:
+			userinfo["auth_time"] = session.Authentication.AuthnTime
 		if session.Authentication.LoginDescriptor is not None:
 			userinfo["ldid"] = session.Authentication.LoginDescriptor
 		if session.Authentication.LoginFactors is not None:
@@ -458,13 +468,13 @@ class OpenIdConnectService(asab.Service):
 			tenants = await self.TenantService.get_tenants_by_scope(
 				scope, session.Credentials.Id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			L.log(asab.LOG_NOTICE, "Tenant not found", struct_data={"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied: No accessible tenants", struct_data={"cid": session.Credentials.Id})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 
 		return tenants
@@ -478,7 +488,7 @@ class OpenIdConnectService(asab.Service):
 		# TODO: This should be removed. There must be only one authorize endpoint.
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
-			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
+			authorize_uri = self.authorization_endpoint_url()
 		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
@@ -489,3 +499,13 @@ class OpenIdConnectService(asab.Service):
 		session: SessionAdapter = await self.get_session_by_access_token(token)
 		if session is not None:
 			await self.SessionService.delete(session.SessionId)
+
+
+	def authorization_endpoint_url(self):
+		return "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
+
+	def token_endpoint_url(self):
+		return "{}{}".format(self.PublicApiBaseUrl, self.TokenPath.lstrip("/"))
+
+	def userinfo_endpoint_url(self):
+		return "{}{}".format(self.PublicApiBaseUrl, self.UserInfoPath.lstrip("/"))
