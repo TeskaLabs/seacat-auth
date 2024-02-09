@@ -49,4 +49,3 @@ The following resources are automatically available in an installation of SeaCat
 * `seacat:session:access`: List sessions and view session details.
 * `seacat:credentials:edit`: Edit and suspend credentials.
 * `seacat:credentials:access`: List credentials and view credentials details.
-* `seacat:access`: Access to Seacat Admin API and UI.
