@@ -9,7 +9,7 @@ Thanks to such integration, you may use your Active Directory, LDAP or social lo
 
  * [TheHive](the-hive)
  * [ElasticSearch/Kibana](elk)
- * Grafana
+ * [Grafana](grafana)
 
 ## NGINX
 

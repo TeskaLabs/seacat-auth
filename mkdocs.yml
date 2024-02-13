@@ -91,7 +91,8 @@ nav:
       - integrations/oauth2-introspect.md
       - Connecting other apps:
         - integrations/cookies.md
-        - integrations/elk.md     
+        - integrations/elk.md
+        - integrations/grafana.md
         - integrations/the-hive.md
   
     - Development:
