@@ -61,11 +61,11 @@ class AuthenticationHandler(object):
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app_public.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
-		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
-		web_app_public.router.add_put(r"/public/logout", self.logout)
+		web_app_public.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app_public.router.add_put("/public/login/{lsid}", self.login)
+		web_app_public.router.add_put("/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app_public.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
+		web_app_public.router.add_put("/public/logout", self.logout)
 
 		# Back-compat; To be removed in next major version
 		# >>>
