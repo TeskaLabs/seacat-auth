@@ -28,7 +28,6 @@ def app_middleware_factory(app):
 def private_auth_middleware_factory(app):
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	require_authentication = asab.Config.getboolean("seacat:api", "require_authentication")
-	api_resource_id = asab.Config.get("seacat:api", "authorization_resource")
 	_allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
 	asab_api_required_bearer_token = asab.Config.get("asab:api:auth", "bearer", fallback=None)
 
@@ -83,22 +82,7 @@ def private_auth_middleware_factory(app):
 
 		# All API endpoints are considered non-public and have to pass authn/authz
 		if request.Session is not None and request.Session.Authorization.Authz is not None:
-			if api_resource_id == "DISABLED":
-				return await handler(request)
-			# Resource authorization is required: scan ALL THE RESOURCES
-			#   for `authorization_resource` or "authz:superuser"
-			authorized_resources = set(
-				resource
-				for resources in request.Session.Authorization.Authz.values()
-				for resource in resources
-			)
-			# Check the session is authorized to access Seacat API
-			if "authz:superuser" in authorized_resources or api_resource_id in authorized_resources:
-				return await handler(request)
-			else:
-				L.log(asab.LOG_NOTICE, "Not authorized to access Seacat API", struct_data={
-					"resource_id": api_resource_id})
-				return aiohttp.web.HTTPForbidden()
+			return await handler(request)
 
 		# ASAB API can be protected with a pre-configured bearer token
 		if (request.path.startswith("/asab/v1") or request.path in ("/doc", "/oauth2-redirect.html")) \

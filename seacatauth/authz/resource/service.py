@@ -22,9 +22,6 @@ class ResourceService(asab.Service):
 
 	# TODO: gather these system resources automatically
 	_BuiltinResources = {
-		"seacat:access": {
-			"description": "Access to Seacat Admin API and UI.",
-		},
 		"authz:superuser": {
 			"description": "Grants superuser access, including the access to all tenants.",
 		},
