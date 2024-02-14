@@ -4,16 +4,16 @@ title: Grafana
 
 # Using Seacat authorization in Grafana
 
-This guide will show you how to set up [Grafana](https://grafana.com/) to use Seacat Auth login and access control.
-Grafana has native support for OAuth authorization flow, so connecting it to Seacat Auth is quite straightforward. 
+This guide will show you how to set up [Grafana](https://grafana.com/) so you can use Seacat Auth for logging in and access control.
+Grafana has native support for OAuth authorization flow, so connecting it to Seacat Auth is quite straightforward.
 
-- Register a new client for your Grafana application in the Clients section of Seacat Admin UI. Note down the client ID.
-- Create the following resource IDs in the Resources section of Seacat Admin UI (or choose different names, but remember to change them in Grafana `role_attribute_path` configuration below):
-  - `grafana:access` - will be mapped to [Grafana's _Viewer_ role](https://grafana.com/docs/grafana/latest/administration/roles-and-permissions/#organization-roles), 
+1. Register a new client for your Grafana application in the **Clients** section of Seacat Admin UI. Note down the client ID.
+2. Create the following resource IDs in the **Resources** section of the Seacat Admin UI (or choose different names, but remember to change them in Grafana `role_attribute_path` configuration below):
+    - `grafana:access`: Will be mapped to [Grafana's _Viewer_ role](https://grafana.com/docs/grafana/latest/administration/roles-and-permissions/#organization-roles), 
     which allows the user to browse dashboards and other data, but not to create or change anything.
-  - `grafana:edit` - will be mapped to [Grafana's _Editor_ role](https://grafana.com/docs/grafana/latest/administration/roles-and-permissions/#organization-roles), 
+    - `grafana:edit`: Will be mapped to [Grafana's _Editor_ role](https://grafana.com/docs/grafana/latest/administration/roles-and-permissions/#organization-roles), 
     which allows the user to browse and edit dashboards and other data.
-- Configure Grafana to use your Seacat Auth instance as a [Generic OAuth provider](https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/).
+3. Configure Grafana to use your Seacat Auth instance as a [Generic OAuth provider](https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/).
   This can be either done in Grafana config file, or perhaps more conveniently using environment variables in your `docker-compose.yaml` file as following:
 
 ```yaml
