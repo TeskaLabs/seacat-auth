@@ -152,10 +152,10 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"credentials_ids": credentials_ids})
 
 
-	@access_control("seacat:credentials:access")
+	@access_control()
 	async def list_credentials(self, request):
 		"""
-		List credentials
+		List credentials that are members of currently authorized tenant
 
 		---
 		parameters:
@@ -194,10 +194,26 @@ class CredentialsHandler(object):
 				enum: ["tenant", "role", "default"]
 				default: default
 		"""
-		page = int(request.query.get('p', 1)) - 1
-		limit = int(request.query.get('i', 10))
+		page = request.query.get("p", 1)
+		try:
+			page = int(page) - 1
+			assert page >= 1
+		except (ValueError, AssertionError) as e:
+			raise asab.exceptions.ValidationError(
+				"The value of `p` (page) query parameter must be a positive integer, not {!r}".format(page)
+			) from e
+
+		limit = request.query.get("l", request.query.get("i", 10))
+		try:
+			limit = int(limit)
+			assert limit >= 1
+		except (ValueError, AssertionError) as e:
+			raise asab.exceptions.ValidationError(
+				"The value of `l` or `i` (limit) query parameter must be a positive integer, not {!r}".format(limit)
+			) from e
 
 		# Filter mode switches between `default` (username) string filter, `role` match and `tenant` match
+		# TODO: Replace with advanced filtering (`atenant=...`, `arole=...` etc.)
 		mode = request.query.get("m", "default")
 		filtr = request.query.get("f", "")
 		if len(filtr) == 0:
@@ -216,7 +232,7 @@ class CredentialsHandler(object):
 				# Check if the user has admin access to the role's tenant
 				tenant = filtr.split("/")[0]
 				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
+						request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
 				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
@@ -228,7 +244,7 @@ class CredentialsHandler(object):
 				# Check if the user has admin access to the requested tenant
 				tenant = filtr
 				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
+						request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
 				):
 					return asab.web.rest.json_response(request, {
 						"result": "NOT-AUTHORIZED"
