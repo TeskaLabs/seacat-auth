@@ -49,9 +49,9 @@ class NoTenantsError(AccessDeniedError):
 	"""
 	Subject has access to no tenants.
 	"""
-	def __init__(self, subject=None, *args):
+	def __init__(self, subject, *args):
 		super().__init__(
-			"Subject {!r} does not have access to any tenant".format(self.Subject), subject=subject, *args)
+			"Subject {!r} does not have access to any tenant".format(subject), subject=subject, *args)
 
 
 class TenantNotFoundError(SeacatAuthError, KeyError):

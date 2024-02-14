@@ -71,10 +71,6 @@ asab.Config.add_defaults({
 		# Specifies if non-public endpoints require authentication
 		"require_authentication": "yes",
 
-		# Specifies resource required for API access
-		# If set to "DISABLED", no authorization is required
-		"authorization_resource": "seacat:access",
-
 		# DEV ONLY!
 		# Allow authentication via access token
 		# This imposes the risk of the access token being misused by 3rd party app (user impersonation)

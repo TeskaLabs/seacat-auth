@@ -33,8 +33,6 @@ title: Resources
 
 ## SeaCat Auth admin resources
 
-### `seacat:access`
-
 ### `authz:superuser`
 
 ### `authz:tenant:access`
