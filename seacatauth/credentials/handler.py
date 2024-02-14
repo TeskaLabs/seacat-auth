@@ -5,7 +5,7 @@ import asab.web.rest
 import asab.web.webcrypto
 import asab.exceptions
 
-from .. import exceptions
+from .. import exceptions, generic
 from ..decorators import access_control
 from .schemas import (
 	CREATE_CREDENTIALS,
@@ -153,7 +153,7 @@ class CredentialsHandler(object):
 
 
 	@access_control()
-	async def list_credentials(self, request):
+	async def list_credentials(self, request, *, resources):
 		"""
 		List credentials that are members of currently authorized tenant
 
@@ -194,34 +194,15 @@ class CredentialsHandler(object):
 				enum: ["tenant", "role", "default"]
 				default: default
 		"""
-		page = request.query.get("p", 1)
-		try:
-			page = int(page) - 1
-			assert page >= 1
-		except (ValueError, AssertionError) as e:
-			raise asab.exceptions.ValidationError(
-				"The value of `p` (page) query parameter must be a positive integer, not {!r}".format(page)
-			) from e
-
-		limit = request.query.get("l", request.query.get("i", 10))
-		try:
-			limit = int(limit)
-			assert limit >= 1
-		except (ValueError, AssertionError) as e:
-			raise asab.exceptions.ValidationError(
-				"The value of `l` or `i` (limit) query parameter must be a positive integer, not {!r}".format(limit)
-			) from e
+		search = generic.SearchParams(request.query)
 
 		# Filter mode switches between `default` (username) string filter, `role` match and `tenant` match
 		# TODO: Replace with advanced filtering (`atenant=...`, `arole=...` etc.)
 		mode = request.query.get("m", "default")
-		filtr = request.query.get("f", "")
-		if len(filtr) == 0:
-			filtr = None
 
 		# Filtering based on IDs obtained form another collection
 		if mode in frozenset(["role", "tenant"]):
-			if filtr is None:
+			if search.SimpleFilter is None:
 				raise asab.exceptions.ValidationError(
 					"Filter mode {!r} requires that a filter string is specified".format(mode))
 
@@ -230,7 +211,7 @@ class CredentialsHandler(object):
 
 			if mode == "role":
 				# Check if the user has admin access to the role's tenant
-				tenant = filtr.split("/")[0]
+				tenant = search.SimpleFilter.split("/")[0]
 				if not rbac_svc.has_resource_access(
 						request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
 				):
@@ -238,11 +219,12 @@ class CredentialsHandler(object):
 						"result": "NOT-AUTHORIZED"
 					})
 				role_svc = self.CredentialsService.App.get_service("seacatauth.RoleService")
-				assignments = await role_svc.list_role_assignments(role_id=filtr, page=page, limit=limit)
+				assignments = await role_svc.list_role_assignments(
+					role_id=search.SimpleFilter, page=search.Page, limit=search.ItemsPerPage)
 
 			elif mode == "tenant":
 				# Check if the user has admin access to the requested tenant
-				tenant = filtr
+				tenant = search.SimpleFilter
 				if not rbac_svc.has_resource_access(
 						request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
 				):
@@ -251,7 +233,8 @@ class CredentialsHandler(object):
 					})
 				tenant_svc = self.CredentialsService.App.get_service("seacatauth.TenantService")
 				provider = tenant_svc.get_provider()
-				assignments = await provider.list_tenant_assignments(tenant, page, limit)
+				assignments = await provider.list_tenant_assignments(
+					tenant, search.Page, search.ItemsPerPage)
 
 			else:
 				raise ValueError("Unknown mode: {}".format(mode))
@@ -276,7 +259,7 @@ class CredentialsHandler(object):
 				except KeyError:
 					L.warning("Found an assignment of nonexisting credentials", struct_data={
 						"cid": cid,
-						"assigned_to": filtr,
+						"assigned_to": search.SimpleFilter,
 					})
 
 		# Substring based filtering
@@ -285,7 +268,7 @@ class CredentialsHandler(object):
 			total_count = 0  # If -1, then total count cannot be determined
 			for provider in self.CredentialsService.CredentialProviders.values():
 				try:
-					count = await provider.count(filtr=filtr)
+					count = await provider.count(filtr=search.SimpleFilter)
 				except Exception as e:
 					L.exception("Exception when getting count from a credentials provider: {}".format(e))
 					continue
@@ -297,9 +280,10 @@ class CredentialsHandler(object):
 					total_count = -1
 
 			# Scroll to first relevant provider
-			offset = page * limit
+			offset = search.Page * search.ItemsPerPage
 			credentials = []
 
+			remaining_items = search.ItemsPerPage
 			for count, provider in stack:
 				if count >= 0:
 					if offset > count:
@@ -307,11 +291,11 @@ class CredentialsHandler(object):
 						offset -= count
 						continue
 
-					async for credobj in provider.iterate(offset=offset, limit=limit, filtr=filtr):
+					async for credobj in provider.iterate(offset=offset, limit=remaining_items, filtr=search.SimpleFilter):
 						credentials.append(credobj)
-						limit -= 1
+						remaining_items -= 1
 
-					if limit <= 0:
+					if remaining_items <= 0:
 						#  We are done here ...
 						break
 
