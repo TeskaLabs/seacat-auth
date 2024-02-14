@@ -855,13 +855,22 @@ class AuthorizeHandler(object):
 			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			L.log(asab.LOG_NOTICE, "Tenant authorization denied: Tenant not found", struct_data={
+				"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
+			L.log(
+				asab.LOG_NOTICE,
+				"Tenant authorization denied: Credentials do not have access to requested tenant",
+				struct_data={"tenant": e.Tenant, "cid": credentials_id}
+			)
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": credentials_id})
+			L.log(
+				asab.LOG_NOTICE,
+				"Tenant authorization denied: Credentials do not have access to any tenant",
+				struct_data={"cid": credentials_id}
+			)
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 
 		return tenants
