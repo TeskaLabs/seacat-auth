@@ -5,6 +5,9 @@
 ### Pre-releases
 - `v24.06-alpha1`
 
+### Fix
+- Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
+
 ### Features
 - Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
 
