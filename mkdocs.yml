@@ -99,6 +99,7 @@ nav:
         - integrations/cookies.md
         - integrations/elk.md     
         - integrations/the-hive.md
+        - integrations/grafana.md
   
     - Development:
       - REST API:
