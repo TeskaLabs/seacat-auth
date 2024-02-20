@@ -298,19 +298,31 @@ class SessionAdapter:
 			and RBACService.is_superuser(self.Authorization.Authz)
 		)
 
-	def has_resource_access(self, tenant: str, resource_id: str) -> bool:
+	def has_tenant_access(self, tenant_id: str) -> bool:
 		"""
-		Is this session authorized to access the resource under the tenant?
+		Is this session authorized to access the tenant?
 		"""
+		assert tenant_id != "*"
 		return (
 			self.Authorization is not None
 			and self.Authorization.Authz is not None
-			and RBACService.has_resource_access(self.Authorization.Authz, tenant, {resource_id})
+			and tenant_id in self.Authorization.Authz
+		)
+
+	def has_resource_access(self, tenant_id: str, resource_id: str) -> bool:
+		"""
+		Is this session authorized to access the resource under the tenant?
+		"""
+		assert tenant_id != "*"
+		return (
+			self.Authorization is not None
+			and self.Authorization.Authz is not None
+			and RBACService.has_resource_access(self.Authorization.Authz, tenant_id, {resource_id})
 		)
 
 	def has_global_resource_access(self, resource_id: str) -> bool:
 		"""
-		Is this session globally authorized to access the resource?
+		Is this session authorized to access the resource globally?
 		"""
 		return (
 			self.Authorization is not None
