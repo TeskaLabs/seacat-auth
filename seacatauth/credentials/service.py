@@ -10,7 +10,7 @@ import typing
 
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
-from .. import AuditLogger
+from .. import AuditLogger, generic, exceptions
 from ..session import SessionAdapter
 
 #
@@ -180,9 +180,9 @@ class CredentialsService(asab.Service):
 		return credentials
 
 	async def iterate(self):
-		'''
+		"""
 		This iterates over all providers and combines their results
-		'''
+		"""
 		pending = [provider.iterate() for provider in self.CredentialProviders.values()]
 		pending_tasks = {
 			asyncio.ensure_future(g.__anext__()): g for g in pending
@@ -199,6 +199,153 @@ class CredentialsService(asab.Service):
 
 				pending_tasks[asyncio.ensure_future(dg.__anext__())] = dg
 				yield r
+
+
+	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, global_search: bool = False):
+		"""
+		List credentials that are members of currently authorized tenants.
+		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
+		"""
+		if len(search_params.AdvancedFilter) > 1:
+			raise asab.exceptions.ValidationError("No more than one advanced filter at a time is supported.")
+
+		if global_search and not session.has_global_resource_access(resource_id="authz:tenant:access"):
+			raise exceptions.AccessDeniedError(
+				"Not authorized to list credentials across all tenants", subject=session.Credentials.Id)
+
+		authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
+
+		# Authorize searched tenants
+		if "tenant" in search_params.AdvancedFilter:
+			# Search only requested tenant
+			tenant_id = search_params.AdvancedFilter["tenant"]
+			# Check authorization
+			if not global_search and tenant_id not in authorized_tenants:
+				raise exceptions.AccessDeniedError(
+					"Not authorized to access tenant members",
+					subject=session.Credentials.Id,
+					resource={"tenant_id": tenant_id}
+				)
+			searched_tenants = [tenant_id]
+		elif global_search:
+			# Search all credentials, ignore tenants
+			searched_tenants = None
+		else:
+			# Search currently authorized tenants
+			searched_tenants = authorized_tenants
+
+		if "role" in search_params.AdvancedFilter:
+			# Authorize searched roles
+			role_id = search_params.AdvancedFilter["role"]
+			tenant_id = role_id.split("/")[0]
+			# Check authorization
+			if not global_search and tenant_id not in authorized_tenants:
+				raise exceptions.AccessDeniedError(
+					"Not authorized to access tenant members",
+					subject=session.Credentials.Id,
+					resource={"tenant_id": tenant_id}
+				)
+			if not session.has_resource_access(tenant_id, "seacat:role:access"):
+				raise exceptions.AccessDeniedError(
+					"Not authorized to access role details",
+					subject=session.Credentials.Id,
+					resource={"role_id": role_id}
+				)
+			searched_roles = [role_id]
+		else:
+			# Do not filter by roles
+			searched_roles = None
+
+		# Get role or tenant assignment objects
+		if searched_roles:
+			role_svc = self.App.get_service("seacatauth.RoleService")
+			assignments = await role_svc.list_role_assignments(
+				role_id=searched_roles, page=search_params.Page, limit=search_params.ItemsPerPage)
+		elif searched_tenants:
+			tenant_svc = self.App.get_service("seacatauth.TenantService")
+			provider = tenant_svc.get_provider()
+			assignments = await provider.list_tenant_assignments(
+				searched_tenants, search_params.Page, search_params.ItemsPerPage)
+		else:
+			assignments = None
+
+		if assignments is not None:
+			if assignments["count"] == 0:
+				return {"count": 0, "data": []}
+
+			credentials = []
+			total_count = assignments["count"]
+
+			for assignment in assignments["data"]:
+				cid = assignment["c"]
+				_, provider_id, _ = cid.split(":", 2)
+				provider = self.CredentialProviders[provider_id]
+				try:
+					credentials.append(await provider.get(cid))
+				except KeyError:
+					L.warning("Found an assignment of nonexisting credentials", struct_data={
+						"cid": cid,
+						"role_id": assignment.get("r"),
+						"tenant_id": assignment.get("t"),
+					})
+
+			return {
+				"data": credentials,
+				"count": total_count,
+			}
+
+		# Search without external filters
+		return await self._list(search_params)
+
+
+	async def _list(self, search_params: generic.SearchParams):
+		"""
+		List credentials
+		"""
+		provider_stack = []
+		total_count = 0  # If -1, then total count cannot be determined
+		for provider in self.CredentialProviders.values():
+			try:
+				count = await provider.count(filtr=search_params.SimpleFilter)
+			except Exception as e:
+				L.exception("Exception when getting count from a credentials provider: {}".format(e))
+				continue
+
+			provider_stack.append((count, provider))
+			if count >= 0 and total_count >= 0:
+				total_count += count
+			else:
+				total_count = -1
+
+		credentials = []
+		offset = search_params.Page * search_params.ItemsPerPage
+		remaining_items = search_params.ItemsPerPage
+		for count, provider in provider_stack:
+			if count >= 0:
+				if offset > count:
+					# The offset is beyond the count of the provider, skip to the next one
+					offset -= count
+					continue
+
+				async for credobj in provider.iterate(offset=offset, limit=remaining_items,
+													  filtr=search_params.SimpleFilter):
+					credentials.append(credobj)
+					remaining_items -= 1
+
+				if remaining_items <= 0:
+					break
+
+				offset = 0
+
+			else:
+				# TODO: Uncountable branch
+				L.error("Not implemented: Uncountable branch.", struct_data={"provider_id": provider.ProviderID})
+				continue
+
+		return {
+			"data": credentials,
+			"count": total_count,
+		}
 
 
 	def get_provider(self, credentials_id):
