@@ -327,8 +327,9 @@ class CredentialsService(asab.Service):
 					offset -= count
 					continue
 
-				async for credobj in provider.iterate(offset=offset, limit=remaining_items,
-													  filtr=search_params.SimpleFilter):
+				async for credobj in provider.iterate(
+					offset=offset, limit=remaining_items, filtr=search_params.SimpleFilter
+				):
 					credentials.append(credobj)
 					remaining_items -= 1
 
