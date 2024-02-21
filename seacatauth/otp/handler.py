@@ -27,14 +27,20 @@ class OTPHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 
 		web_app = app.WebContainer.WebApp
+		web_app.router.add_get("/account/totp", self.prepare_totp_if_not_active)
+		web_app.router.add_put("/account/set-totp", self.set_totp)
+		web_app.router.add_put("/account/unset-totp", self.unset_totp)
+
+		# Back-compat; To be removed in next major version
+		# >>>
 		web_app.router.add_get("/public/totp", self.prepare_totp_if_not_active)
 		web_app.router.add_put("/public/set-totp", self.set_totp)
 		web_app.router.add_put("/public/unset-totp", self.unset_totp)
 
-		# Public endpoints
 		web_app_public.router.add_get("/public/totp", self.prepare_totp_if_not_active)
 		web_app_public.router.add_put("/public/set-totp", self.set_totp)
 		web_app_public.router.add_put("/public/unset-totp", self.unset_totp)
+		# <<<
 
 	@access_control()
 	async def prepare_totp_if_not_active(self, request, *, credentials_id):
