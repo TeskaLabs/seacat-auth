@@ -3,9 +3,14 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha2`
 - `v24.06-alpha1`
 
+### Breaking changes
+- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha2`)
+
 ### Features
+- List credentials from authorized tenant only (#348, `v24.06-alpha2`)
 - Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
 
 ---
