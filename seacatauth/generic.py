@@ -42,7 +42,7 @@ class SearchParams:
 					raise asab.exceptions.ValidationError(
 						"The value of `p` (page) query parameter must be a positive integer, not {!r}".format(v)
 					) from e
-				self.Page = v - 1
+				self.Page = v - 1  # Page number is 1-indexed
 
 			elif k in {"i", "l"}:
 				try:
