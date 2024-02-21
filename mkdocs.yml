@@ -54,6 +54,11 @@ extra:
       link: mailto:info@teskalabs.com
       name: info@teskalabs.com
 
+plugins:
+  - search
+  - glightbox
+  - open-in-new-tab
+
 nav:
   - About:
     - index.md
@@ -62,6 +67,17 @@ nav:
 
   - Administration guide:
     - admin/index.md
+  
+    - Access control:
+      - access/index.md
+      - access/key-terms.md
+      - access/credentials.md
+      - access/tenants.md
+      - access/resources.md      
+      - access/roles.md
+      - access/clients.md
+      - access/sessions.md
+
     - Installation:
       - installation/quick-start.md
       - installation/provisioning.md
@@ -75,16 +91,6 @@ nav:
       - Authentication and login:
         - config/external-login.md
       - config/notifications-configuration.md
-  
-    - Access control:
-      - access/index.md
-      - access/key-terms.md
-      - access/credentials.md
-      - access/tenants.md
-      - access/resources.md      
-      - access/roles.md
-      - access/clients.md
-      - access/sessions.md
 
     - Integrating apps:
       - integrations/index.md
@@ -93,6 +99,7 @@ nav:
         - integrations/cookies.md
         - integrations/elk.md     
         - integrations/the-hive.md
+        - integrations/grafana.md
   
     - Development:
       - REST API:
@@ -100,18 +107,17 @@ nav:
         - development/postman.md
       - development/oauth2.md
   
-    - Reference:
-      - reference/architecture.md
-      - reference/components.md
-      - reference/resources.md
-      - reference/clients.md
-      - reference/session.md
-
-
-  - Account help:
+  - User guide:
       - user/index.md
       - user/login.md
       - user/account-details.md
       - user/change-password.md
       - user/otp.md
       - user/hardware-keys.md
+
+  - Reference:
+      - reference/architecture.md
+      - reference/components.md
+      - reference/resources.md
+      - reference/clients.md
+      - reference/session.md

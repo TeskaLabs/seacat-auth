@@ -2,6 +2,7 @@ import re
 import logging
 import aiohttp
 import aiohttp.client_exceptions
+import asab
 import asab.config
 
 from seacatauth.authz import build_credentials_authz
@@ -33,6 +34,9 @@ class GrafanaIntegration(asab.config.Configurable):
 
 	def __init__(self, batman_svc, config_section_name="batman:grafana", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
+		asab.LogObsolete.warning(
+			"Batman for Grafana is deprecated. Please use Grafana generic OAuth instead.",
+			struct_data={"eol": "2024-12-31"})
 		self.BatmanService = batman_svc
 		self.TenantService = self.BatmanService.App.get_service("seacatauth.TenantService")
 		self.RoleService = self.BatmanService.App.get_service("seacatauth.RoleService")
