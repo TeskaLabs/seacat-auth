@@ -208,8 +208,15 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		})
 
 
-	async def list_tenant_assignments(self, tenant, page: int = 0, limit: int = None):
-		query_filter = {'t': tenant}
+	async def list_tenant_assignments(self, tenant: str | list, page: int = 0, limit: int = None):
+		"""
+		List credentials assigned to the tenant or tenants
+		"""
+		if isinstance(tenant, str):
+			query_filter = {"t": tenant}
+		else:
+			query_filter = {"t": {"$in": tenant}}
+
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
 		cursor = collection.find(query_filter)
 
