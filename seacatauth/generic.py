@@ -36,24 +36,24 @@ class SearchParams:
 		for k, v in query.items():
 			if k == "p":
 				try:
-					v = int(v) - 1
+					v = int(v)
 					assert v >= 1
 				except (ValueError, AssertionError) as e:
 					raise asab.exceptions.ValidationError(
 						"The value of `p` (page) query parameter must be a positive integer, not {!r}".format(v)
 					) from e
-				self.Page = v
+				self.Page = v - 1
 
 			elif k in {"i", "l"}:
 				try:
-					k = int(k)
-					assert k >= 1
+					v = int(v)
+					assert v >= 1
 				except (ValueError, AssertionError) as e:
 					raise asab.exceptions.ValidationError(
 						"The value of `i` or `l` (items per page) query parameter must be a positive integer, "
 						"not {!r}".format(v)
 					) from e
-				self.ItemsPerPage = k
+				self.ItemsPerPage = v
 
 			elif k == "f":
 				self.SimpleFilter = v
