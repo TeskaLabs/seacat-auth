@@ -210,7 +210,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 	async def list_tenant_assignments(self, tenant: str | list, page: int = 0, limit: int = None):
 		"""
-		List credentials assigned to the tenant or tenants
+		List credential IDs assigned to the tenant or tenants
 		"""
 		if isinstance(tenant, str):
 			query_filter = {"t": tenant}
