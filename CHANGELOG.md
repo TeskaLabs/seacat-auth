@@ -10,6 +10,7 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- New paths for account management endpoints (#343, `v24.06-alpha3`)
 - Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
 
 ---
