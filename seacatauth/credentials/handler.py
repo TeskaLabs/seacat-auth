@@ -153,7 +153,7 @@ class CredentialsHandler(object):
 
 
 	@access_control()
-	async def list_credentials(self, request, *, resources):
+	async def list_credentials(self, request):
 		"""
 		List credentials that are members of currently authorized tenant
 
@@ -162,158 +162,53 @@ class CredentialsHandler(object):
 		-	name: p
 			in: query
 			description: Page number
-			schema:
-				type: integer
+			schema: {"type": "integer"}
 		-	name: i
 			in: query
 			description: Items per page
-			schema:
-				type: integer
+			schema: {"type": "integer"}
 		-	name: f
 			in: query
-			description: Filter string
-			schema:
-				type: string
-		-	name: m
+			description: Filter by username or email
+			schema: {"type": "string"}
+		-	name: atenant
+			in: query
+			required: false
+			description: Filter by tenant
+			schema: {"type": "string"}
+		-	name: arole
+			in: query
+			required: false
+			description: Filter by role
+			schema: {"type": "string"}
+		-	name: global
 			in: query
 			required: false
 			description:
-				Filter mode.
-
-				- In the `default` mode, the request filters for credentials whose attributes contain
-				the *filter string*. The actual attributes searched depend on the capabilities of the respective
-				credential provider.
-
-				- In the `tenant` mode, the request filters for credentials assigned to the tenant that exactly
-				matches the *filter string*.
-
-				- In the `role` mode, the request filters for credentials with the role that exactly
-				matches the *filter string*.
-			schema:
-				type: string
-				enum: ["tenant", "role", "default"]
-				default: default
+			schema: {"type": "boolean"}
 		"""
 		search = generic.SearchParams(request.query)
 
-		# Filter mode switches between `default` (username) string filter, `role` match and `tenant` match
-		# TODO: Replace with advanced filtering (`atenant=...`, `arole=...` etc.)
+		# BACK-COMPAT: Convert the old "mode" search to advanced filters
 		mode = request.query.get("m", "default")
+		if mode == "role":
+			search.AdvancedFilter["role"] = request.query.get("f")
+		elif mode == "tenant":
+			search.AdvancedFilter["tenant"] = request.query.get("f")
+		elif mode == "default":
+			search.SimpleFilter = request.query.get("f")
 
-		# Filtering based on IDs obtained form another collection
-		if mode in frozenset(["role", "tenant"]):
-			if search.SimpleFilter is None:
-				raise asab.exceptions.ValidationError(
-					"Filter mode {!r} requires that a filter string is specified".format(mode))
+		if len(search.AdvancedFilter) > 1:
+			raise asab.exceptions.ValidationError("No more than one advanced filter at a time is supported.")
 
-			# These filters require access dedicated resource
-			rbac_svc = self.CredentialsService.App.get_service("seacatauth.RBACService")
+		global_search = request.query.get("global", "false") == "true"
 
-			if mode == "role":
-				# Check if the user has admin access to the role's tenant
-				tenant = search.SimpleFilter.split("/")[0]
-				if not rbac_svc.has_resource_access(
-						request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
-				):
-					return asab.web.rest.json_response(request, {
-						"result": "NOT-AUTHORIZED"
-					})
-				role_svc = self.CredentialsService.App.get_service("seacatauth.RoleService")
-				assignments = await role_svc.list_role_assignments(
-					role_id=search.SimpleFilter, page=search.Page, limit=search.ItemsPerPage)
-
-			elif mode == "tenant":
-				# Check if the user has admin access to the requested tenant
-				tenant = search.SimpleFilter
-				if not rbac_svc.has_resource_access(
-						request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
-				):
-					return asab.web.rest.json_response(request, {
-						"result": "NOT-AUTHORIZED"
-					})
-				tenant_svc = self.CredentialsService.App.get_service("seacatauth.TenantService")
-				provider = tenant_svc.get_provider()
-				assignments = await provider.list_tenant_assignments(
-					tenant, search.Page, search.ItemsPerPage)
-
-			else:
-				raise ValueError("Unknown mode: {}".format(mode))
-
-			if assignments["count"] == 0:
-				return asab.web.rest.json_response(request, {
-					"result": "OK",
-					"count": 0,
-					"data": []
-				})
-
-			credentials = []
-			total_count = assignments["count"]
-
-			# Sort the ids by their respective provider
-			for assignment in assignments["data"]:
-				cid = assignment["c"]
-				_, provider_id, _ = cid.split(":", 2)
-				provider = self.CredentialsService.CredentialProviders[provider_id]
-				try:
-					credentials.append(await provider.get(cid))
-				except KeyError:
-					L.warning("Found an assignment of nonexisting credentials", struct_data={
-						"cid": cid,
-						"assigned_to": search.SimpleFilter,
-					})
-
-		# Substring based filtering
-		elif mode in frozenset(["", "default"]):
-			stack = []
-			total_count = 0  # If -1, then total count cannot be determined
-			for provider in self.CredentialsService.CredentialProviders.values():
-				try:
-					count = await provider.count(filtr=search.SimpleFilter)
-				except Exception as e:
-					L.exception("Exception when getting count from a credentials provider: {}".format(e))
-					continue
-
-				stack.append((count, provider))
-				if count >= 0 and total_count >= 0:
-					total_count += count
-				else:
-					total_count = -1
-
-			# Scroll to first relevant provider
-			offset = search.Page * search.ItemsPerPage
-			credentials = []
-
-			remaining_items = search.ItemsPerPage
-			for count, provider in stack:
-				if count >= 0:
-					if offset > count:
-						# The offset is beyond the count of the provider, so let's skip to the next one
-						offset -= count
-						continue
-
-					async for credobj in provider.iterate(offset=offset, limit=remaining_items, filtr=search.SimpleFilter):
-						credentials.append(credobj)
-						remaining_items -= 1
-
-					if remaining_items <= 0:
-						#  We are done here ...
-						break
-
-					# Continue to the beginning of the next provider (zero offset)
-					offset = 0
-
-				else:
-					# TODO: Uncountable branch
-					L.error("Not implemented: Uncountable branch.", struct_data={"provider_id": provider.ProviderID})
-					continue
-
-		else:
-			raise asab.exceptions.ValidationError("Unsupported filter mode {!r}".format(mode))
+		result = await self.CredentialsService.list(request.Session, search, global_search)
 
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
-			"data": credentials,
-			"count": total_count,
+			"data": result["data"],
+			"count": result["count"],
 		})
 
 
