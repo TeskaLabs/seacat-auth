@@ -92,6 +92,11 @@ asab.Config.add_defaults({
 		"ident_fields": "username:ignorecase email:ignorecase",
 	},
 
+	"seacatauth:tenant": {
+		# Additional characters to be allowed in tenant IDs besides lowercase letters and numbers
+		"additional_allowed_id_characters": "",
+	},
+
 	"seacatauth:registration": {
 		# How long until invitation expires
 		"expiration": "3d",
