@@ -54,7 +54,7 @@ class CredentialsHandler(object):
 
 		web_app.router.add_get("/account/provider", self.get_my_provider_info)
 		web_app.router.add_put("/account/credentials", self.update_my_credentials)
-		web_app.router.add_get("/account/last_login", self.get_my_last_login_data)
+		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
 
 		# Back-compat; To be removed in next major version
 		# >>>
