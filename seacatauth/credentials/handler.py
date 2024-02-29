@@ -107,7 +107,6 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control("seacat:credentials:access")
 	async def get_last_login_data(self, request):
 		"""
 		Get the credentials' last successful/failed login data.
@@ -128,7 +127,6 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control("seacat:credentials:access")
 	async def locate_credentials(self, request):
 		"""
 		Return the IDs of credentials that match the specified ident.
