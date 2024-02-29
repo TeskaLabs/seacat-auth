@@ -4,6 +4,7 @@ import asab
 import asab.web.rest
 import asab.web.webcrypto
 import asab.exceptions
+import asab.utils
 
 from .. import exceptions, generic
 from ..decorators import access_control
@@ -206,9 +207,9 @@ class CredentialsHandler(object):
 		if len(search.AdvancedFilter) > 1:
 			raise asab.exceptions.ValidationError("No more than one advanced filter at a time is supported.")
 
-		global_search = request.query.get("global", "false") == "true"
+		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
-		result = await self.CredentialsService.list(request.Session, search, global_search)
+		result = await self.CredentialsService.list(request.Session, search, try_global_search)
 
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
