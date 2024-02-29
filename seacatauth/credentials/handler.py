@@ -70,7 +70,6 @@ class CredentialsHandler(object):
 		# <<<
 
 
-	@access_control("seacat:credentials:access")
 	async def list_providers(self, request):
 		"""
 		Get credential providers and their metadata
@@ -81,7 +80,6 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, providers)
 
 
-	@access_control("seacat:credentials:access")
 	async def get_provider_info(self, request):
 		"""
 		Get the metadata of the requested credential provider.
@@ -224,7 +222,6 @@ class CredentialsHandler(object):
 			"type": "string"
 		}
 	})
-	@access_control("seacat:credentials:access")
 	async def get_idents_from_ids(self, request, *, json_data):
 		"""
 		Get human-intelligible identifiers for a list of credential IDs
@@ -252,7 +249,6 @@ class CredentialsHandler(object):
 			"data": result_data
 		})
 
-	@access_control("seacat:credentials:access")
 	async def get_credentials(self, request):
 		"""
 		Get requested credentials' detail
