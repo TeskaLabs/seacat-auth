@@ -3,12 +3,14 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha5`
 - `v24.06-alpha4`
 - `v24.06-alpha3`
 - `v24.06-alpha2`
 - `v24.06-alpha1`
 
 ### Fix
+- Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
 - Fix typo in last login endpoint path (#346, `v24.06-alpha4`)
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
