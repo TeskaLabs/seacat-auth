@@ -201,7 +201,7 @@ class CredentialsService(asab.Service):
 				yield r
 
 
-	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, global_search: bool = False):
+	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, try_global_search: bool = False):
 		"""
 		List credentials that are members of currently authorized tenants.
 		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
@@ -209,9 +209,11 @@ class CredentialsService(asab.Service):
 		if len(search_params.AdvancedFilter) > 1:
 			raise asab.exceptions.ValidationError("No more than one advanced filter at a time is supported.")
 
-		if global_search and not session.has_global_resource_access(resource_id="authz:tenant:access"):
-			raise exceptions.AccessDeniedError(
-				"Not authorized to list credentials across all tenants", subject=session.Credentials.Id)
+		if try_global_search and not session.is_superuser():
+			# Return only tenant members
+			L.info("Not authorized to list credentials across all tenants", struct_data={
+				"cid": session.Credentials.Id})
+			try_global_search = False
 
 		authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
 
@@ -220,14 +222,14 @@ class CredentialsService(asab.Service):
 			# Search only requested tenant
 			tenant_id = search_params.AdvancedFilter["tenant"]
 			# Check authorization
-			if not global_search and tenant_id not in authorized_tenants:
+			if not try_global_search and tenant_id not in authorized_tenants:
 				raise exceptions.AccessDeniedError(
 					"Not authorized to access tenant members",
 					subject=session.Credentials.Id,
 					resource={"tenant_id": tenant_id}
 				)
 			searched_tenants = [tenant_id]
-		elif global_search:
+		elif try_global_search:
 			# Search all credentials, ignore tenants
 			searched_tenants = None
 		else:
@@ -239,7 +241,7 @@ class CredentialsService(asab.Service):
 			role_id = search_params.AdvancedFilter["role"]
 			tenant_id = role_id.split("/")[0]
 			# Check authorization
-			if not global_search and tenant_id not in authorized_tenants:
+			if not try_global_search and tenant_id not in authorized_tenants:
 				raise exceptions.AccessDeniedError(
 					"Not authorized to access tenant members",
 					subject=session.Credentials.Id,
