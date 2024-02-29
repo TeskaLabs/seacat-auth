@@ -21,7 +21,7 @@ class TenantService(asab.Service):
 		super().__init__(app, service_name)
 		self.TenantsProvider = None
 		self.AdditionalIdCharacters = asab.Config.get(
-			"seacatauth:tenant", "additional_allowed_id_characters", default="")
+			"seacatauth:tenant", "additional_allowed_id_characters", fallback="")
 		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
