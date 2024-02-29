@@ -76,7 +76,7 @@ class TenantService(asab.Service):
 			if self.AdditionalIdCharacters:
 				message = (
 					"Invalid tenant ID {!r}. "
-					"Tenant ID must consist only of lowercase letters (a-z), numbers (0-9) and characters {}. "
+					"Tenant ID must consist only of lowercase letters (a-z), numbers (0-9) and characters {!r}. "
 					"It must start with a letter and be between 3 and 32 characters long.".format(
 						tenant_id, self.AdditionalIdCharacters)
 				)
