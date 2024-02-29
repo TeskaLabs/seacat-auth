@@ -51,23 +51,29 @@ class AuthenticationHandler(object):
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app.router.add_put(r"/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
-		web_app.router.add_put(r"/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
-		web_app.router.add_put(r"/public/logout", self.logout)
-		web_app.router.add_put("/impersonate", self.impersonate)
-		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
+		web_app.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app.router.add_put("/public/login/{lsid}", self.login)
+		web_app.router.add_put("/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
+		web_app.router.add_put("/public/logout", self.logout)
+		web_app.router.add_put("/account/impersonate", self.impersonate)
+		web_app.router.add_post("/account/impersonate", self.impersonate_and_redirect)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app_public.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
-		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
-		web_app_public.router.add_put(r"/public/logout", self.logout)
+		web_app_public.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app_public.router.add_put("/public/login/{lsid}", self.login)
+		web_app_public.router.add_put("/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app_public.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
+		web_app_public.router.add_put("/public/logout", self.logout)
+
+		# Back-compat; To be removed in next major version
+		# >>>
+		web_app.router.add_put("/impersonate", self.impersonate)
+		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
 		web_app_public.router.add_put("/impersonate", self.impersonate)
 		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
+		# <<<
 
 
 	@asab.web.rest.json_schema_handler({
