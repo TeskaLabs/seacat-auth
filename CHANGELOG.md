@@ -3,11 +3,15 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha6`
 - `v24.06-alpha5`
 - `v24.06-alpha4`
 - `v24.06-alpha3`
 - `v24.06-alpha2`
 - `v24.06-alpha1`
+
+### Breaking changes
+- Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
 - Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
@@ -15,6 +19,7 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 - New paths for account management endpoints (#343, `v24.06-alpha3`)
 - Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
 

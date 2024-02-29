@@ -15,12 +15,14 @@ L = logging.getLogger(__name__)
 
 
 class TenantService(asab.Service):
-	TenantNamePattern = r"[a-z][a-z0-9._-]{2,31}"
+	TenantIdPattern = "^[a-z][a-z0-9{}]{{2,31}}$"
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
 		self.TenantsProvider = None
-		self.TenantNameRegex = re.compile("^{}$".format(self.TenantNamePattern))
+		self.AdditionalIdCharacters = asab.Config.get(
+			"seacatauth:tenant", "additional_allowed_id_characters", fallback="")
+		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 
@@ -70,11 +72,21 @@ class TenantService(asab.Service):
 		data: dict = None,
 		creator_id: str = None
 	):
-		if not self.TenantNameRegex.match(tenant_id):
-			raise asab.exceptions.ValidationError(
-				"Invalid tenant ID {!r}. "
-				"Tenant ID must consist only of characters 'a-z0-9._-', "
-				"start with a letter, and be between 3 and 32 characters long.".format(tenant_id))
+		if not self.TenantIdRegex.match(tenant_id):
+			if self.AdditionalIdCharacters:
+				message = (
+					"Invalid tenant ID {!r}. "
+					"Tenant ID must consist only of lowercase letters (a-z), numbers (0-9) and characters {!r}. "
+					"It must start with a letter and be between 3 and 32 characters long.".format(
+						tenant_id, self.AdditionalIdCharacters)
+				)
+			else:
+				message = (
+					"Invalid tenant ID {!r}. "
+					"Tenant ID must consist only of lowercase letters (a-z) and numbers (0-9). "
+					"It must start with a letter and be between 3 and 32 characters long.".format(tenant_id)
+				)
+			raise asab.exceptions.ValidationError(message)
 
 		try:
 			tenant_id = await self.TenantsProvider.create(
