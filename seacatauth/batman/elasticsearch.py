@@ -54,6 +54,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		# This role 'flags' users in ElasticSearch/Kibana that is managed by Seacat Auth
 		# There should be a role created in the ElasticSearch that grants no rights
 		"seacat_user_flag": "seacat_managed",
+
+		# What indices can be accessed by tenant members. Space-separated.
+		"tenant_indices": "lmio-{tenant}-*",
 	}
 
 	EssentialKibanaResources = {
@@ -107,6 +110,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		self.Headers = self._prepare_session_headers(username, password, api_key)
 
+		self.TenantIndices = self.Config.get("tenant_indices").split(" ")
 		self.ResourcePrefix = "kibana:"
 		self.DeprecatedResourcePrefix = "elk:"
 		self.DeprecatedResourceRegex = re.compile("^elk:")
@@ -319,17 +323,25 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 			L.log(asab.LOG_NOTICE, "Kibana space created", struct_data={"id": space_id, "tenant": tenant_id})
 
-			# Create roles for space access
-			await self._create_kibana_role(tenant_id, space_id, "read")
-			await self._create_kibana_role(tenant_id, space_id, "all")
+		# Create roles for space access
+		await self._create_or_update_kibana_role(tenant_id, space_id, "read")
+		await self._create_or_update_kibana_role(tenant_id, space_id, "all")
 
 
-	async def _create_kibana_role(self, tenant_id: str, space_id: str, privileges: str = "read"):
+	async def _create_or_update_kibana_role(self, tenant_id: str, space_id: str, privileges: str = "read"):
 		assert privileges in {"read", "all"}
 		role_name = self._elastic_role_from_tenant(tenant_id, privileges)
 		role = {
 			# Add all privileges for the new space
-			"kibana": [{"spaces": [space_id], "base": [privileges]}]
+			"kibana": [{"spaces": [space_id], "base": [privileges]}],
+			# Add access to elasticsearch indices
+			"elasticsearch": {"indices": {
+				"names": [
+					index.format(tenant=tenant_id)
+					for index in self.TenantIndices
+				],
+				"privileges": [privileges]}
+			}
 		}
 
 		async with self._elasticsearch_session() as session:
