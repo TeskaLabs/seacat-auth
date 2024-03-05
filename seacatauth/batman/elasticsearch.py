@@ -110,7 +110,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		self.Headers = self._prepare_session_headers(username, password, api_key)
 
-		self.TenantIndices = self.Config.get("tenant_indices").split(" ")
+		self.TenantIndices = re.split(r"\s+", self.Config.get("tenant_indices"))
 		self.ResourcePrefix = "kibana:"
 		self.DeprecatedResourcePrefix = "elk:"
 		self.DeprecatedResourceRegex = re.compile("^elk:")
