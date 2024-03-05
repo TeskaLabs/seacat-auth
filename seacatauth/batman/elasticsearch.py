@@ -333,18 +333,21 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		role = {
 			# Add all privileges for the new space
 			"kibana": [
-				{"spaces": [space_id], "base": [privileges]}
+				{
+					"spaces": [space_id],
+					"base": [privileges]
+				}
 			],
 			# Add access to elasticsearch indices
-			"elasticsearch": {
-				"indices": [{
+			"elasticsearch": {"indices": [
+				{
 					"names": [
 						index.format(tenant=tenant_id)
 						for index in self.TenantIndices
 					],
 					"privileges": [privileges]
-				}]
-			}
+				}
+			]}
 		}
 
 		async with self._elasticsearch_session() as session:
