@@ -55,8 +55,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		# There should be a role created in the ElasticSearch that grants no rights
 		"seacat_user_flag": "seacat_managed",
 
-		# What indices can be accessed by tenant members. Space-separated.
-		"tenant_indices": "lmio-{tenant}-*",
+		# What indices can be accessed by tenant members. Space-separated. Can use {tenant} variable.
+		"tenant_indices": "{tenant}-*",
 	}
 
 	EssentialKibanaResources = {
@@ -290,7 +290,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			# No changes
 			L.debug("Kibana space metadata up to date", struct_data={
 				"space_id": space_id, "tenant_id": tenant_id})
-			return
 
 		elif existing_space:
 			# Update existing space
@@ -333,14 +332,18 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		role_name = self._elastic_role_from_tenant(tenant_id, privileges)
 		role = {
 			# Add all privileges for the new space
-			"kibana": [{"spaces": [space_id], "base": [privileges]}],
+			"kibana": [
+				{"spaces": [space_id], "base": [privileges]}
+			],
 			# Add access to elasticsearch indices
-			"elasticsearch": {"indices": {
-				"names": [
-					index.format(tenant=tenant_id)
-					for index in self.TenantIndices
-				],
-				"privileges": [privileges]}
+			"elasticsearch": {
+				"indices": [{
+					"names": [
+						index.format(tenant=tenant_id)
+						for index in self.TenantIndices
+					],
+					"privileges": [privileges]
+				}]
 			}
 		}
 
