@@ -30,7 +30,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		"url": "",
 
 		# Enables automatic synchronization of Kibana spaces with Seacat tenants
-		# Space and role sync is disabled if kibana_url is empty.
+		# Space sync is disabled if kibana_url is empty.
 		"kibana_url": "http://localhost:5601",
 
 		# Basic credentials / API key (mutually exclusive)
@@ -94,9 +94,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.RoleService = self.App.get_service("seacatauth.RoleService")
 		self.ResourceService = self.App.get_service("seacatauth.ResourceService")
 
-		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
-		if len(self.KibanaUrl) == 0:
-			self.KibanaUrl = None
+		self.Kibana = KibanaUtils(self.App, config_section_name, config)
 
 		self.ElasticSearchUrl = self.Config.get("url")
 		self.ElasticSearchNodesUrls = get_url_list(self.ElasticSearchUrl)
@@ -206,32 +204,26 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		try:
 			for privileges in {"read", "all"}:
 				await self._create_or_update_elasticsearch_role(tenant_id, privileges)
-			if self.KibanaUrl:
-				# Update Kibana space and add space privileges to roles
-				space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-				await self._create_or_update_kibana_space(tenant_id, space_id)
-				for privileges in {"read", "all"}:
-					await self._add_kibana_space_privileges(tenant_id, space_id, privileges)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
+
+		if self.Kibana.is_enabled():
+			await self.Kibana.sync_space(tenant_id)
 
 
 	async def _on_tenant_updated(self, event_name, tenant_id):
 		try:
 			for privileges in {"read", "all"}:
 				await self._create_or_update_elasticsearch_role(tenant_id, privileges)
-			if self.KibanaUrl:
-				# Update Kibana space and add space privileges to roles
-				space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-				await self._create_or_update_kibana_space(tenant_id, space_id)
-				for privileges in {"read", "all"}:
-					await self._add_kibana_space_privileges(tenant_id, space_id, privileges)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
+
+		if self.Kibana.is_enabled():
+			await self.Kibana.sync_space(tenant_id)
 
 
 	async def _sync_all_roles_and_spaces(self):
@@ -245,111 +237,13 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
-		if self.KibanaUrl:
-			try:
-				async for tenant in self.TenantService.iterate():
-					# Update Kibana space and add space privileges to roles
-					space_id = self._kibana_space_id_from_tenant_id(tenant["_id"])
-					await self._create_or_update_kibana_space(tenant, space_id)
-					for privileges in {"read", "all"}:
-						await self._add_kibana_space_privileges(tenant["_id"], space_id, privileges)
-			except aiohttp.client_exceptions.ClientConnectionError as e:
-				L.error("Cannot connect to Kibana: {}".format(str(e)))
-				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
-				return
-
-
-	async def _create_or_update_kibana_space(self, tenant: str | dict, space_id: str = None):
-		"""
-		Create a Kibana space for specified tenant or update its metadata if necessary.
-		Also create a read-only and a read-write Kibana role for that space.
-		"""
-		if self.KibanaUrl is None:
-			return
-
-		if isinstance(tenant, str):
-			tenant_id = tenant
-			tenant = await self.TenantService.get_tenant(tenant_id)
-		else:
-			tenant_id = tenant["_id"]
-
-		if not space_id:
-			space_id = self._kibana_space_id_from_tenant_id(tenant_id)
-
-		async with self._elasticsearch_session() as session:
-			async with session.get("{}/api/spaces/space/{}".format(self.KibanaUrl, space_id)) as resp:
-				if resp.status == 404:
-					existing_space = None
-				elif resp.status == 200:
-					existing_space = await resp.json()
-				else:
-					text = await resp.text()
-					L.error(
-						"Failed to fetch Kibana tenant space (Server responded with {}):\n{}".format(
-							resp.status, text[:1000]),
-						struct_data={"space_id": space_id, "tenant_id": tenant_id}
-					)
-					return
-
-		space_update = {}
-		if existing_space:
-			name = tenant.get("label", tenant_id)
-			if existing_space.get("name") != name:
-				space_update["name"] = name
-			description = tenant.get("description")
-			if existing_space.get("description") != description:
-				space_update["description"] = description
-			if len(space_update) > 0:
-				space_update["id"] = space_id
-		else:
-			space_update = {
-				"id": space_id,
-				"name": tenant.get("label", tenant_id)
-			}
-			if "description" in tenant:
-				space_update["description"] = tenant["description"]
-
-		if not space_update:
-			# No changes
-			L.debug("Kibana space metadata up to date.", struct_data={
-				"space_id": space_id, "tenant_id": tenant_id})
-			return
-
-		elif existing_space:
-			# Update existing space
-			async with self._elasticsearch_session() as session:
-				async with session.put(
-					"{}/api/spaces/space/{}".format(self.KibanaUrl, space_id), json=space_update
-				) as resp:
-					if not (200 <= resp.status < 300):
-						text = await resp.text()
-						L.error(
-							"Failed to update Kibana tenant space (Server responded with {}):\n{}".format(
-								resp.status, text[:1000]),
-							struct_data={"space_id": space_id, "tenant_id": tenant_id}
-						)
-			L.log(asab.LOG_NOTICE, "Kibana space updated", struct_data={"id": space_id, "tenant": tenant_id})
-			return
-
-		else:
-			# Create new space
-			async with self._elasticsearch_session() as session:
-				async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space_update) as resp:
-					if not (200 <= resp.status < 300):
-						text = await resp.text()
-						L.error(
-							"Failed to create Kibana tenant space (Server responded with {}):\n{}".format(
-								resp.status, text[:1000]),
-							struct_data={"space_id": space_id, "tenant_id": tenant_id}
-						)
-						return
-
-			L.log(asab.LOG_NOTICE, "Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
+		if self.Kibana.is_enabled():
+			await self.Kibana.sync_all_spaces()
 
 
 	async def _create_or_update_elasticsearch_role(self, tenant_id: str, privileges: str = "read"):
 		assert privileges in {"read", "all"}
-		role_name = self._elastic_role_from_tenant(tenant_id, privileges)
+		role_name = elastic_role_from_tenant(tenant_id, privileges)
 		required_index_settings = {
 			"names": [
 				index.format(tenant=tenant_id)
@@ -367,7 +261,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 				else:
 					text = await resp.text()
 					L.error(
-						"Failed to get ElasticSearch role:\n{}".format( text[:1000]),
+						"Failed to get ElasticSearch role:\n{}".format(text[:1000]),
 						struct_data={"code": resp.status, "role": role_name}
 					)
 					return
@@ -383,6 +277,10 @@ class ElasticSearchIntegration(asab.config.Configurable):
 					return
 
 		# Add access to elasticsearch indices
+		if not role_data:
+			role_data = {}
+		if not role_data.get("indices"):
+			role_data["indices"] = []
 		role_data["indices"].append(required_index_settings)
 		async with self._elasticsearch_session() as session:
 			async with session.put(
@@ -404,69 +302,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			L.info("ElasticSearch role updated.", struct_data={"role": role_name})
 
 		return role_name
-
-
-	async def _add_kibana_space_privileges(self, tenant_id: str, space_id: str, privileges: str = "read"):
-		assert self.KibanaUrl is not None
-		assert privileges in {"read", "all"}
-		role_name = self._elastic_role_from_tenant(tenant_id, privileges)
-		required_space_settings = {
-			"spaces": [space_id],
-			"base": [privileges]
-		}
-
-		async with self._elasticsearch_session() as session:
-			async with session.get("{}/api/security/role/{}".format(self.KibanaUrl, role_name)) as resp:
-				if resp.status == 200:
-					role_data = await resp.json()
-				elif resp.status == 404:
-					role_data = None
-				else:
-					text = await resp.text()
-					L.error("Failed to get ElasticSearch role:\n{}".format(text[:1000]), struct_data={
-						"role": role_name})
-					return
-
-		# Check if space privileges are present in role settings
-		if role_data and role_data.get("kibana"):
-			for space_settings in role_data.get("kibana"):
-				for k, v in required_space_settings.items():
-					if v != space_settings.get(k):
-						break
-				else:
-					L.debug("ElasticSearch role space privileges up to date.", struct_data={"role": role_name})
-					return
-
-		# Update space privileges of the role
-		role = {
-			"elasticsearch": role_data.get("elasticsearch"),
-			"kibana": role_data.get("kibana", {}),
-			"metadata": role_data.get("metadata"),
-		}
-		role["kibana"].append(required_space_settings)
-		async with self._elasticsearch_session() as session:
-			async with session.put(
-				"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
-			) as resp:
-				if not (200 <= resp.status < 300):
-					text = await resp.text()
-					L.error("Failed to update ElasticSearch role {!r} with Kibana space privileges:\n{}".format(
-						role_name, text[:1000]))
-					return
-
-		L.info("Added Kibana space access to ElasticSearch role.", struct_data={
-			"role": role_name, "space": space_id})
-
-
-	async def _get_kibana_spaces(self):
-		async with self._elasticsearch_session() as session:
-			async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
-				if resp.status != 200:
-					text = await resp.text()
-					L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
-					return
-				spaces = await resp.json()
-		return spaces
 
 
 	async def initialize(self):
@@ -549,9 +384,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		# Tenant-scoped resources grant privileges for specific tenant spaces
 		for tenant_id, resources in authz.items():
 			if "elasticsearch:access" in resources or "kibana:access" in resources:
-				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "read"))
+				elk_roles.add(elastic_role_from_tenant(tenant_id, "read"))
 			if "elasticsearch:edit" in resources or "kibana:edit" in resources:
-				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "all"))
+				elk_roles.add(elastic_role_from_tenant(tenant_id, "all"))
 
 		# Globally authorized resources grant privileges across all Kibana spaces
 		global_authz = frozenset(authz.get("*", frozenset()))
@@ -584,19 +419,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 				)
 
 
-	def _elastic_role_from_tenant(self, tenant: str, privileges: str):
-		return "tenant_{}_{}".format(tenant, privileges)
-
-
-	def _kibana_space_id_from_tenant_id(self, tenant_id: str):
-		if tenant_id == "default":
-			# "default" is a reserved space name in Kibana
-			return "tenant-default"
-		# Replace forbidden characters with "--"
-		# NOTE: Tenant ID can contain "." while space ID can not
-		return re.sub("[^a-z0-9_-]", "--", tenant_id)
-
-
 	def _prepare_ignored_usernames(self):
 		"""
 		Load usernames that will not be synchronized to avoid conflicts with ELK system users
@@ -608,8 +430,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	def _prepare_session_headers(self, username, password, api_key):
-		headers = {"kbn-xsrf": "kibana"}
-
+		headers = {}
 		if username != "" and api_key != "":
 			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
 
@@ -619,6 +440,260 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			headers["Authorization"] = "ApiKey {}".format(api_key)
 
 		return headers
+
+
+class KibanaUtils(asab.config.Configurable):
+	"""
+	Utilities for synchronizing Kibana spaces with Seacat tenants
+	and adding Kibana space access to ElasticSearch roles
+	"""
+
+	def __init__(self, app, config_section_name="batman:elasticsearch", config=None):
+		super().__init__(config_section_name=config_section_name, config=config)
+
+		# ES connection parameters should be specified in a config section [elasticsearch]
+		if "elasticsearch" in asab.Config:
+			self.Config.update(asab.Config["elasticsearch"])
+
+		self.App = app
+		self.TenantService = self.App.get_service("seacatauth.TenantService")
+
+		self.KibanaUrl = self.Config.get("kibana_url").rstrip("/")
+		if len(self.KibanaUrl) == 0:
+			self.KibanaUrl = None
+
+		# Authorization: username + password or API-key
+		username = self.Config.get("username")
+		password = self.Config.get("password")
+		api_key = self.Config.get("api_key")
+
+		self.Headers = self._prepare_session_headers(username, password, api_key)
+
+
+	def is_enabled(self):
+		return self.KibanaUrl is not None
+
+
+	@contextlib.asynccontextmanager
+	async def _kibana_session(self):
+		async with aiohttp.TCPConnector(ssl=False) as connector:
+			async with aiohttp.ClientSession(connector=connector, headers=self.Headers) as session:
+				yield session
+
+
+	def _prepare_session_headers(self, username, password, api_key):
+		headers = {"kbn-xsrf": "kibana"}
+
+		if username and api_key:
+			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
+
+		if username != "":
+			headers["Authorization"] = aiohttp.BasicAuth(username, password).encode()
+		elif api_key != "":
+			headers["Authorization"] = "ApiKey {}".format(api_key)
+
+		return headers
+
+
+	def kibana_space_id_from_tenant_id(self, tenant_id: str):
+		if tenant_id == "default":
+			# "default" is a reserved space name in Kibana
+			return "tenant-default"
+		# Replace forbidden characters with "--"
+		return re.sub("[^a-z0-9_-]", "--", tenant_id)
+
+
+	async def create_or_update_kibana_space(self, tenant: str | dict, space_id: str = None):
+		"""
+		Create a Kibana space for specified tenant or update its metadata if necessary.
+		"""
+		assert self.is_enabled()
+
+		if isinstance(tenant, str):
+			tenant_id = tenant
+			tenant = await self.TenantService.get_tenant(tenant_id)
+		else:
+			tenant_id = tenant["_id"]
+
+		if not space_id:
+			space_id = self.kibana_space_id_from_tenant_id(tenant_id)
+
+		async with self._kibana_session() as session:
+			async with session.get("{}/api/spaces/space/{}".format(self.KibanaUrl, space_id)) as resp:
+				if resp.status == 404:
+					existing_space = None
+				elif resp.status == 200:
+					existing_space = await resp.json()
+				else:
+					text = await resp.text()
+					L.error(
+						"Failed to fetch Kibana tenant space (Server responded with {}):\n{}".format(
+							resp.status, text[:1000]),
+						struct_data={"space_id": space_id, "tenant_id": tenant_id}
+					)
+					return
+
+		space_update = {}
+		if existing_space:
+			name = tenant.get("label", tenant_id)
+			if existing_space.get("name") != name:
+				space_update["name"] = name
+			description = tenant.get("description")
+			if existing_space.get("description") != description:
+				space_update["description"] = description
+			if len(space_update) > 0:
+				space_update["id"] = space_id
+		else:
+			space_update = {
+				"id": space_id,
+				"name": tenant.get("label", tenant_id)
+			}
+			if "description" in tenant:
+				space_update["description"] = tenant["description"]
+
+		if not space_update:
+			# No changes
+			L.debug("Kibana space metadata up to date.", struct_data={
+				"space_id": space_id, "tenant_id": tenant_id})
+			return
+
+		elif existing_space:
+			# Update existing space
+			async with self._kibana_session() as session:
+				async with session.put(
+					"{}/api/spaces/space/{}".format(self.KibanaUrl, space_id), json=space_update
+				) as resp:
+					if not (200 <= resp.status < 300):
+						text = await resp.text()
+						L.error(
+							"Failed to update Kibana tenant space (Server responded with {}):\n{}".format(
+								resp.status, text[:1000]),
+							struct_data={"space_id": space_id, "tenant_id": tenant_id}
+						)
+			L.info("Kibana space updated", struct_data={"id": space_id, "tenant": tenant_id})
+			return
+
+		else:
+			# Create new space
+			async with self._kibana_session() as session:
+				async with session.post("{}/api/spaces/space".format(self.KibanaUrl), json=space_update) as resp:
+					if not (200 <= resp.status < 300):
+						text = await resp.text()
+						L.error(
+							"Failed to create Kibana tenant space (Server responded with {}):\n{}".format(
+								resp.status, text[:1000]),
+							struct_data={"space_id": space_id, "tenant_id": tenant_id}
+						)
+						return
+
+			L.info("Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
+
+
+	async def get_kibana_spaces(self):
+		assert self.is_enabled()
+
+		async with self._kibana_session() as session:
+			async with session.get("{}/api/spaces/space".format(self.KibanaUrl)) as resp:
+				if resp.status != 200:
+					text = await resp.text()
+					L.error("Failed to fetch Kibana spaces:\n{}".format(text[:1000]))
+					return
+				spaces = await resp.json()
+		return spaces
+
+
+	async def add_kibana_space_privileges(self, role_name: str, space_id: str, privileges: str = "read"):
+		"""
+		Update ElasticSearch role with Kibana space privileges
+		@param role_name: ElasticSearch role to be updated
+		@param space_id: Kibana space to be accessed
+		@param privileges: "read" for read-only access or "all" for read-write access
+		@return:
+		"""
+		assert self.is_enabled()
+		assert privileges in {"read", "all"}
+
+		required_space_settings = {
+			"spaces": [space_id],
+			"base": [privileges]
+		}
+
+		async with self._kibana_session() as session:
+			async with session.get("{}/api/security/role/{}".format(self.KibanaUrl, role_name)) as resp:
+				if resp.status == 200:
+					role_data = await resp.json()
+				elif resp.status == 404:
+					role_data = None
+				else:
+					text = await resp.text()
+					L.error("Failed to get ElasticSearch role:\n{}".format(text[:1000]), struct_data={
+						"role": role_name})
+					return
+
+		# Check if space privileges are present in role settings
+		if role_data and role_data.get("kibana"):
+			for space_settings in role_data.get("kibana"):
+				for k, v in required_space_settings.items():
+					if v != space_settings.get(k):
+						break
+				else:
+					L.debug("ElasticSearch role space privileges up to date.", struct_data={"role": role_name})
+					return
+
+		# Update space privileges of the role
+		if not role_data:
+			role_data = {}
+		if not role_data.get("kibana"):
+			role_data["kibana"] = []
+		role = {
+			"elasticsearch": role_data.get("elasticsearch"),
+			"kibana": role_data.get("kibana", {}),
+			"metadata": role_data.get("metadata"),
+		}
+		role["kibana"].append(required_space_settings)
+		async with self._kibana_session() as session:
+			async with session.put(
+				"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
+			) as resp:
+				if not (200 <= resp.status < 300):
+					text = await resp.text()
+					L.error("Failed to update ElasticSearch role {!r} with Kibana space privileges:\n{}".format(
+						role_name, text[:1000]))
+					return
+
+		L.info("Added Kibana space access to ElasticSearch role.", struct_data={
+			"role": role_name, "space": space_id})
+
+
+	async def sync_space(self, tenant):
+		"""
+		Sync Kibana space with Seacat tenant, add Kibana space access to ElasticSearch roles
+		"""
+		assert self.is_enabled()
+
+		if isinstance(tenant, str):
+			tenant_id = tenant
+			tenant = await self.TenantService.get_tenant(tenant_id)
+		else:
+			tenant_id = tenant["_id"]
+
+		try:
+			# Update Kibana space and add space privileges to roles
+			space_id = self.kibana_space_id_from_tenant_id(tenant_id)
+			await self.create_or_update_kibana_space(tenant, space_id)
+			for privileges in {"read", "all"}:
+				role_name = elastic_role_from_tenant(tenant_id, privileges)
+				await self.add_kibana_space_privileges(role_name, space_id, privileges)
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to Kibana: {}".format(str(e)))
+			return
+
+
+	async def sync_all_spaces(self):
+		assert self.is_enabled()
+
+		async for tenant in self.TenantService.iterate():
+			await self.sync_space(tenant)
 
 
 def getmultiline(url_string):
@@ -665,3 +740,8 @@ def section_has_ssl_option(config_section_name):
 		if item in asab.tls.SSLContextBuilder.ConfigDefaults:
 			return True
 	return False
+
+
+def elastic_role_from_tenant(tenant: str, privileges: str):
+	assert privileges in {"read", "all"}
+	return "tenant_{}_{}".format(tenant, privileges)
