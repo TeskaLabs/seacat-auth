@@ -23,5 +23,5 @@ class NameProposerService(asab.Service):
 	def propose_name(self):
 		adjective = random.choice(ADJECTIVES)
 		animal = random.choice(ANIMALS)
-		tenant_name = "{}-{}".format(adjective, animal).lower()
+		tenant_name = "{}{}".format(adjective, animal).lower()
 		return tenant_name
