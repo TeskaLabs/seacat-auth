@@ -21,12 +21,6 @@ L = logging.getLogger(__name__)
 #
 
 
-# TODO: When credentials are added/updated/deleted, the sync should happen
-#       That's to be done using PubSub mechanism
-
-# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
-
-
 class ElasticSearchIntegration(asab.config.Configurable):
 	"""
 	ElasticSearch / Kibana authorization and user data synchronization
@@ -59,14 +53,20 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		"tenant_indices": "tenant-{tenant}-*",
 	}
 
-	EssentialKibanaResources = {
-		"kibana:access": {
+	EssentialElasticsearchResources = {
+		"elasticsearch:access": {
+			"description":
+				"Read-only access to tenant indices in ElasticSearch and tenant space in Kibana."},
+		"elasticsearch:edit": {
+			"description":
+				"Read-write access to tenant indices in ElasticSearch and tenant space in Kibana."},
+		"kibana:access": {  # TODO: OBSOLETE; use "elasticsearch:access"
 			"description":
 				"Read-only access to tenant space in Kibana."},
-		"kibana:edit": {
+		"kibana:edit": {  # TODO: OBSOLETE; use "elasticsearch:edit"
 			"description":
 				"Read-write access to tenant space in Kibana."},
-		"kibana:admin": {
+		"kibana:admin": {  # TODO: OBSOLETE; superuser role is enough
 			"role_name": "kibana_admin",
 			"description":
 				"Grants access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
@@ -478,7 +478,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		Create Seacat Auth resources that grant access to ElasticSearch roles
 		"""
 		# Create core resources that don't exist yet
-		for resource_id, resource in self.EssentialKibanaResources.items():
+		for resource_id, resource in self.EssentialElasticsearchResources.items():
 			try:
 				await self.ResourceService.get(resource_id)
 			except KeyError:
@@ -488,6 +488,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 				)
 
 	async def sync_all_credentials(self):
+		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
 		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
 		elk_resources = set(
 			resource["_id"]
@@ -547,17 +548,17 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		# Tenant-scoped resources grant privileges for specific tenant spaces
 		for tenant_id, resources in authz.items():
-			if "kibana:access" in resources:
+			if "elasticsearch:access" in resources or "kibana:access" in resources:
 				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "read"))
-			if "kibana:edit" in resources:
+			if "elasticsearch:edit" in resources or "kibana:edit" in resources:
 				elk_roles.add(self._elastic_role_from_tenant(tenant_id, "all"))
 
 		# Globally authorized resources grant privileges across all Kibana spaces
 		global_authz = frozenset(authz.get("*", frozenset()))
 		if "authz:superuser" in global_authz:
-			elk_roles.add(self.EssentialKibanaResources["authz:superuser"]["role_name"])
+			elk_roles.add(self.EssentialElasticsearchResources["authz:superuser"]["role_name"])
 		if "kibana:admin" in global_authz:
-			elk_roles.add(self.EssentialKibanaResources["kibana:admin"]["role_name"])
+			elk_roles.add(self.EssentialElasticsearchResources["kibana:admin"]["role_name"])
 
 		# BACK COMPAT
 		# Map globally authorized Seacat resources prefixed with "elk:" to Elastic roles
