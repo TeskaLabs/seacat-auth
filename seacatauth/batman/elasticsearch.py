@@ -51,22 +51,22 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		# What indices can be accessed by tenant members. Space-separated. Can use {tenant} variable.
 		"tenant_indices": "tenant-{tenant}-*",
+
+		# IDs of Elasticsearch and Kibana resources
+		"kibana_read_resource_id": "tools:kibana:read",  # Read-only access to tenant space in Kibana
+		"kibana_all_resource_id": "tools:kibana:all",  # Read-write access to tenant space in Kibana
+		"kibana_admin_resource_id": "tools:kibana:admin",  # Admin access to all of Kibana
+		"elasticsearch_superuser_resource_id": "authz:superuser",  # Superuser access to the entire Elasticsearch cluster
 	}
 
 	EssentialElasticsearchResources = {
-		"elasticsearch:access": {
-			"description":
-				"Read-only access to tenant indices in ElasticSearch and tenant space in Kibana."},
-		"elasticsearch:edit": {
-			"description":
-				"Read-write access to tenant indices in ElasticSearch and tenant space in Kibana."},
-		"kibana:access": {  # TODO: OBSOLETE; use "elasticsearch:access"
+		"kibana:read": {
 			"description":
 				"Read-only access to tenant space in Kibana."},
-		"kibana:edit": {  # TODO: OBSOLETE; use "elasticsearch:edit"
+		"kibana:all": {
 			"description":
 				"Read-write access to tenant space in Kibana."},
-		"kibana:admin": {  # TODO: OBSOLETE; superuser role is enough
+		"kibana:admin": {
 			"role_name": "kibana_admin",
 			"description":
 				"Grants access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
@@ -77,6 +77,12 @@ class ElasticSearchIntegration(asab.config.Configurable):
 				"Grants full access to cluster management and data indices. This role also grants direct read-only "
 				"access to restricted indices like .security. A user with the superuser role can impersonate "
 				"any other user in the system."},
+		"kibana:access": {  # TODO: OBSOLETE; use "kibana:read"
+			"description":
+				"Read-only access to tenant space in Kibana."},
+		"kibana:edit": {  # TODO: OBSOLETE; use "kibana:all"
+			"description":
+				"Read-write access to tenant space in Kibana."},
 	}
 
 
@@ -109,9 +115,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.Headers = self._prepare_session_headers(username, password, api_key)
 
 		self.TenantIndices = re.split(r"\s+", self.Config.get("tenant_indices"))
-		self.ResourcePrefix = "kibana:"
-		self.DeprecatedResourcePrefix = "elk:"
-		self.DeprecatedResourceRegex = re.compile("^elk:")
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
@@ -324,29 +327,20 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 	async def sync_all_credentials(self):
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
-		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
-		elk_resources = set(
-			resource["_id"]
-			for resource in elk_resources["data"]
-		)
 		async with self._elasticsearch_session() as session:
 			async for cred in self.CredentialsService.iterate():
-				await self._sync_credentials(session, cred, elk_resources)
+				await self._sync_credentials(session, cred)
 
 
 	async def sync_credentials(self, credentials_id: str):
-		elk_resources = await self.ResourceService.list(query_filter={"_id": self.DeprecatedResourceRegex})
-		elk_resources = set(
-			resource["_id"]
-			for resource in elk_resources["data"]
-		)
+
 		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
 		credentials = await cred_svc.get(credentials_id)
 		async with self._elasticsearch_session() as session:
-			await self._sync_credentials(session, credentials, elk_resources)
+			await self._sync_credentials(session, credentials)
 
 
-	async def _sync_credentials(self, session: aiohttp.ClientSession, cred: dict, elk_resources: typing.Iterable):
+	async def _sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
@@ -394,13 +388,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			elk_roles.add(self.EssentialElasticsearchResources["authz:superuser"]["role_name"])
 		if "kibana:admin" in global_authz:
 			elk_roles.add(self.EssentialElasticsearchResources["kibana:admin"]["role_name"])
-
-		# BACK COMPAT
-		# Map globally authorized Seacat resources prefixed with "elk:" to Elastic roles
-		elk_roles.update(
-			resource[len(self.DeprecatedResourcePrefix):]
-			for resource in global_authz.intersection(elk_resources)
-		)
 
 		elastic_user["roles"] = list(elk_roles)
 
