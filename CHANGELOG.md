@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-beta`
 - `v24.06-alpha6`
 - `v24.06-alpha5`
 - `v24.06-alpha4`
