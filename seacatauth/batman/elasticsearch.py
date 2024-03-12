@@ -413,7 +413,7 @@ class KibanaUtils(asab.config.Configurable):
 	ConfigDefaults = {
 		# Enables automatic synchronization of Kibana spaces with Seacat tenants
 		# Space sync is disabled if kibana_url is empty.
-		"kibana_url": "http://localhost:5601",
+		"kibana_url": "",
 
 		# IDs of Kibana resources
 		"kibana_read_resource_id": "tools:kibana:read",  # Read-only access to tenant space in Kibana
