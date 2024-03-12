@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha7`
 - `v24.06-beta`
 - `v24.06-alpha6`
 - `v24.06-alpha5`
@@ -20,6 +21,7 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 - New paths for account management endpoints (#343, `v24.06-alpha3`)
 - Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
