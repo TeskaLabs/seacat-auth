@@ -3,7 +3,6 @@ import datetime
 import re
 import ssl
 import logging
-import typing
 import aiohttp
 import aiohttp.client_exceptions
 import urllib.parse
