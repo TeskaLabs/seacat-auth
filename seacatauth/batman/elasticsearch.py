@@ -29,10 +29,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 	ConfigDefaults = {
 		"url": "",
 
-		# Enables automatic synchronization of Kibana spaces with Seacat tenants
-		# Space sync is disabled if kibana_url is empty.
-		"kibana_url": "http://localhost:5601",
-
 		# Basic credentials / API key (mutually exclusive)
 		"username": "",
 		"password": "",
@@ -52,37 +48,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		# What indices can be accessed by tenant members. Space-separated. Can use {tenant} variable.
 		"tenant_indices": "tenant-{tenant}-*",
 
-		# IDs of Elasticsearch and Kibana resources
-		"kibana_read_resource_id": "tools:kibana:read",  # Read-only access to tenant space in Kibana
-		"kibana_all_resource_id": "tools:kibana:all",  # Read-write access to tenant space in Kibana
-		"kibana_admin_resource_id": "tools:kibana:admin",  # Admin access to all of Kibana
+		# IDs of Elasticsearch resources
 		"elasticsearch_superuser_resource_id": "authz:superuser",  # Superuser access to the entire Elasticsearch cluster
-	}
-
-	EssentialElasticsearchResources = {
-		"kibana:read": {
-			"description":
-				"Read-only access to tenant space in Kibana."},
-		"kibana:all": {
-			"description":
-				"Read-write access to tenant space in Kibana."},
-		"kibana:admin": {
-			"role_name": "kibana_admin",
-			"description":
-				"Grants access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
-				"role in ElasticSearch documentation."},
-		"authz:superuser": {
-			"role_name": "superuser",
-			"description":
-				"Grants full access to cluster management and data indices. This role also grants direct read-only "
-				"access to restricted indices like .security. A user with the superuser role can impersonate "
-				"any other user in the system."},
-		"kibana:access": {  # TODO: OBSOLETE; use "kibana:read"
-			"description":
-				"Read-only access to tenant space in Kibana."},
-		"kibana:edit": {  # TODO: OBSOLETE; use "kibana:all"
-			"description":
-				"Read-write access to tenant space in Kibana."},
 	}
 
 
@@ -115,6 +82,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.Headers = self._prepare_session_headers(username, password, api_key)
 
 		self.TenantIndices = re.split(r"\s+", self.Config.get("tenant_indices"))
+		self.ElasticsearchSuperuserResourceId = self.Config.get("elasticsearch_superuser_resource_id")
+
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
 
@@ -154,41 +123,41 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		await self._initialize_resources()
 		# Ensure sync on startup even if housekeeping does not happen; prevent syncing twice
 		if not asab.Config.getboolean("housekeeping", "run_at_startup"):
-			try:
-				await self._sync_all_roles_and_spaces()
-			except aiohttp.client_exceptions.ClientConnectionError as e:
-				L.error("Cannot connect to Kibana: {}".format(str(e)))
-				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
-				return
-			try:
-				await self.sync_all_credentials()
-			except aiohttp.client_exceptions.ClientConnectionError as e:
-				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
-				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
-				return
+			await self.full_sync()
 
 
 	async def _on_housekeeping(self, event_name):
-		try:
-			await self._sync_all_roles_and_spaces()
-		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to Kibana: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
-			return
-		try:
-			await self.sync_all_credentials()
-		except aiohttp.client_exceptions.ClientConnectionError as e:
-			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
-			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
-			return
+		await self.full_sync()
 
 
 	async def _retry_sync(self, event_name):
 		if not self.RetrySyncAll or datetime.datetime.now(datetime.UTC) < self.RetrySyncAll:
 			return
 		self.RetrySyncAll = None
-		await self._sync_all_roles_and_spaces()
-		await self.sync_all_credentials()
+		await self.full_sync()
+
+
+	async def full_sync(self):
+		self.RetrySyncAll = None
+		try:
+			await self._sync_all_index_access_roles()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+			return
+		if self.Kibana.is_enabled():
+			try:
+				await self.Kibana.sync_all_spaces_and_roles()
+			except aiohttp.client_exceptions.ClientConnectionError as e:
+				L.error("Cannot connect to Kibana: {}".format(str(e)))
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+				return
+		try:
+			await self.sync_all_credentials()
+		except aiohttp.client_exceptions.ClientConnectionError as e:
+			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+			return
 
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
@@ -205,48 +174,42 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 	async def _on_tenant_created(self, event_name, tenant_id):
 		try:
-			for privileges in {"read", "all"}:
-				await self._create_or_update_elasticsearch_role(tenant_id, privileges)
+			await self._upsert_role_for_index_access(tenant_id, "read")
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 		if self.Kibana.is_enabled():
-			await self.Kibana.sync_space(tenant_id)
+			await self.Kibana.sync_space_and_roles(tenant_id)
 
 
 	async def _on_tenant_updated(self, event_name, tenant_id):
 		try:
-			for privileges in {"read", "all"}:
-				await self._create_or_update_elasticsearch_role(tenant_id, privileges)
+			await self._upsert_role_for_index_access(tenant_id, "read")
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
 		if self.Kibana.is_enabled():
-			await self.Kibana.sync_space(tenant_id)
+			await self.Kibana.sync_space_and_roles(tenant_id)
 
 
-	async def _sync_all_roles_and_spaces(self):
+	async def _sync_all_index_access_roles(self):
 		try:
 			async for tenant in self.TenantService.iterate():
-				# Update Elasticsearch roles with index privileges
-				for privileges in {"read", "all"}:
-					await self._create_or_update_elasticsearch_role(tenant["_id"], privileges)
+				# Update Elasticsearch roles with index access privileges
+				await self._upsert_role_for_index_access(tenant["_id"], "read")
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
 
-		if self.Kibana.is_enabled():
-			await self.Kibana.sync_all_spaces()
 
-
-	async def _create_or_update_elasticsearch_role(self, tenant_id: str, privileges: str = "read"):
+	async def _upsert_role_for_index_access(self, tenant_id: str, privileges: str = "read"):
 		assert privileges in {"read", "all"}
-		role_name = elastic_role_from_tenant(tenant_id, privileges)
+		role_name = get_index_access_role_name(tenant_id, privileges)
 		required_index_settings = {
 			"names": [
 				index.format(tenant=tenant_id)
@@ -313,16 +276,25 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 	async def _initialize_resources(self):
 		"""
-		Create Seacat Auth resources that grant access to ElasticSearch roles
+		Create Seacat Auth resources that are mapped to ElasticSearch and Kibana roles
 		"""
-		# Create core resources that don't exist yet
-		for resource_id, resource in self.EssentialElasticsearchResources.items():
+		resources = {
+			self.ElasticsearchSuperuserResourceId:
+				"Grants full access to cluster management and data indices. This role also grants direct read-only "
+				"access to restricted indices like .security. A user with the superuser role can impersonate "
+				"any other user in the system."
+		}
+		if self.Kibana.is_enabled():
+			resources.update(self.Kibana.get_kibana_resources())
+
+		# Initialize resources that are not initialized yet
+		for resource_id, description in resources.items():
 			try:
 				await self.ResourceService.get(resource_id)
 			except KeyError:
 				await self.ResourceService.create(
 					resource_id,
-					description=resource.get("description")
+					description=description
 				)
 
 	async def sync_all_credentials(self):
@@ -333,7 +305,11 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def sync_credentials(self, credentials_id: str):
-
+		"""
+		Create or update ElasticSearch user from Seacat Auth credentials, synchronize their roles and tenant access.
+		@param credentials_id:
+		@return:
+		"""
 		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
 		credentials = await cred_svc.get(credentials_id)
 		async with self._elasticsearch_session() as session:
@@ -375,19 +351,18 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		authz = await build_credentials_authz(
 			self.TenantService, self.RoleService, cred["_id"], tenants=assigned_tenants)
 
-		# Tenant-scoped resources grant privileges for specific tenant spaces
-		for tenant_id, resources in authz.items():
-			if "elasticsearch:access" in resources or "kibana:access" in resources:
-				elk_roles.add(elastic_role_from_tenant(tenant_id, "read"))
-			if "elasticsearch:edit" in resources or "kibana:edit" in resources:
-				elk_roles.add(elastic_role_from_tenant(tenant_id, "all"))
+		# Tenant membership grants read access to tenant indices
+		for tenant_id, authorized_resources in authz.items():
+			if tenant_id == "*":
+				# Seacat superuser is mapped to Elasticsearch "superuser" role
+				if "authz:superuser" in authorized_resources:
+					elk_roles.add("superuser")
+				continue
+			elk_roles.add(get_index_access_role_name(tenant_id, "read"))
 
-		# Globally authorized resources grant privileges across all Kibana spaces
-		global_authz = frozenset(authz.get("*", frozenset()))
-		if "authz:superuser" in global_authz:
-			elk_roles.add(self.EssentialElasticsearchResources["authz:superuser"]["role_name"])
-		if "kibana:admin" in global_authz:
-			elk_roles.add(self.EssentialElasticsearchResources["kibana:admin"]["role_name"])
+		# Add roles with Kibana space privileges
+		if self.Kibana.is_enabled():
+			elk_roles.update(self.Kibana.get_kibana_roles_by_authz(authz))
 
 		elastic_user["roles"] = list(elk_roles)
 
@@ -435,6 +410,17 @@ class KibanaUtils(asab.config.Configurable):
 	and adding Kibana space access to ElasticSearch roles
 	"""
 
+	ConfigDefaults = {
+		# Enables automatic synchronization of Kibana spaces with Seacat tenants
+		# Space sync is disabled if kibana_url is empty.
+		"kibana_url": "http://localhost:5601",
+
+		# IDs of Kibana resources
+		"kibana_read_resource_id": "tools:kibana:read",  # Read-only access to tenant space in Kibana
+		"kibana_all_resource_id": "tools:kibana:all",  # Read-write access to tenant space in Kibana
+		"kibana_admin_resource_id": "tools:kibana:admin",  # Admin access to all of Kibana
+	}
+
 	def __init__(self, app, config_section_name="batman:elasticsearch", config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
 
@@ -456,9 +442,39 @@ class KibanaUtils(asab.config.Configurable):
 
 		self.Headers = self._prepare_session_headers(username, password, api_key)
 
+		self.ReadResourceId = self.Config.get("kibana_read_resource_id")
+		self.AllResourceId = self.Config.get("kibana_all_resource_id")
+		self.AdminResourceId = self.Config.get("kibana_admin_resource_id")
+
 
 	def is_enabled(self):
 		return self.KibanaUrl is not None
+
+
+	def get_kibana_resources(self):
+		return {
+			self.ReadResourceId:
+				"Read-only access to tenant space in Kibana",
+			self.AllResourceId:
+				"Read-write access to tenant space in Kibana",
+			self.AdminResourceId:
+				"Access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
+				"role in ElasticSearch documentation.",
+		}
+
+
+	def get_kibana_roles_by_authz(self, authz: dict):
+		roles = set()
+		for tenant_id, authorized_resources in authz.items():
+			if tenant_id == "*":
+				if self.AdminResourceId in authorized_resources:
+					roles.add("kibana_admin")
+				continue
+			if self.ReadResourceId in authorized_resources:
+				roles.add(get_space_access_role_name(tenant_id, "read"))
+			if self.AllResourceId in authorized_resources:
+				roles.add(get_space_access_role_name(tenant_id, "all"))
+		return roles
 
 
 	@contextlib.asynccontextmanager
@@ -482,7 +498,7 @@ class KibanaUtils(asab.config.Configurable):
 		return headers
 
 
-	def kibana_space_id_from_tenant_id(self, tenant_id: str):
+	def space_id_from_tenant_id(self, tenant_id: str):
 		if tenant_id == "default":
 			# "default" is a reserved space name in Kibana
 			return "tenant-default"
@@ -490,7 +506,7 @@ class KibanaUtils(asab.config.Configurable):
 		return re.sub("[^a-z0-9_-]", "--", tenant_id)
 
 
-	async def create_or_update_kibana_space(self, tenant: str | dict, space_id: str = None):
+	async def upsert_kibana_space(self, tenant: str | dict):
 		"""
 		Create a Kibana space for specified tenant or update its metadata if necessary.
 		"""
@@ -502,8 +518,7 @@ class KibanaUtils(asab.config.Configurable):
 		else:
 			tenant_id = tenant["_id"]
 
-		if not space_id:
-			space_id = self.kibana_space_id_from_tenant_id(tenant_id)
+		space_id = self.space_id_from_tenant_id(tenant_id)
 
 		async with self._kibana_session() as session:
 			async with session.get("{}/api/spaces/space/{}".format(self.KibanaUrl, space_id)) as resp:
@@ -589,17 +604,18 @@ class KibanaUtils(asab.config.Configurable):
 		return spaces
 
 
-	async def add_kibana_space_privileges(self, role_name: str, space_id: str, privileges: str = "read"):
+	async def upsert_role_for_space_access(self, tenant_id: str, privileges: str = "read"):
 		"""
-		Update ElasticSearch role with Kibana space privileges
-		@param role_name: ElasticSearch role to be updated
-		@param space_id: Kibana space to be accessed
+		Create or update a Kibana role with Kibana space privileges
+		@param tenant_id: Tenant whose Kibana space is to be accessed
 		@param privileges: "read" for read-only access or "all" for read-write access
 		@return:
 		"""
 		assert self.is_enabled()
 		assert privileges in {"read", "all"}
 
+		space_id = self.space_id_from_tenant_id(tenant_id)
+		role_name = get_space_access_role_name(tenant_id, privileges)
 		required_space_settings = {
 			"spaces": [space_id],
 			"base": [privileges]
@@ -633,9 +649,9 @@ class KibanaUtils(asab.config.Configurable):
 		if not role_data.get("kibana"):
 			role_data["kibana"] = []
 		role = {
-			"elasticsearch": role_data.get("elasticsearch"),
-			"kibana": role_data.get("kibana", {}),
-			"metadata": role_data.get("metadata"),
+			"elasticsearch": role_data.get("elasticsearch", {}),
+			"kibana": role_data.get("kibana"),
+			"metadata": role_data.get("metadata", {}),
 		}
 		role["kibana"].append(required_space_settings)
 		async with self._kibana_session() as session:
@@ -644,15 +660,15 @@ class KibanaUtils(asab.config.Configurable):
 			) as resp:
 				if not (200 <= resp.status < 300):
 					text = await resp.text()
-					L.error("Failed to update ElasticSearch role {!r} with Kibana space privileges:\n{}".format(
+					L.error("Failed to update role {!r} with Kibana space access privileges:\n{}".format(
 						role_name, text[:1000]))
 					return
 
-		L.info("Added Kibana space access to ElasticSearch role.", struct_data={
+		L.info("Added space access privileges to Kibana role.", struct_data={
 			"role": role_name, "space": space_id})
 
 
-	async def sync_space(self, tenant):
+	async def sync_space_and_roles(self, tenant: str | dict):
 		"""
 		Sync Kibana space with Seacat tenant, add Kibana space access to ElasticSearch roles
 		"""
@@ -665,22 +681,20 @@ class KibanaUtils(asab.config.Configurable):
 			tenant_id = tenant["_id"]
 
 		try:
-			# Update Kibana space and add space privileges to roles
-			space_id = self.kibana_space_id_from_tenant_id(tenant_id)
-			await self.create_or_update_kibana_space(tenant, space_id)
+			# Update Kibana space and add space access privileges to roles
+			await self.upsert_kibana_space(tenant)
 			for privileges in {"read", "all"}:
-				role_name = elastic_role_from_tenant(tenant_id, privileges)
-				await self.add_kibana_space_privileges(role_name, space_id, privileges)
+				await self.upsert_role_for_space_access(tenant_id, privileges)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to Kibana: {}".format(str(e)))
 			return
 
 
-	async def sync_all_spaces(self):
+	async def sync_all_spaces_and_roles(self):
 		assert self.is_enabled()
 
 		async for tenant in self.TenantService.iterate():
-			await self.sync_space(tenant)
+			await self.sync_space_and_roles(tenant)
 
 
 def getmultiline(url_string):
@@ -729,6 +743,11 @@ def section_has_ssl_option(config_section_name):
 	return False
 
 
-def elastic_role_from_tenant(tenant: str, privileges: str):
+def get_index_access_role_name(tenant: str, privileges: str):
 	assert privileges in {"read", "all"}
 	return "tenant_{}_{}".format(tenant, privileges)
+
+
+def get_space_access_role_name(tenant: str, privileges: str):
+	assert privileges in {"read", "all"}
+	return "space_{}_{}".format(tenant, privileges)
