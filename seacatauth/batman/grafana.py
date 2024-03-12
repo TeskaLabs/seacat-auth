@@ -77,14 +77,16 @@ class GrafanaIntegration(asab.config.Configurable):
 		except KeyError:
 			await self.ResourceService.create(
 				_GRAFANA_ADMIN_RESOURCE,
-				description="Grants admin access to Grafana."
+				description="Grants admin access to Grafana.",
+				is_managed_by_seacat_auth=True,
 			)
 		try:
 			await self.ResourceService.get(_GRAFANA_USER_RESOURCE)
 		except KeyError:
 			await self.ResourceService.create(
 				_GRAFANA_USER_RESOURCE,
-				description="Grants user access to Grafana."
+				description="Grants user access to Grafana.",
+				is_managed_by_seacat_auth=True,
 			)
 
 	async def initialize(self):

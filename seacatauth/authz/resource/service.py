@@ -99,8 +99,9 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
-	def is_builtin_resource(self, resource_id):
-		return resource_id in self._BuiltinResources
+	def is_editable_resource(self, resource_id):
+		# TODO: Check the `managed_by` flag
+		return resource_id not in self._BuiltinResources
 
 
 	def is_global_only_resource(self, resource_id):
@@ -119,7 +120,7 @@ class ResourceService(asab.Service):
 			try:
 				db_resource = await self.get(resource_id)
 			except KeyError:
-				await self.create(resource_id, description)
+				await self.create(resource_id, description, is_managed_by_seacat_auth=True)
 				continue
 
 			# Update resource description
@@ -142,7 +143,7 @@ class ResourceService(asab.Service):
 		resources = []
 		count = await collection.count_documents(query_filter)
 		async for resource_dict in cursor:
-			if self.is_builtin_resource(resource_dict["_id"]):
+			if self.is_editable_resource(resource_dict["_id"]):
 				resource_dict["editable"] = False
 			if self.is_global_only_resource(resource_dict["_id"]):
 				resource_dict["global_only"] = True
@@ -156,14 +157,14 @@ class ResourceService(asab.Service):
 
 	async def get(self, resource_id: str):
 		data = await self.StorageService.get(self.ResourceCollection, resource_id)
-		if self.is_builtin_resource(data["_id"]):
+		if self.is_editable_resource(data["_id"]):
 			data["editable"] = False
 		if self.is_global_only_resource(data["_id"]):
 			data["global_only"] = True
 		return data
 
 
-	async def create(self, resource_id: str, description: str = None):
+	async def create(self, resource_id: str, description: str = None, is_managed_by_seacat_auth=False):
 		if self.ResourceIdRegex.match(resource_id) is None:
 			raise asab.exceptions.ValidationError(
 				"Resource ID must consist only of characters 'a-z0-9.:_-', "
@@ -173,6 +174,9 @@ class ResourceService(asab.Service):
 
 		if description is not None:
 			upsertor.set("description", description)
+
+		if is_managed_by_seacat_auth:
+			upsertor.set("managed_by", "seacat-auth")
 
 		try:
 			await upsertor.execute(event_type=EventTypes.RESOURCE_CREATED)
@@ -204,13 +208,13 @@ class ResourceService(asab.Service):
 
 
 	async def update(self, resource_id: str, description: str):
-		if self.is_builtin_resource(resource_id):
+		if self.is_editable_resource(resource_id):
 			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
 		await self._update(resource_id, description)
 
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
-		if self.is_builtin_resource(resource_id):
+		if self.is_editable_resource(resource_id):
 			raise asab.exceptions.ValidationError("Built-in resource cannot be deleted")
 
 		resource = await self.get(resource_id)
@@ -266,7 +270,7 @@ class ResourceService(asab.Service):
 		Shortcut for creating a new resource with the desired name,
 		assigning it to roles that have the original resource and deleting the original resource
 		"""
-		if self.is_builtin_resource(resource_id):
+		if self.is_editable_resource(resource_id):
 			raise asab.exceptions.ValidationError("Built-in resource cannot be renamed")
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
