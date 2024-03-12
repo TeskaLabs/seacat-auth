@@ -741,7 +741,7 @@ def section_has_ssl_option(config_section_name):
 
 def get_index_access_role_name(tenant: str, privileges: str):
 	assert privileges in {"read", "all"}
-	return "tenant_{}_{}".format(tenant, privileges)
+	return "index_{}_{}".format(tenant, privileges)
 
 
 def get_space_access_role_name(tenant: str, privileges: str):
