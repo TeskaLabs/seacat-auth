@@ -68,8 +68,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		self.Kibana = KibanaUtils(self.App, config_section_name, config)
 
-		self.ElasticSearchUrl = self.Config.get("url")
-		self.ElasticSearchNodesUrls = get_url_list(self.ElasticSearchUrl)
+		elasticsearch_url = self.Config.get("url")
+		self.ElasticSearchNodesUrls = get_url_list(elasticsearch_url)
 		if len(self.ElasticSearchNodesUrls) == 0:
 			raise ValueError("No ElasticSearch URL has been provided")
 
@@ -218,7 +218,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		}
 
 		async with self._elasticsearch_session() as session:
-			async with session.get("{}_security/role/{}".format(self.ElasticSearchUrl, role_name)) as resp:
+			async with session.get("{}_security/role/{}".format(random.choice(self.ElasticSearchNodesUrls), role_name)) as resp:
 				if resp.status == 200:
 					role_data = (await resp.json()).get(role_name)
 				elif resp.status == 404:
@@ -249,7 +249,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		role_data["indices"].append(required_index_settings)
 		async with self._elasticsearch_session() as session:
 			async with session.put(
-				"{}_security/role/{}".format(self.ElasticSearchUrl, role_name), json=role_data
+				"{}_security/role/{}".format(random.choice(self.ElasticSearchNodesUrls), role_name), json=role_data
 			) as resp:
 				if not (200 <= resp.status < 300):
 					text = await resp.text()
