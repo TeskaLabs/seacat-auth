@@ -294,7 +294,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			except KeyError:
 				await self.ResourceService.create(
 					resource_id,
-					description=description
+					description=description,
+					is_managed_by_seacat_auth=True,
 				)
 
 	async def sync_all_credentials(self):
