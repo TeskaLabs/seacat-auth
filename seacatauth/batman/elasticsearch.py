@@ -242,11 +242,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 					return
 
 		# Add access to elasticsearch indices
-		if not role_data:
-			role_data = {}
-		if not role_data.get("indices"):
-			role_data["indices"] = []
-		role_data["indices"].append(required_index_settings)
+		role_data = {"indices": [required_index_settings]}
 		async with self._elasticsearch_session() as session:
 			async with session.put(
 				"{}_security/role/{}".format(random.choice(self.ElasticSearchNodesUrls), role_name), json=role_data
