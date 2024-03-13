@@ -28,7 +28,14 @@ L = logging.getLogger(__name__)
 
 asab.Config.add_defaults({
 	"seacatauth:webauthn": {
-		"attestation": "direct"
+		"attestation": "direct",
+
+		# Authenticator metadata source file, for details see https://fidoalliance.org/metadata
+		# Possible values:
+		#   - HTTPS or HTTP address of a JWT MDS file (defaults to "https://mds3.fidoalliance.org")
+		#   - Relative or absolute path of a JWT MDS file
+		#   - Empty value or "DISABLED" (disables the metadata service)
+		"metadata_service_url": "https://mds3.fidoalliance.org",
 	}
 })
 
@@ -37,7 +44,6 @@ class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
 	FidoMetadataServiceCollection = "fms"
-	FidoMetadataServiceUrl = "https://mds3.fidoalliance.org"
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
@@ -69,31 +75,43 @@ class WebAuthnService(asab.Service):
 			webauthn.helpers.structs.COSEAlgorithmIdentifier(-7)  # Es256
 		]
 
+		self.FidoMetadataServiceUrl = asab.Config.get("seacatauth:webauthn", "metadata_service_url")
+		if self.FidoMetadataServiceUrl in ("", "DISABLED"):
+			self.FidoMetadataServiceUrl = None
 		self._FidoMetadataByAAGUID: typing.Dict[int, dict] | None = None
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
 	async def initialize(self, app):
-		await self._load_fido_metadata()
+		try:
+			await self._load_fido_metadata()
+		except Exception as e:
+			L.exception("Failed to fetch FIDO Alliance Metadata ({}: {})".format(e.__class__.__name__, e))
 
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
-		await self._load_fido_metadata(only_if_empty=False)
+		try:
+			await self._load_fido_metadata(force_reload=True)
+		except Exception as e:
+			L.info("Failed to fetch FIDO Alliance Metadata: {}".format(e))
 
 
-	async def _load_fido_metadata(self, only_if_empty=True):
+	async def _load_fido_metadata(self, *, force_reload: bool = False):
 		"""
 		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
 		"""
-		if only_if_empty:
+		if not self.FidoMetadataServiceUrl:
+			return
+
+		if not force_reload:
 			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
 			count = await coll.estimated_document_count()
 			if count > 0:
 				return
 
-		try:
+		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
 			async with aiohttp.ClientSession() as session:
 				async with session.get(self.FidoMetadataServiceUrl) as resp:
 					if resp.status != 200:
@@ -101,9 +119,10 @@ class WebAuthnService(asab.Service):
 						L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
 						return
 					jwt = await resp.text()
-		except ConnectionError:
-			L.error("Cannot connect to FIDO Alliance Metadata Service.")
-			return
+		else:
+			# Load from local file
+			with open(self.FidoMetadataServiceUrl) as f:
+				jwt = f.read()
 
 		jwt = jwcrypto.jwt.JWT(jwt=jwt)
 		cert_chain = jwt.token.jose_header.get("x5c", [])
@@ -179,7 +198,11 @@ class WebAuthnService(asab.Service):
 		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid.hex()})
 
 	async def _get_authenticator_metadata(self, verified_registration):
-		await self._load_fido_metadata()
+		try:
+			await self._load_fido_metadata()
+		except Exception as e:
+			L.info("Failed to fetch FIDO Alliance Metadata: {}".format(e))
+
 		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
 		if aaguid == 0:
 			# Authenticators with other identifiers than AAGUID are not supported
