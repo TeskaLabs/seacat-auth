@@ -3,7 +3,6 @@ import datetime
 import json
 import logging
 import secrets
-import typing
 import urllib.parse
 
 import aiohttp
