@@ -109,11 +109,14 @@ class WebAuthnService(asab.Service):
 					async with session.get(self.FidoMetadataServiceUrl) as resp:
 						if resp.status != 200:
 							text = await resp.text()
-							L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
+							L.info(
+								"FIDO Metadata Service responded with error:\n{!r}.".format(text[:1000]),
+								struct_data={"status": resp.status}
+							)
 							return
 						jwt = await resp.text()
 			except (TimeoutError, ConnectionError) as e:
-				L.info("FIDO metadata service is unreachable ({}).".format(e.__class__.__name__))
+				L.info("FIDO Metadata Service is unreachable ({}: {}).".format(e.__class__.__name__, e))
 				return
 
 		else:
