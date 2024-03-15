@@ -104,13 +104,18 @@ class WebAuthnService(asab.Service):
 				return
 
 		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
-			async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-				async with session.get(self.FidoMetadataServiceUrl) as resp:
-					if resp.status != 200:
-						text = await resp.text()
-						L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
-						return
-					jwt = await resp.text()
+			try:
+				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+					async with session.get(self.FidoMetadataServiceUrl) as resp:
+						if resp.status != 200:
+							text = await resp.text()
+							L.error("Failed to fetch FIDO metadata:\n{}".format(text[:1000]))
+							return
+						jwt = await resp.text()
+			except (TimeoutError, ConnectionError) as e:
+				L.log(asab.LOG_NOTICE, "FIDO metadata service is unreachable ({}).".format(e.__class__.__name__))
+				return
+
 		else:
 			# Load from local file
 			with open(self.FidoMetadataServiceUrl) as f:
