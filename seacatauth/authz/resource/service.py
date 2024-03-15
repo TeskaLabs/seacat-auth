@@ -110,7 +110,7 @@ class ResourceService(asab.Service):
 			if resource_id in self._BuiltinResources:
 				return False
 
-		if "managed_by" in resource:
+		if resource.get("managed_by"):
 			return False
 		else:
 			return True
