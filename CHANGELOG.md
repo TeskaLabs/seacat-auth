@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha9`
 - `v24.06-alpha8`
 - `v24.06-beta2`
 - `v24.06-alpha7.2`
@@ -18,6 +19,7 @@
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
+- Fix resource editability (#355, `v24.06-alpha9`)
 - Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
 - Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
 - Fix typo in last login endpoint path (#346, `v24.06-alpha4`)
