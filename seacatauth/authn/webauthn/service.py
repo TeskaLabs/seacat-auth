@@ -107,14 +107,15 @@ class WebAuthnService(asab.Service):
 			try:
 				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
 					async with session.get(self.FidoMetadataServiceUrl) as resp:
-						if resp.status != 200:
+						if resp.status == 200:
+							jwt = await resp.text()
+						else:
 							text = await resp.text()
 							L.info(
 								"FIDO Metadata Service responded with error:\n{!r}.".format(text[:1000]),
 								struct_data={"status": resp.status}
 							)
 							return
-						jwt = await resp.text()
 			except (TimeoutError, ConnectionError) as e:
 				L.info("FIDO Metadata Service is unreachable ({}: {}).".format(e.__class__.__name__, e))
 				return
