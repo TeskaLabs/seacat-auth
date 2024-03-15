@@ -279,6 +279,13 @@ class AuthenticationService(asab.Service):
 	def get_login_factor(self, factor_type):
 		return self.LoginFactors[factor_type]
 
+	async def get_eligible_factors(self, credentials_id: str):
+		return [
+			factor.Type
+			for factor in self.LoginFactors.values()
+			if await factor.is_eligible({"credentials_id": credentials_id})
+		]
+
 	def create_login_factor(self, factor_config):
 		self.LoginFactors[factor_config["type"]] = login_factor_builder(self, factor_config)
 		return self.LoginFactors[factor_config["type"]]
