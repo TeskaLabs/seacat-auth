@@ -49,6 +49,7 @@ class WebAuthnService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.TaskService = app.get_service("asab.TaskService")
 
 		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
 
@@ -78,24 +79,16 @@ class WebAuthnService(asab.Service):
 		self.FidoMetadataServiceUrl = asab.Config.get("seacatauth:webauthn", "metadata_service_url")
 		if self.FidoMetadataServiceUrl in ("", "DISABLED"):
 			self.FidoMetadataServiceUrl = None
-		self._FidoMetadataByAAGUID: typing.Dict[int, dict] | None = None
+		else:
+			self.TaskService.schedule(self._load_fido_metadata())
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def initialize(self, app):
-		try:
-			await self._load_fido_metadata()
-		except Exception as e:
-			L.exception("Failed to fetch FIDO Alliance Metadata ({}: {})".format(e.__class__.__name__, e))
-
-
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
-		try:
-			await self._load_fido_metadata(force_reload=True)
-		except Exception as e:
-			L.info("Failed to fetch FIDO Alliance Metadata: {}".format(e))
+		if self.FidoMetadataServiceUrl is not None:
+			self.TaskService.schedule(self._load_fido_metadata(force_reload=True))
 
 
 	async def _load_fido_metadata(self, *, force_reload: bool = False):
@@ -112,7 +105,7 @@ class WebAuthnService(asab.Service):
 				return
 
 		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
-			async with aiohttp.ClientSession() as session:
+			async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
 				async with session.get(self.FidoMetadataServiceUrl) as resp:
 					if resp.status != 200:
 						text = await resp.text()
@@ -198,11 +191,6 @@ class WebAuthnService(asab.Service):
 		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid.hex()})
 
 	async def _get_authenticator_metadata(self, verified_registration):
-		try:
-			await self._load_fido_metadata()
-		except Exception as e:
-			L.info("Failed to fetch FIDO Alliance Metadata: {}".format(e))
-
 		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
 		if aaguid == 0:
 			# Authenticators with other identifiers than AAGUID are not supported
