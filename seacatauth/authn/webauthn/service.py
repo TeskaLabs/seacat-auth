@@ -113,7 +113,7 @@ class WebAuthnService(asab.Service):
 							return
 						jwt = await resp.text()
 			except (TimeoutError, ConnectionError) as e:
-				L.log(asab.LOG_NOTICE, "FIDO metadata service is unreachable ({}).".format(e.__class__.__name__))
+				L.info("FIDO metadata service is unreachable ({}).".format(e.__class__.__name__))
 				return
 
 		else:
