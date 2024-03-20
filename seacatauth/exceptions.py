@@ -123,9 +123,18 @@ class TenantNotAssignedError(SeacatAuthError, KeyError):
 		super().__init__("Credentials do not have the tenant assigned.", *args)
 
 
-class TOTPError(SeacatAuthError):
+class TOTPActivationError(SeacatAuthError):
 	"""
-	Failed to activate, verify or deactivate TOTP
+	Failed to activate TOTP
+	"""
+	def __init__(self, message: str, credentials_id: str):
+		self.CredentialsID: str = credentials_id
+		super().__init__(message)
+
+
+class TOTPDeactivationError(SeacatAuthError):
+	"""
+	Failed to deactivate TOTP
 	"""
 	def __init__(self, message: str, credentials_id: str):
 		self.CredentialsID: str = credentials_id
