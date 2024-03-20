@@ -8,7 +8,7 @@ import asab
 import asab.storage
 
 from typing import Optional
-from ..exceptions import TOTPNotActiveError
+from .. import exceptions
 from ..events import EventTypes
 
 #
@@ -46,7 +46,7 @@ class OTPService(asab.Service):
 		Delete active TOTP secret for requested credentials.
 		"""
 		if not await self.has_activated_totp(credential_id):
-			raise TOTPNotActiveError(credential_id)
+			raise exceptions.TOTPError(credential_id)
 		try:
 			await self.StorageService.delete(collection=self.TOTPCollection, obj_id=credential_id)
 		except KeyError:
@@ -86,28 +86,26 @@ class OTPService(asab.Service):
 		Requires entering the generated OTP to succeed.
 		"""
 		if await self.has_activated_totp(credentials_id):
-			return {"result": "FAILED"}
+			raise exceptions.TOTPError("TOTP is already active.", credentials_id)
 
 		try:
 			secret = await self._get_prepared_totp_secret_by_session_id(session.SessionId)
 		except KeyError:
 			# TOTP secret has not been initialized or has expired
-			return {"result": "FAILED"}
+			raise exceptions.TOTPError("TOTP secret is not ready, possibly expired.", credentials_id)
 
 		totp = pyotp.TOTP(secret)
 		if totp.verify(request_otp) is False:
 			# TOTP secret does not match
-			return {"result": "FAILED"}
+			raise exceptions.TOTPError("TOTP verification failed.", credentials_id)
 
 		# Store secret in its own dedicated collection
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
 		upsertor.set("__totp", secret.encode("ascii"), encrypt=True)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
-		L.log(asab.LOG_NOTICE, "TOTP secret registered.", struct_data={"cid": credentials_id})
+		L.log(asab.LOG_NOTICE, "TOTP activated.", struct_data={"cid": credentials_id})
 
 		await self._delete_prepared_totp_secret(session.SessionId)
-
-		return {"result": "OK"}
 
 
 	async def _create_totp_secret(self, session_id: str) -> str:

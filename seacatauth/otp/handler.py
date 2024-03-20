@@ -4,7 +4,7 @@ import asab.web
 import asab.web.rest
 
 from ..decorators import access_control
-from ..exceptions import TOTPNotActiveError
+from .. import exceptions
 
 #
 
@@ -78,8 +78,11 @@ class OTPHandler(object):
 		This requires that a TOTP secret is already prepared for the user.
 		"""
 		otp = json_data.get("otp")
-		response = await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
-		return asab.web.rest.json_response(request, response)
+		try:
+			await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
+		except exceptions.TOTPError:
+			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@access_control()
@@ -91,7 +94,7 @@ class OTPHandler(object):
 		"""
 		try:
 			await self.OTPService.deactivate_totp(credentials_id)
-		except TOTPNotActiveError:
+		except exceptions.TOTPError:
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
