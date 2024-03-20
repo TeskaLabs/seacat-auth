@@ -28,18 +28,18 @@ class OTPHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/account/totp", self.prepare_totp_if_not_active)
-		web_app.router.add_put("/account/set-totp", self.set_totp)
-		web_app.router.add_put("/account/unset-totp", self.unset_totp)
+		web_app.router.add_put("/account/set-totp", self.activate_totp)
+		web_app.router.add_put("/account/unset-totp", self.deactivate_totp)
 
 		# Back-compat; To be removed in next major version
 		# >>>
 		web_app.router.add_get("/public/totp", self.prepare_totp_if_not_active)
-		web_app.router.add_put("/public/set-totp", self.set_totp)
-		web_app.router.add_put("/public/unset-totp", self.unset_totp)
+		web_app.router.add_put("/public/set-totp", self.activate_totp)
+		web_app.router.add_put("/public/unset-totp", self.deactivate_totp)
 
 		web_app_public.router.add_get("/public/totp", self.prepare_totp_if_not_active)
-		web_app_public.router.add_put("/public/set-totp", self.set_totp)
-		web_app_public.router.add_put("/public/unset-totp", self.unset_totp)
+		web_app_public.router.add_put("/public/set-totp", self.activate_totp)
+		web_app_public.router.add_put("/public/unset-totp", self.deactivate_totp)
 		# <<<
 
 	@access_control()
@@ -71,7 +71,7 @@ class OTPHandler(object):
 		}
 	})
 	@access_control()
-	async def set_totp(self, request, *, credentials_id, json_data):
+	async def activate_totp(self, request, *, credentials_id, json_data):
 		"""
 		Activate TOTP for the current user
 
@@ -80,13 +80,13 @@ class OTPHandler(object):
 		otp = json_data.get("otp")
 		try:
 			await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
-		except exceptions.TOTPError:
+		except exceptions.TOTPActivationError:
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@access_control()
-	async def unset_totp(self, request, *, credentials_id):
+	async def deactivate_totp(self, request, *, credentials_id):
 		"""
 		Deactivate TOTP for the current user
 
@@ -94,7 +94,7 @@ class OTPHandler(object):
 		"""
 		try:
 			await self.OTPService.deactivate_totp(credentials_id)
-		except exceptions.TOTPError:
+		except exceptions.TOTPDeactivationError:
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
