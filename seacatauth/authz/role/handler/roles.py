@@ -34,14 +34,19 @@ class RolesHandler(object):
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
 
-	@access_control("seacat:role:access")
-	async def get_roles_by_credentials(self, request, *, tenant):
+
+	async def get_roles_by_credentials(self, request):
 		"""
 		Get credentials' roles
 		"""
 		creds_id = request.match_info["credentials_id"]
-		result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant])
-		return asab.web.rest.json_response(request, result)
+		tenant_id = request.match_info["tenant"]
+		if request.can_access_all_tenants \
+			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
+			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant_id])
+			return asab.web.rest.json_response(request, result)
+		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"cid": request.CredentialsId, "t": tenant_id})
+		return aiohttp.web.HTTPForbidden()
 
 
 	@asab.web.rest.json_schema_handler({
@@ -49,16 +54,21 @@ class RolesHandler(object):
 		"description": "Credential IDs",
 		"items": {"type": "string"}
 	})
-	@access_control("seacat:role:access")
-	async def get_roles_batch(self, request, *, tenant, json_data):
+	async def get_roles_batch(self, request, *, json_data):
 		"""
 		Get the assigned roles for several credentials
 		"""
-		response = {
-			cid: await self.RoleService.get_roles_by_credentials(cid, [tenant])
-			for cid in json_data
-		}
-		return asab.web.rest.json_response(request, response)
+		tenant_id = request.match_info["tenant"]
+		if request.can_access_all_tenants \
+			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
+			response = {
+				cid: await self.RoleService.get_roles_by_credentials(cid, [tenant_id])
+				for cid in json_data
+			}
+			return asab.web.rest.json_response(request, response)
+
+		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"cid": request.CredentialsId, "t": tenant_id})
+		return aiohttp.web.HTTPForbidden()
 
 
 	@asab.web.rest.json_schema_handler({
