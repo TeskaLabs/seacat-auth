@@ -3,7 +3,13 @@
 ## v24.06
 
 ### Pre-releases
-- `v24.06-alpha7`
+- `v24.06-alpha10`
+- `v24.06-beta3`
+- `v24.06-alpha9`
+- `v24.06-alpha8`
+- `v24.06-beta2`
+- `v24.06-alpha7.2`
+- `v24.06-beta`
 - `v24.06-alpha6`
 - `v24.06-alpha5`
 - `v24.06-alpha4`
@@ -12,16 +18,20 @@
 - `v24.06-alpha1`
 
 ### Breaking changes
-- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha7`)
+- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha10`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
+- Fix resource editability (#355, `v24.06-alpha9`)
+- Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
 - Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
 - Fix typo in last login endpoint path (#346, `v24.06-alpha4`)
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
-- List credentials from authorized tenant only (#348, `v24.06-alpha7`)
+- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha10`)
+- List credentials from authorized tenant only (#348, `v24.06-alpha10`)
+- ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7.2`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 - New paths for account management endpoints (#343, `v24.06-alpha3`)
 - Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
