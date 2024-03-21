@@ -41,11 +41,12 @@ class RolesHandler(object):
 		"""
 		creds_id = request.match_info["credentials_id"]
 		tenant_id = request.match_info["tenant"]
-		if request.can_access_all_tenants \
+		if tenant_id == "*" or request.can_access_all_tenants \
 			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
 			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant_id])
 			return asab.web.rest.json_response(request, result)
-		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"cid": request.CredentialsId, "t": tenant_id})
+		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={
+			"cid": request.Session.Credentials.Id, "t": tenant_id})
 		return aiohttp.web.HTTPForbidden()
 
 
@@ -59,7 +60,7 @@ class RolesHandler(object):
 		Get the assigned roles for several credentials
 		"""
 		tenant_id = request.match_info["tenant"]
-		if request.can_access_all_tenants \
+		if tenant_id == "*" or request.can_access_all_tenants \
 			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
 			response = {
 				cid: await self.RoleService.get_roles_by_credentials(cid, [tenant_id])
@@ -67,7 +68,8 @@ class RolesHandler(object):
 			}
 			return asab.web.rest.json_response(request, response)
 
-		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"cid": request.CredentialsId, "t": tenant_id})
+		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={
+			"cid": request.Session.Credentials.Id, "t": tenant_id})
 		return aiohttp.web.HTTPForbidden()
 
 
