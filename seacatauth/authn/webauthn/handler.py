@@ -140,7 +140,8 @@ class WebAuthnHandler(object):
 		"properties": {
 			"name": {
 				"type": "string",
-				"pattern": "^[a-z][a-z0-9._-]{0,128}[a-z0-9]$"
+				"minLength": 3,
+				"maxLength": 128,
 			},
 		}
 	})

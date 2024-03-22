@@ -70,10 +70,7 @@ def authentication_session_builder(login_descriptor):
 
 
 async def available_factors_session_builder(authentication_service, credentials_id):
-	factors = []
-	for factor in authentication_service.LoginFactors.values():
-		if await factor.is_eligible({"credentials_id": credentials_id}):
-			factors.append(factor.Type)
+	factors = await authentication_service.get_eligible_factors(credentials_id)
 	return ((SessionAdapter.FN.Authentication.AvailableFactors, factors),)
 
 
