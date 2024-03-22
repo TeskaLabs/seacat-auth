@@ -205,10 +205,14 @@ class CredentialsHandler(object):
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
-		result = await self.CredentialsService.list(request.Session, search, try_global_search)
-
+		try:
+			result = await self.CredentialsService.list(request.Session, search, try_global_search)
+		except exceptions.AccessDeniedError as e:
+			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
+			return asab.web.rest.json_response(request, status=403, data={
+				"result": "ACCESS-DENIED",
+			})
 		return asab.web.rest.json_response(request, {
-			"result": "OK",
 			"data": result["data"],
 			"count": result["count"],
 		})
