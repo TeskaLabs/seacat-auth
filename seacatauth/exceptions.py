@@ -123,13 +123,22 @@ class TenantNotAssignedError(SeacatAuthError, KeyError):
 		super().__init__("Credentials do not have the tenant assigned.", *args)
 
 
-class TOTPNotActiveError(SeacatAuthError):
+class TOTPActivationError(SeacatAuthError):
 	"""
-	Credentials do not have any registered TOTP secret
+	Failed to activate TOTP
 	"""
-	def __init__(self, credential_id: str):
-		self.CredentialID: str = credential_id
-		super().__init__("TOTP not active for credentials.")
+	def __init__(self, message: str, credentials_id: str):
+		self.CredentialsID: str = credentials_id
+		super().__init__(message)
+
+
+class TOTPDeactivationError(SeacatAuthError):
+	"""
+	Failed to deactivate TOTP
+	"""
+	def __init__(self, message: str, credentials_id: str):
+		self.CredentialsID: str = credentials_id
+		super().__init__(message)
 
 
 class ClientResponseError(SeacatAuthError):
