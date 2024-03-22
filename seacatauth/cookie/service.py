@@ -191,11 +191,17 @@ class CookieService(asab.Service):
 			])
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
+			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+			available_factors = await self.AuthenticationService.get_eligible_factors(root_session.Credentials.Id)
+			available_external_logins = {
+				result["t"]: result["s"]
+				for result in await external_login_service.list(root_session.Credentials.Id)
+			}
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
 				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, root_session.Authentication.ExternalLoginOptions),
-				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
+				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
+				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
 			])
 
 		if root_session.TrackId is not None:

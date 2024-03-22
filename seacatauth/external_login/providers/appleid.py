@@ -35,7 +35,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		"token_endpoint": "https://appleid.apple.com/auth/token",
 		"jwks_uri": "https://appleid.apple.com/auth/keys",
 		"scope": "name email",
-		"label": "Sign in with Apple",
+		"label": "AppleID",
 	}
 
 	def __init__(self, external_login_svc, config_section_name, config=None):

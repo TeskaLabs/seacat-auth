@@ -8,7 +8,7 @@ import asab
 import asab.storage
 
 from typing import Optional
-from ..exceptions import TOTPNotActiveError
+from .. import exceptions
 from ..events import EventTypes
 
 #
@@ -41,21 +41,23 @@ class OTPService(asab.Service):
 		await self._delete_expired_totp_secrets()
 
 
-	async def deactivate_totp(self, credential_id: str):
+	async def deactivate_totp(self, credentials_id: str):
 		"""
 		Delete active TOTP secret for requested credentials.
 		"""
-		if not await self.has_activated_totp(credential_id):
-			raise TOTPNotActiveError(credential_id)
+		if not await self.has_activated_totp(credentials_id):
+			L.log(asab.LOG_NOTICE, "Cannot deactivate TOTP because it is already active.", struct_data={
+				"cid": credentials_id})
+			raise exceptions.TOTPDeactivationError("TOTP is not active.", credentials_id)
 		try:
-			await self.StorageService.delete(collection=self.TOTPCollection, obj_id=credential_id)
+			await self.StorageService.delete(collection=self.TOTPCollection, obj_id=credentials_id)
 		except KeyError:
 			# TOTP are stored in the old self.PreparedTOTPCollection -> only for backward compatibility
 			pass
 
 
-		provider = self.CredentialsService.get_provider(credential_id)
-		await provider.update(credential_id, {
+		provider = self.CredentialsService.get_provider(credentials_id)
+		await provider.update(credentials_id, {
 			"__totp": None
 		})
 
@@ -86,28 +88,31 @@ class OTPService(asab.Service):
 		Requires entering the generated OTP to succeed.
 		"""
 		if await self.has_activated_totp(credentials_id):
-			return {"result": "FAILED"}
+			L.log(asab.LOG_NOTICE, "Cannot activate TOTP because it is already active.", struct_data={
+				"cid": credentials_id})
+			raise exceptions.TOTPActivationError("TOTP is already active.", credentials_id)
 
 		try:
 			secret = await self._get_prepared_totp_secret_by_session_id(session.SessionId)
 		except KeyError:
-			# TOTP secret has not been initialized or has expired
-			return {"result": "FAILED"}
+			L.log(asab.LOG_NOTICE, "Cannot activate TOTP because the secret is not ready or has expired.", struct_data={
+				"cid": credentials_id})
+			raise exceptions.TOTPActivationError("TOTP secret is not ready, or possibly has expired.", credentials_id)
 
 		totp = pyotp.TOTP(secret)
 		if totp.verify(request_otp) is False:
 			# TOTP secret does not match
-			return {"result": "FAILED"}
+			L.log(asab.LOG_NOTICE, "Cannot activate TOTP because the verification failed.", struct_data={
+				"cid": credentials_id})
+			raise exceptions.TOTPActivationError("TOTP verification failed.", credentials_id)
 
 		# Store secret in its own dedicated collection
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
 		upsertor.set("__totp", secret.encode("ascii"), encrypt=True)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
-		L.log(asab.LOG_NOTICE, "TOTP secret registered.", struct_data={"cid": credentials_id})
+		L.log(asab.LOG_NOTICE, "TOTP activated.", struct_data={"cid": credentials_id})
 
 		await self._delete_prepared_totp_secret(session.SessionId)
-
-		return {"result": "OK"}
 
 
 	async def _create_totp_secret(self, session_id: str) -> str:
@@ -126,7 +131,7 @@ class OTPService(asab.Service):
 		expires: datetime.datetime = datetime.datetime.now(datetime.timezone.utc) + self.RegistrationTimeout
 		upsertor.set("exp", expires)
 
-		secret: str = pyotp.random_base32().encode("ascii")
+		secret = pyotp.random_base32().encode("ascii")
 		upsertor.set("__s", secret, encrypt=True)
 
 		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)

@@ -23,6 +23,7 @@ class FeatureHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/public/features", self.get_features)
+		web_app.router.add_get("/account/features", self.get_features)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp

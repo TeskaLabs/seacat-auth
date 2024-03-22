@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha11`
 - `v24.06-alpha10`
 - `v24.06-beta3`
 - `v24.06-alpha9`
@@ -18,10 +19,11 @@
 - `v24.06-alpha1`
 
 ### Breaking changes
-- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha10`)
+- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha11`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
+- Better TOTP error responses (#352, `v24.06-alpha10`)
 - Fix resource editability (#355, `v24.06-alpha9`)
 - Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
 - Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
@@ -29,8 +31,9 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
-- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha10`)
-- List credentials from authorized tenant only (#348, `v24.06-alpha10`)
+- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha11`)
+- List credentials from authorized tenant only (#348, `v24.06-alpha11`)
+- External login provider label contains just the display name (#352, `v24.06-alpha10`)
 - ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7.2`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 - New paths for account management endpoints (#343, `v24.06-alpha3`)
