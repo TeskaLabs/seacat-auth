@@ -222,7 +222,7 @@ class CredentialsService(asab.Service):
 			# Search only requested tenant
 			tenant_id = search_params.AdvancedFilter["tenant"]
 			# Check authorization
-			if not try_global_search and tenant_id not in authorized_tenants:
+			if not session.is_superuser() and tenant_id not in authorized_tenants:
 				raise exceptions.AccessDeniedError(
 					"Not authorized to access tenant members",
 					subject=session.Credentials.Id,
