@@ -221,8 +221,8 @@ class CredentialsService(asab.Service):
 		if "tenant" in search_params.AdvancedFilter:
 			# Search only requested tenant
 			tenant_id = search_params.AdvancedFilter["tenant"]
-			# Check authorization
-			if not session.is_superuser() and tenant_id not in authorized_tenants:
+			# Check tenant access
+			if not (tenant_id in authorized_tenants or session.is_superuser()):
 				raise exceptions.AccessDeniedError(
 					"Not authorized to access tenant members",
 					subject=session.Credentials.Id,
@@ -240,8 +240,8 @@ class CredentialsService(asab.Service):
 			# Authorize searched roles
 			role_id = search_params.AdvancedFilter["role"]
 			tenant_id = role_id.split("/")[0]
-			# Check authorization
-			if not try_global_search and tenant_id not in authorized_tenants:
+			# Check tenant access
+			if not (tenant_id in authorized_tenants or session.is_superuser()):
 				raise exceptions.AccessDeniedError(
 					"Not authorized to access tenant members",
 					subject=session.Credentials.Id,
