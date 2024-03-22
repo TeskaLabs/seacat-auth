@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha10`
 - `v24.06-beta3`
 - `v24.06-alpha9`
 - `v24.06-alpha8`
@@ -20,6 +21,7 @@
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
+- Better TOTP error responses (#352, `v24.06-alpha10`)
 - Fix resource editability (#355, `v24.06-alpha9`)
 - Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
 - Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
@@ -27,6 +29,7 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- External login provider label contains just the display name (#352, `v24.06-alpha10`)
 - ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7.2`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 - New paths for account management endpoints (#343, `v24.06-alpha3`)
