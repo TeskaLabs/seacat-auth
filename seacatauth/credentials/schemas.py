@@ -13,6 +13,7 @@ _FIELDS = {
 		"description": "Email address",
 		"anyOf": [
 			{"type": "null"},
+			{"type": "string", "const": ""},
 			{"type": "string", "format": "email"},
 		],
 	},
@@ -20,6 +21,7 @@ _FIELDS = {
 		"description": "Mobile number",
 		"anyOf": [
 			{"type": "null"},
+			{"type": "string", "const": ""},
 			{"type": "string", "pattern": r"^\+?[0-9 ]+$"},
 		],
 	},
