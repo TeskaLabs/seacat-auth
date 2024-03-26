@@ -11,7 +11,7 @@ L = logging.getLogger(__name__)
 #
 
 
-class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
+class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 	Type = "abc"
 	Editable = False
@@ -60,14 +60,6 @@ class CredentialsProviderABC(asab.ConfigObject, abc.ABC):
 		Create a descriptor for the allowed login configurations
 		'''
 		return []
-
-
-	async def detail(self, credentials_id) -> Optional[dict]:
-		'''
-		Obsolete, use get()
-		'''
-		L.warning("Obsolete method used -> CredentialsProvider.detail :-(")
-		return await self.get(credentials_id)
 
 
 	@abc.abstractmethod

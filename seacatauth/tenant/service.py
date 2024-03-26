@@ -15,13 +15,15 @@ L = logging.getLogger(__name__)
 
 
 class TenantService(asab.Service):
-	TenantNamePattern = r"[a-z][a-z0-9._-]{2,31}"
+	TenantIdPattern = "^[a-z][a-z0-9{}]{{2,31}}$"
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
 		self.TenantsProvider = None
-		self.TenantNameRegex = re.compile("^{}$".format(self.TenantNamePattern))
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.AdditionalIdCharacters = asab.Config.get(
+			"seacatauth:tenant", "additional_allowed_id_characters", fallback="")
+		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 
 	def create_provider(self, provider_id, config_section_name):
@@ -37,28 +39,72 @@ class TenantService(asab.Service):
 		self.TenantsProvider = provider
 
 
+	async def list_tenant_ids(self):
+		"""
+		List all registered tenant IDs
+		"""
+		# TODO: This has to be cached agressivelly
+		provider = self.get_provider()
+		result = []
+		async for tenant in provider.iterate():
+			result.append(tenant["_id"])
+		return result
+
+
+	async def iterate(self):
+		"""
+		Iterate over all tenants
+		"""
+		# TODO: Limit, page, filter
+		provider = self.get_provider()
+		async for tenant in provider.iterate():
+			yield tenant
+
+
 	async def get_tenant(self, tenant_id: str):
 		return await self.TenantsProvider.get(tenant_id)
 
 
-	async def create_tenant(self, tenant_id: str, creator_id: str = None):
-		if not self.TenantNameRegex.match(tenant_id):
-			raise asab.exceptions.ValidationError(
-				"Invalid tenant ID {!r}. "
-				"Tenant ID must consist only of characters 'a-z0-9._-', "
-				"start with a letter, and be between 3 and 32 characters long.".format(tenant_id))
+	async def create_tenant(
+		self, tenant_id: str, *,
+		label: str = None,
+		description: str = None,
+		data: dict = None,
+		creator_id: str = None
+	):
+		if not self.TenantIdRegex.match(tenant_id):
+			if self.AdditionalIdCharacters:
+				message = (
+					"Invalid tenant ID {!r}. "
+					"Tenant ID must consist only of lowercase letters (a-z), numbers (0-9) and characters {!r}. "
+					"It must start with a letter and be between 3 and 32 characters long.".format(
+						tenant_id, self.AdditionalIdCharacters)
+				)
+			else:
+				message = (
+					"Invalid tenant ID {!r}. "
+					"Tenant ID must consist only of lowercase letters (a-z) and numbers (0-9). "
+					"It must start with a letter and be between 3 and 32 characters long.".format(tenant_id)
+				)
+			raise asab.exceptions.ValidationError(message)
 
 		try:
-			tenant_id = await self.TenantsProvider.create(tenant_id, creator_id)
+			tenant_id = await self.TenantsProvider.create(
+				tenant_id, label=label, description=description, data=data, creator_id=creator_id)
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
 			raise asab.exceptions.Conflict(value=tenant_id)
+
+		self.App.PubSub.publish("Tenant.created!", tenant_id=tenant_id)
 
 		return tenant_id
 
 
 	async def update_tenant(self, tenant_id: str, **kwargs):
 		result = await self.TenantsProvider.update(tenant_id, **kwargs)
+
+		self.App.PubSub.publish("Tenant.updated!", tenant_id=tenant_id)
+
 		return {"result": result}
 
 
@@ -84,6 +130,8 @@ class TenantService(asab.Service):
 
 		# Delete tenant from provider
 		await self.TenantsProvider.delete(tenant_id)
+
+		self.App.PubSub.publish("Tenant.deleted!", tenant_id=tenant_id)
 
 		# Delete sessions that have the tenant in scope
 		await session_service.delete_sessions_by_tenant_in_scope(tenant_id)
@@ -218,6 +266,7 @@ class TenantService(asab.Service):
 			"cid": credentials_id,
 			"tenant": tenant,
 		})
+		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
@@ -236,6 +285,7 @@ class TenantService(asab.Service):
 		)
 
 		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
+		self.App.PubSub.publish("Tenant.unassigned!", credentials_id=credentials_id, tenant_id=tenant)
 
 
 	def is_enabled(self):
@@ -278,7 +328,7 @@ class TenantService(asab.Service):
 		if len(tenants) == 0 and "tenant" in scope:
 			last_tenants = [
 				tenant
-				for tenant in (await self.AuditService.get_last_authorized_tenants(credential_id) or [])
+				for tenant in (await self.LastActivityService.get_last_authorized_tenants(credential_id) or [])
 				if tenant in user_tenants
 			]
 			if last_tenants:

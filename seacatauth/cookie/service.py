@@ -1,19 +1,24 @@
 import base64
+import datetime
 import hashlib
 import re
 import logging
 
 import asab
 import asab.storage
+import asab.exceptions
+import jwcrypto.jws
 
+from .. import exceptions
 from ..session import SessionAdapter
+from ..session.adapter import CookieData
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
 	cookie_session_builder
 )
 from ..openidconnect.session import oauth2_session_builder
-from ..audit import AuditCode
+from .. import AuditLogger
 
 #
 
@@ -34,21 +39,22 @@ class CookieService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
 		self.AuthenticationService = None
 		self.OpenIdConnectService = None
 
 		# Configure root cookie
 		self.CookieName = asab.Config.get("seacatauth:cookie", "name")
 		self.CookiePattern = re.compile(
-			"(^{cookie}=[^;]*; ?|; ?{cookie}=[^;]*|^{cookie}=[^;]*)".format(cookie=self.CookieName)
+			"(^{cookie}({client_suffix})?=[^;]*; ?"
+			"|; ?{cookie}({client_suffix})?=[^;]*"
+			"|^{cookie}({client_suffix})?=[^;]*)".format(cookie=self.CookieName, client_suffix=r"_[A-Z8-9]+")
 		)
 		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
 		self.RootCookieDomain = asab.Config.get("seacatauth:cookie", "domain") or None
 		if self.RootCookieDomain is not None:
 			self.RootCookieDomain = self._validate_cookie_domain(self.RootCookieDomain)
 
-		self.AuthWebUiBaseUrl = asab.Config.get("general", "auth_webui_base_url")
+		self.AuthWebUiBaseUrl = app.AuthWebUiUrl.rstrip("/")
 
 
 	async def initialize(self, app):
@@ -67,6 +73,10 @@ class CookieService(asab.Service):
 		return cookie_name
 
 
+	def remove_seacat_cookies_from_request(self, cookie_string):
+		return self.CookiePattern.sub("", cookie_string)
+
+
 	@staticmethod
 	def _validate_cookie_domain(domain):
 		if not domain.isascii():
@@ -79,15 +89,9 @@ class CookieService(asab.Service):
 		"""
 		Get Seacat session cookie value from request header
 		"""
-		cookie = request.cookies.get(self.get_cookie_name(client_id))
-		if cookie is None:
-			return None
-		try:
-			session_cookie_id = base64.urlsafe_b64decode(cookie.encode("ascii"))
-		except ValueError:
-			L.warning("Cookie value is not base64", struct_data={"sci": cookie})
-			return None
-		return session_cookie_id
+		cookie_name = self.get_cookie_name(client_id)
+		cookie = request.cookies.get(cookie_name)
+		return cookie
 
 
 	async def get_session_by_request_cookie(self, request, client_id=None):
@@ -99,56 +103,55 @@ class CookieService(asab.Service):
 		"""
 		session_cookie_id = self.get_session_cookie_value(request, client_id)
 		if session_cookie_id is None:
-			return None
+			raise exceptions.NoCookieError(client_id)
 		return await self.get_session_by_session_cookie_value(session_cookie_id)
 
 
-	async def get_session_by_session_cookie_value(self, cookie_value):
+	async def get_session_by_session_cookie_value(self, cookie_value: str):
 		"""
 		Get session by cookie value.
 		"""
+		# First try interpreting the token as an algorithmic session
+		if "." in cookie_value:
+			try:
+				return await self.SessionService.Algorithmic.deserialize(cookie_value)
+			except asab.exceptions.NotAuthenticatedError as e:
+				# The JWToken is invalid or expired
+				raise exceptions.SessionNotFoundError(
+					"Invalid algorithmic session token", query={"cookie_value": cookie_value}) from e
+			except jwcrypto.jws.InvalidJWSObject:
+				# Not a JWT token
+				pass
+
+		# Then try looking for the session in the database
+		try:
+			cookie_value = base64.urlsafe_b64decode(cookie_value.encode("ascii"))
+		except ValueError as e:
+			raise exceptions.SessionNotFoundError(
+				"Cookie value is not base64", query={"cookie_value": cookie_value}) from e
+
 		try:
 			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, cookie_value)
-		except KeyError:
-			L.info("Session not found.", struct_data={"sci": cookie_value})
-			return None
-		except ValueError:
-			L.warning("Error retrieving session.", exc_info=True, struct_data={"sci": cookie_value})
-			return None
+		except KeyError as e:
+			raise exceptions.SessionNotFoundError(
+				"Session not found", query={"cookie_value": cookie_value}) from e
+		except ValueError as e:
+			raise exceptions.SessionNotFoundError(
+				"Error deserializing session", query={"cookie_value": cookie_value}) from e
 
 		return session
-
-
-	def get_cookie_domain(self, cookie_domain_id=None):
-		if cookie_domain_id is not None:
-			cookie_domain = self.ApplicationCookies.get(cookie_domain_id, {}).get("domain")
-			if cookie_domain is None:
-				L.error("Unknown cookie domain ID", struct_data={"domain_id": cookie_domain_id})
-				raise KeyError("Unknown domain_id: {}".format(cookie_domain_id))
-			return cookie_domain
-		else:
-			return self.RootCookieDomain
 
 
 	async def get_session_by_authorization_code(self, code):
-		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
-		try:
-			session_id = await oidc_svc.pop_session_id_by_authorization_code(code)
-		except KeyError:
-			L.warning("Authorization code not found", struct_data={"code": code})
-			return None
-
-		# Get the session
-		try:
-			session = await self.SessionService.get(session_id)
-		except KeyError:
-			L.error("Session not found", struct_data={"sid": session_id})
-			return None
-
-		return session
+		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
 
 
-	async def create_cookie_client_session(self, root_session, client_id, scope, tenants, requested_expiration):
+	async def create_cookie_client_session(
+		self, root_session, client_id, scope,
+		nonce=None,
+		tenants=None,
+		requested_expiration=None
+	):
 		"""
 		Create a new cookie-based session
 		"""
@@ -188,10 +191,17 @@ class CookieService(asab.Service):
 			])
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
+			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+			available_factors = await self.AuthenticationService.get_eligible_factors(root_session.Credentials.Id)
+			available_external_logins = {
+				result["t"]: result["s"]
+				for result in await external_login_service.list(root_session.Credentials.Id)
+			}
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, root_session.Authentication.ExternalLoginOptions),
-				(SessionAdapter.FN.Authentication.AvailableFactors, root_session.Authentication.AvailableFactors),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
+				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
+				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
 			])
 
 		if root_session.TrackId is not None:
@@ -210,11 +220,7 @@ class CookieService(asab.Service):
 				),
 			))
 
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
@@ -227,64 +233,31 @@ class CookieService(asab.Service):
 
 
 	async def create_anonymous_cookie_client_session(
-		self, anonymous_cid, client_id, scope,
-		tenants=None,
-		track_id=None,
-		root_session_id=None,
-		requested_expiration=None,
+		self, anonymous_cid: str, client_dict: dict, scope: list,
+		track_id: bytes = None,
+		tenants: list = None,
 		from_info=None,
 	):
 		"""
 		Create a new anonymous cookie-based session
 		"""
-		# Check if the Client exists
-		client_svc = self.App.get_service("seacatauth.ClientService")
-		try:
-			await client_svc.get(client_id)
-		except KeyError:
-			raise KeyError("Client '{}' not found".format(client_id))
+		session_svc = self.App.get_service("seacatauth.SessionService")
 
-		# Build the session
-		session_builders = [
-			((SessionAdapter.FN.Authentication.IsAnonymous, True),),
-			await credentials_session_builder(self.CredentialsService, anonymous_cid, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=anonymous_cid,
-				tenants=tenants,
-			),
-			cookie_session_builder(),
-		]
+		session = await session_svc.Algorithmic.create_anonymous_session(
+			created_at=datetime.datetime.now(datetime.timezone.utc),
+			track_id=track_id,
+			client_dict=client_dict,
+			scope=scope)
 
-		if track_id is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, track_id),))
-		# Otherwise keep the session without tracking ID for now
+		session.Cookie = CookieData(
+			Id=session_svc.Algorithmic.serialize(session),
+			Domain=client_dict.get("cookie_domain") or None)
 
-		oauth2_data = {
-			"scope": scope,
-			"client_id": client_id,
-		}
-		session_builders.append(oauth2_session_builder(oauth2_data))
-
-		session = await self.SessionService.create_session(
-			session_type="cookie",
-			parent_session_id=root_session_id,
-			expiration=self.SessionService.AnonymousExpiration,
-			session_builders=session_builders,
-		)
-
-		L.log(asab.LOG_NOTICE, "Anonymous session created.", struct_data={
+		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+			"anonymous": True,
 			"cid": anonymous_cid,
-			"client_id": client_id,
-			"sid": str(session.Session.Id),
-			"fi": from_info})
-
-		# Add an audit entry
-		await self.AuditService.append(AuditCode.ANONYMOUS_SESSION_CREATED, {
-			"cid": anonymous_cid,
-			"client_id": client_id,
-			"sid": str(session.Session.Id),
+			"client_id": client_dict["_id"],
+			"track_id": track_id,
 			"fi": from_info})
 
 		return session

@@ -13,6 +13,8 @@ SeaCat Auth currently supports these login providers:
 - Office 365
 - Github
 - MojeID
+- Facebook
+- AppleID
 
 
 ## Usage
@@ -76,6 +78,7 @@ See below for config examples of the individual login providers.
 
 ---
 
+
 ## Supported providers
 
 SeaCat Auth currently supports the following external login providers:
@@ -136,4 +139,75 @@ to obtain client ID and secret.
 [seacatauth:mojeid]
 client_id=a2c4e6...
 client_secret=1b3d5f...
+```
+
+### AppleID
+
+Provider ID: `appleid`
+
+Register your app in [Apple Developer program Service ID settings](https://developer.apple.com/account/resources/identifiers/list/serviceId)
+to obtain client ID. 
+Apple returns e-mail and username in the response right after OAuth2 /authorize call, so we do not need client_secret,
+because we do not need to hit the /token endpoint at all.
+
+Sign in with Apple [documentation](https://developer.apple.com/documentation/sign_in_with_apple/) 
+
+```ini
+[seacatauth:appleid]
+client_id=a2c4e6...
+```
+
+---
+
+
+## Registering unknown users via webhook
+
+When an unknown user logs in via external identity provider, it is possible to trigger a webhook to an external 
+service. This service can register the user and send back their credential ID. If the response contains a valid 
+`credential_id`, the login proceeds as successful.
+
+To enable the webhook, specify the webhook URL in the configuration file:
+```ini
+[seacatauth:external_login]
+registration_webhook_uri=http://localhost:8089/external-registration
+```
+
+The webhook is a POST request with JSON payload containing the following properties:
+
+- `provider_type` - the type of the identity provider (e.g. google or appleid),
+- `authorization_response` - response query parameters without the authorization code,
+- `user_info` - OpenID UserInfo-like claims about the logged-in user (mandatory `sub`, optional `email`, 
+    `preferred_username` etc.). The actual claims differ from provider to provider and also depend on your 
+    client's scope and configuration.
+
+A successful webhook response must contain a valid credential_id of the created credentials. 
+Otherwise, the response is considered error and the login results in failure.
+
+
+### Example
+
+Request:
+```
+POST /webhook_url
+{
+  "provider_type": "google",
+  "authorization_response": {
+    "scope": "email profile openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
+    "authuser": "0",
+    "prompt": "consent"
+  },
+  "user_info": {
+    "iss": "accounts.google.com",
+    "sub": "01234567890123456789",
+    "email": "abcdefgh@gmail.com",
+    "email_verified": true
+  }
+}
+```
+
+Response:
+```
+{
+  "credential_id": "mongodb:custom:abcd123456789"
+}
 ```

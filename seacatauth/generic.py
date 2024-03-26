@@ -1,5 +1,6 @@
 import random
 import logging
+import re
 import urllib.parse
 import aiohttp.web
 import asab
@@ -21,9 +22,23 @@ def get_bearer_token_value(request):
 		return None
 	if auth_header.startswith(bearer_prefix):
 		return auth_header[len(bearer_prefix):]
-	else:
-		L.info("No Bearer token in Authorization header")
+
+	L.info("No Bearer token in Authorization header")
+	return None
+
+
+def get_access_token_value_from_websocket(request):
+	token_prefix = "access_token_"
+	ws_protocol_header: str = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
+	if ws_protocol_header is None:
+		L.info("Request has no 'Sec-WebSocket-Protocol' header")
 		return None
+	for value in ws_protocol_header.split(", "):
+		if value.startswith(token_prefix):
+			return value[len(token_prefix):]
+
+	L.info("No access token in Sec-WebSocket-Protocol header")
+	return None
 
 
 async def add_to_header(headers, attributes_to_add, session, requested_tenant=None):
@@ -58,18 +73,13 @@ async def add_to_header(headers, attributes_to_add, session, requested_tenant=No
 
 	# Obtain login factors from session object
 	if "factors" in attributes_to_add:
-		if session.Authentication.LoginDescriptor is not None:
-			factors = [
-				factor["id"]
-				for factor
-				in session.Authentication.LoginDescriptor["factors"]
-			]
-			headers["X-Login-Factors"] = " ".join(factors)
+		if session.Authentication.LoginFactors is not None:
+			headers["X-Login-Factors"] = " ".join(session.Authentication.LoginFactors)
 
 	# Obtain login descriptor IDs from session object
 	if "ldid" in attributes_to_add:
 		if session.Authentication.LoginDescriptor is not None:
-			headers["X-Login-Descriptor"] = session.Authentication.LoginDescriptor["id"]
+			headers["X-Login-Descriptor"] = session.Authentication.LoginDescriptor
 
 	return headers
 
@@ -112,7 +122,9 @@ async def nginx_introspection(
 			return aiohttp.web.HTTPForbidden()
 
 	# Extend session expiration
-	session = await session_service.touch(session)
+	# (Do not extend algorithmic sessions)
+	if not session.is_algorithmic():
+		session = await session_service.touch(session)
 
 	id_token = await oidc_service.build_id_token(session)
 
@@ -123,9 +135,14 @@ async def nginx_introspection(
 
 	# Delete SeaCat cookie from header unless "keepcookie" param is passed in query
 	cookie_string = request.headers.get(aiohttp.hdrs.COOKIE, "")
-	if request.query.get("keepcookie") is None:
-		cookie_string = cookie_service.CookiePattern.sub("", cookie_string)
-	headers[aiohttp.hdrs.COOKIE] = cookie_string
+	if not request.query.get("keepcookie"):
+		headers[aiohttp.hdrs.COOKIE] = cookie_service.remove_seacat_cookies_from_request(cookie_string)
+	else:
+		headers[aiohttp.hdrs.COOKIE] = cookie_string
+
+	ws_prorocol = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
+	if ws_prorocol:
+		headers[aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL] = re.sub(r"access_token_[^ ,]+(, )?", "", ws_prorocol)
 
 	# Add headers
 	headers = await add_to_header(
@@ -178,6 +195,14 @@ def add_params_to_url_query(url, **params):
 	query.update(params)
 	parsed["query"] = urllib.parse.urlencode(query)
 	return urlunparse(**parsed)
+
+
+def get_request_access_ips(request) -> list:
+	access_ips = [request.remote]
+	ff = request.headers.get("X-Forwarded-For")
+	if ff is not None:
+		access_ips.extend(ff.split(", "))
+	return access_ips
 
 
 def generate_ergonomic_token(length: int):

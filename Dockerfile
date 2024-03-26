@@ -1,4 +1,4 @@
-FROM alpine:3.17 AS stage1
+FROM alpine:3.18 AS stage1
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG C.UTF-8
@@ -41,14 +41,13 @@ RUN apk add --no-cache  \
     aiomysql \
     jinja2 \
     pyotp \
-    webauthn \
+    webauthn==1.9.0 \
     pyyaml \
     pymongo \
-    pydantic==1.10 \
+    sentry-sdk \
     git+https://github.com/TeskaLabs/asab.git
-# There is a broken pydantic dependency in py_webauthn.
-# Remove the "pydantic==1.10" requirement once this is fixed.
-# https://github.com/duo-labs/py_webauthn/issues/156
+# There is a broken pydantic dependency in webauthn.
+# Remove the version lock once this is fixed.
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -59,14 +58,14 @@ COPY ./.git /app/seacat-auth/.git
 RUN asab-manifest.py ./MANIFEST.json
 
 
-FROM alpine:3.17
+FROM alpine:3.18
 
 RUN apk add --no-cache \
   python3 \
   openssl \
   openldap
 
-COPY --from=stage1 /usr/lib/python3.10/site-packages /usr/lib/python3.10/site-packages
+COPY --from=stage1 /usr/lib/python3.11/site-packages /usr/lib/python3.11/site-packages
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py

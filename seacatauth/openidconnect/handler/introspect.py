@@ -5,7 +5,7 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-from ...generic import nginx_introspection, get_bearer_token_value
+from ...generic import nginx_introspection, get_bearer_token_value, get_access_token_value_from_websocket
 
 #
 
@@ -32,12 +32,18 @@ class TokenIntrospectionHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
-		web_app.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
+		web_app.router.add_post("/nginx/introspect/openidconnect", self.introspect_nginx)
 
-		# Public endpoints
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/openidconnect/introspect", self.introspect)
-		web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
+		# TODO: Insecure, back-compat only - remove after 2024-03-31
+		if asab.Config.getboolean("seacatauth:introspection", "_enable_legacy_endpoints", fallback=False):
+			asab.LogObsolete.warning(
+				"Insecure legacy introspection endpoints are enabled. Please migrate your Nginx configuration to the "
+				"new recommended endpoints and then turn off the '_enable_legacy_endpoints' option. "
+				"See https://github.com/TeskaLabs/seacat-auth/pull/311 for migration details.",
+				struct_data={"eol": "2024-03-31"}
+			)
+			web_app_public = app.PublicWebContainer.WebApp
+			web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
 
 
 	async def introspect(self, request):
@@ -73,11 +79,17 @@ class TokenIntrospectionHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	async def authenticate_request(self, request):
+	async def _authenticate_request(self, request):
 		token_value = get_bearer_token_value(request)
 		if token_value is None:
+			token_value = get_access_token_value_from_websocket(request)
+		if token_value is None:
+			L.log(asab.LOG_NOTICE, "Access token not found in 'Authorization' nor 'Sec-WebSocket-Protocol' header")
 			return None
-		return await self.OpenIdConnectService.get_session_by_access_token(token_value)
+		session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+		if session is None:
+			L.log(asab.LOG_NOTICE, "Access token matched no session.")
+		return session
 
 
 	async def introspect_nginx(self, request):
@@ -116,7 +128,7 @@ class TokenIntrospectionHandler(object):
 					internal;
 					proxy_method          POST;
 					proxy_set_body        "$http_authorization";
-					proxy_pass            http://localhost:8080/openidconnect/introspect/nginx;
+					proxy_pass            http://localhost:8900/nginx/introspect/openidconnect?client_id=my-app;
 
 					proxy_cache           token_responses;     # Enable caching
 					proxy_cache_key       $http_authorization; # Cache for each access token
@@ -128,13 +140,13 @@ class TokenIntrospectionHandler(object):
 		}
 		"""
 
-		session = await self.authenticate_request(request)
+		session = await self._authenticate_request(request)
 
 		if session is not None:
 			try:
 				response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
 			except Exception as e:
-				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 		else:
 			response = aiohttp.web.HTTPUnauthorized()

@@ -22,7 +22,7 @@ class SessionData:
 	Expiration: datetime.datetime
 	MaxExpiration: datetime.datetime
 	ExpirationExtension: int
-	TrackId: typing.Optional[str]
+	TrackId: typing.Optional[bytes]
 
 
 @dataclasses.dataclass
@@ -38,9 +38,11 @@ class CredentialsData:
 
 @dataclasses.dataclass
 class AuthenticationData:
+	AuthnTime: datetime.datetime
 	TOTPSet: str
 	ExternalLoginOptions: typing.Optional[list]
-	LoginDescriptor: typing.Optional[dict]
+	LoginDescriptor: typing.Optional[str]
+	LoginFactors: typing.Optional[list]
 	AvailableFactors: typing.Optional[list]
 	LastLogin: typing.Optional[dict]
 	IsAnonymous: typing.Optional[bool]
@@ -51,7 +53,7 @@ class AuthenticationData:
 @dataclasses.dataclass
 class AuthorizationData:
 	Authz: dict
-	Tenants: list
+	AssignedTenants: list
 
 
 @dataclasses.dataclass
@@ -61,7 +63,7 @@ class OAuth2Data:
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
-	PKCE: typing.Optional[dict]
+	Nonce: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -79,6 +81,8 @@ class SessionAdapter:
 	"""
 	Light object that represent a momentary view on the persisted session
 	"""
+
+	ALGORITHMIC_SESSION_ID = "<algorithmic>"
 
 	class FN:
 		"""
@@ -111,15 +115,16 @@ class SessionAdapter:
 
 		class Authorization:
 			_prefix = "az"
-			Tenants = "az_t"
-			Resources = "az_rs"
+			AssignedTenants = "az_t"
 			Authz = "az_az"
 
 		class Authentication:
 			_prefix = "an"
+			AuthnTime = "an_t"
 			TOTPSet = "an_ts"
 			ExternalLoginOptions = "an_ex"
 			LoginDescriptor = "an_ld"
+			LoginFactors = "an_lf"
 			AvailableFactors = "an_af"
 			LastLogin = "an_ll"
 			IsAnonymous = "an_ano"
@@ -133,7 +138,7 @@ class SessionAdapter:
 			RefreshToken = "oa_rt"
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
-			PKCE = "oa_pkce"
+			Nonce = "oa_no"
 
 		class Cookie:
 			_prefix = "ck"
@@ -225,8 +230,10 @@ class SessionAdapter:
 
 		if self.Authentication is not None:
 			session_dict.update({
+				self.FN.Authentication.AuthnTime: self.Authentication.AuthnTime,
 				self.FN.Authentication.LastLogin: self.Authentication.LastLogin,
 				self.FN.Authentication.LoginDescriptor: self.Authentication.LoginDescriptor,
+				self.FN.Authentication.LoginFactors: self.Authentication.LoginFactors,
 				self.FN.Authentication.AvailableFactors: self.Authentication.AvailableFactors,
 				self.FN.Authentication.TOTPSet: self.Authentication.TOTPSet,
 				self.FN.Authentication.IsAnonymous: self.Authentication.IsAnonymous,
@@ -237,7 +244,7 @@ class SessionAdapter:
 		if self.Authorization is not None:
 			session_dict.update({
 				self.FN.Authorization.Authz: self.Authorization.Authz,
-				self.FN.Authorization.Tenants: self.Authorization.Tenants,
+				self.FN.Authorization.AssignedTenants: self.Authorization.AssignedTenants,
 			})
 
 		if self.Cookie is not None:
@@ -253,7 +260,7 @@ class SessionAdapter:
 				self.FN.OAuth2.RefreshToken: self.OAuth2.RefreshToken,
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
-				self.FN.OAuth2.PKCE: self.OAuth2.PKCE,
+				self.FN.OAuth2.Nonce: self.OAuth2.Nonce,
 			})
 
 		if self.Batman is not None:
@@ -261,13 +268,17 @@ class SessionAdapter:
 				self.FN.Batman.Token: self.Batman.Token,
 			})
 
-		# TODO: encrypt sensitive fields
-
 		return {k: v for k, v in session_dict.items() if v is not None}
 
 	def rest_get(self):
 		session_dict = self.serialize()
 		return rest_get(session_dict)
+
+	def is_algorithmic(self):
+		return self.SessionId == self.ALGORITHMIC_SESSION_ID
+
+	def is_anonymous(self):
+		return self.Authentication is not None and bool(self.Authentication.IsAnonymous)
 
 	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields
@@ -303,7 +314,7 @@ class SessionAdapter:
 
 	@classmethod
 	def _deserialize_credentials_data(cls, session_dict):
-		credentials_id = session_dict.pop(cls.FN.Credentials.Id, None) or session_dict.pop("Cid", None)
+		credentials_id = session_dict.pop(cls.FN.Credentials.Id, None)
 		if credentials_id is None:
 			return
 		return CredentialsData(
@@ -316,19 +327,19 @@ class SessionAdapter:
 			CustomData=session_dict.pop(cls.FN.Credentials.CustomData, None),
 		)
 
-	# TODO: The following methods contain BACK-COMPAT fallbacks (the or-sections)
-	#   Remove the fallbacks in December 2022
-
 	@classmethod
 	def _deserialize_authentication_data(cls, session_dict):
+		# BACK COMPAT for existing sessions with old login descriptor
+		login_descriptor = session_dict.pop(cls.FN.Authentication.LoginDescriptor, None)
+		if isinstance(login_descriptor, dict):
+			login_descriptor = login_descriptor["id"]
 		return AuthenticationData(
-			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None)
-			or session_dict.pop("TS", None),
+			AuthnTime=session_dict.pop(cls.FN.Authentication.AuthnTime, None),
+			TOTPSet=session_dict.pop(cls.FN.Authentication.TOTPSet, None),
 			ExternalLoginOptions=session_dict.pop(cls.FN.Authentication.ExternalLoginOptions, None),
-			LoginDescriptor=session_dict.pop(cls.FN.Authentication.LoginDescriptor, None)
-			or session_dict.pop("LD", None),
-			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None)
-			or session_dict.pop("AF", None),
+			LoginDescriptor=login_descriptor,
+			LoginFactors=session_dict.pop(cls.FN.Authentication.LoginFactors, None),
+			AvailableFactors=session_dict.pop(cls.FN.Authentication.AvailableFactors, None),
 			LastLogin=session_dict.pop(cls.FN.Authentication.LastLogin, None),
 			IsAnonymous=session_dict.pop(cls.FN.Authentication.IsAnonymous, None),
 			ImpersonatorCredentialsId=session_dict.pop(cls.FN.Authentication.ImpersonatorCredentialsId, None),
@@ -337,46 +348,43 @@ class SessionAdapter:
 
 	@classmethod
 	def _deserialize_authorization_data(cls, session_dict):
-		authz = session_dict.pop(cls.FN.Authorization.Authz, None) or session_dict.pop("Authz", None)
+		authz = session_dict.pop(cls.FN.Authorization.Authz, None)
 		return AuthorizationData(
 			Authz=authz,
-			Tenants=session_dict.pop(cls.FN.Authorization.Tenants, None) or session_dict.pop("Tn", None),
+			AssignedTenants=session_dict.pop(cls.FN.Authorization.AssignedTenants, None),
 		)
 
 	@classmethod
 	def _deserialize_oauth2_data(cls, session_dict):
-		oa2_data = session_dict.pop("oa", {})  # BACK COMPAT
-		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None) or oa2_data.pop("Ti", None)
+		id_token = session_dict.pop(cls.FN.OAuth2.IdToken, None)
 		if id_token is not None:
 			try:
 				id_token = id_token.decode("ascii")
 			except UnicodeDecodeError:
 				# Probably old ID token, encoded differently
-				L.warning("Cannot deserialize ID token", struct_data={"id_token": id_token})
+				L.error("Cannot deserialize ID token", struct_data={"id_token": id_token})
 
-		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None) or oa2_data.pop("Ta", None)
+		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None)
 		if access_token is not None:
 			# Base64-encode the tokens for OIDC service convenience
 			access_token = base64.urlsafe_b64encode(access_token).decode("ascii")
 
-		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken, None) or oa2_data.pop("Tr", None)
+		refresh_token = session_dict.pop(cls.FN.OAuth2.RefreshToken, None)
 		if refresh_token is not None:
 			refresh_token = base64.urlsafe_b64encode(refresh_token).decode("ascii")
-
-		pkce = session_dict.pop(cls.FN.OAuth2.PKCE, None)
 
 		return OAuth2Data(
 			IDToken=id_token,
 			AccessToken=access_token,
 			RefreshToken=refresh_token,
-			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None) or oa2_data.pop("S", None),
+			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
-			PKCE=pkce,
+			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
 		)
 
 	@classmethod
 	def _deserialize_cookie_data(cls, session_dict):
-		sci = session_dict.pop(cls.FN.Cookie.Id, None) or session_dict.pop("SCI", None)
+		sci = session_dict.pop(cls.FN.Cookie.Id, None)
 		if sci is None:
 			return None
 		return CookieData(
@@ -404,22 +412,32 @@ def rest_get(session_dict):
 		"expiration": session_dict.get(SessionAdapter.FN.Session.Expiration),
 		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
 		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
+		"authn_time": session_dict.get(SessionAdapter.FN.Authentication.AuthnTime),
 		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
-		"authz": session_dict.get(SessionAdapter.FN.Authorization.Authz),  # BACK COMPAT
-		"tenants": session_dict.get(SessionAdapter.FN.Authorization.Tenants),
+		"login_factors": session_dict.get(SessionAdapter.FN.Authentication.LoginFactors),
+		"tenants": session_dict.get(SessionAdapter.FN.Authorization.AssignedTenants),
 		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
 		"track_id": session_dict.get(SessionAdapter.FN.Session.TrackId),
 	}
 	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)
 	if psid is not None:
 		data["parent_session_id"] = psid
-	if session_dict.get(SessionAdapter.FN.OAuth2.IdToken) is not None:
-		data["oauth2"] = True
+
+	client_id = session_dict.get(SessionAdapter.FN.OAuth2.ClientId)
+	if client_id is not None:
+		data["client_id"] = client_id
+	scope = session_dict.get(SessionAdapter.FN.OAuth2.Scope)
+	if scope is not None:
+		data["scope"] = scope
+
+	if session_dict.get(SessionAdapter.FN.OAuth2.AccessToken) is not None:
+		data["access_token"] = True
 	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
 		data["cookie"] = True
 
 	if session_dict.get(SessionAdapter.FN.Authentication.IsAnonymous) is True:
 		data["anonymous"] = True
+
 	impersonator_cid = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId)
 	if impersonator_cid is not None:
 		data["impersonator_cid"] = impersonator_cid

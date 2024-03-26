@@ -57,20 +57,18 @@ class PKCE:
 		"""
 		Validate whether the client can use the requested method in authorization
 		"""
+		expected_method = client.get("code_challenge_method", "none")
 		if requested_code_challenge_method is None:
-			if code_challenge is None:
-				requested_code_challenge_method = "none"
-			else:
-				requested_code_challenge_method = "plain"
+			# If no specific method is requested, default to the pre-configured client value
+			requested_code_challenge_method = expected_method
+		elif requested_code_challenge_method != expected_method:
+			raise InvalidCodeChallengeMethodError(
+				client_id=client["_id"], code_challenge_method=requested_code_challenge_method)
 
 		if requested_code_challenge_method == "none" and code_challenge is not None:
 			raise InvalidCodeChallengeError(
-				"Cannot request code_challenge_method without providing code_challenge.", client_id=client["_id"])
-
-		expected_method = client.get("code_challenge_method", "none")
-		if requested_code_challenge_method != expected_method:
-			raise InvalidCodeChallengeMethodError(
-				client_id=client["_id"], code_challenge_method=requested_code_challenge_method)
+				"Cannot use non-empty 'code_challenge' when 'code_challenge_method' is 'none'.",
+				client_id=client["_id"])
 
 		return requested_code_challenge_method
 

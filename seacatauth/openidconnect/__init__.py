@@ -8,6 +8,7 @@ from .handler.userinfo import UserInfoHandler
 from .handler.introspect import TokenIntrospectionHandler
 from .handler.session import SessionHandler
 from .handler.public_keys import PublicKeysHandler
+from .handler.discovery import DiscoveryHandler
 
 
 class OpenIdConnectModule(asab.Module):
@@ -18,8 +19,8 @@ class OpenIdConnectModule(asab.Module):
 	def __init__(self, app):
 		super().__init__(app)
 
-		public_api_base_url = asab.Config.get("general", "public_api_base_url")
-		auth_webui_base_url = asab.Config.get("general", "auth_webui_base_url")
+		public_api_base_url = app.PublicOpenIdConnectApiUrl
+		auth_webui_base_url = app.AuthWebUiUrl
 
 		self.OpenIdConnectService = OpenIdConnectService(app)
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
@@ -44,3 +45,4 @@ class OpenIdConnectModule(asab.Module):
 		)
 		self.SessionHandler = SessionHandler(app, self.OpenIdConnectService, self.SessionService)
 		self.PublicKeysHandler = PublicKeysHandler(app, self.OpenIdConnectService)
+		self.DiscoveryHandler = DiscoveryHandler(app, self.OpenIdConnectService)

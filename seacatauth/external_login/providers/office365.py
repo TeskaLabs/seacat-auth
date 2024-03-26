@@ -12,12 +12,15 @@ class Office365OAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "office365"
 	ConfigDefaults = {
-		"authorize_uri": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize",
-		"access_token_uri": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+		"issuer": "https://sts.windows.net/{tenant_id}",
+		"discovery_uri": "https://sts.windows.net/{tenant_id}/.well-known/openid-configuration",
+		# also available at "https://login.microsoftonline.com/{tenant_id}/.well-known/openid-configuration",
+		"jwks_uri": "https://login.microsoftonline.com/common/discovery/keys",
+		"authorization_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize",
+		"token_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
 		"tenant_id": "",
 		"scope": "openid",
-		"jwt_public_keys": "",  # For id_token validation
-		"label": "Sign in with Office365",
+		"label": "Office365",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
@@ -25,5 +28,6 @@ class Office365OAuth2Login(GenericOAuth2Login):
 		self.TenantID = self.Config.get("tenant_id")
 		assert self.TenantID not in (None, "")
 
-		self.AuthorizeURI = self.AuthorizeURI.format(tenant_id=self.TenantID)
-		self.AccessTokenURI = self.AccessTokenURI.format(tenant_id=self.TenantID)
+		self.Issuer = self.Issuer.format(tenant_id=self.TenantID)
+		self.AuthorizationEndpoint = self.AuthorizationEndpoint.format(tenant_id=self.TenantID)
+		self.TokenEndpoint = self.TokenEndpoint.format(tenant_id=self.TenantID)

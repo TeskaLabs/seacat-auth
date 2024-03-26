@@ -1,6 +1,210 @@
 # CHANGELOG
 
-## Release candidate
+## v24.06
+
+### Pre-releases
+- `v24.06-alpha10`
+- `v24.06-beta3`
+- `v24.06-alpha9`
+- `v24.06-alpha8`
+- `v24.06-beta2`
+- `v24.06-alpha7.2`
+- `v24.06-beta`
+- `v24.06-alpha6`
+- `v24.06-alpha5`
+- `v24.06-alpha4`
+- `v24.06-alpha3`
+- `v24.06-alpha2`
+- `v24.06-alpha1`
+
+### Breaking changes
+- Disable special characters in tenant ID (#349, `v24.06-alpha6`)
+
+### Fix
+- Better TOTP error responses (#352, `v24.06-alpha10`)
+- Fix resource editability (#355, `v24.06-alpha9`)
+- Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
+- Improve error handling in FIDO MDS (#351, `v24.06-alpha5`)
+- Fix typo in last login endpoint path (#346, `v24.06-alpha4`)
+- Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
+
+### Features
+- External login provider label contains just the display name (#352, `v24.06-alpha10`)
+- ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7.2`)
+- Disable special characters in tenant ID (#349, `v24.06-alpha6`)
+- New paths for account management endpoints (#343, `v24.06-alpha3`)
+- Deprecate "seacat:access" resource ID (#341, `v24.06-alpha1`)
+
+---
+
+
+## v23.47
+
+### Pre-releases
+- `v23.47-beta2`
+- `v23.47-alpha7`
+- `v23.47-alpha6`
+- `v23.47-beta`
+- `v23.47-alpha5`
+- `v23.47-alpha4`
+- `v23.47-alpha3`
+- `v23.47-alpha2`
+- `v23.47-alpha`
+
+### Breaking changes
+- Config section 'batman:elk' renamed to 'batman:elasticsearch' (#333, `v23.47-alpha5`)
+- Public URL config changed (#328, #330, `v23.47-alpha4`)
+- Remove access token from websocket protocol header during introspection (#324, `v23.47-alpha2`)
+- Batman for Kibana now also requires `kibana_url` (#281, `v23.47-alpha`)
+- Batman does no longer create Seacat resources from all Kibana roles (#281, `v23.47-alpha`)
+- ~~Config section 'batman:elk' renamed to 'batman:kibana' (#281, `v23.47-alpha`)~~
+
+### Fix
+- Impersonation error handling (#339, `v23.47-alpha7`)
+- Initialize batman service regardless of configuration (#337, `v23.47-alpha7`)
+- Well-known endpoints in the private container are available without auth (#335, `v23.47-alpha6`)
+- Check suspended credentials before login and password reset (#334, `v23.47-alpha6`)
+- Fixed Batman Kibana component initialization (#333, `v23.47-alpha5`)
+
+### Features
+- Access token Batman introspection (#333, `v23.47-alpha5`)
+- Replace audit service with audit logger (#329, `v23.47-alpha5`)
+- Hash password reset codes in the database (#329, `v23.47-alpha5`)
+- Batman configuration for Kibana can be also loaded from the `[elasticsearch]` section (#326, `v23.47-alpha4`)
+- Public URL config now requires only one option in canonical deployments (#328, #330, `v23.47-alpha4`)
+- Kibana spaces and roles are now synchronized with Seacat tenants (#281, `v23.47-alpha`)
+
+### Refactoring
+- Modular login session (#336, `v23.47-alpha7`)
+- Multiple ElasticSearch node URLs are supported (#326, `v23.47-alpha4`)
+- Separate login factors in session object (#325, `v23.47-alpha3`)
+
+---
+
+
+## v23.44-beta
+
+### Pre-releases
+- `v23.44-alpha6`
+- `v23.44-alpha5`
+- `v23.44-alpha4`
+- `v23.44-alpha3`
+
+### Breaking changes
+- Dropped support for authorize query params `ldid` and `expiration` (#296, PLUM Sprint 231006)
+
+### Fix
+- Fix client cookie introspection (#322, INDIGO Sprint 231110, `v23.44-alpha5`)
+- Handle missing webauthn data in login request (#314, INDIGO Sprint 231027, `v23.44-alpha4`)
+- Fix default authorize parameter values when redirecting (#313, PLUM Sprint 231020)
+
+### Features
+- Log successful authorization requests (#323, INDIGO Sprint 231110, `v23.44-alpha6`)
+- Lower client ID length limit (#322, INDIGO Sprint 231110, `v23.44-alpha5`)
+- Include client ID and scope in session detail (#318, INDIGO Sprint 231027, `v23.44-alpha4`)
+- Reduce grafana sync frequency (#317, INDIGO Sprint 231027, `v23.44-alpha3`)
+- Authorization for websocket requests (#300, PLUM Sprint 231006)
+- Silence stable log messages (#312, PLUM Sprint 231006)
+- External login registration webhook (#286, PLUM Sprint 231006)
+- OAuth Authorize ignores all unknown parameters (#296, PLUM Sprint 231006)
+- Log failure reasons in introspection and authorization flow (#315, INDIGO Sprint 231027)
+
+### Refactoring
+- Do not log "unhappy flow" as errors (#315, INDIGO Sprint 231027)
+
+---
+
+
+## v23.42-beta
+
+### Breaking changes
+- NGINX introspection endpoints paths changed and moved to private API (#301, #311, PLUM Sprint 231006)
+
+### Fix
+- Preserve nonce when redirecting to login (#294, PLUM Sprint 230908, @elpablos)
+- Allow username for WebAuthn credentials username (#297, PLUM Sprint 230908)
+- NGINX introspection endpoints moved to private API (#301, #311, PLUM Sprint 231006)
+
+### Features
+- Login with AppleID (#293, PLUM Sprint 230908, @filipmelik)
+- Webauthn authenticator metadata (#256, PLUM Sprint 230908)
+- Configurably disable auditing of anonymous sessions (#304, PLUM Sprint 231006)
+
+---
+
+
+## v23.39-beta
+
+### Fix
+- Fix private key provisioning (#267, @vosmol)
+- Handle missing fields in credential creation (#290, PLUM Sprint 230908)
+- Remove upsertor from audit service (#269, PLUM Sprint 230908)
+
+### Features
+- Support tenant search in old MongoDB versions (#268, PLUM Sprint 230908)
+- Public invitations to tenant (#261, PLUM Sprint 230908)
+- Human-readable tenant label (#285, PLUM Sprint 230908)
+- Log failed password change requests (#291, PLUM Sprint 230908)
+- Get Github user email address (#289, PLUM Sprint 230908)
+- External login ID token validation (#292, PLUM Sprint 230908)
+- Log reasons for introspection failure (#299, PLUM Sprint 231006)
+
+---
+
+
+## v23.37-beta
+
+### Breaking changes
+- Config option `sender_email_address` is now called `from` (#257, PLUM Sprint 230825)
+- Invalid redirect URI or client ID in Authorize request results in an error response without redirect (#266, PLUM Sprint 230908)
+- Config section `[seacat_auth]` renamed to `[seacatauth]` (#266, PLUM Sprint 230908)
+
+### Fix
+- Add `id_token_signing_alg_values_supported` in OIDC discovery (#260)
+- Add support for `nonce` authorize parameter (#263, PLUM Sprint 230908)
+- Handle special characters in login ident (#264, PLUM Sprint 230908)
+
+### Features
+- Unified SMTP config (#257, PLUM Sprint 230825)
+- Endpoint for pruning old audit entries (#259, PLUM Sprint 230825)
+- Algorithmic (stateless) anonymous sessions (#232, PLUM Sprint 230825)
+- Initialize Zookeeper service (#265, PLUM Sprint 230908)
+- Initialize Sentry service (#262, PLUM Sprint 230908)
+- Config option to disable all redirect URI validations (#266, PLUM Sprint 230908)
+
+### Refactoring
+- Last login info moved to a dedicated collection (#259, PLUM Sprint 230825)
+
+---
+
+
+## v23.36-beta
+
+### Fix
+- Default OIDC Issuer name set to the value of PUBLIC_AUTH_API (#249, PLUM Sprint 230811)
+- Re-lock webauthn package version (#258, PLUM Sprint 230811)
+
+### Features
+- Role list supports searching by name (#247, PLUM Sprint 230811)
+- OIDC/OAuth discovery endpoint (#249, PLUM Sprint 230811)
+- Token revocation endpoint (#249, PLUM Sprint 230811)
+- Added /.well-known/jwks.json endpoint (#249, PLUM Sprint 230811)
+
+---
+
+
+## v23.33-beta
+
+### Features
+- Upgrade to Alpine 3.18 and Python 3.11 (#245, PLUM Sprint 230728)
+
+### Refactoring
+- ELK Batman uses ASAB SSLContextBuilder (#244, PLUM Sprint 230728)
+
+---
+
+
+## v23.32-beta
 
 ### Breaking changes
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
@@ -8,9 +212,11 @@
 ### Fix
 - Validate client session expiration (#237, PLUM Sprint 230714)
 - Add `editable` field in provider info (#238, PLUM Sprint 230728)
+- Fix resource rename flow (#239, PLUM Sprint 230728)
 
 ### Features
 - Seacat Auth listens on ports 3081 and 8900 by default (#230, PLUM Sprint 230714)
+- Add SSL and API key support in ELK batman (#241, GREY Sprint 230714)
 
 ---
 

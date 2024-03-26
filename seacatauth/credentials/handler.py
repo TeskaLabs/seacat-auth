@@ -1,13 +1,11 @@
 import logging
 
-import aiohttp
-import aiohttp.web
-
 import asab
 import asab.web.rest
 import asab.web.webcrypto
 import asab.exceptions
 
+from .. import exceptions
 from ..decorators import access_control
 from .schemas import (
 	CREATE_CREDENTIALS,
@@ -35,7 +33,7 @@ class CredentialsHandler(object):
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 		web_app = app.WebContainer.WebApp
 
@@ -50,20 +48,25 @@ class CredentialsHandler(object):
 		web_app.router.add_put("/credentials/{credentials_id}", self.update_credentials)
 		web_app.router.add_delete("/credentials/{credentials_id}", self.delete_credentials)
 
+		web_app.router.add_get("/provider/{provider_id}", self.get_provider_info)
+		web_app.router.add_get("/providers", self.list_providers)
+		web_app.router.add_put("/enforce-factors/{credentials_id}", self.enforce_factors)
+
+		web_app.router.add_get("/account/provider", self.get_my_provider_info)
+		web_app.router.add_put("/account/credentials", self.update_my_credentials)
+		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
+
+		# Back-compat; To be removed in next major version
+		# >>>
+		web_app.router.add_get("/public/provider", self.get_my_provider_info)
 		web_app.router.add_put("/public/credentials", self.update_my_credentials)
 		web_app.router.add_get("/public/last_login", self.get_my_last_login_data)
 
-		# Providers
-		web_app.router.add_get("/provider/{provider_id}", self.get_provider_info)
-		web_app.router.add_get("/providers", self.list_providers)
-		web_app.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app.router.add_put("/enforce-factors/{credentials_id}", self.enforce_factors)
-
-		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_put("/public/credentials", self.update_my_credentials)
 		web_app_public.router.add_get("/public/provider", self.get_my_provider_info)
 		web_app_public.router.add_get("/public/last_login", self.get_my_last_login_data)
+		# <<<
 
 
 	@access_control("seacat:credentials:access")
@@ -111,7 +114,7 @@ class CredentialsHandler(object):
 		Get the credentials' last successful/failed login data.
 		"""
 		credentials_id = request.match_info["credentials_id"]
-		data = await self.AuditService.get_last_logins(credentials_id)
+		data = await self.LastActivityService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -120,9 +123,9 @@ class CredentialsHandler(object):
 		"""
 		Get the current user's last successful/failed login data.
 		"""
-		if request.Session.Authentication.IsAnonymous:
+		if request.Session.is_anonymous():
 			raise asab.exceptions.AccessDeniedError()
-		data = await self.AuditService.get_last_logins(credentials_id)
+		data = await self.LastActivityService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -208,8 +211,8 @@ class CredentialsHandler(object):
 		# Filtering based on IDs obtained form another collection
 		if mode in frozenset(["role", "tenant"]):
 			if filtr is None:
-				L.error("No filter string specified.", struct_data={"mode": mode})
-				raise aiohttp.web.HTTPBadRequest()
+				raise asab.exceptions.ValidationError(
+					"Filter mode {!r} requires that a filter string is specified".format(mode))
 
 			# These filters require access dedicated resource
 			rbac_svc = self.CredentialsService.App.get_service("seacatauth.RBACService")
@@ -310,8 +313,7 @@ class CredentialsHandler(object):
 					continue
 
 		else:
-			L.error("Unsupported filter mode", struct_data={"mode": mode})
-			raise aiohttp.web.HTTPBadRequest()
+			raise asab.exceptions.ValidationError("Unsupported filter mode {!r}".format(mode))
 
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
@@ -376,7 +378,7 @@ class CredentialsHandler(object):
 		credentials = await provider.get(request.match_info["credentials_id"])
 
 		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
-			credentials["_ll"] = await self.AuditService.get_last_logins(credentials_id)
+			credentials["_ll"] = await self.LastActivityService.get_last_logins(credentials_id)
 
 		return asab.web.rest.json_response(request, credentials)
 
@@ -403,7 +405,11 @@ class CredentialsHandler(object):
 		if password_link:
 			# TODO: Separate password creation from password reset
 			crd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
-			await crd_svc.init_password_change(credentials_id, is_new_user=True)
+			try:
+				await crd_svc.init_password_change(credentials_id, is_new_user=True)
+			except exceptions.CommunicationError:
+				L.error("Password reset failed: Failed to send password change link", struct_data={
+					"cid": credentials_id})
 
 		return asab.web.rest.json_response(request, {
 			"status": "OK",

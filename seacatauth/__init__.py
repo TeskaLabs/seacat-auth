@@ -1,19 +1,30 @@
+import asab
+import logging
+
 from .app import SeaCatAuthApplication
 
-import asab
 
 asab.Config.add_defaults({
 	"general": {
-		# Public API base URL lets the app know from what URL is its public API served.
-		# It is used by the OpenIDConnect authorize handler for generating loopback redirect URIs.
+		# Absolute URL of the server where Seacat Auth API is available.
+		# Used for deriving callback URLs, issuer IDs (OAuth, WebAuthn, ...).
 		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
-		"public_api_base_url": "http://localhost/auth/api",
+		# Defaults to "http://localhost", which can be overwritten by PUBLIC_SERVER_URL environment variable.
+		"public_url": "",
+
+		# URL prefix of public Seacat Auth API
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"public_seacat_auth_base_url": "api/seacat-auth/",
+
+		# URL prefix of public OpenID Connect API
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"public_openidconnect_base_url": "api/",
 
 		# Auth web UI base URL lets the app know where the auth web UI is served to the public.
 		# It is used for building login and password reset URIs.
 		# The domain name is extracted for cookie and authentication purposes.
-		# For full feature availability, the use of HTTPS and a proper domain name is recommended.
-		"auth_webui_base_url": "http://localhost/auth",
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"auth_webui_base_url": "auth/",
 	},
 
 	# Admin API (non-public)
@@ -26,10 +37,13 @@ asab.Config.add_defaults({
 		"listen": "3081",  # Well-known port
 	},
 
+	"seacatauth": {
+		"private_key": "",
+	},
+
 	"openidconnect": {
 		"bearer_realm": "asab",
 		"auth_code_timeout": "60 s",
-		"private_key": "",
 	},
 
 	"seacatauth:client": {
@@ -57,10 +71,6 @@ asab.Config.add_defaults({
 		# Specifies if non-public endpoints require authentication
 		"require_authentication": "yes",
 
-		# Specifies resource required for API access
-		# If set to "DISABLED", no authorization is required
-		"authorization_resource": "seacat:access",
-
 		# DEV ONLY!
 		# Allow authentication via access token
 		# This imposes the risk of the access token being misused by 3rd party app (user impersonation)
@@ -80,6 +90,11 @@ asab.Config.add_defaults({
 		# Specify what attributes are used in locating credentials (if supported by the respective provider)
 		# Attributes may be specified with a ":ignorecase" modifier for case-insensitive searching
 		"ident_fields": "username:ignorecase email:ignorecase",
+	},
+
+	"seacatauth:tenant": {
+		# Additional characters to be allowed in tenant IDs besides lowercase letters and numbers
+		"additional_allowed_id_characters": "",
 	},
 
 	"seacatauth:registration": {
@@ -159,6 +174,10 @@ asab.Config.add_defaults({
 
 		# Maximum session age, beyond which the session cannot be extended
 		"maximum_age": "7 d",
+
+		# Algorithmic sessions cache data about tenant and resource authorization.
+		# This option sets the validity period of that data.
+		"algo_cache_expiration": "3 m",
 	},
 
 	"seacatauth:password": {
@@ -172,6 +191,8 @@ asab.Config.add_defaults({
 	},
 })
 
+AuditLogger = logging.getLogger("AUDIT")
+
 __all__ = [
-	'SeaCatAuthApplication'
+	"SeaCatAuthApplication"
 ]

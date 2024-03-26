@@ -29,9 +29,13 @@ class BatmanService(asab.Service):
 			self.Key = b"12345678901234567890123456789012"
 
 		if "batman:elk" in asab.Config.sections():
-			from .elk import ELKIntegration
+			raise ValueError(
+				"Config section 'batman:elk' has been renamed to 'batman:elasticsearch'. Please update your config.")
+
+		if "batman:elasticsearch" in asab.Config.sections() or "batman:elk" in asab.Config.sections():
+			from .elasticsearch import ElasticSearchIntegration
 			self.Integrations.append(
-				ELKIntegration(self)
+				ElasticSearchIntegration(self)
 			)
 
 		if "batman:grafana" in asab.Config.sections():
@@ -41,6 +45,10 @@ class BatmanService(asab.Service):
 			)
 
 		app.TaskService.schedule(*[i.initialize() for i in self.Integrations])
+
+
+	async def initialize(self, app):
+		app.PubSub.publish("Batman.initialized!", asynchronously=True)
 
 
 	def generate_password(self, credentials_id):

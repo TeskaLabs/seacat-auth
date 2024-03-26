@@ -45,7 +45,7 @@ class RoleService(asab.Service):
 
 
 	async def list(
-		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, *,
+		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, filter: str = None, *,
 		resource: str = None,
 		active_only: bool = False,
 		exclude_global: bool = False,
@@ -57,6 +57,9 @@ class RoleService(asab.Service):
 				query_filter["tenant"] = {"$in": [tenant]}
 			else:
 				query_filter["tenant"] = {"$in": [tenant, None]}
+		if filter:
+			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
+			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(filter)}
 		if resource is not None:
 			query_filter["resources"] = resource
 		if active_only is True:
@@ -122,6 +125,7 @@ class RoleService(asab.Service):
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="role", value=role_id)
 
+		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
 		return role_id
 
 
@@ -135,6 +139,7 @@ class RoleService(asab.Service):
 		# Delete the role
 		await self.StorageService.delete(self.RoleCollection, role_id)
 		L.log(asab.LOG_NOTICE, "Role deleted", struct_data={'role_id': role_id})
+		self.App.PubSub.publish("Role.deleted!", role_id=role_id, asynchronously=True)
 		return "OK"
 
 
@@ -165,8 +170,8 @@ class RoleService(asab.Service):
 			# Global-only resources cannot be assigned to a tenant role
 			for resource in resources_to_assign:
 				if self.ResourceService.is_global_only_resource(resource):
-					message = "Cannot assign global-only resources to tenant roles"
-					L.warning(message, struct_data={"resource": resource, "role": role_id})
+					message = "Cannot assign global-only resources to tenant roles."
+					L.error(message, struct_data={"resource": resource, "role": role_id})
 					raise asab.exceptions.ValidationError(message)
 
 		if resources_to_set is None:
@@ -212,6 +217,8 @@ class RoleService(asab.Service):
 
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
+		self.App.PubSub.publish("Role.updated!", role_id=role_id, asynchronously=True)
+
 		return "OK"
 
 
@@ -362,6 +369,7 @@ class RoleService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict("Role already assigned.") from e
 
+		self.App.PubSub.publish("Role.assigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
 		L.log(asab.LOG_NOTICE, "Role assigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,
@@ -371,6 +379,7 @@ class RoleService(asab.Service):
 	async def unassign_role(self, credentials_id: str, role_id: str):
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
+		self.App.PubSub.publish("Role.unassigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
 		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,

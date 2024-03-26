@@ -161,14 +161,15 @@ class ResourceHandler(object):
 		resource_id = request.match_info["resource_id"]
 		if "description" in json_data:
 			await self.ResourceService.update(resource_id, json_data["description"])
-		if "name" in json_data:
+		if "name" in json_data and json_data["name"] != resource_id:
+			# TODO: Renaming should be on a separate endpoint
 			await self.ResourceService.rename(resource_id, json_data["name"])
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@access_control("seacat:resource:edit")
-	async def delete(self, request):
+	async def delete(self, request, *, credentials_id):
 		"""
 		Delete resource
 
@@ -190,6 +191,8 @@ class ResourceHandler(object):
 		resource_id = request.match_info["resource_id"]
 		hard_delete = request.query.get("hard_delete") == "true"
 		if hard_delete and not request.is_superuser:
-			raise aiohttp.web.HTTPForbidden()
+			L.log(asab.LOG_NOTICE, "Cannot hard-delete resources without superuser rights", struct_data={
+				"cid": credentials_id, "resource": resource_id})
+			return aiohttp.web.HTTPForbidden()
 		await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
 		return asab.web.rest.json_response(request, {"result": "OK"})

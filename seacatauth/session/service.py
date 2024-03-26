@@ -9,14 +9,14 @@ import cryptography.hazmat.primitives.ciphers
 import cryptography.hazmat.primitives.ciphers.algorithms
 import cryptography.hazmat.primitives.ciphers.modes
 
-
 import asab
 import asab.storage
 import pymongo
 
-from .adapter import SessionAdapter, rest_get
 from .. import exceptions
 from ..events import EventTypes
+from .adapter import SessionAdapter, rest_get
+from .algorithmic import AlgorithmicSessionProvider
 
 #
 
@@ -32,6 +32,7 @@ class SessionService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
+		self.Algorithmic = AlgorithmicSessionProvider(app)
 
 		# SessionService does not use the encryption provided by StorageService.
 		# It needs to be able to search by encrypted values and thus requires
@@ -86,6 +87,8 @@ class SessionService(asab.Service):
 
 
 	async def initialize(self, app):
+		await self.Algorithmic.initialize(app)
+
 		# Initialize indexes
 		collection = await self.StorageService.collection(self.SessionCollection)
 
@@ -271,8 +274,11 @@ class SessionService(asab.Service):
 	async def get(self, session_id):
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
-		session_dict = await self.StorageService.get(
-			self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
+		try:
+			session_dict = await self.StorageService.get(
+				self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
+		except KeyError:
+			raise exceptions.SessionNotFoundError("Session not found", session_id=session_id)
 
 		# Do not return expired sessions
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
@@ -421,7 +427,9 @@ class SessionService(asab.Service):
 		try:
 			await upsertor.execute(event_type=EventTypes.SESSION_EXTENDED)
 		except KeyError:
-			L.warning("Conflict: Session already touched.", struct_data={"sid": session.Session.Id, "v": version})
+			# This is often caused by a race condition when simultaneous requests attempt to touch the session.
+			# It can be ignored.
+			L.info("Conflict: Session already touched", struct_data={"sid": session.Session.Id, "v": version})
 
 		return await self.get(session.SessionId)
 
@@ -546,7 +554,7 @@ class SessionService(asab.Service):
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
 
-		elif not src_session.Authentication.IsAnonymous:
+		elif not src_session.is_anonymous():
 			L.info("Cannot transfer Track ID: Source session is not anonymous.", struct_data={
 				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
 			root_session_id = dst_session.Session.ParentSessionId
@@ -573,13 +581,11 @@ class SessionService(asab.Service):
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
 
-		elif not dst_session.Authentication.IsAnonymous:
+		elif not dst_session.is_anonymous():
 			# The destination session is authenticated while the source one is anonymous
 			# Transfer the track ID to the destination session and delete the source session
 			assert dst_session.Session.ParentSessionId is not None
 			session_builders = [((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),)]
-			old_session_group_id = src_session.Session.ParentSessionId or src_session.SessionId
-			await self.delete(old_session_group_id)
 			await self.update_session(dst_session.SessionId, session_builders)
 			await self.update_session(dst_session.Session.ParentSessionId, session_builders)
 

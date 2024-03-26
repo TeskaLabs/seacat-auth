@@ -5,6 +5,7 @@ import asab
 import asab.web.rest
 import asab.storage.exceptions
 
+from .... import exceptions
 from ....decorators import access_control
 
 #
@@ -96,10 +97,14 @@ class RoleHandler(object):
 		limit = request.query.get("i")
 		if limit is not None:
 			limit = int(limit)
+		filter_string = request.query.get("f")
 		resource = request.query.get("resource")
 		exclude_global = request.query.get("exclude_global", "false") == "true"
 
-		result = await self.RoleService.list(tenant, page, limit, resource=resource, exclude_global=exclude_global)
+		result = await self.RoleService.list(
+			tenant, page, limit, filter_string,
+			resource=resource,
+			exclude_global=exclude_global)
 		return asab.web.rest.json_response(request, result)
 
 
@@ -112,15 +117,10 @@ class RoleHandler(object):
 		role_id = "{}/{}".format(tenant, role_name)
 		try:
 			result = await self.RoleService.get(role_id)
-		except ValueError:
-			L.log(asab.LOG_NOTICE, "Invalid role_id: {}".format(role_id))
-			raise aiohttp.web.HTTPBadRequest()
 		except KeyError:
 			L.log(asab.LOG_NOTICE, "Couldn't find role '{}'".format(role_id))
-			raise aiohttp.web.HTTPNotFound()
-		return asab.web.rest.json_response(
-			request, result
-		)
+			return aiohttp.web.HTTPNotFound()
+		return asab.web.rest.json_response(request, result)
 
 
 	@access_control("seacat:role:edit")
@@ -144,15 +144,10 @@ class RoleHandler(object):
 
 		try:
 			result = await self.RoleService.delete(role_id)
-		except ValueError:
-			L.error("Invalid role_id", struct_data={"role_id": role_id})
-			raise aiohttp.web.HTTPBadRequest()
 		except KeyError:
-			L.error("Couldn't find role", struct_data={"role_id": role_id})
-			raise aiohttp.web.HTTPNotFound()
-		return asab.web.rest.json_response(
-			request, result
-		)
+			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": role_id})
+			return aiohttp.web.HTTPNotFound()
+		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -190,11 +185,11 @@ class RoleHandler(object):
 		if not request.is_superuser:
 			# Cannot edit global roles
 			if tenant in (None, "*"):
-				L.warning("Not authorized to edit global roles", struct_data={
+				L.log(asab.LOG_NOTICE, "Not authorized to edit global roles", struct_data={
 					"role_id": role_id,
 					"cid": request.CredentialsId
 				})
-				raise aiohttp.web.HTTPForbidden()
+				return aiohttp.web.HTTPForbidden()
 
 		try:
 			result = await self.RoleService.update(
@@ -204,9 +199,7 @@ class RoleHandler(object):
 				resources_to_add=resources_to_add,
 				resources_to_remove=resources_to_remove,
 			)
-		except ValueError:
-			raise aiohttp.web.HTTPBadRequest()
-		return asab.web.rest.json_response(
-			request,
-			data={"result": result}
-		)
+		except exceptions.RoleNotFoundError as e:
+			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": e.Role})
+			return aiohttp.web.HTTPNotFound()
+		return asab.web.rest.json_response(request, data={"result": result})

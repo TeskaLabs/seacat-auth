@@ -24,13 +24,13 @@ class UserInfoHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		# The Client sends the UserInfo Request using either HTTP GET or HTTP POST.
-		web_app.router.add_get("/openidconnect/userinfo", self.userinfo)
-		web_app.router.add_post("/openidconnect/userinfo", self.userinfo)
+		web_app.router.add_get(self.OpenIdConnectService.UserInfoPath, self.userinfo)
+		web_app.router.add_post(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get("/openidconnect/userinfo", self.userinfo)
-		web_app_public.router.add_post("/openidconnect/userinfo", self.userinfo)
+		web_app_public.router.add_get(self.OpenIdConnectService.UserInfoPath, self.userinfo)
+		web_app_public.router.add_post(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 
 
 	async def userinfo(self, request):
@@ -43,8 +43,8 @@ class UserInfoHandler(object):
 		session = request.Session
 
 		if session is None:
-			L.warning("Request for invalid/expired session")
-			return self.error_response("invalid_session", "The access token is invalid/expired.")
+			L.log(asab.LOG_NOTICE, "Authentication required")
+			return self.error_response("invalid_token", "Access token or cookie is invalid.")
 
 		# # if authorized get provider for this identity
 

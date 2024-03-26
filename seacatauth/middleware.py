@@ -2,6 +2,7 @@ import aiohttp.web
 import asab
 import logging
 
+from . import exceptions
 from .generic import get_bearer_token_value
 
 #
@@ -27,8 +28,8 @@ def app_middleware_factory(app):
 def private_auth_middleware_factory(app):
 	oidc_service = app.get_service("seacatauth.OpenIdConnectService")
 	require_authentication = asab.Config.getboolean("seacat:api", "require_authentication")
-	authorization_resource = asab.Config.get("seacat:api", "authorization_resource")
 	_allow_access_token_auth = asab.Config.getboolean("seacat:api", "_allow_access_token_auth")
+	asab_api_required_bearer_token = asab.Config.get("asab:api:auth", "bearer", fallback=None)
 
 	rbac_svc = app.get_service("seacatauth.RBACService")
 
@@ -45,6 +46,15 @@ def private_auth_middleware_factory(app):
 		bearer=xtA4J9c6KK3g_Y0VplS_Rz4xmoVoU1QWrwz9CHz2p3aTpHzOkr0yp3xhcbkJK-Z0
 		"""
 		request.Session = None
+
+		if request.path.startswith("/nginx/"):
+			# NGINX introspection endpoints handle authentication on their own
+			return await handler(request)
+
+		elif request.path.startswith("/.well-known/"):
+			# Well-known endpoints use no authentication
+			return await handler(request)
+
 		token_value = get_bearer_token_value(request)
 		if token_value is not None:
 			try:
@@ -72,34 +82,21 @@ def private_auth_middleware_factory(app):
 
 		# All API endpoints are considered non-public and have to pass authn/authz
 		if request.Session is not None and request.Session.Authorization.Authz is not None:
-			if authorization_resource == "DISABLED":
-				return await handler(request)
-			# Resource authorization is required: scan ALL THE RESOURCES
-			#   for `authorization_resource` or "authz:superuser"
-			resources = set(
-				resource
-				for resources in request.Session.Authorization.Authz.values()
-				for resource in resources
-			)
-			# Grant access to superuser
-			if "authz:superuser" in resources:
-				return await handler(request)
-			# Grant access to the bearer of `authorization_resource`
-			if authorization_resource in resources:
-				return await handler(request)
+			return await handler(request)
 
-		# TODO authorization should be demanded on the handler level based on @accesscontrol
+		# ASAB API can be protected with a pre-configured bearer token
 		if (request.path.startswith("/asab/v1") or request.path in ("/doc", "/oauth2-redirect.html")) \
 			and request.method == "GET":
-			if "asab:api:auth" in asab.Config.sections():
-				if request.headers.get("Authorization") == "Bearer " + asab.Config.get("asab:api:auth", "bearer"):
+			if asab_api_required_bearer_token:
+				if request.headers.get("Authorization") == "Bearer {}".format(asab_api_required_bearer_token):
 					return await handler(request)
 				else:
-					raise aiohttp.web.HTTPUnauthorized()
+					L.log(asab.LOG_NOTICE, "Invalid bearer token for ASAB API access")
+					return aiohttp.web.HTTPUnauthorized()
 			else:
 				return await handler(request)
 
-		raise aiohttp.web.HTTPUnauthorized()
+		return aiohttp.web.HTTPUnauthorized()
 
 	return private_auth_middleware
 
@@ -130,11 +127,18 @@ def public_auth_middleware_factory(app):
 				elif _allow_access_token_auth:
 					request.Session = await oidc_service.get_session_by_access_token(token_value)
 				else:
-					L.info("Invalid Bearer token")
-					raise aiohttp.web.HTTPUnauthorized()
+					L.log(asab.LOG_NOTICE, "Invalid bearer token")
+					return aiohttp.web.HTTPUnauthorized()
 		else:
 			# No Bearer token exists, authorize using cookie
-			request.Session = await cookie_service.get_session_by_request_cookie(request)
+			try:
+				request.Session = await cookie_service.get_session_by_request_cookie(request)
+			except exceptions.NoCookieError:
+				L.info("No root cookie found in request")
+				request.Session = None
+			except exceptions.SessionNotFoundError:
+				L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
+				request.Session = None
 
 		return await handler(request)
 

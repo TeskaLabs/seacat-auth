@@ -10,16 +10,27 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
-import seacatauth.exceptions
-from ..audit import AuditCode
+from .. import exceptions, AuditLogger, generic
+from ..last_activity import EventCode
 from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
+from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
 #
 
 L = logging.getLogger(__name__)
 
 #
+
+
+JWK_PARAMS = {
+	"crv": {"type": "string"},
+	"ext": {"type": "boolean"},
+	"key_ops": {"type": "array"},
+	"kty": {"type": "string"},
+	"x": {"type": "string"},
+	"y": {"type": "string"}
+}
 
 
 class AuthenticationHandler(object):
@@ -36,32 +47,38 @@ class AuthenticationHandler(object):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CookieService = app.get_service("seacatauth.CookieService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
-		self.BatmanService = app.BatmanService
+		self.BatmanService = app.get_service("seacatauth.BatmanService")
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
-		web_app.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
-		web_app.router.add_put(r"/public/logout", self.logout)
-		web_app.router.add_put("/impersonate", self.impersonate)
-		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
+		web_app.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app.router.add_put("/public/login/{lsid}", self.login)
+		web_app.router.add_put("/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
+		web_app.router.add_put("/public/logout", self.logout)
+		web_app.router.add_put("/account/impersonate", self.impersonate)
+		web_app.router.add_post("/account/impersonate", self.impersonate_and_redirect)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put(r"/public/login.prologue", self.login_prologue)
-		web_app_public.router.add_put(r"/public/login/{lsid}", self.login)
-		web_app_public.router.add_put(r"/public/login/{lsid}/smslogin", self.smslogin)
-		web_app_public.router.add_put(r"/public/login/{lsid}/webauthn", self.webauthn_login)
-		web_app_public.router.add_put(r"/public/logout", self.logout)
+		web_app_public.router.add_put("/public/login.prologue", self.login_prologue)
+		web_app_public.router.add_put("/public/login/{lsid}", self.login)
+		web_app_public.router.add_put("/public/login/{lsid}/smslogin", self.prepare_smslogin_challenge)
+		web_app_public.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
+		web_app_public.router.add_put("/public/logout", self.logout)
+
+		# Back-compat; To be removed in next major version
+		# >>>
+		web_app.router.add_put("/impersonate", self.impersonate)
+		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
 		web_app_public.router.add_put("/impersonate", self.impersonate)
 		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
+		# <<<
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["ident"],
+		"required": ["ident", *JWK_PARAMS.keys()],
 		"properties": {
 			"ident": {
 				"type": "string",
@@ -71,7 +88,9 @@ class AuthenticationHandler(object):
 				"description":
 					"Optional extra parameters used for locating credentials. "
 					"Allowed parameter names must be listed in `[seacatauth:authentication] custom_login_parameters` "
-					"in the app configuration."}}
+					"in the app configuration."},
+			**JWK_PARAMS
+		}
 	})
 	async def login_prologue(self, request, *, json_data):
 		"""
@@ -86,6 +105,7 @@ class AuthenticationHandler(object):
 		"""
 		key = jwcrypto.jwk.JWK.from_json(await request.read())
 		ident = json_data.get("ident")
+		login_session_id = json_data.get("lsid")
 
 		# Get arguments specified in login URL query
 		login_preferences = None
@@ -99,66 +119,45 @@ class AuthenticationHandler(object):
 			for k, v in query_dict.items():
 				if k in self.AuthenticationService.CustomLoginParameters:
 					if len(v) > 1:
-						L.error("Repeated query parameters are not supported", struct_data={"qs": query_string})
-						raise asab.exceptions.ValidationError("Invalid request")
+						raise asab.exceptions.ValidationError("Repeated query parameters are not supported")
 					login_dict[k] = v[0]
 
 			# Get preferred login descriptor IDs
 			# TODO: This option should be moved to client config or removed completely
 			login_preferences = query_dict.get("ldid")
 
-		# Locate credentials
-		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
-		if credentials_id is None or credentials_id == []:
-			L.warning("Cannot locate credentials.", struct_data={"ident": ident})
-			# Empty credentials is used for creating a fake login session
-			credentials_id = ""
+		if login_session_id:
+			login_session = await self.AuthenticationService.get_login_session(login_session_id)
+		else:
+			login_session = await self.AuthenticationService.create_login_session()
 
-		# Deny login to m2m credentials
-		if credentials_id != "":
-			cred_provider = self.CredentialsService.get_provider(credentials_id)
-			if cred_provider.Type == "m2m":
-				L.warning("Cannot login with machine credentials.", struct_data={"cid": credentials_id})
-				# Empty credentials is used for creating a fake login session
-				credentials_id = ""
-
-		# Prepare login descriptors
-		login_descriptors = None
-		if credentials_id != "":
-			login_descriptors = await self.AuthenticationService.prepare_login_descriptors(
-				credentials_id=credentials_id,
+		try:
+			login_session = await self.AuthenticationService.prepare_seacat_login(
+				login_session=login_session,
+				ident=ident,
+				client_public_key=key.get_op_key("encrypt"),
 				request_headers=request.headers,
+				login_dict=login_dict,
 				login_preferences=login_preferences
 			)
-
-		if login_descriptors is None:
-			# Prepare fallback login descriptors for fake login session
-			credentials_id = ""
-			L.warning("Creating fake login session.", struct_data={"ident": ident})
-			login_descriptors = await self.AuthenticationService.prepare_fallback_login_descriptors(
-				credentials_id=credentials_id,
-				request_headers=request.headers
+		except exceptions.LoginPrologueDeniedError:
+			login_session = await self.AuthenticationService.prepare_failed_seacat_login(
+				login_session=login_session,
+				ident=ident,
+				client_public_key=key.get_op_key("encrypt")
 			)
 
-		if login_descriptors is None:
-			L.error("Fatal error: Failed to prepare fallback login descriptors.", struct_data={"ident": ident})
-			raise aiohttp.web.HTTPInternalServerError()
-
-		login_session = await self.AuthenticationService.create_login_session(
-			credentials_id=credentials_id,
-			client_public_key=key.get_op_key("encrypt"),  # extract EC public key from JWT
-			login_descriptors=login_descriptors,
-			ident=ident,
-		)
-
-		key = jwcrypto.jwk.JWK.from_pyca(login_session.PublicKey)
+		key = jwcrypto.jwk.JWK.from_pyca(login_session.SeacatLogin.ServerPublicKey)
 
 		response = {
-			'lsid': login_session.Id,
-			'lds': [descriptor.serialize() for descriptor in login_descriptors],
-			'key': key.export_public(as_dict=True),
+			"lsid": login_session.Id,
+			"lds": [
+				descriptor.serialize()
+				for descriptor in login_session.SeacatLogin.LoginDescriptors],
+			"key": key.export_public(as_dict=True),
 		}
 		return asab.web.rest.json_response(request, response)
+
 
 	async def login(self, request):
 		"""
@@ -175,32 +174,33 @@ class AuthenticationHandler(object):
 
 		try:
 			login_session = await self.AuthenticationService.get_login_session(lsid)
-		except KeyError:
-			L.warning("Login failed: Invalid login session ID", struct_data={
+		except KeyError as e:
+			print(e)
+			L.log(asab.LOG_NOTICE, "Login failed: Invalid login session ID", struct_data={
 				"lsid": lsid
 			})
 			return asab.web.rest.json_response(
 				request,
-				data={'result': 'FAILED'},
+				data={"result": "FAILED"},
 				status=401
 			)
 
-		if login_session.RemainingLoginAttempts <= 0:
+		if login_session.SeacatLogin.LoginAttemptsLeft <= 0:
 			await self.AuthenticationService.delete_login_session(lsid)
-			L.warning("Login failed: no more attempts", struct_data={
+			L.log(asab.LOG_NOTICE, "Login failed: No more attempts", struct_data={
 				"lsid": lsid,
 				"ident": login_session.Ident,
 				"cid": login_session.CredentialsId
 			})
 			return asab.web.rest.json_response(
 				request,
-				data={'result': 'FAILED'},
+				data={"result": "FAILED"},
 				status=401
 			)
 
-		await self.AuthenticationService.update_login_session(
-			lsid,
-			remaining_login_attempts=login_session.RemainingLoginAttempts - 1
+		login_session = await self.AuthenticationService.update_login_session(
+			login_session,
+			login_attempts_left=login_session.SeacatLogin.LoginAttemptsLeft - 1
 		)
 
 		request_data = login_session.decrypt(await request.read())
@@ -208,54 +208,52 @@ class AuthenticationHandler(object):
 
 		request_data["request_headers"] = request.headers
 
-		access_ips = [request.remote]
-		ff = request.headers.get('X-Forwarded-For')
-		if ff is not None:
-			access_ips.extend(ff.split(', '))
+		access_ips = generic.get_request_access_ips(request)
 
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			# TODO: Log also the IP address
-			await self.AuditService.append(
-				AuditCode.LOGIN_FAILED,
-				{
-					'cid': login_session.CredentialsId,
-					'ips': access_ips,
-				}
-			)
-
-			L.warning("Login failed: authentication failed", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+				"cid": login_session.SeacatLogin.CredentialsId,
 				"lsid": lsid,
-				"ident": login_session.Ident,
-				"cid": login_session.CredentialsId
+				"ident": login_session.SeacatLogin.Ident,
+				"from_ip": access_ips
 			})
+			await self.AuthenticationService.LastActivityService.update_last_activity(
+				EventCode.LOGIN_FAILED, login_session.SeacatLogin.CredentialsId, from_ip=access_ips)
 
-			self.AuthenticationService.LoginCounter.add('failed', 1)
+			self.AuthenticationService.LoginCounter.add("failed", 1)
 
 			return asab.web.rest.json_response(
 				request,
-				data={'result': 'FAILED'},
+				data={"result": "FAILED"},
 				status=401
 			)
 
+		# If there already is a root session with the same credentials ID, refresh it instead of creating a new one
+		if request.Session is not None and request.Session.Credentials.Id == login_session.SeacatLogin.CredentialsId:
+			root_session = request.Session
+		else:
+			root_session = None
+
 		# Do the actual login
-		session = await self.AuthenticationService.login(login_session, from_info=access_ips)
+		session = await self.AuthenticationService.login(
+			login_session, root_session=root_session, from_info=access_ips)
 
 		# TODO: Note the last successful login time
 		# TODO: Log also the IP address
 		body = {
 			'result': 'OK',
-			'cid': login_session.CredentialsId,
+			'cid': login_session.SeacatLogin.CredentialsId,
 			'sid': str(session.Session.Id),
 		}
 
 		response = aiohttp.web.Response(
-			body=login_session.encrypt(body)
+			body=login_session.SeacatLogin.encrypt(body)
 		)
 
 		cookie_domain = None
-		if hasattr(login_session, "ClientId"):
+		if hasattr(login_session.SeacatLogin, "ClientId"):
 			client_svc = self.App.get_service("seacatauth.ClientService")
 			try:
 				client = await client_svc.get(login_session.ClientId)
@@ -271,13 +269,19 @@ class AuthenticationHandler(object):
 
 		return response
 
+
 	async def logout(self, request):
 		"""
 		Log out of the current session and all its subsessions
 		"""
-		session = await self.CookieService.get_session_by_request_cookie(request)
-		if session is None:
-			raise aiohttp.web.HTTPBadRequest()
+		try:
+			session = await self.CookieService.get_session_by_request_cookie(request)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "Unauthorized: No root cookie in request")
+			return aiohttp.web.HTTPBadRequest()
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Unauthorized: Request cookie matched no active session")
+			return aiohttp.web.HTTPBadRequest()
 
 		await self.SessionService.delete(session.Session.Id)
 
@@ -295,7 +299,7 @@ class AuthenticationHandler(object):
 			try:
 				impersonator_session = await self.SessionService.get(session.Authentication.ImpersonatorSessionId)
 			except KeyError:
-				L.log(asab.LOG_NOTICE, "Impersonator session not found.", struct_data={
+				L.log(asab.LOG_NOTICE, "Impersonator session not found", struct_data={
 					"sid": session.Authentication.ImpersonatorSessionId})
 			else:
 				if impersonator_session.Cookie is None:
@@ -304,18 +308,27 @@ class AuthenticationHandler(object):
 				else:
 					set_cookie(self.App, response, impersonator_session)
 
+		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
+			"cid": session.Credentials.Id, "sid": session.SessionId, "token_type": "cookie"})
+
 		return response
 
-	async def smslogin(self, request):
+
+	async def prepare_smslogin_challenge(self, request):
 		"""
 		Generate a one-time passcode and send it via SMS
 		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = await self.AuthenticationService.get_login_session(lsid)
-		if login_session is None:
-			L.error("Login session not found.", struct_data={"lsid": lsid})
-			raise aiohttp.web.HTTPUnauthorized()
+		try:
+			login_session = await self.AuthenticationService.get_login_session(lsid)
+		except KeyError:
+			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
+
+		if login_session.SeacatLogin is None:
+			L.log(asab.LOG_NOTICE, "Seacat login not initialized", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
 
@@ -334,40 +347,49 @@ class AuthenticationHandler(object):
 		body = {"result": "OK" if success is True else "FAILED"}
 		return aiohttp.web.Response(body=login_session.encrypt(body))
 
-	async def webauthn_login(self, request):
+
+	async def prepare_webauthn_login_challenge(self, request):
 		"""
 		Initialize WebAuthn challenge and return WebAuthn authentication options object
 		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
-		login_session = await self.AuthenticationService.get_login_session(lsid)
-		if login_session is None:
-			L.error("Login session not found.", struct_data={"lsid": lsid})
-			raise aiohttp.web.HTTPUnauthorized()
+		try:
+			login_session = await self.AuthenticationService.get_login_session(lsid)
+		except KeyError:
+			L.log(asab.LOG_NOTICE, "Login session not found", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
+
+		if login_session.SeacatLogin is None:
+			L.log(asab.LOG_NOTICE, "Seacat login not initialized", struct_data={"lsid": lsid})
+			return aiohttp.web.HTTPUnauthorized()
 
 		json_body = login_session.decrypt(await request.read())
 
-		# descriptor_id = json_body.get("descriptor_id")
 		factor_type = json_body.get("factor_type")
 		if factor_type != "webauthn":
 			body = {"result": "FAILED", "message": "Unsupported factor type."}
-			return aiohttp.web.Response(body=login_session.encrypt(body))
+			return aiohttp.web.Response(body=login_session.SeacatLogin.encrypt(body))
 
 		# Webauthn challenge timeout should be the same as the current login session timeout
-		timeout = (login_session.ExpiresAt - datetime.datetime.now(datetime.timezone.utc)).total_seconds() * 1000
+		timeout = (
+			login_session.Created
+			+ self.AuthenticationService.LoginSessionExpiration
+			- datetime.datetime.now(datetime.timezone.utc)
+		).total_seconds() * 1000
 
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
 		authentication_options = await webauthn_svc.get_authentication_options(
-			login_session.CredentialsId,
+			login_session.SeacatLogin.CredentialsId,
 			timeout
 		)
 
-		login_data = login_session.Data
+		login_data = login_session.SeacatLogin.Data
 		login_data["webauthn"] = authentication_options
 
-		await self.AuthenticationService.update_login_session(lsid, data=login_data)
+		login_session = await self.AuthenticationService.update_login_session(login_session, data=login_data)
 
-		return aiohttp.web.Response(body=login_session.encrypt(authentication_options))
+		return aiohttp.web.Response(body=login_session.SeacatLogin.encrypt(authentication_options))
 
 
 	async def _get_client_login_key(self, client_id):
@@ -378,6 +400,7 @@ class AuthenticationHandler(object):
 		except KeyError:
 			login_key = None
 		return login_key
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -414,7 +437,10 @@ class AuthenticationHandler(object):
 		else:
 			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
 
-		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		try:
+			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		except aiohttp.web.HTTPForbidden as e:
+			return e
 		response = asab.web.rest.json_response(request, {"result": "OK"})
 		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
 		return response
@@ -474,15 +500,16 @@ class AuthenticationHandler(object):
 		else:
 			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
 
-		session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		try:
+			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
+		except aiohttp.web.HTTPForbidden as e:
+			return e
 
 		client_dict = await client_service.get(request_data["client_id"])
 		query = {
 			k: v for k, v in request_data.items()
-			if k in frozenset([
-				"redirect_uri", "response_type", "scope", "prompt", "code_challenge", "code_challenge_method"])
-		}
-		authorize_uri = oidc_service.build_authorize_uri(client_dict, client_id=request_data["client_id"], **query)
+			if k in AUTHORIZE_PARAMETERS}
+		authorize_uri = oidc_service.build_authorize_uri(client_dict, **query)
 
 		response = aiohttp.web.HTTPFound(
 			authorize_uri,
@@ -496,6 +523,7 @@ class AuthenticationHandler(object):
 		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
 		return response
 
+
 	async def _impersonate(self, impersonator_root_session, impersonator_from_info, target_cid):
 		"""
 		Create a new impersonated session and log the event.
@@ -505,48 +533,36 @@ class AuthenticationHandler(object):
 		try:
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)
-		except seacatauth.exceptions.AccessDeniedError as e:
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": impersonator_from_info,
-				}
-			)
-			raise aiohttp.web.HTTPForbidden() from e
+		except exceptions.CredentialsNotFoundError:
+			AuditLogger.warning("Impersonation failed: Target credentials ID not found", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"from_ip": impersonator_from_info,
+			})
+			raise aiohttp.web.HTTPForbidden()
+		except exceptions.AccessDeniedError:
+			AuditLogger.warning("Impersonation failed: Access denied", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"from_ip": impersonator_from_info,
+			})
+			raise aiohttp.web.HTTPForbidden()
 		except Exception as e:
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_FAILED,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"fi": impersonator_from_info,
-				}
-			)
-			raise e
+			AuditLogger.exception("Impersonation failed: Unexpected error ({})".format(e), struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"from_ip": impersonator_from_info,
+			})
+			raise aiohttp.web.HTTPForbidden()
 		else:
-			L.log(
-				asab.LOG_NOTICE,
-				"Impersonation successful.",
-				struct_data={
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": str(session.Session.Id),
-					"from_info": impersonator_from_info,
-				}
-			)
-			await self.AuditService.append(
-				AuditCode.IMPERSONATION_SUCCESSFUL,
-				{
-					"impersonator_cid": impersonator_cid,
-					"impersonator_sid": impersonator_root_session.SessionId,
-					"target_cid": target_cid,
-					"target_sid": session.Session.Id,
-					"fi": impersonator_from_info,
-				}
-			)
+			AuditLogger.log(asab.LOG_NOTICE, "Impersonation successful", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"impersonator_sid": impersonator_root_session.SessionId,
+				"target_cid": target_cid,
+				"target_sid": str(session.Session.Id),
+				"from_ip": impersonator_from_info,
+			})
 		return session

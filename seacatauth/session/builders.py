@@ -1,5 +1,6 @@
 import logging
 import secrets
+import datetime
 
 from .adapter import SessionAdapter
 from ..authz import build_credentials_authz
@@ -56,20 +57,20 @@ async def authz_session_builder(
 	user_tenants = list(set(await tenant_service.get_tenants(credentials_id)).union(tenants))
 	return (
 		(SessionAdapter.FN.Authorization.Authz, authz),
-		(SessionAdapter.FN.Authorization.Tenants, user_tenants),
+		(SessionAdapter.FN.Authorization.AssignedTenants, user_tenants),
 	)
 
 
-def login_descriptor_session_builder(login_descriptor):
+def authentication_session_builder(login_descriptor):
+	yield (SessionAdapter.FN.Authentication.AuthnTime, datetime.datetime.now(datetime.UTC))
 	if login_descriptor is not None:
-		yield (SessionAdapter.FN.Authentication.LoginDescriptor, login_descriptor)
+		yield (SessionAdapter.FN.Authentication.LoginDescriptor, login_descriptor["id"])
+		yield (SessionAdapter.FN.Authentication.LoginFactors, [
+			factor["type"] for factor in login_descriptor["factors"]])
 
 
 async def available_factors_session_builder(authentication_service, credentials_id):
-	factors = []
-	for factor in authentication_service.LoginFactors.values():
-		if await factor.is_eligible({"credentials_id": credentials_id}):
-			factors.append(factor.Type)
+	factors = await authentication_service.get_eligible_factors(credentials_id)
 	return ((SessionAdapter.FN.Authentication.AvailableFactors, factors),)
 
 

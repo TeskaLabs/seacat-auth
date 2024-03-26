@@ -5,6 +5,7 @@ import aiohttp.web
 import asab.web
 import asab.web.rest
 
+from ... import exceptions
 from ...decorators import access_control
 
 #
@@ -27,19 +28,27 @@ class WebAuthnHandler(object):
 		self.WebAuthnService = webauthn_svc
 
 		web_app = app.WebContainer.WebApp
+		web_app.router.add_get("/account/webauthn/register-options", self.get_registration_options)
+		web_app.router.add_put("/account/webauthn/register", self.register_credential)
+		web_app.router.add_delete("/account/webauthn/{wacid}", self.remove_credential)
+		web_app.router.add_put("/account/webauthn/{wacid}", self.update_credential)
+		web_app.router.add_get("/account/webauthn", self.list_credentials)
+
+		# Back-compat; To be removed in next major version
+		# >>>
 		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
 		web_app.router.add_put('/public/webauthn/register', self.register_credential)
 		web_app.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
 		web_app.router.add_put('/public/webauthn/{wacid}', self.update_credential)
 		web_app.router.add_get('/public/webauthn', self.list_credentials)
 
-		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
 		web_app_public.router.add_put('/public/webauthn/register', self.register_credential)
 		web_app_public.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
 		web_app_public.router.add_put('/public/webauthn/{wacid}', self.update_credential)
 		web_app_public.router.add_get('/public/webauthn', self.list_credentials)
+		# <<<
 
 
 	@access_control()
@@ -47,7 +56,10 @@ class WebAuthnHandler(object):
 		"""
 		Get WebAuthn registration options
 		"""
-		options = await self.WebAuthnService.get_registration_options(request.Session)
+		try:
+			options = await self.WebAuthnService.get_registration_options(request.Session)
+		except exceptions.AccessDeniedError:
+			return asab.web.rest.json_response(request, data={"status": "FAILED"}, status=400)
 		return aiohttp.web.Response(body=options, content_type="application/json")
 		# return asab.web.rest.json_response(request, options)
 
@@ -128,7 +140,8 @@ class WebAuthnHandler(object):
 		"properties": {
 			"name": {
 				"type": "string",
-				"pattern": "^[a-z][a-z0-9._-]{0,128}[a-z0-9]$"
+				"minLength": 3,
+				"maxLength": 128,
 			},
 		}
 	})

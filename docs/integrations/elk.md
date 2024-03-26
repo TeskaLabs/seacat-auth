@@ -1,33 +1,33 @@
 ---
-title: ElasticSearch + Kibana and TeskaLabs SeaCat Auth Batman
+title: Elasticsearch and Kibana
 ---
 
-# ElasticSearch + Kibana and Seacat Batman
+# Connecting to Elasticsearch and Kibana
 
 This is a guide to configuring SeaCat Auth as a proxy to [Kibana](https://www.elastic.co/kibana/) users and roles.
 As Kibana is not OAuth-compatible and supports only Basic Authentication, 
 integrating it into a Single Sign-On environment requires a special approach.
-The Batman component (Basic Auth Token MANager) is designed exactly for this task -
+The **SeaCat Auth Batman** component (Basic Auth Token MANager) is designed exactly for this task -
 it "translates" Seacat session cookies into Basic Auth headers and
-synchronizes Kibana/ElasticSearch users with Seacat Auth credentials and their access rights.
+synchronizes Kibana/Elasticsearch users with Seacat Auth credentials and their access rights.
 
 
 ## How does it work?
 
 The flow for using Batman auth is almost the same as the [cookie auth flow](index#cookie-authorization-flow), 
 the only difference being in the type of introspection used. 
-Instead of the `PUT /cookie/nginx` endpoint (which exchanges Seacat client cookie for ID token), 
-Batman auth uses `PUT /batman/nginx` (which exchanges Seacat client cookie for Basic auth header).
+Instead of the `PUT /nginx/introspect/cookie` endpoint (which exchanges Seacat client cookie for ID token), 
+Batman auth uses `PUT /nginx/introspect/batman` (which exchanges Seacat client cookie for Basic auth header).
 
 
 ## Configuration example
 
 Let's set up Seacat Batman authorization for our Kibana app. We need to have 
-[ElasticSearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
+[Elasticsearch](https://www.elastic.co/elasticsearch/) and [Kibana](https://www.elastic.co/kibana/) applications 
 up and running, as well as [a working instance of Seacat Auth with Nginx reverse proxy](../getting-started/quick-start). 
 We will need to configure these three components:
 
-- Update **Seacat Auth configuration** with `[batman:elk]` section to allow it to use ElasticSearch API to synchronize 
+- Update **Seacat Auth configuration** with `[batman:elk]` section to allow it to use Elasticsearch API to synchronize 
   users and manage their authorization.
 - Create and configure a **Kibana client**. This client object represents and identifies Kibana 
   in communication with Seacat Auth.
@@ -35,7 +35,7 @@ We will need to configure these three components:
 
 ### Seacat Auth configuration
 
-Create the ELK Batman section and provide ElasticSearch base URL and API credentials, e.g.
+Create the ELK Batman section and provide Elasticsearch base URL and API credentials, e.g.
 
 ```ini
 [batman:elk]
@@ -123,8 +123,8 @@ location = /_kibana_introspection {
 
 	# Seacat Auth Batman introspection upstream
 	# !! Use your client's actual client_id !!
-	proxy_method          PUT;
-	proxy_pass            http://seacat_auth_api/batman/nginx?client_id=RZhlE-D4yuJxoKitYVL4dg;
+	proxy_method          POST;
+	proxy_pass            http://seacat_auth_api/nginx/introspect/batman?client_id=RZhlE-D4yuJxoKitYVL4dg;
 
 	proxy_set_header      X-Request-URI "$request_uri";
 	proxy_ignore_headers  Cache-Control Expires Set-Cookie;

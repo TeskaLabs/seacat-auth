@@ -31,11 +31,11 @@ class RegistrationHandler(object):
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.AuditService = app.get_service("seacatauth.AuditService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/{tenant}/invite", self.create_invitation)
+		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
 		web_app.router.add_post("/invite/{credentials_id}", self.resend_invitation)
+		web_app.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
@@ -44,10 +44,47 @@ class RegistrationHandler(object):
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
+		web_app_public.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
 		web_app_public.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
 		web_app_public.router.add_post(
 			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
+
+
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"required": ["email"],  # TODO: Enable more communication options
+		"additionalProperties": False,
+		"properties": {
+			"email": {"type": "string"},
+		}
+	})
+	@access_control("seacat:tenant:assign")
+	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
+		"""
+		Common user request to invite a new user to join specified tenant and create an account
+		if they don't have one yet. The invited user gets a registration link in their email.
+		"""
+		# TODO: Limit the number of requests
+		# Get IPs of the invitation issuer
+		access_ips = [request.remote]
+		forwarded_for = request.headers.get("X-Forwarded-For")
+		if forwarded_for is not None:
+			access_ips.extend(forwarded_for.split(", "))
+
+		expiration = json_data.get("expiration")
+		if isinstance(expiration, str):
+			expiration = asab.utils.convert_to_seconds(expiration)
+		else:
+			expiration = self.RegistrationService.RegistrationExpiration
+
+		credential_data = {"email": json_data.get("email")}
+
+		await self._create_invitation(
+			tenant, credential_data, expiration, access_ips,
+			invited_by_cid=credentials_id)
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@asab.web.rest.json_schema_handler({
@@ -69,8 +106,8 @@ class RegistrationHandler(object):
 				"examples": ["6 h", "3d", "1w", 7200]},
 		},
 	})
-	@access_control("seacat:tenant:assign")  # TODO: Maybe create a dedicated resource for invitations
-	async def create_invitation(self, request, *, tenant, credentials_id, json_data):
+	@access_control("seacat:tenant:assign")
+	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
 		Generate a registration code and send a registration link to the user's email.
@@ -89,11 +126,20 @@ class RegistrationHandler(object):
 
 		credential_data = json_data["credentials"]
 
+		# Assign tenant
+		invited_credentials_id = await self._create_invitation(
+			tenant, credential_data, expiration, access_ips,
+			invited_by_cid=credentials_id)
+
+		return asab.web.rest.json_response(request, {"credentials_id": invited_credentials_id})
+
+
+	async def _create_invitation(self, tenant, credential_data, expiration, access_ips, invited_by_cid):
 		# Create invitation
 		invited_credentials_id, registration_code = await self.RegistrationService.draft_credentials(
 			credential_data=credential_data,
 			expiration=expiration,
-			invited_by_cid=credentials_id,
+			invited_by_cid=invited_by_cid,
 			invited_from_ips=access_ips,
 		)
 
@@ -109,17 +155,13 @@ class RegistrationHandler(object):
 			expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 		)
 
-		payload = {
-			"credentials_id": invited_credentials_id,
-		}
-
-		return asab.web.rest.json_response(request, payload)
+		return invited_credentials_id
 
 
-	@access_control("seacat:tenant:assign")
+	@access_control("seacat:tenant:invite")
 	async def resend_invitation(self, request):
 		"""
-		Resend invitation to an already invited user
+		Resend invitation to an already invited user and extend the expiration of the invitation.
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
@@ -128,6 +170,16 @@ class RegistrationHandler(object):
 			raise asab.exceptions.ValidationError("Credentials already registered.")
 		assert "email" in credentials
 
+		# Extend the expiration
+		expiration = (
+			datetime.datetime.now(datetime.timezone.utc)
+			+ datetime.timedelta(seconds=self.RegistrationService.RegistrationExpiration))
+		if credentials["__registration"]["exp"] < expiration:
+			await self.RegistrationService.CredentialProvider.update(
+				credentials["_id"], {"__registration.exp": expiration})
+		else:
+			expiration = credentials["__registration"]["exp"]
+
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
 
 		await self.RegistrationService.CommunicationService.invitation(
@@ -135,7 +187,7 @@ class RegistrationHandler(object):
 			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			username=credentials.get("username"),
 			tenants=tenants,
-			expires_at=credentials["__registration"]["exp"],
+			expires_at=expiration,
 		)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
@@ -158,7 +210,8 @@ class RegistrationHandler(object):
 		"""
 		# Disable this endpoint if self-registration is not enabled
 		if not self.RegistrationService.SelfRegistrationEnabled:
-			raise aiohttp.web.HTTPNotFound()
+			L.log(asab.LOG_NOTICE, "Self-registration is not enabled")
+			return aiohttp.web.HTTPNotFound()
 
 		# Log IPs from which the request was made
 		access_ips = [request.remote]

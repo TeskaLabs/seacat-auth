@@ -22,9 +22,6 @@ class ResourceService(asab.Service):
 
 	# TODO: gather these system resources automatically
 	_BuiltinResources = {
-		"seacat:access": {
-			"description": "Access to Seacat Admin API and UI.",
-		},
 		"authz:superuser": {
 			"description": "Grants superuser access, including the access to all tenants.",
 		},
@@ -71,7 +68,7 @@ class ResourceService(asab.Service):
 			"description": "Delete tenant.",
 		},
 		"seacat:tenant:assign": {
-			"description": "Assign and unassign tenant members.",
+			"description": "Assign and unassign tenant members, invite new users to tenant.",
 		},
 		"seacat:role:access": {
 			"description": "Search tenant roles, view role detail and list role bearers.",
@@ -102,8 +99,21 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
-	def is_builtin_resource(self, resource_id):
-		return resource_id in self._BuiltinResources
+	async def is_editable_resource(self, resource: dict | str):
+		if isinstance(resource, str):
+			resource_id = resource
+			if resource_id in self._BuiltinResources:
+				return False
+			resource = await self.get(resource_id)
+		else:
+			resource_id = resource["_id"]
+			if resource_id in self._BuiltinResources:
+				return False
+
+		if resource.get("managed_by"):
+			return False
+		else:
+			return True
 
 
 	def is_global_only_resource(self, resource_id):
@@ -122,7 +132,7 @@ class ResourceService(asab.Service):
 			try:
 				db_resource = await self.get(resource_id)
 			except KeyError:
-				await self.create(resource_id, description)
+				await self.create(resource_id, description, is_managed_by_seacat_auth=True)
 				continue
 
 			# Update resource description
@@ -145,7 +155,7 @@ class ResourceService(asab.Service):
 		resources = []
 		count = await collection.count_documents(query_filter)
 		async for resource_dict in cursor:
-			if self.is_builtin_resource(resource_dict["_id"]):
+			if not await self.is_editable_resource(resource_dict):
 				resource_dict["editable"] = False
 			if self.is_global_only_resource(resource_dict["_id"]):
 				resource_dict["global_only"] = True
@@ -159,14 +169,14 @@ class ResourceService(asab.Service):
 
 	async def get(self, resource_id: str):
 		data = await self.StorageService.get(self.ResourceCollection, resource_id)
-		if self.is_builtin_resource(data["_id"]):
+		if not await self.is_editable_resource(data):
 			data["editable"] = False
 		if self.is_global_only_resource(data["_id"]):
 			data["global_only"] = True
 		return data
 
 
-	async def create(self, resource_id: str, description: str = None):
+	async def create(self, resource_id: str, description: str = None, is_managed_by_seacat_auth=False):
 		if self.ResourceIdRegex.match(resource_id) is None:
 			raise asab.exceptions.ValidationError(
 				"Resource ID must consist only of characters 'a-z0-9.:_-', "
@@ -177,11 +187,14 @@ class ResourceService(asab.Service):
 		if description is not None:
 			upsertor.set("description", description)
 
+		if is_managed_by_seacat_auth:
+			upsertor.set("managed_by", "seacat-auth")
+
 		try:
 			await upsertor.execute(event_type=EventTypes.RESOURCE_CREATED)
 		except asab.storage.exceptions.DuplicateError as e:
 			if e.KeyValue is not None:
-				key, value = e.KeyValue
+				key, value = e.KeyValue.popitem()
 				raise asab.exceptions.Conflict(key=key, value=value)
 			else:
 				raise asab.exceptions.Conflict()
@@ -189,8 +202,10 @@ class ResourceService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource": resource_id})
 
 
-	async def _update(self, resource_id: str, description: str):
+	async def update(self, resource_id: str, description: str):
 		resource = await self.get(resource_id)
+		if not await self.is_editable_resource(resource):
+			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
 			obj_id=resource_id,
@@ -206,17 +221,10 @@ class ResourceService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Resource updated", struct_data={"resource": resource_id})
 
 
-	async def update(self, resource_id: str, description: str):
-		if self.is_builtin_resource(resource_id):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
-		await self._update(resource_id, description)
-
-
 	async def delete(self, resource_id: str, hard_delete: bool = False):
-		if self.is_builtin_resource(resource_id):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be deleted")
-
 		resource = await self.get(resource_id)
+		if not await self.is_editable_resource(resource):
+			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
 
 		# Remove the resource from all roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
@@ -269,15 +277,19 @@ class ResourceService(asab.Service):
 		Shortcut for creating a new resource with the desired name,
 		assigning it to roles that have the original resource and deleting the original resource
 		"""
-		if self.is_builtin_resource(resource_id):
+		# Get existing resource details and roles
+		resource = await self.get(resource_id)
+		if not await self.is_editable_resource(resource):
 			raise asab.exceptions.ValidationError("Built-in resource cannot be renamed")
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
-
-		resource = await self.get(resource_id)
-		await self.create(new_resource_id, resource.get("description"))
-
 		roles = await role_svc.list(resource=resource_id)
+
+		# Delete existing resource
+		await self.StorageService.delete(self.ResourceCollection, resource_id)
+
+		# Create a new resource and assign it to the original one's roles
+		await self.create(new_resource_id, resource.get("description"))
 		if roles["count"] > 0:
 			for role in roles["data"]:
 				await role_svc.update(
@@ -285,7 +297,6 @@ class ResourceService(asab.Service):
 					resources_to_remove=[resource_id],
 					resources_to_add=[new_resource_id])
 
-		await self.StorageService.delete(self.ResourceCollection, resource_id)
 		L.log(asab.LOG_NOTICE, "Resource renamed", struct_data={
 			"old_resource": resource_id,
 			"new_resource": resource_id,

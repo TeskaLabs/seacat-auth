@@ -4,9 +4,10 @@ import uuid
 import aiohttp
 import aiohttp.web
 import asab.web.rest
+import asab.exceptions
 
-from .. import exceptions
-from ..generic import nginx_introspection, get_bearer_token_value
+from .. import exceptions, AuditLogger
+from .. import generic
 from .utils import set_cookie, delete_cookie
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
@@ -59,7 +60,7 @@ class CookieHandler(object):
 			proxy_method          POST;
 			proxy_set_body        "$http_authorization";
 			proxy_set_header      X-Request-Uri "$scheme://$host$request_uri";
-			proxy_pass            http://auth_api/cookie/nginx?client_id=my-protected-app;
+			proxy_pass            http://auth_api/nginx/introspect/cookie?client_id=my-protected-app;
 			proxy_ignore_headers  Cache-Control Expires Set-Cookie;
 
 			# Successful introspection responses should be cached
@@ -88,17 +89,20 @@ class CookieHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/cookie/nginx", self.nginx)
-		web_app.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
+		web_app.router.add_post("/nginx/introspect/cookie", self.nginx)
+		web_app.router.add_post("/nginx/introspect/cookie/anonymous", self.nginx_anonymous)
 		web_app.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app.router.add_post("/cookie/entry", self.bouncer_post)
 
 		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_post("/cookie/nginx", self.nginx)
-		web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
 		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
+
+		# TODO: Insecure, back-compat only - remove after 2024-03-31
+		if asab.Config.getboolean("seacatauth:introspection", "_enable_insecure_legacy_endpoints", fallback=False):
+			web_app_public.router.add_post("/cookie/nginx", self.nginx)
+			web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
 
 
 	async def nginx(self, request):
@@ -154,15 +158,15 @@ class CookieHandler(object):
 		session = await self._authenticate_request(request, client_id)
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
-		elif session.Authentication.IsAnonymous:
-			L.warning("Regular cookie introspection does not allow anonymous user access.", struct_data={
+		elif session.is_anonymous():
+			L.log(asab.LOG_NOTICE, "Anonymous user access not allowed", struct_data={
 				"client_id": client_id, "cid": session.Credentials.Id})
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
-				response = await nginx_introspection(request, session, self.App)
+				response = await generic.nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
@@ -236,7 +240,7 @@ class CookieHandler(object):
 				from_info.extend(forwarded_for.split(", "))
 			track_id = uuid.uuid4().bytes
 			session = await self.CookieService.create_anonymous_cookie_client_session(
-				anonymous_cid, client_id, scope,
+				anonymous_cid, client, scope,
 				track_id=track_id,
 				from_info=from_info)
 			anonymous_session_created = True
@@ -245,9 +249,9 @@ class CookieHandler(object):
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
-				response = await nginx_introspection(request, session, self.App)
+				response = await generic.nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.warning("Request authorization failed: {}".format(e), exc_info=True)
+				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 
 		cookie_domain = client.get("cookie_domain") or None
@@ -342,64 +346,115 @@ class CookieHandler(object):
 		Exchange authorization code for cookie and redirect to specified redirect URI.
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
+		from_ip = generic.get_request_access_ips(request)
 
 		client_id = parameters.get("client_id")
 		if client_id is None:
-			L.error("No 'client_id' specified in cookie entrypoint query.")
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: No 'client_id' in request query",
+				struct_data={"from_ip": from_ip}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 		try:
 			client = await client_svc.get(client_id)
 		except KeyError:
-			L.error("Client not found.", struct_data={"client_id": client_id})
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: Client not found",
+				struct_data={"from_ip": from_ip, "client_id": client_id}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidClient}, status=400)
 
 		grant_type = parameters.get("grant_type")
 		if grant_type != "authorization_code":
-			L.error("Grant type not supported.", struct_data={"grant_type": grant_type})
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: Unsupported grant type",
+				struct_data={
+					"client_id": client_id,
+					"from_ip": from_ip,
+					"grant_type": grant_type,
+				}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.UnsupportedGrantType}, status=400)
 
 		# Use the code to get session ID
-		code = parameters.get("code")
-		if code in (None, ""):
-			L.warning("Empty or missing 'code' parameter in query.", struct_data={"client_id": client_id})
+		authorization_code = parameters.get("code")
+		if not authorization_code:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: No 'code' in request query",
+				struct_data={
+					"client_id": client_id,
+					"from_ip": from_ip,
+				}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
-		session = await self.CookieService.get_session_by_authorization_code(code)
-		if session is None:
-			L.warning("Session not found: Authorization code invalid or expired.", struct_data={"client_id": client_id})
+		try:
+			session = await self.CookieService.get_session_by_authorization_code(authorization_code)
+		except KeyError:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: Invalid or expired authorization code",
+				struct_data={
+					"client_id": client_id,
+					"from_ip": from_ip,
+				}
+			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
 
 		# Determine the destination URI
 		if "redirect_uri" in parameters:
 			# Use the redirect URI from request query
+			# TODO: Optionally validate the URI against client["redirect_uris"]
+			#   and check if it is the same as in the authorization request
 			redirect_uri = parameters["redirect_uri"]
 		else:
 			# Fallback to client URI or Auth UI
-			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl
+			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl.rstrip("/")
 
 		# Set track ID if not set yet
 		if session.TrackId is None:
 			session = await self.SessionService.inherit_track_id_from_root(session)
 		if session.TrackId is None:
 			# Obtain the old session by request cookie or access token
-			cookie_value = self.CookieService.get_session_cookie_value(request, session.OAuth2.ClientId)
-			token_value = get_bearer_token_value(request)
-			old_session = None
-			if cookie_value is not None:
-				old_session = await self.CookieService.get_session_by_session_cookie_value(cookie_value)
+			try:
+				old_session = await self.CookieService.get_session_by_request_cookie(
+					request, session.OAuth2.ClientId)
+			except exceptions.SessionNotFoundError:
+				old_session = None
+			except exceptions.NoCookieError:
+				old_session = None
+
+			token_value = generic.get_bearer_token_value(request)
 			if old_session is None and token_value is not None:
 				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
 				if old_session is None:
-					L.error("Cannot transfer Track ID: Invalid access token.", struct_data={"value": token_value})
-					raise aiohttp.web.HTTPBadRequest()
+					# Invalid access token should result in error
+					AuditLogger.log(
+						asab.LOG_NOTICE,
+						"Cookie request denied: Track ID transfer failed because of invalid Authorization header",
+						struct_data={
+							"cid": session.Credentials.Id,
+							"sid": session.Id,
+							"client_id": session.OAuth2.ClientId,
+							"from_ip": from_ip,
+							"redirect_uri": redirect_uri
+						}
+					)
+					return aiohttp.web.HTTPBadRequest()
 			try:
 				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
-			except ValueError:
-				raise aiohttp.web.HTTPBadRequest()
+			except ValueError as e:
+				# Return 400 to prevent disclosure while keeping the stacktrace
+				L.error("Failed to produce session track ID")
+				raise aiohttp.web.HTTPBadRequest() from e
 
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):
@@ -419,7 +474,10 @@ class CookieHandler(object):
 
 		# TODO: Verify that the request came from the correct domain
 
-		set_cookie(self.App, response, session, cookie_domain)
+		if session.is_algorithmic():
+			pass
+		else:
+			set_cookie(self.App, response, session, cookie_domain)
 
 		# Trigger webhook and set custom client response headers
 		try:
@@ -427,16 +485,41 @@ class CookieHandler(object):
 			if data is not None:
 				response.headers.update(data.get("response_headers", {}))
 		except exceptions.ClientResponseError as e:
-			L.error("Webhook responded with error.", struct_data={
+			L.log(asab.LOG_NOTICE, "Webhook responded with error", struct_data={
 				"status": e.Status, "text": e.Data})
+			AuditLogger.log(asab.LOG_NOTICE, "Cookie request denied: Webhook error", struct_data={
+				"cid": session.Credentials.Id,
+				"sid": session.Id,
+				"client_id": session.OAuth2.ClientId,
+				"from_ip": from_ip,
+				"redirect_uri": redirect_uri})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
+
+		AuditLogger.log(asab.LOG_NOTICE, "Cookie request granted", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"from_ip": from_ip,
+			"redirect_uri": redirect_uri})
 
 		return response
 
 
 	async def _authenticate_request(self, request, client_id=None):
-		return await self.CookieService.get_session_by_request_cookie(request, client_id)
+		"""
+		Locate session by request cookie
+		"""
+		try:
+			session = await self.CookieService.get_session_by_request_cookie(request, client_id)
+		except exceptions.NoCookieError:
+			L.log(asab.LOG_NOTICE, "No client cookie found in request", struct_data={"client_id": client_id})
+			return None
+		except exceptions.SessionNotFoundError:
+			L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
+			return None
+
+		return session
 
 
 	async def _fetch_webhook_data(self, client, session):
