@@ -21,7 +21,7 @@ class SearchParams:
 	"""
 	def __init__(
 		self, query: typing.Mapping, *,
-		page_default=1,
+		page_default=0,
 		items_per_page_default=10,
 		simple_filter_default=None
 	):
@@ -65,6 +65,26 @@ class SearchParams:
 				self.SortBy.append((k[1:], v))
 
 			# Ignore any other parameter
+
+	def asdict(self):
+		d = {}
+		if self.Page is not None:
+			d["page"] = self.Page
+		if self.ItemsPerPage is not None:
+			d["items_per_page"] = self.ItemsPerPage
+		if self.SimpleFilter is not None:
+			d["simple_filter"] = self.SimpleFilter
+		if self.AdvancedFilter:
+			d["advanced_filter"] = self.AdvancedFilter
+		if self.SortBy:
+			d["sort_by"] = self.SortBy
+		return d
+
+	def __repr__(self):
+		return "SearchParams({})".format(", ".join(
+			"{}={}".format(k, repr(v))
+			for k, v in self.asdict().items()
+		))
 
 
 def get_bearer_token_value(request):
