@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from typing import Optional
 
 import asab.storage.exceptions
@@ -292,12 +293,16 @@ class RoleService(asab.Service):
 			await self.unassign_role(credentials_id, role)
 
 
-	async def list_role_assignments(self, role_id, page: int = 0, limit: int = None):
+	async def list_role_assignments(self, role_id: str | typing.Iterable, page: int = 0, limit: int = None):
 		"""
 		List all role assignments of a specified role
 		"""
+		if isinstance(role_id, str):
+			query_filter = {"r": role_id}
+		else:
+			query_filter = {"r": {"$in": role_id}}
+
 		collection = self.StorageService.Database[self.CredentialsRolesCollection]
-		query_filter = {"r": role_id}
 		cursor = collection.find(query_filter)
 
 		cursor.sort("_c", -1)
