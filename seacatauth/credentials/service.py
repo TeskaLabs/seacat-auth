@@ -212,7 +212,7 @@ class CredentialsService(asab.Service):
 		if try_global_search and not session.is_superuser():
 			# Return only tenant members
 			L.info("Not authorized to list credentials across all tenants", struct_data={
-				"cid": session.Credentials.Id})
+				"cid": session.Credentials.Id, "resource_id": "authz:superuser"})
 			try_global_search = False
 
 		authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
@@ -241,55 +241,60 @@ class CredentialsService(asab.Service):
 			role_id = search_params.AdvancedFilter["role"]
 			tenant_id = role_id.split("/")[0]
 			# Check tenant access
-			if not (tenant_id in authorized_tenants or session.is_superuser()):
+			#  - global role is always accessible
+			#  - role in my authorized tenants is accessible
+			#  - superuser can access anything
+			if not (tenant_id == "*" or tenant_id in authorized_tenants or session.is_superuser()):
 				raise exceptions.AccessDeniedError(
 					"Not authorized to access tenant members",
 					subject=session.Credentials.Id,
 					resource={"tenant_id": tenant_id}
-				)
-			if not session.has_resource_access(tenant_id, "seacat:role:access"):
-				raise exceptions.AccessDeniedError(
-					"Not authorized to access role details",
-					subject=session.Credentials.Id,
-					resource={"role_id": role_id}
 				)
 			searched_roles = [role_id]
 		else:
 			# Do not filter by roles
 			searched_roles = None
 
-		# Get role or tenant assignment objects
+		# Get credential IDs that match both the tenant filter and the role filter
+		filtered_cids = None
+		estimated_count = None
 		if searched_roles:
 			role_svc = self.App.get_service("seacatauth.RoleService")
 			assignments = await role_svc.list_role_assignments(
 				role_id=searched_roles, page=search_params.Page, limit=search_params.ItemsPerPage)
-		elif searched_tenants:
+			if filtered_cids is None:
+				filtered_cids = set(a["c"] for a in assignments["data"])
+				estimated_count = assignments["count"]
+			else:
+				filtered_cids.intersection_update(a["c"] for a in assignments["data"])
+				estimated_count = min(estimated_count, assignments["count"])
+		if searched_tenants:
 			tenant_svc = self.App.get_service("seacatauth.TenantService")
 			provider = tenant_svc.get_provider()
 			assignments = await provider.list_tenant_assignments(
-				searched_tenants, search_params.Page, search_params.ItemsPerPage)
-		else:
-			assignments = None
+				searched_tenants, page=search_params.Page, limit=search_params.ItemsPerPage)
+			if filtered_cids is None:
+				filtered_cids = set(a["c"] for a in assignments["data"])
+				estimated_count = assignments["count"]
+			else:
+				filtered_cids.intersection_update(a["c"] for a in assignments["data"])
+				estimated_count = min(estimated_count, assignments["count"])
 
-		if assignments is not None:
-			if assignments["count"] == 0:
+		if filtered_cids is not None:
+			if len(filtered_cids) == 0:
 				return {"count": 0, "data": []}
 
 			credentials = []
-			total_count = assignments["count"]
+			total_count = estimated_count
 
-			for assignment in assignments["data"]:
-				cid = assignment["c"]
+			for cid in filtered_cids:
 				_, provider_id, _ = cid.split(":", 2)
 				provider = self.CredentialProviders[provider_id]
 				try:
 					credentials.append(await provider.get(cid))
 				except KeyError:
 					L.warning("Found an assignment of nonexisting credentials", struct_data={
-						"cid": cid,
-						"role_id": assignment.get("r"),
-						"tenant_id": assignment.get("t"),
-					})
+						"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
 
 			return {
 				"data": credentials,
