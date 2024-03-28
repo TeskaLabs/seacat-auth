@@ -21,6 +21,9 @@ L = logging.getLogger(__name__)
 class AlgorithmicSessionProvider:
 	"""
 	Provide algorithmic session serialization and deserialization.
+
+	A variation of OAuth's "self-encoded access tokens"
+	https://www.oauth.com/oauth2-servers/access-tokens/self-encoded-access-tokens/
 	"""
 	Type = "algorithmic"
 
