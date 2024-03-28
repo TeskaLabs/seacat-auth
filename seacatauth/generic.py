@@ -1,6 +1,7 @@
 import random
 import logging
 import re
+import typing
 import urllib.parse
 import aiohttp.web
 import asab
@@ -12,6 +13,78 @@ from .session import SessionAdapter
 L = logging.getLogger(__name__)
 
 #
+
+
+class SearchParams:
+	"""
+	Parse and validate standard search parameters from request query
+	"""
+	def __init__(
+		self, query: typing.Mapping, *,
+		page_default=0,
+		items_per_page_default=10,
+		simple_filter_default=None
+	):
+		# Set defaults
+		self.Page: int | None = page_default
+		self.ItemsPerPage: int | None = items_per_page_default
+		self.SimpleFilter: str | None = simple_filter_default
+		self.AdvancedFilter: dict = {}
+		self.SortBy: list = []
+
+		# Load actual parameter values from the query dict
+		for k, v in query.items():
+			if k == "p":
+				try:
+					v = int(v)
+					assert v >= 1
+				except (ValueError, AssertionError) as e:
+					raise asab.exceptions.ValidationError(
+						"The value of `p` (page) query parameter must be a positive integer, not {!r}".format(v)
+					) from e
+				self.Page = v - 1  # Page number is 1-indexed
+
+			elif k in {"i", "l"}:
+				try:
+					v = int(v)
+					assert v >= 1
+				except (ValueError, AssertionError) as e:
+					raise asab.exceptions.ValidationError(
+						"The value of `i` or `l` (items per page) query parameter must be a positive integer, "
+						"not {!r}".format(v)
+					) from e
+				self.ItemsPerPage = v
+
+			elif k == "f":
+				self.SimpleFilter = v
+
+			elif k.startswith("a"):
+				self.AdvancedFilter[k[1:]] = v
+
+			elif k.startswith("s") and v in {"a", "d"}:
+				self.SortBy.append((k[1:], v))
+
+			# Ignore any other parameter
+
+	def asdict(self):
+		d = {}
+		if self.Page is not None:
+			d["page"] = self.Page
+		if self.ItemsPerPage is not None:
+			d["items_per_page"] = self.ItemsPerPage
+		if self.SimpleFilter is not None:
+			d["simple_filter"] = self.SimpleFilter
+		if self.AdvancedFilter:
+			d["advanced_filter"] = self.AdvancedFilter
+		if self.SortBy:
+			d["sort_by"] = self.SortBy
+		return d
+
+	def __repr__(self):
+		return "SearchParams({})".format(", ".join(
+			"{}={}".format(k, repr(v))
+			for k, v in self.asdict().items()
+		))
 
 
 def get_bearer_token_value(request):
