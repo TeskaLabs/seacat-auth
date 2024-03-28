@@ -1,3 +1,4 @@
+import base64
 import datetime
 import logging
 import secrets
@@ -15,10 +16,10 @@ L = logging.getLogger(__name__)
 
 
 class AuthTokenType:
-	OAuthAccessToken = "oat"
 	OAuthRefreshToken = "ort"
-	OAuthAuthorizationCode = "oac"
-	Cookie = "c"
+	OAuthAuthorizationCode = "oac"  # TODO: Move authorization code here
+	OAuthAccessToken = "oat"  # TODO: Move access tokens here (consider performance first!)
+	Cookie = "c"  # TODO: Move auth cookies here (consider performance first!)
 
 
 class AuthTokenField:
@@ -41,6 +42,21 @@ class AuthTokenService(asab.Service):
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
+	async def create_oauth_refresh_token(self, session_id: str):
+		"""
+		Create OAuth2 refresh token
+
+		@param session_id: Session identifier
+		@return: Base64-encoded token value
+		"""
+		raw_value = await self.create(
+			token_length=32,
+			token_type=AuthTokenType.OAuthRefreshToken,
+			session_id=session_id
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+
+
 	async def create(
 		self, token_length: int, token_type: str, session_id: str,
 		expiration: typing.Optional[float] = None
@@ -52,7 +68,7 @@ class AuthTokenService(asab.Service):
 		@param token_type: Token type string
 		@param session_id: Session identifier
 		@param expiration: Expiration in seconds
-		@return:
+		@return: Raw token value
 		"""
 		token = _generate_token(token_length)
 		upsertor = self.StorageService.upsertor(self.AuthTokenCollection, obj_id=_hash_token(token))
@@ -123,11 +139,25 @@ class AuthTokenService(asab.Service):
 		Delete expired auth tokens
 		"""
 		collection = self.StorageService.Database[self.AuthTokenCollection]
-		query_filter: dict = {AuthTokenField.ExpiresAt: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+		query_filter = {AuthTokenField.ExpiresAt: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
 			L.log(asab.LOG_NOTICE, "Expired auth tokens deleted.", struct_data={
 				"count": result.deleted_count
+			})
+
+
+	async def _delete_tokens_by_session_id(self, session_id: str):
+		"""
+		Delete all of session's auth tokens
+		"""
+		collection = self.StorageService.Database[self.AuthTokenCollection]
+		query_filter = {AuthTokenField.SessionId: session_id}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Session's auth tokens deleted.", struct_data={
+				"sid": session_id,
+				"count": result.deleted_count,
 			})
 
 
