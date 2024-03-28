@@ -17,6 +17,7 @@ from .. import exceptions
 from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
+from .token import AuthTokenService, AuthTokenType
 
 #
 
@@ -31,6 +32,7 @@ class SessionService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
+		self.TokenService = AuthTokenService(app, "seacatauth.AuthTokenService")
 		self.StorageService = app.get_service("asab.StorageService")
 		self.Algorithmic = AlgorithmicSessionProvider(app)
 
