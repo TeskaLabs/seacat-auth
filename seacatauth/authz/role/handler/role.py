@@ -58,10 +58,10 @@ class RoleHandler(object):
 			schema:
 				type: string
 		"""
-		return await self._list(request, tenant=None)
+		return await self._list(request, tenant_id=None)
 
-	@access_control("seacat:role:access")
-	async def list(self, request, *, tenant):
+
+	async def list(self, request):
 		"""
 		List tenant roles
 
@@ -90,9 +90,12 @@ class RoleHandler(object):
 				enum:
 				- true
 		"""
-		return await self._list(request, tenant=tenant)
+		tenant_id = request.match_info["tenant"]
+		if tenant_id == "*":
+			asab.web.rest.json_response(request, {"result": "ACCESS-DENIED"}, status=403)
+		return await self._list(request, tenant_id=tenant_id)
 
-	async def _list(self, request, *, tenant):
+	async def _list(self, request, *, tenant_id):
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i")
 		if limit is not None:
@@ -102,19 +105,19 @@ class RoleHandler(object):
 		exclude_global = request.query.get("exclude_global", "false") == "true"
 
 		result = await self.RoleService.list(
-			tenant, page, limit, filter_string,
+			tenant_id, page, limit, filter_string,
 			resource=resource,
 			exclude_global=exclude_global)
 		return asab.web.rest.json_response(request, result)
 
 
-	@access_control("seacat:role:access")
-	async def get(self, request, *, tenant):
+	async def get(self, request):
 		"""
 		Get role detail
 		"""
+		tenant_id = request.match_info["tenant"]
 		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant, role_name)
+		role_id = "{}/{}".format(tenant_id, role_name)
 		try:
 			result = await self.RoleService.get(role_id)
 		except KeyError:
