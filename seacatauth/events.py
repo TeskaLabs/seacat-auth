@@ -35,6 +35,8 @@ class EventTypes:
 	SESSION_CREATED = "session_created"
 	SESSION_UPDATED = "session_updated"
 	SESSION_EXTENDED = "session_extended"
+	AUTH_TOKEN_CREATED = "auth_token_created"
+	AUTH_TOKEN_EXTENDED = "auth_token_extended"
 
 	TENANT_ASSIGNED = "tenant_assigned"
 

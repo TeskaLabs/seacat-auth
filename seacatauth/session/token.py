@@ -1,0 +1,146 @@
+import datetime
+import logging
+import secrets
+import hashlib
+import typing
+
+import asab.storage
+from ..events import EventTypes
+
+#
+
+L = logging.getLogger(__name__)
+
+#
+
+
+class AuthTokenType:
+	OAuthAccessToken = "oat"
+	OAuthRefreshToken = "ort"
+	OAuthAuthorizationCode = "oac"
+	Cookie = "c"
+
+
+class AuthTokenField:
+	TokenType = "t"
+	SessionId = "sid"
+	ExpiresAt = "exp"
+	Version = "_v"
+
+
+class AuthTokenService(asab.Service):
+	"""
+	Create and manage securely hashed session identifiers (tokens)
+	"""
+
+	AuthTokenCollection = "at"
+
+	def __init__(self, app, service_name="seacatauth.AuthTokenService"):
+		super().__init__(app, service_name)
+		self.StorageService = app.get_service("asab.StorageService")
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	async def create(
+		self, token_length: int, token_type: str, session_id: str,
+		expiration: typing.Optional[float] = None
+	):
+		"""
+		Create and store a new auth token
+
+		@param token_length: Number of token bytes
+		@param token_type: Token type string
+		@param session_id: Session identifier
+		@param expiration: Expiration in seconds
+		@return:
+		"""
+		token = _generate_token(token_length)
+		upsertor = self.StorageService.upsertor(self.AuthTokenCollection, obj_id=_hash_token(token))
+
+		upsertor.set(AuthTokenField.TokenType, token_type)
+		upsertor.set(AuthTokenField.SessionId, session_id)
+		if expiration:
+			expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
+			upsertor.set(AuthTokenField.ExpiresAt, expires_at)
+
+		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_CREATED)
+		L.log(asab.LOG_NOTICE, "Auth token created.", struct_data={"sid": session_id, "type": token_type})
+
+		return token
+
+
+	async def get(self, token: bytes):
+		"""
+		Get auth token
+
+		@param token: Raw token value
+		@return:
+		"""
+		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
+		if not _is_valid(data):
+			raise KeyError("Auth token expired.")
+		return data
+
+
+	async def extend_token(self, token: bytes, expiration: float):
+		"""
+		Extend auth token validity
+
+		@param token: Raw token value
+		@param expiration: Expiration in seconds
+		@return:
+		"""
+		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
+		upsertor = self.StorageService.upsertor(
+			self.AuthTokenCollection,
+			obj_id=_hash_token(token),
+			version=data[AuthTokenField.Version]
+		)
+		expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
+		upsertor.set(AuthTokenField.ExpiresAt, expires_at)
+		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_EXTENDED)
+		L.log(asab.LOG_NOTICE, "Auth token validity extended.", struct_data={
+			"sid": data[AuthTokenField.SessionId], "type": data[AuthTokenField.TokenType]})
+		return data
+
+
+	async def delete(self, token: bytes):
+		"""
+		Delete auth token
+
+		@param token: Raw token value
+		@return:
+		"""
+		await self.StorageService.delete(self.AuthTokenCollection, _hash_token(token))
+
+
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_tokens()
+
+
+	async def _delete_expired_tokens(self):
+		"""
+		Delete expired auth tokens
+		"""
+		collection = self.StorageService.Database[self.AuthTokenCollection]
+		query_filter: dict = {AuthTokenField.ExpiresAt: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+		result = await collection.delete_many(query_filter)
+		if result.deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Expired auth tokens deleted.", struct_data={
+				"count": result.deleted_count
+			})
+
+
+def _is_valid(token_data: dict):
+	return (
+		AuthTokenField.ExpiresAt in token_data
+		and token_data[AuthTokenField.ExpiresAt] < datetime.datetime.now(datetime.UTC)
+	)
+
+
+def _hash_token(token: bytes):
+	return hashlib.sha256(token).digest()
+
+
+def _generate_token(token_length: int):
+	return secrets.token_bytes(token_length)
