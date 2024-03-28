@@ -207,13 +207,15 @@ class TokenHandler(object):
 
 		id_token = await self.OpenIdConnectService.build_id_token(new_session)
 
+		refresh_token = await self.SessionService.TokenService.create_oauth_refresh_token(new_session.SessionId)
+
 		# 3.1.3.3.  Successful Token Response
 		data = {
 			"token_type": "Bearer",
 			"scope": " ".join(new_session.OAuth2.Scope),
 			"access_token": new_session.OAuth2.AccessToken,
+			"refresh_token": refresh_token,
 			"id_token": id_token,
-			# TODO: Include refresh_token
 		}
 
 		if new_session.Session.Expiration:
