@@ -1,4 +1,5 @@
 from .service import SessionService
+from .token import AuthTokenService
 from .handler import SessionHandler
 from .adapter import SessionAdapter
 
@@ -11,6 +12,7 @@ from .builders import external_login_session_builder
 
 __all__ = [
 	"SessionService",
+	"AuthTokenService",
 	"SessionHandler",
 	"SessionAdapter",
 	"credentials_session_builder",
