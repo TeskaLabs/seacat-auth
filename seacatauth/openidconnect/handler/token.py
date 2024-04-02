@@ -88,19 +88,56 @@ class TokenHandler(object):
 						required:
 							- grant_type
 		"""
-		data = await request.post()
+		query_data = await request.post()
+		from_ip = generic.get_request_access_ips(request)
 
 		# 3.1.3.2.  Token Request Validation
-		grant_type = data.get("grant_type")
+		grant_type = query_data.get("grant_type")
+		if grant_type not in {"authorization_code", "refresh_token"}:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
+				"from_ip": from_ip, "grant_type": grant_type})
+			return aiohttp.web.HTTPBadRequest()
+
+		try:
+			await self._authenticate_client(request, query_data)
+		except:  # TODO
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": grant_type,
+				"client_id": query_data.get("client_id"),
+				"redirect_uri": query_data.get("redirect_uri")
+			})
+			return aiohttp.web.HTTPUnauthorized()
+
+		try:
+			await self._verify_redirect_uri(request, query_data)
+		except:  # TODO
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Redirect URI mismatch.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": grant_type,
+				"client_id": query_data.get("client_id"),
+				"redirect_uri": query_data.get("redirect_uri")
+			})
+			return aiohttp.web.HTTPUnauthorized()
 
 		if grant_type == "authorization_code":
-			return await self._token_request_authorization_code(request, data)
+			return await self._token_request_authorization_code(request, query_data)
 
-		# TODO: elif grant_type == "refresh_token"
+		elif grant_type == "refresh_token":
+			return await self._token_request_refresh_token(request, query_data)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type", struct_data={
-			"from_ip": generic.get_request_access_ips(request), "grant_type": grant_type})
-		return aiohttp.web.HTTPBadRequest()
+
+	async def _authenticate_client(self, request, query_data):
+		# TODO: If client_id and client_secret is present in the query, verify that their values are the same
+		#  as those used in the authorization request
+		# TODO: Authenticate confidential clients with client_secret
+		pass
+
+
+	async def _verify_redirect_uri(self, request, query_data):
+		# TODO: If redirect_uri is present in the query, verify that its value is the same
+		#  as those used in the authorization request
+		pass
 
 
 	async def _token_request_authorization_code(self, request, qs_data):
