@@ -37,6 +37,7 @@ RUN apk add --no-cache  \
     fastjsonschema \
     passlib \
     bcrypt \
+    argon2_cffi \
     python-ldap \
     aiomysql \
     jinja2 \
