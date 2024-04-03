@@ -6,6 +6,7 @@ import urllib.parse
 
 import asab.storage.exceptions
 import asab.exceptions
+import passlib.hash
 
 from seacatauth.client import exceptions
 from asab.utils import convert_to_seconds
@@ -36,7 +37,7 @@ APPLICATION_TYPES = [
 ]
 TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none",
-	# "client_secret_basic",
+	"client_secret_basic",
 	# "client_secret_post",
 	# "client_secret_jwt",
 	# "private_key_jwt"
@@ -339,8 +340,6 @@ class ClientService(asab.Service):
 			client_secret = None
 			client_secret_expires_at = None
 		elif token_endpoint_auth_method == "client_secret_basic":
-			raise NotImplementedError("Token endpoint auth method 'client_secret_basic' is not supported.")
-			# TODO: Finish implementing authorization with client secret
 			# The client is CONFIDENTIAL
 			# Clients capable of maintaining the confidentiality of their
 			# credentials (e.g., client implemented on a secure server with
@@ -350,7 +349,8 @@ class ClientService(asab.Service):
 			# client credentials used for authenticating with the authorization
 			# server (e.g., password, public/private key pair).
 			client_secret, client_secret_expires_at = self._generate_client_secret()
-			upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
+			client_secret_hash = passlib.hash.argon2.hash(client_secret)
+			upsertor.set("__client_secret", client_secret_hash, encrypt=True)
 			if client_secret_expires_at is not None:
 				upsertor.set("client_secret_expires_at", client_secret_expires_at)
 		else:
@@ -421,7 +421,8 @@ class ClientService(asab.Service):
 			raise asab.exceptions.ValidationError("Cannot set secret for public client")
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
-		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
+		client_secret_hash = passlib.hash.argon2.hash(client_secret)
+		upsertor.set("__client_secret", client_secret_hash, encrypt=True)
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
 		await upsertor.execute(event_type=EventTypes.CLIENT_SECRET_RESET)
@@ -504,22 +505,41 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client(self, client: dict, client_secret: str = None):
+	async def authenticate_client(self, client: dict, client_id: str, client_secret: str = None):
 		"""
-		Verify client credentials (client_id and client_secret).
+		Verify client ID and secret.
 		"""
+		if client_id != client["_id"]:
+			raise exceptions.ClientError(
+				"Client IDs do not match.",
+				client_id=client["_id"],
+				attempted_client_id=client_id
+			)
+
 		# TODO: Use a client credential provider.
 		if client_secret is None:
 			# The client MAY omit the parameter if the client secret is an empty string.
 			# [rfc6749#section-2.3.1]
 			client_secret = ""
+
+		client_secret_hash = client.get("__client_secret")
+		if not client_secret_hash:
+			# No client secret is set, none is expected!
+			if not client_secret:
+				return True
+			else:
+				raise exceptions.ClientError(
+					"Got non-empty secret from non-confidential client.", client_id=client["_id"])
+
 		if "client_secret_expires_at" in client \
 			and client["client_secret_expires_at"] != 0 \
 			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			L.warning("Client secret expired.", struct_data={"client_id": client["_id"]})
-		if client_secret != client.get("__client_secret", ""):
-			L.warning("Incorrect client secret.", struct_data={"client_id": client["_id"]})
-		return True
+			raise exceptions.ClientError("Expired client secret.", client_id=client["_id"])
+
+		if passlib.hash.argon2.verify(client_secret, client_secret_hash):
+			raise exceptions.ClientError("Incorrect client secret.", client_id=client["_id"])
+		else:
+			return True
 
 
 	def _check_grant_types(self, grant_types, response_types):
