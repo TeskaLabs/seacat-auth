@@ -35,6 +35,10 @@ class AuthTokenService(asab.Service):
 	"""
 
 	AuthTokenCollection = "at"
+	OAuthRefreshTokenLength = 32
+	OAuthAuthorizationCodeLength = 32
+	OAuthAccessTokenLength = 32
+	CookieLength = 32
 
 	def __init__(self, app, service_name="seacatauth.AuthTokenService"):
 		super().__init__(app, service_name)
@@ -42,22 +46,74 @@ class AuthTokenService(asab.Service):
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def create_oauth_refresh_token(self, session_id: str):
+	async def create_oauth_authorization_code(self, session_id: str, expiration: float):
+		"""
+		Create OAuth2 authorization code
+
+		@param session_id: Session identifier
+		@param expiration: Expiration in seconds
+		@return: Base64-encoded token value
+		"""
+		raw_value = await self._create(
+			token_length=self.OAuthAuthorizationCodeLength,
+			token_type=AuthTokenType.OAuthAuthorizationCode,
+			session_id=session_id,
+			expiration=expiration,
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+
+
+	async def create_oauth_access_token(self, session_id: str, expiration: float):
+		"""
+		Create OAuth2 access token
+
+		@param session_id: Session identifier
+		@param expiration: Expiration in seconds
+		@return: Base64-encoded token value
+		"""
+		raw_value = await self._create(
+			token_length=self.OAuthAccessTokenLength,
+			token_type=AuthTokenType.OAuthAccessToken,
+			session_id=session_id,
+			expiration=expiration,
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+
+
+	async def create_oauth_refresh_token(self, session_id: str, expiration: float):
 		"""
 		Create OAuth2 refresh token
 
 		@param session_id: Session identifier
 		@return: Base64-encoded token value
 		"""
-		raw_value = await self.create(
-			token_length=32,
+		raw_value = await self._create(
+			token_length=self.OAuthRefreshTokenLength,
 			token_type=AuthTokenType.OAuthRefreshToken,
-			session_id=session_id
+			session_id=session_id,
+			expiration=expiration,
 		)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create(
+	async def create_cookie(self, session_id: str, expiration: float):
+		"""
+		Create HTTP cookie value
+
+		@param session_id: Session identifier
+		@param expiration: Expiration in seconds
+		@return: Base64-encoded token value
+		"""
+		raw_value = await self._create(
+			token_length=self.CookieLength,
+			token_type=AuthTokenType.OAuthAccessToken,
+			session_id=session_id,
+			expiration=expiration,
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+
+
+	async def _create(
 		self, token_length: int, token_type: str, session_id: str,
 		expiration: typing.Optional[float] = None
 	):
@@ -85,7 +141,7 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get(self, token: bytes):
+	async def get(self, token: bytes, token_type: str):
 		"""
 		Get auth token
 
@@ -95,6 +151,8 @@ class AuthTokenService(asab.Service):
 		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
 		if not _is_valid(data):
 			raise KeyError("Auth token expired.")
+		if data["t"] != token_type:
+			raise KeyError("Auth token type does not match.")
 		return data
 
 
