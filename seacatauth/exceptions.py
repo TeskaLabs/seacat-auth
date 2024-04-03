@@ -172,7 +172,7 @@ class CommunicationError(SeacatAuthError):
 
 class NoCookieError(SeacatAuthError):
 	"""
-	Request has no (roo or client) cookie
+	Request has no (root or client) cookie
 	"""
 	def __init__(self, client_id=None, *args):
 		self.ClientId = client_id
@@ -181,3 +181,22 @@ class NoCookieError(SeacatAuthError):
 		else:
 			message = "Request contains no root session cookie"
 		super().__init__(message, *args)
+
+
+class ClientAuthenticationError(SeacatAuthError):
+	"""
+	Failed to authenticate client
+	"""
+	def __init__(self, message, *args, client_id: str | None = None):
+		self.ClientId = client_id
+		super().__init__(message, *args)
+
+
+class URLValidationError(SeacatAuthError):
+	"""
+	Failed to verify requested URL
+	"""
+	def __init__(self, url: str, client_id: str | None = None):
+		self.ClientId = client_id
+		self.URL = url
+		super().__init__("Cannot verify requested URL.")
