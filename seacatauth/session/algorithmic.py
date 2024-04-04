@@ -57,12 +57,18 @@ class AlgorithmicSessionProvider:
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 
-	async def create_anonymous_session(self, created_at, track_id, client_dict, scope) -> SessionAdapter:
-		session = await self._build_anonymous_session(created_at, track_id, client_dict, scope)
+	async def create_anonymous_session(
+		self, created_at, track_id, client_dict, scope,
+		redirect_uri: str = None
+	) -> SessionAdapter:
+		session = await self._build_anonymous_session(created_at, track_id, client_dict, scope, redirect_uri)
 		self.AnonymousSessionCounter.add("sessions", 1)
 		return session
 
-	async def _build_anonymous_session(self, created_at, track_id, client_dict, scope) -> SessionAdapter:
+	async def _build_anonymous_session(
+		self, created_at, track_id, client_dict, scope,
+		redirect_uri: str = None
+	) -> SessionAdapter:
 		session_dict = {
 			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
 			SessionAdapter.FN.Version: None,
