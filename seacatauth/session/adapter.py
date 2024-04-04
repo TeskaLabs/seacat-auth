@@ -64,6 +64,7 @@ class OAuth2Data:
 	ClientId: typing.Optional[str]
 	Scope: typing.Optional[str]
 	Nonce: typing.Optional[str]
+	RedirectUri: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -139,6 +140,7 @@ class SessionAdapter:
 			Scope = "oa_sc"
 			ClientId = "oa_cl"
 			Nonce = "oa_no"
+			RedirectUri = "oa_ru"
 
 		class Cookie:
 			_prefix = "ck"
@@ -261,6 +263,7 @@ class SessionAdapter:
 				self.FN.OAuth2.ClientId: self.OAuth2.ClientId,
 				self.FN.OAuth2.Scope: self.OAuth2.Scope,
 				self.FN.OAuth2.Nonce: self.OAuth2.Nonce,
+				self.FN.OAuth2.RedirectUri: self.OAuth2.RedirectUri,
 			})
 
 		if self.Batman is not None:
@@ -380,6 +383,7 @@ class SessionAdapter:
 			Scope=session_dict.pop(cls.FN.OAuth2.Scope, None),
 			ClientId=session_dict.pop(cls.FN.OAuth2.ClientId, None),
 			Nonce=session_dict.pop(cls.FN.OAuth2.Nonce, None),
+			RedirectUri=session_dict.pop(cls.FN.OAuth2.RedirectUri, None),
 		)
 
 	@classmethod

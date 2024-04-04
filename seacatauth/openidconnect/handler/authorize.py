@@ -466,12 +466,14 @@ class AuthorizeHandler(object):
 				new_session = await self.OpenIdConnectService.create_oidc_session(
 					root_session, client_id, requested_scope,
 					nonce=nonce,
+					redirect_uri=redirect_uri,
 					tenants=[authorized_tenant] if authorized_tenant else None,
 					requested_expiration=session_expiration)
 			elif auth_token_type == "cookie":
 				new_session = await self.CookieService.create_cookie_client_session(
 					root_session, client_id, requested_scope,
 					nonce=nonce,
+					redirect_uri=redirect_uri,
 					tenants=[authorized_tenant] if authorized_tenant else None,
 					requested_expiration=session_expiration)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
@@ -519,12 +521,16 @@ class AuthorizeHandler(object):
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
 					anonymous_cid, client_dict, requested_scope,
 					tenants=[authorized_tenant] if authorized_tenant else None,
-					from_info=from_info)
+					redirect_uri=redirect_uri,
+					from_info=from_info,
+				)
 			elif auth_token_type == "cookie":
 				new_session = await self.CookieService.create_anonymous_cookie_client_session(
 					anonymous_cid, client_dict, requested_scope,
 					tenants=[authorized_tenant] if authorized_tenant else None,
-					from_info=from_info)
+					redirect_uri=redirect_uri,
+					from_info=from_info,
+				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 			else:

@@ -24,6 +24,7 @@ from ..session import (
 from .session import oauth2_session_builder
 from .. import exceptions
 from . import pkce
+from ..authz import build_credentials_authz
 
 from ..events import EventTypes
 
@@ -235,6 +236,7 @@ class OpenIdConnectService(asab.Service):
 	async def create_oidc_session(
 		self, root_session, client_id, scope,
 		nonce=None,
+		redirect_uri=None,
 		tenants=None,
 		requested_expiration=None
 	):
@@ -280,7 +282,7 @@ class OpenIdConnectService(asab.Service):
 				(SessionAdapter.FN.Batman.Token, basic_auth),
 			])
 
-		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
 
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
@@ -313,13 +315,16 @@ class OpenIdConnectService(asab.Service):
 		self, anonymous_cid: str, client_dict: dict, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
-		from_info=None
+		redirect_uri: list = None,
+		from_info=None,
 	):
 		session = await self.SessionService.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
-			scope=scope)
+			scope=scope,
+			redirect_uri=redirect_uri,
+		)
 
 		session.OAuth2.AccessToken = self.SessionService.Algorithmic.serialize(session)
 		return session
