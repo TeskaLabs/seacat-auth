@@ -145,6 +145,119 @@ class OpenIdConnectService(asab.Service):
 			})
 
 
+	async def refresh_session(
+		self,
+		session: SessionAdapter,
+		requested_scope: typing.Optional[typing.Iterable] = None,
+	):
+		"""
+		Update/rebuild the session according to its authorization parameters
+
+		@param session:
+		@param track_id:
+		@return:
+		"""
+		# Get parent session
+		root_session = await self.SessionService.get(session.Session.ParentSessionId)
+
+		# Check that the requested scope is a subset of granted scope
+		if requested_scope is not None:
+			requested_scope = set(requested_scope)
+			unauthorized_scope = requested_scope - set(session.OAuth2.Scope)
+			if len(unauthorized_scope) > 0:
+				raise exceptions.AccessDeniedError(
+					"Client requested unauthorized scope.",
+					subject=session.OAuth2.ClientId,
+					resource=unauthorized_scope
+				)
+			granted_scope = requested_scope
+		else:
+			granted_scope = session.OAuth2.Scope
+
+		# TODO: Differentiate between ActiveScope and AuthorizedScope
+
+		# Exclude critical resource grants from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
+		else:
+			exclude_resources = set()
+
+		# Authorize tenant
+		authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, root_session.Credentials.Id,
+			tenants=None,
+			exclude_resources=exclude_resources
+		)
+		authorized_tenant = await self.get_accessible_tenant_from_scope(
+			granted_scope, root_session.Credentials.Id,
+			has_access_to_all_tenants=self.RBACService.can_access_all_tenants(authz)
+		)
+
+		session_builders = [
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, session.OAuth2.Scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=root_session.Credentials.Id,
+				tenants=[authorized_tenant] if authorized_tenant else None,
+				exclude_resources=exclude_resources,
+			)
+		]
+
+		if "profile" in granted_scope or "userinfo:authn" in granted_scope or "userinfo:*" in granted_scope:
+			authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
+			available_external_logins = {
+				result["t"]: result["s"]
+				for result in await external_login_service.list(root_session.Credentials.Id)
+			}
+			session_builders.append([
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
+				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
+				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
+			])
+
+		if "batman" in granted_scope:
+			batman_service = self.App.get_service("seacatauth.BatmanService")
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
+		session_builders.append(oauth2_session_builder(session.OAuth2.ClientId, granted_scope, session.OAuth2.Nonce))
+
+		# Obtain Track ID if there is any in the root session
+		if root_session.TrackId is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
+
+		# Transfer impersonation data
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			session_builders.append((
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					root_session.Authentication.ImpersonatorSessionId
+				),
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					root_session.Authentication.ImpersonatorCredentialsId
+				),
+			))
+
+		# TODO: Expiration
+
+		session = await self.SessionService.create_session(
+			session_type="openidconnect",
+			parent_session_id=root_session.SessionId,
+			session_builders=session_builders,
+		)
+
+		return session
+
+
 	async def pop_session_by_authorization_code(self, code, code_verifier: str = None):
 		"""
 		Retrieves session by its temporary authorization code.
