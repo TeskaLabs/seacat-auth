@@ -3,6 +3,7 @@ import json
 import base64
 import secrets
 import logging
+import typing
 
 import asab
 import asab.web.rest
@@ -493,3 +494,31 @@ class OpenIdConnectService(asab.Service):
 		session: SessionAdapter = await self.get_session_by_access_token(token)
 		if session is not None:
 			await self.SessionService.delete(session.SessionId)
+
+
+	async def get_accessible_tenant_from_scope(
+		self,
+		scope: typing.Iterable,
+		credentials_id: str,
+		has_access_to_all_tenants: bool = False
+	):
+		"""
+		Extract tenants from requested scope and return the first accessible one.
+		"""
+		try:
+			tenants: set = await self.TenantService.get_tenants_by_scope(
+				scope, credentials_id, has_access_to_all_tenants)
+		except exceptions.TenantNotFoundError as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			raise exceptions.AccessDeniedError(subject=credentials_id)
+		except exceptions.TenantAccessDeniedError as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
+			raise exceptions.AccessDeniedError(subject=credentials_id)
+		except exceptions.NoTenantsError:
+			L.error("Tenant access denied", struct_data={"cid": credentials_id})
+			raise exceptions.AccessDeniedError(subject=credentials_id)
+
+		if tenants:
+			return tenants.pop()
+		else:
+			return None

@@ -303,7 +303,7 @@ class AuthorizeHandler(object):
 
 		# Decide whether this is an openid or cookie request
 		try:
-			auth_token_type = await self._get_authorize_type(client_id, requested_scope)
+			auth_token_type = await self._get_auth_token_type(client_id, requested_scope)
 		except OAuthAuthorizeError as e:
 			e.RedirectUri = redirect_uri
 			e.State = state
@@ -450,8 +450,11 @@ class AuthorizeHandler(object):
 
 			# Authorize access to tenants requested in scope
 			try:
-				authorized_tenant = await self.get_accessible_tenant_from_scope(
-					requested_scope, root_session.Authorization.Authz, root_session.Credentials.Id, client_id)
+				authorized_tenant = await self.OpenIdConnectService.get_accessible_tenant_from_scope(
+					requested_scope, root_session.Credentials.Id,
+					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(
+						root_session.Authorization.Authz)
+				)
 			except exceptions.AccessDeniedError:
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.AccessDenied, client_id,
@@ -501,8 +504,10 @@ class AuthorizeHandler(object):
 
 			# Authorize access to tenants requested in scope
 			try:
-				authorized_tenant = await self.get_accessible_tenant_from_scope(
-					requested_scope, authz, anonymous_cid, client_id)
+				authorized_tenant = await self.OpenIdConnectService.get_accessible_tenant_from_scope(
+					requested_scope, anonymous_cid,
+					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(authz)
+				)
 			except exceptions.AccessDeniedError:
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.AccessDenied, client_id,
@@ -586,7 +591,7 @@ class AuthorizeHandler(object):
 		return client_dict
 
 
-	async def _get_authorize_type(self, client_id, scope):
+	async def _get_auth_token_type(self, client_id, scope):
 		"""
 		Extract authorization type - either 'openid' or 'cookie'.
 		"""
@@ -844,30 +849,6 @@ class AuthorizeHandler(object):
 			"client_id": error.ClientId,
 			**error.StructData
 		})
-
-
-	async def get_accessible_tenant_from_scope(self, scope, authz, credentials_id, client_id):
-		"""
-		Extract tenants from requested scope and return the first accessible one.
-		"""
-		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.can_access_all_tenants(authz)
-		try:
-			tenants: set = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
-				scope, credentials_id, has_access_to_all_tenants)
-		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-
-		if tenants:
-			return tenants.pop()
-		else:
-			return None
 
 
 	def _build_login_uri(self, client_dict, login_query_params):
