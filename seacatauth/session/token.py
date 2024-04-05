@@ -25,6 +25,7 @@ class AuthTokenType:
 class AuthTokenField:
 	TokenType = "t"
 	SessionId = "sid"
+	IsSessionAlgorithmic = "st"
 	ExpiresAt = "exp"
 	Version = "_v"
 
@@ -52,6 +53,7 @@ class AuthTokenService(asab.Service):
 
 	async def create_oauth_authorization_code(
 		self, session_id: str, expiration: float,
+		is_session_algorithmic: bool = False,
 		code_challenge: str | None = None,
 		code_challenge_method: str | None = None
 	) -> str:
@@ -60,6 +62,7 @@ class AuthTokenService(asab.Service):
 
 		@param session_id: Session identifier
 		@param expiration: Expiration in seconds
+		@param is_session_algorithmic: Whether the session is algorithmic
 		@param code_challenge: PKCE challenge string
 		@param code_challenge_method: PKCE verification method
 		@return: Base64-encoded token value
@@ -69,18 +72,23 @@ class AuthTokenService(asab.Service):
 			token_type=AuthTokenType.OAuthAuthorizationCode,
 			session_id=session_id,
 			expiration=expiration,
+			is_session_algorithmic=is_session_algorithmic,
 			code_challenge=code_challenge,
 			code_challenge_method=code_challenge_method,
 		)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_oauth_access_token(self, session_id: str, expiration: float) -> str:
+	async def create_oauth_access_token(
+		self, session_id: str, expiration: float,
+		is_session_algorithmic: bool = False
+	) -> str:
 		"""
 		Create OAuth2 access token
 
 		@param session_id: Session identifier
 		@param expiration: Expiration in seconds
+		@param is_session_algorithmic: Whether the session is algorithmic
 		@return: Base64-encoded token value
 		"""
 		raw_value = await self._create_token(
@@ -88,15 +96,21 @@ class AuthTokenService(asab.Service):
 			token_type=AuthTokenType.OAuthAccessToken,
 			session_id=session_id,
 			expiration=expiration,
+			is_session_algorithmic=is_session_algorithmic,
 		)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_oauth_refresh_token(self, session_id: str, expiration: float) -> str:
+	async def create_oauth_refresh_token(
+		self, session_id: str, expiration: float,
+		is_session_algorithmic: bool = False
+	) -> str:
 		"""
 		Create OAuth2 refresh token
 
 		@param session_id: Session identifier
+		@param expiration: Expiration in seconds
+		@param is_session_algorithmic: Whether the session is algorithmic
 		@return: Base64-encoded token value
 		"""
 		raw_value = await self._create_token(
@@ -104,16 +118,21 @@ class AuthTokenService(asab.Service):
 			token_type=AuthTokenType.OAuthRefreshToken,
 			session_id=session_id,
 			expiration=expiration,
+			is_session_algorithmic=is_session_algorithmic,
 		)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_cookie(self, session_id: str, expiration: float) -> str:
+	async def create_cookie(
+		self, session_id: str, expiration: float,
+		is_session_algorithmic: bool = False
+	) -> str:
 		"""
 		Create HTTP cookie value
 
 		@param session_id: Session identifier
 		@param expiration: Expiration in seconds
+		@param is_session_algorithmic: Whether the session is algorithmic
 		@return: Base64-encoded token value
 		"""
 		raw_value = await self._create_token(
@@ -121,6 +140,7 @@ class AuthTokenService(asab.Service):
 			token_type=AuthTokenType.OAuthAccessToken,
 			session_id=session_id,
 			expiration=expiration,
+			is_session_algorithmic=is_session_algorithmic,
 		)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
@@ -128,6 +148,7 @@ class AuthTokenService(asab.Service):
 	async def _create_token(
 		self, token_length: int, token_type: str, session_id: str,
 		expiration: typing.Optional[float] = None,
+		is_session_algorithmic: bool = False,
 		**kwargs
 	) -> bytes:
 		"""
@@ -137,6 +158,7 @@ class AuthTokenService(asab.Service):
 		@param token_type: Token type string
 		@param session_id: Session identifier
 		@param expiration: Expiration in seconds
+		@param is_session_algorithmic: Whether the session is algorithmic
 		@return: Raw token value
 		"""
 		token = _generate_token(token_length)
@@ -144,6 +166,7 @@ class AuthTokenService(asab.Service):
 
 		upsertor.set(AuthTokenField.TokenType, token_type)
 		upsertor.set(AuthTokenField.SessionId, session_id)
+		upsertor.set(AuthTokenField.IsSessionAlgorithmic, is_session_algorithmic)
 		if expiration:
 			expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
 			upsertor.set(AuthTokenField.ExpiresAt, expires_at)
@@ -221,7 +244,7 @@ class AuthTokenService(asab.Service):
 			raise KeyError("Auth token type does not match.")
 		if verifier is not None:
 			verifier(data)
-		return data[AuthTokenField.SessionId]
+		return data[AuthTokenField.SessionId], data[AuthTokenField.IsSessionAlgorithmic]
 
 
 	async def extend_token(self, token: bytes, expiration: float):
