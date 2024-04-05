@@ -157,7 +157,47 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get_token(self, token: bytes, token_type: str):
+	async def get_by_oauth2_access_token(self, token: bytes):
+		"""
+		Get access token data
+
+		@param token: Raw token value
+		@return:
+		"""
+		return await self.get(token, AuthTokenType.OAuthAccessToken)
+
+
+	async def get_by_oauth2_refresh_token(self, token: bytes):
+		"""
+		Get refresh token data
+
+		@param token: Raw token value
+		@return:
+		"""
+		return await self.get(token, AuthTokenType.OAuthRefreshToken)
+
+
+	async def get_by_oauth2_authorization_code(self, token: bytes):
+		"""
+		Get authorization code data
+
+		@param token: Raw token value
+		@return:
+		"""
+		return await self.get(token, AuthTokenType.OAuthAuthorizationCode)
+
+
+	async def get_by_cookie(self, token: bytes):
+		"""
+		Get cookie data
+
+		@param token: Raw token value
+		@return:
+		"""
+		return await self.get(token, AuthTokenType.Cookie)
+
+
+	async def get(self, token: bytes, token_type: str | None = None):
 		"""
 		Get auth token
 
@@ -167,23 +207,7 @@ class AuthTokenService(asab.Service):
 		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
 		if not _is_valid(data):
 			raise KeyError("Auth token expired.")
-		if data["t"] != token_type:
-			raise KeyError("Auth token type does not match.")
-		return data
-
-
-	async def pop_token(self, token: bytes, token_type: str):
-		"""
-		Get auth token and remove it from the database
-
-		@param token: Raw token value
-		@return:
-		"""
-		collection = self.StorageService.Database[self.AuthTokenCollection]
-		data = await collection.find_one_and_delete(filter={"_id": token})
-		if not _is_valid(data):
-			raise KeyError("Auth token expired.")
-		if data["t"] != token_type:
+		if token_type is not None and data["t"] != token_type:
 			raise KeyError("Auth token type does not match.")
 		return data
 
@@ -210,7 +234,7 @@ class AuthTokenService(asab.Service):
 		return data
 
 
-	async def delete_token(self, token: bytes):
+	async def delete(self, token: bytes):
 		"""
 		Delete auth token
 
