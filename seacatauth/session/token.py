@@ -46,19 +46,31 @@ class AuthTokenService(asab.Service):
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
-	async def create_oauth_authorization_code(self, session_id: str, expiration: float):
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired_tokens()
+
+
+	async def create_oauth_authorization_code(
+		self, session_id: str, expiration: float,
+		code_challenge: str | None = None,
+		code_challenge_method: str | None = None
+	):
 		"""
 		Create OAuth2 authorization code
 
 		@param session_id: Session identifier
 		@param expiration: Expiration in seconds
+		@param code_challenge: PKCE challenge string
+		@param code_challenge_method: PKCE verification method
 		@return: Base64-encoded token value
 		"""
-		raw_value = await self._create(
+		raw_value = await self._create_token(
 			token_length=self.OAuthAuthorizationCodeLength,
 			token_type=AuthTokenType.OAuthAuthorizationCode,
 			session_id=session_id,
 			expiration=expiration,
+			code_challenge=code_challenge,
+			code_challenge_method=code_challenge_method,
 		)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
@@ -71,7 +83,7 @@ class AuthTokenService(asab.Service):
 		@param expiration: Expiration in seconds
 		@return: Base64-encoded token value
 		"""
-		raw_value = await self._create(
+		raw_value = await self._create_token(
 			token_length=self.OAuthAccessTokenLength,
 			token_type=AuthTokenType.OAuthAccessToken,
 			session_id=session_id,
@@ -87,7 +99,7 @@ class AuthTokenService(asab.Service):
 		@param session_id: Session identifier
 		@return: Base64-encoded token value
 		"""
-		raw_value = await self._create(
+		raw_value = await self._create_token(
 			token_length=self.OAuthRefreshTokenLength,
 			token_type=AuthTokenType.OAuthRefreshToken,
 			session_id=session_id,
@@ -104,7 +116,7 @@ class AuthTokenService(asab.Service):
 		@param expiration: Expiration in seconds
 		@return: Base64-encoded token value
 		"""
-		raw_value = await self._create(
+		raw_value = await self._create_token(
 			token_length=self.CookieLength,
 			token_type=AuthTokenType.OAuthAccessToken,
 			session_id=session_id,
@@ -113,9 +125,10 @@ class AuthTokenService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def _create(
+	async def _create_token(
 		self, token_length: int, token_type: str, session_id: str,
-		expiration: typing.Optional[float] = None
+		expiration: typing.Optional[float] = None,
+		**kwargs
 	):
 		"""
 		Create and store a new auth token
@@ -134,6 +147,9 @@ class AuthTokenService(asab.Service):
 		if expiration:
 			expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
 			upsertor.set(AuthTokenField.ExpiresAt, expires_at)
+		for k, v in kwargs.items():
+			if v is not None:
+				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_CREATED)
 		L.log(asab.LOG_NOTICE, "Auth token created.", struct_data={"sid": session_id, "type": token_type})
@@ -141,7 +157,7 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get(self, token: bytes, token_type: str):
+	async def get_token(self, token: bytes, token_type: str):
 		"""
 		Get auth token
 
@@ -149,6 +165,22 @@ class AuthTokenService(asab.Service):
 		@return:
 		"""
 		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
+		if not _is_valid(data):
+			raise KeyError("Auth token expired.")
+		if data["t"] != token_type:
+			raise KeyError("Auth token type does not match.")
+		return data
+
+
+	async def pop_token(self, token: bytes, token_type: str):
+		"""
+		Get auth token and remove it from the database
+
+		@param token: Raw token value
+		@return:
+		"""
+		collection = self.StorageService.Database[self.AuthTokenCollection]
+		data = await collection.find_one_and_delete(filter={"_id": token})
 		if not _is_valid(data):
 			raise KeyError("Auth token expired.")
 		if data["t"] != token_type:
@@ -178,7 +210,7 @@ class AuthTokenService(asab.Service):
 		return data
 
 
-	async def delete(self, token: bytes):
+	async def delete_token(self, token: bytes):
 		"""
 		Delete auth token
 
@@ -186,10 +218,6 @@ class AuthTokenService(asab.Service):
 		@return:
 		"""
 		await self.StorageService.delete(self.AuthTokenCollection, _hash_token(token))
-
-
-	async def _on_housekeeping(self, event_name):
-		await self._delete_expired_tokens()
 
 
 	async def _delete_expired_tokens(self):
