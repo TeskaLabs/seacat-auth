@@ -157,55 +157,61 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get_by_oauth2_access_token(self, token: str):
+	async def get_session_id_by_oauth2_access_token(self, token: str):
 		"""
-		Get access token data
+		Get session ID by access token
 
 		@param token: Token string (base64-encoded)
 		@return:
 		"""
 		token = base64.urlsafe_b64encode(token.encode("ascii"))
-		return await self.get(token, AuthTokenType.OAuthAccessToken)
+		return await self._get_session_id_by_token(token, AuthTokenType.OAuthAccessToken)
 
 
-	async def get_by_oauth2_refresh_token(self, token: str):
+	async def get_session_id_by_oauth2_refresh_token(self, token: str):
 		"""
-		Get refresh token data
+		Get session ID by refresh token
 
 		@param token: Token string (base64-encoded)
 		@return:
 		"""
 		token = base64.urlsafe_b64encode(token.encode("ascii"))
-		return await self.get(token, AuthTokenType.OAuthRefreshToken)
+		return await self._get_session_id_by_token(token, AuthTokenType.OAuthRefreshToken)
 
 
-	async def get_by_oauth2_authorization_code(self, token: str):
+	async def get_session_id_by_oauth2_authorization_code(self, token: str):
 		"""
-		Get authorization code data
+		Get session ID by authorization code
 
 		@param token: Token string (base64-encoded)
 		@return:
 		"""
 		token = base64.urlsafe_b64encode(token.encode("ascii"))
-		return await self.get(token, AuthTokenType.OAuthAuthorizationCode)
+		return await self._get_session_id_by_token(token, AuthTokenType.OAuthAuthorizationCode)
 
 
-	async def get_by_cookie(self, token: str):
+	async def get_session_id_by_cookie(self, token: str):
 		"""
-		Get cookie data
+		Get session ID by cookie
 
 		@param token: Token string (base64-encoded)
 		@return:
 		"""
 		token = base64.urlsafe_b64encode(token.encode("ascii"))
-		return await self.get(token, AuthTokenType.Cookie)
+		return await self._get_session_id_by_token(token, AuthTokenType.Cookie)
 
 
-	async def get(self, token: bytes, token_type: str | None = None):
+	async def _get_session_id_by_token(
+		self, token: bytes,
+		token_type: typing.Optional[str] = None,
+		verifier: typing.Optional[typing.Callable] = None
+	):
 		"""
 		Get auth token
 
 		@param token: Raw token bytes
+		@param token_type: Type of the token
+		@param verifier: Verifier function that raises an error when verification fails
 		@return:
 		"""
 		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
@@ -213,7 +219,9 @@ class AuthTokenService(asab.Service):
 			raise KeyError("Auth token expired.")
 		if token_type is not None and data["t"] != token_type:
 			raise KeyError("Auth token type does not match.")
-		return data
+		if verifier is not None:
+			verifier(data)
+		return data[AuthTokenField.SessionId]
 
 
 	async def extend_token(self, token: bytes, expiration: float):
