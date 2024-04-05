@@ -54,7 +54,7 @@ class AuthTokenService(asab.Service):
 		self, session_id: str, expiration: float,
 		code_challenge: str | None = None,
 		code_challenge_method: str | None = None
-	):
+	) -> str:
 		"""
 		Create OAuth2 authorization code
 
@@ -75,7 +75,7 @@ class AuthTokenService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_oauth_access_token(self, session_id: str, expiration: float):
+	async def create_oauth_access_token(self, session_id: str, expiration: float) -> str:
 		"""
 		Create OAuth2 access token
 
@@ -92,7 +92,7 @@ class AuthTokenService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_oauth_refresh_token(self, session_id: str, expiration: float):
+	async def create_oauth_refresh_token(self, session_id: str, expiration: float) -> str:
 		"""
 		Create OAuth2 refresh token
 
@@ -108,7 +108,7 @@ class AuthTokenService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_cookie(self, session_id: str, expiration: float):
+	async def create_cookie(self, session_id: str, expiration: float) -> str:
 		"""
 		Create HTTP cookie value
 
@@ -129,7 +129,7 @@ class AuthTokenService(asab.Service):
 		self, token_length: int, token_type: str, session_id: str,
 		expiration: typing.Optional[float] = None,
 		**kwargs
-	):
+	) -> bytes:
 		"""
 		Create and store a new auth token
 
@@ -157,43 +157,47 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get_by_oauth2_access_token(self, token: bytes):
+	async def get_by_oauth2_access_token(self, token: str):
 		"""
 		Get access token data
 
-		@param token: Raw token value
+		@param token: Token string (base64-encoded)
 		@return:
 		"""
+		token = base64.urlsafe_b64encode(token.encode("ascii"))
 		return await self.get(token, AuthTokenType.OAuthAccessToken)
 
 
-	async def get_by_oauth2_refresh_token(self, token: bytes):
+	async def get_by_oauth2_refresh_token(self, token: str):
 		"""
 		Get refresh token data
 
-		@param token: Raw token value
+		@param token: Token string (base64-encoded)
 		@return:
 		"""
+		token = base64.urlsafe_b64encode(token.encode("ascii"))
 		return await self.get(token, AuthTokenType.OAuthRefreshToken)
 
 
-	async def get_by_oauth2_authorization_code(self, token: bytes):
+	async def get_by_oauth2_authorization_code(self, token: str):
 		"""
 		Get authorization code data
 
-		@param token: Raw token value
+		@param token: Token string (base64-encoded)
 		@return:
 		"""
+		token = base64.urlsafe_b64encode(token.encode("ascii"))
 		return await self.get(token, AuthTokenType.OAuthAuthorizationCode)
 
 
-	async def get_by_cookie(self, token: bytes):
+	async def get_by_cookie(self, token: str):
 		"""
 		Get cookie data
 
-		@param token: Raw token value
+		@param token: Token string (base64-encoded)
 		@return:
 		"""
+		token = base64.urlsafe_b64encode(token.encode("ascii"))
 		return await self.get(token, AuthTokenType.Cookie)
 
 
@@ -201,7 +205,7 @@ class AuthTokenService(asab.Service):
 		"""
 		Get auth token
 
-		@param token: Raw token value
+		@param token: Raw token bytes
 		@return:
 		"""
 		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
