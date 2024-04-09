@@ -195,7 +195,7 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get_by_oauth2_access_token(self, token: str):
+	async def get_oauth2_access_token(self, token: str):
 		"""
 		Get session ID by access token
 
@@ -206,7 +206,7 @@ class AuthTokenService(asab.Service):
 		return await self._get(token, AuthTokenType.OAuthAccessToken)
 
 
-	async def get_by_oauth2_refresh_token(self, token: str):
+	async def get_oauth2_refresh_token(self, token: str):
 		"""
 		Get session ID by refresh token
 
@@ -217,7 +217,7 @@ class AuthTokenService(asab.Service):
 		return await self._get(token, AuthTokenType.OAuthRefreshToken)
 
 
-	async def get_by_oauth2_authorization_code(self, token: str):
+	async def get_oauth2_authorization_code(self, token: str):
 		"""
 		Get session ID by authorization code
 
@@ -228,7 +228,7 @@ class AuthTokenService(asab.Service):
 		return await self._get(token, AuthTokenType.OAuthAuthorizationCode)
 
 
-	async def get_by_cookie(self, token: str):
+	async def get_cookie(self, token: str):
 		"""
 		Get session ID by cookie
 
