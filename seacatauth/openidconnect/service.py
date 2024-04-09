@@ -213,8 +213,6 @@ class OpenIdConnectService(asab.Service):
 				for result in await external_login_service.list(root_session.Credentials.Id)
 			}
 			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
 				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
 			])
@@ -228,32 +226,11 @@ class OpenIdConnectService(asab.Service):
 				(SessionAdapter.FN.Batman.Token, basic_auth),
 			])
 
-		session_builders.append(oauth2_session_builder(session.OAuth2.ClientId, granted_scope, session.OAuth2.Nonce))
-
-		# Obtain Track ID if there is any in the root session
-		if root_session.TrackId is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
-
-		# Transfer impersonation data
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			session_builders.append((
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
-					root_session.Authentication.ImpersonatorSessionId
-				),
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
-					root_session.Authentication.ImpersonatorCredentialsId
-				),
-			))
+		session_builders.append(((SessionAdapter.FN.OAuth2.Scope, granted_scope),))
 
 		# TODO: Expiration
 
-		session = await self.SessionService.create_session(
-			session_type="openidconnect",
-			parent_session_id=root_session.SessionId,
-			session_builders=session_builders,
-		)
+		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
 		return session
 
@@ -344,12 +321,6 @@ class OpenIdConnectService(asab.Service):
 			return None
 
 		return session
-
-
-	def refresh_token(self, refresh_token, client_id, client_secret, scope):
-		# TODO: this is not implemented
-		L.error("refresh_token is not implemented", struct_data=[refresh_token, client_id, client_secret, scope])
-		return aiohttp.web.HTTPNotImplemented()
 
 
 	def check_access_token(self, bearer_token):
