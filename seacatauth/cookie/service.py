@@ -143,7 +143,7 @@ class CookieService(asab.Service):
 
 
 	async def get_session_by_authorization_code(self, code):
-		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
+		return await self.OpenIdConnectService.get_session_by_authorization_code(code)
 
 
 	async def create_cookie_client_session(

@@ -183,7 +183,7 @@ class TokenHandler(object):
 			new_refresh_token = await self.SessionService.TokenService.create_oauth2_refresh_token(
 				session.SessionId, expiration=self.RefreshTokenExpiration)
 
-		t = await self.SessionService.TokenService.get_by_oauth2_refresh_token(new_refresh_token)
+		t = await self.SessionService.TokenService.get_oauth2_refresh_token(new_refresh_token)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
@@ -295,7 +295,7 @@ class TokenHandler(object):
 			raise asab.exceptions.ValidationError("No authorization code in request.")
 
 		# Locate the session by authorization code
-		session = await self.OpenIdConnectService.pop_session_by_authorization_code(
+		session = await self.OpenIdConnectService.get_session_by_authorization_code(
 			authorization_code, form_data.get("code_verifier"))
 
 		# TODO: If possible, verify that the Authorization Code has not been previously used.

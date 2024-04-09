@@ -79,9 +79,7 @@ class OpenIdConnectService(asab.Service):
 			# Default fallback option
 			self.Issuer = self.PublicApiBaseUrl.rstrip("/")
 
-		self.AuthorizationCodeTimeout = datetime.timedelta(
-			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
-		)
+		self.AuthorizationCodeTimeout = asab.Config.getseconds("openidconnect", "auth_code_timeout")
 
 		self.DisableRedirectUriValidation = asab.Config.getboolean(
 			"openidconnect", "_disable_redirect_uri_validation", fallback=False)
@@ -111,27 +109,22 @@ class OpenIdConnectService(asab.Service):
 		Generates a random authorization code and stores it as a temporary
 		session identifier until the session is retrieved.
 		"""
-		# TODO: Store PKCE challenge here, not in the session object
-		code = secrets.token_urlsafe(36)
-		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
-
 		if session.is_algorithmic():
-			algo_token = self.SessionService.Algorithmic.serialize(session)
-			upsertor.set("alt", algo_token.encode("ascii"), encrypt=True)
-			upsertor.set("client_id", session.OAuth2.ClientId)
-			upsertor.set("scope", session.OAuth2.Scope)
+			return await self.SessionService.TokenService.create_oauth2_authorization_code(
+				session_id=self.SessionService.Algorithmic.serialize(session),
+				expiration=self.AuthorizationCodeTimeout,
+				is_session_algorithmic=True,
+				code_challenge=code_challenge,
+				code_challenge_method=code_challenge_method,
+			)
 		else:
-			upsertor.set("sid", session.SessionId)
-
-		if code_challenge:
-			upsertor.set("cc", code_challenge)
-			upsertor.set("ccm", code_challenge_method)
-
-		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
-
-		await upsertor.execute(event_type=EventTypes.OPENID_AUTH_CODE_GENERATED)
-
-		return code
+			return await self.SessionService.TokenService.create_oauth2_authorization_code(
+				session_id=session.SessionId,
+				expiration=self.AuthorizationCodeTimeout,
+				is_session_algorithmic=False,
+				code_challenge=code_challenge,
+				code_challenge_method=code_challenge_method,
+			)
 
 
 	async def _delete_expired_authorization_codes(self):
@@ -235,47 +228,37 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	async def pop_session_by_authorization_code(self, code, code_verifier: str = None):
+	async def get_session_by_authorization_code(self, code, code_verifier: str | None = None):
 		"""
 		Retrieves session by its temporary authorization code.
 		"""
-		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
-		data = await collection.find_one_and_delete(filter={"_id": code})
-		if data is None:
-			raise exceptions.SessionNotFoundError("Authorization code not found")
-
-		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.SessionNotFoundError("Authorization code expired")
-
-		if "cc" in data:
+		code_data = await self.SessionService.TokenService.get_oauth2_authorization_code(code)
+		if "cc" in code_data:
 			self.PKCE.evaluate_code_challenge(
-				code_challenge_method=data["ccm"],
-				code_challenge=data["cc"],
+				code_challenge_method=code_data["ccm"],
+				code_challenge=code_data["cc"],
 				code_verifier=code_verifier)
-
-		if "sid" in data:
-			return await self.SessionService.get(data["sid"])
-		elif "alt" in data:
-			algo_token = self.StorageService.aes_decrypt(data["alt"])
+		if code_data.get("sa"):
+			# Session is algorithmic (self-encoded token)
+			algo_token = self.StorageService.aes_decrypt(code_data["sid"])
 			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
 		else:
-			L.error("Unexpected authorization code object", struct_data=data)
-			raise exceptions.SessionNotFoundError("Invalid authorization code")
+			# Session is in the DB
+			return await self.SessionService.get(code_data["sid"])
 
 
 	async def get_session_by_refresh_token(self, refresh_token: str):
 		"""
 		Retrieves session by its refresh token.
 		"""
-		refresh_token_data = await self.SessionService.TokenService.get_by_oauth2_refresh_token(refresh_token)
+		refresh_token_data = await self.SessionService.TokenService.get_oauth2_refresh_token(refresh_token)
 		return await self.SessionService.get(refresh_token_data["sid"])
 
 
 	async def get_session_by_access_token(self, token_value):
 		try:
 			# Get session ID by token
-			token_data = await self.SessionService.TokenService.get_by_oauth2_access_token(token_value)
+			token_data = await self.SessionService.TokenService.get_oauth2_access_token(token_value)
 			# Get session by ID
 			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
