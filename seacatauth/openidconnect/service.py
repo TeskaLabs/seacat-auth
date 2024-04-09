@@ -174,7 +174,7 @@ class OpenIdConnectService(asab.Service):
 		else:
 			granted_scope = session.OAuth2.Scope
 
-		# TODO: Differentiate between ActiveScope and AuthorizedScope
+		# TODO: Differentiate between the scope granted at authorization time and the sub-scope requested for this token
 
 		# Exclude critical resource grants from impersonated sessions
 		if root_session.Authentication.ImpersonatorSessionId is not None:
@@ -285,6 +285,18 @@ class OpenIdConnectService(asab.Service):
 		else:
 			L.error("Unexpected authorization code object", struct_data=data)
 			raise exceptions.SessionNotFoundError("Invalid authorization code")
+
+
+	async def get_session_by_refresh_token(self, refresh_token: str):
+		"""
+		Retrieves session by its refresh token.
+		"""
+		refresh_token_data = await self.SessionService.TokenService.get_by_oauth2_refresh_token(refresh_token)
+		if refresh_token_data.get("sa"):
+			algo_token = self.StorageService.aes_decrypt(refresh_token_data["sid"])
+			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
+		else:
+			return await self.SessionService.get(refresh_token_data["sid"])
 
 
 	async def get_session_by_access_token(self, token_value):
