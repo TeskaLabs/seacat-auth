@@ -7,7 +7,6 @@ import aiohttp.web
 import asab
 
 from ...authz import build_credentials_authz
-from ...cookie.utils import delete_cookie
 from ... import client, generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
@@ -736,7 +735,7 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-		delete_cookie(self.App, response)
+		self.CookieService.delete_session_cookie(response)
 		return response
 
 	async def reply_with_factor_setup_redirect(

@@ -131,7 +131,8 @@ class CookieService(asab.Service):
 				"Cookie value is not base64", query={"cookie_value": cookie_value}) from e
 
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, cookie_value)
+			token_data = await self.SessionService.TokenService.get_cookie(cookie_value)
+			session = await self.SessionService.get(token_data["sid"])
 		except KeyError as e:
 			raise exceptions.SessionNotFoundError(
 				"Session not found", query={"cookie_value": cookie_value}) from e
@@ -179,7 +180,6 @@ class CookieService(asab.Service):
 				tenants=tenants,
 				exclude_resources=exclude_resources,
 			),
-			cookie_session_builder(),
 		]
 
 		if "batman" in scope:
@@ -265,3 +265,29 @@ class CookieService(asab.Service):
 			"fi": from_info})
 
 		return session
+
+
+	def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
+		"""
+		Add a Set-Cookie header to the response.
+		The cookie serves as a Seacat Auth session identifier and is used for authentication.
+		"""
+		cookie_name = self.get_cookie_name(client_id)
+		cookie_domain = cookie_domain or self.RootCookieDomain
+		if secure is None:
+			secure = self.CookieSecure
+
+		response.set_cookie(
+			cookie_name,
+			cookie_value,
+			httponly=True,  # Not accessible from Javascript
+			domain=cookie_domain,
+			secure=secure,
+		)
+
+
+	def delete_session_cookie(self, response):
+		"""
+		Add a Set-Cookie header to the response to unset Seacat Session cookie
+		"""
+		response.del_cookie(self.CookieName)

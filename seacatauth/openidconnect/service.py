@@ -232,27 +232,27 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieves session by its temporary authorization code.
 		"""
-		code_data = await self.SessionService.TokenService.get_oauth2_authorization_code(code)
-		if "cc" in code_data:
+		token_data = await self.SessionService.TokenService.get_oauth2_authorization_code(code)
+		if "cc" in token_data:
 			self.PKCE.evaluate_code_challenge(
-				code_challenge_method=code_data["ccm"],
-				code_challenge=code_data["cc"],
+				code_challenge_method=token_data["ccm"],
+				code_challenge=token_data["cc"],
 				code_verifier=code_verifier)
-		if code_data.get("sa"):
+		if token_data.get("sa"):
 			# Session is algorithmic (self-encoded token)
-			algo_token = self.StorageService.aes_decrypt(code_data["sid"])
+			algo_token = self.StorageService.aes_decrypt(token_data["sid"])
 			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
 		else:
 			# Session is in the DB
-			return await self.SessionService.get(code_data["sid"])
+			return await self.SessionService.get(token_data["sid"])
 
 
 	async def get_session_by_refresh_token(self, refresh_token: str):
 		"""
 		Retrieves session by its refresh token.
 		"""
-		refresh_token_data = await self.SessionService.TokenService.get_oauth2_refresh_token(refresh_token)
-		return await self.SessionService.get(refresh_token_data["sid"])
+		token_data = await self.SessionService.TokenService.get_oauth2_refresh_token(refresh_token)
+		return await self.SessionService.get(token_data["sid"])
 
 
 	async def get_session_by_access_token(self, token_value):
