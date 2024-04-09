@@ -178,7 +178,7 @@ class TokenHandler(object):
 			new_access_token = await self.SessionService.Algorithmic.serialize(session)
 			new_refresh_token = None
 		else:
-			new_access_token = await self.SessionService.TokenService.create_oauth2_access_token(  # TODO
+			new_access_token = await self.SessionService.TokenService.create_oauth2_access_token(
 				session.SessionId, expiration=self.AccessTokenExpiration)
 			new_refresh_token = await self.SessionService.TokenService.create_oauth2_refresh_token(
 				session.SessionId, expiration=self.RefreshTokenExpiration)
@@ -195,7 +195,7 @@ class TokenHandler(object):
 		response_payload = {
 			"token_type": "Bearer",
 			"scope": " ".join(session.OAuth2.Scope),
-			"access_token": session.OAuth2.AccessToken,  # TODO: Use the access token above
+			"access_token": new_access_token,
 			"id_token": await self.OpenIdConnectService.build_id_token(session),
 		}
 
@@ -257,7 +257,7 @@ class TokenHandler(object):
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
 		# Generate new auth tokens
-		new_access_token = await self.SessionService.TokenService.create_oauth2_access_token(  # TODO
+		new_access_token = await self.SessionService.TokenService.create_oauth2_access_token(
 			session.SessionId, expiration=self.AccessTokenExpiration)
 		new_refresh_token = await self.SessionService.TokenService.create_oauth2_refresh_token(
 			session.SessionId, expiration=self.RefreshTokenExpiration)
@@ -272,7 +272,7 @@ class TokenHandler(object):
 		response_payload = {
 			"token_type": "Bearer",
 			"scope": " ".join(session.OAuth2.Scope),
-			"access_token": session.OAuth2.AccessToken,  # TODO: Use the access token above
+			"access_token": new_access_token,
 			"refresh_token": new_refresh_token,
 			"id_token": await self.OpenIdConnectService.build_id_token(session),
 		}
