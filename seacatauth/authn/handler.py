@@ -12,7 +12,6 @@ import jwcrypto.jwk
 
 from .. import exceptions, AuditLogger, generic
 from ..last_activity import EventCode
-from ..cookie import set_cookie, delete_cookie
 from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
@@ -262,9 +261,14 @@ class AuthenticationHandler(object):
 		if cookie_domain is None:
 			cookie_domain = self.CookieService.RootCookieDomain
 
-		set_cookie(self.App, response, session, cookie_domain)
+		self.CookieService.set_session_cookie(
+			response=response,
+			cookie_value=session.Cookie.Id,
+			client_id=session.OAuth.ClientId,
+			cookie_domain=cookie_domain
+		)
 
-		self.AuthenticationService.LoginCounter.add('successful', 1)
+		self.AuthenticationService.LoginCounter.add("successful", 1)
 
 		return response
 
@@ -290,7 +294,7 @@ class AuthenticationHandler(object):
 		else:
 			response = asab.web.rest.json_response(request, {'result': 'OK'})
 
-		delete_cookie(self.App, response)
+		self.CookieService.delete_session_cookie(response)
 
 		# If the current session is impersonated and the original session has a
 		# root cookie, try to restore the original session
@@ -305,7 +309,11 @@ class AuthenticationHandler(object):
 					# Case when the impersonation was started by an M2M session, which has no cookie
 					pass
 				else:
-					set_cookie(self.App, response, impersonator_session)
+					self.CookieService.set_session_cookie(
+						response=response,
+						cookie_value=impersonator_session.Cookie.Id,
+						client_id=impersonator_session.OAuth.ClientId,
+					)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
 			"cid": session.Credentials.Id, "sid": session.SessionId, "token_type": "cookie"})
@@ -440,8 +448,12 @@ class AuthenticationHandler(object):
 			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
 		except aiohttp.web.HTTPForbidden as e:
 			return e
+
 		response = asab.web.rest.json_response(request, {"result": "OK"})
-		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
+		self.CookieService.set_session_cookie(
+			response=response,
+			cookie_value=session.Cookie.Id,
+		)
 		return response
 
 
@@ -519,7 +531,11 @@ class AuthenticationHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-		set_cookie(self.App, response, session, cookie_domain=self.CookieService.RootCookieDomain)
+		self.CookieService.set_session_cookie(
+			response=response,
+			cookie_value=session.Cookie.Id,
+			client_id=session.OAuth.ClientId,
+		)
 		return response
 
 

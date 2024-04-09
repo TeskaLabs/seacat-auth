@@ -1,3 +1,4 @@
+import datetime
 import logging
 import uuid
 
@@ -8,7 +9,6 @@ import asab.exceptions
 
 from .. import exceptions, AuditLogger
 from .. import generic
-from .utils import set_cookie, delete_cookie
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
 #
@@ -170,7 +170,7 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response)
 			return response
 
 		return response
@@ -257,11 +257,16 @@ class CookieHandler(object):
 		cookie_domain = client.get("cookie_domain") or None
 
 		if response.status_code != 200:
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response)
 			return response
 
 		if anonymous_session_created:
-			set_cookie(self.App, response, session, cookie_domain)
+			self.CookieService.set_session_cookie(
+				response=response,
+				cookie_value=session.Cookie.Id,
+				client_id=session.OAuth.ClientId,
+				cookie_domain=cookie_domain
+			)
 
 			# Trigger webhook and add custom HTTP headers
 			try:
@@ -475,9 +480,21 @@ class CookieHandler(object):
 		# TODO: Verify that the request came from the correct domain
 
 		if session.is_algorithmic():
+			# TODO: Why is this here????????? Add comment!
 			pass
 		else:
-			set_cookie(self.App, response, session, cookie_domain)
+			# Generate a new cookie
+			session_cookie_value = await self.SessionService.TokenService.create_cookie(
+				session_id=session.SessionId,
+				expiration=(session.Expiration - datetime.datetime.now(datetime.UTC)).seconds,
+				is_session_algorithmic=True,
+			)
+			self.CookieService.set_session_cookie(
+				response=response,
+				cookie_value=session_cookie_value,
+				client_id=client_id,
+				cookie_domain=cookie_domain
+			)
 
 		# Trigger webhook and set custom client response headers
 		try:
