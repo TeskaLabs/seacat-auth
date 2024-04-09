@@ -269,26 +269,17 @@ class OpenIdConnectService(asab.Service):
 		Retrieves session by its refresh token.
 		"""
 		refresh_token_data = await self.SessionService.TokenService.get_by_oauth2_refresh_token(refresh_token)
-		if refresh_token_data.get("sa"):
-			algo_token = self.StorageService.aes_decrypt(refresh_token_data["sid"])
-			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
-		else:
-			return await self.SessionService.get(refresh_token_data["sid"])
+		return await self.SessionService.get(refresh_token_data["sid"])
 
 
 	async def get_session_by_access_token(self, token_value):
-		# Decode the access token
 		try:
-			access_token = base64.urlsafe_b64decode(token_value)
-		except ValueError:
-			L.info("Access token is not base64: '{}'".format(token_value))
-			return None
-
-		# Locate the session
-		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
+			# Get session ID by token
+			token_data = await self.SessionService.TokenService.get_by_oauth2_access_token(token_value)
+			# Get session by ID
+			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
-			L.info("Session not found by access token: {}".format(access_token))
+			L.info("Session not found by access token: {}".format(token_value))
 			return None
 
 		return session
