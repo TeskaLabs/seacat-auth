@@ -1,3 +1,4 @@
+import base64
 import datetime
 import logging
 import re
@@ -8,7 +9,7 @@ import passlib.hash
 import asab.storage.exceptions
 import asab.exceptions
 
-from seacatauth.client import exceptions
+from seacatauth import exceptions
 from asab.utils import convert_to_seconds
 
 from ..events import EventTypes
@@ -37,8 +38,8 @@ APPLICATION_TYPES = [
 ]
 TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none",
-	# "client_secret_basic",
-	# "client_secret_post",
+	"client_secret_basic",
+	"client_secret_post",
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
@@ -457,39 +458,63 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client(self, client: dict, client_id: str, client_secret: str = None):
+	async def authenticate_client_request(self, request, expected_client_id: str) -> str:
 		"""
 		Verify client ID and secret.
 		"""
-		if client_id != client["_id"]:
-			raise exceptions.ClientError(
-				"Client IDs do not match.",
-				client_id=client["_id"],
-				attempted_client_id=client_id
-			)
-		if client_secret is None:
-			# The client MAY omit the parameter if the client secret is an empty string.
-			# [rfc6749#section-2.3.1]
-			client_secret = ""
+		client_dict = await self.get(expected_client_id)
+		token_endpoint_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+		if token_endpoint_auth_method == "none":
+			# Public client - no authentication required
+			return expected_client_id
 
-		client_secret_hash = client.get("__client_secret")
-		if not client_secret_hash:
-			# No client secret is set, none is expected!
-			if not client_secret:
-				return True
+		# Check secret expiration
+		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
+		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=expected_client_id)
+
+		client_secret_hash = client_dict.get("__client_secret", None)
+		if token_endpoint_auth_method == "client_secret_basic":
+			try:
+				auth_header = request.headers.get("Authorization")
+				_, basic_auth = auth_header.split(" ")
+				client_id, client_secret = base64.urlsafe_b64decode(
+					basic_auth.encode("ascii")).decode("ascii").split(":")
+			except Exception as e:
+				raise exceptions.ClientAuthenticationError(
+					"Falied to get client credentials from Authorization header: {}.".format(e),
+					client_id=expected_client_id
+				)
+			if client_id != expected_client_id:
+				raise exceptions.ClientAuthenticationError(
+					"Client IDs do not match (expected {!r}).".format(expected_client_id),
+					client_id=client_id,
+				)
+			if passlib.hash.argon2.verify(client_secret, client_secret_hash):
+				return client_id
 			else:
-				raise exceptions.ClientError(
-					"Got non-empty secret from non-confidential client.", client_id=client["_id"])
+				raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
-		if "client_secret_expires_at" in client \
-			and client["client_secret_expires_at"] != 0 \
-			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.ClientError("Expired client secret.", client_id=client["_id"])
+		elif token_endpoint_auth_method == "client_secret_post":
+			post_data = await request.post()
+			client_id = post_data.get("client_id")
+			client_secret = post_data.get("client_secret")
+			if client_id != expected_client_id:
+				raise exceptions.ClientAuthenticationError(
+					"Client IDs do not match (expected {!r}).".format(expected_client_id),
+					client_id=client_id,
+				)
+			if passlib.hash.argon2.verify(client_secret, client_secret_hash):
+				return client_id
+			else:
+				raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
-		if not passlib.hash.argon2.verify(client_secret, client_secret_hash):
-			raise exceptions.ClientError("Incorrect client secret.", client_id=client["_id"])
+		elif token_endpoint_auth_method == "client_secret_jwt":
+			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
+		elif token_endpoint_auth_method == "private_key_jwt":
+			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
 		else:
-			return True
+			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
 
 
 	def _check_grant_types(self, grant_types, response_types):

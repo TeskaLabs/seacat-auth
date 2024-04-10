@@ -150,7 +150,7 @@ class TokenHandler(object):
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client ({}).".format(e), struct_data={
 				"from_ip": from_ip,
 				"grant_type": "authorization_code",
-				"client_id": form_data.get("client_id"),
+				"client_id": e.ClientID,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
@@ -227,22 +227,23 @@ class TokenHandler(object):
 					"from_ip": from_ip,
 					"grant_type": "refresh_token",
 					"client_id": form_data.get("client_id"),
-					"redirect_uri": form_data.get("redirect_uri"),
 				}
 			)
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
 
-		except exceptions.ClientAuthenticationError:
+		except exceptions.ClientAuthenticationError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client.", struct_data={
 				"from_ip": from_ip,
 				"grant_type": "refresh_token",
-				"client_id": form_data.get("client_id"),
-				"redirect_uri": form_data.get("redirect_uri"),
+				"client_id": e.ClientID,
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
 
 		# Refresh is not supported for algorithmic sessions (yet)
 		assert not session.is_algorithmic()
+
+		# Delete the used refresh token and the current access token
+		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
 		# Everything is okay: Request granted
 		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
@@ -252,9 +253,6 @@ class TokenHandler(object):
 			"grant_type": "refresh_token",
 			"from_ip": from_ip
 		})
-
-		# Delete the used refresh token and the current access token
-		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
 		# Generate new auth tokens
 		new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
@@ -299,7 +297,8 @@ class TokenHandler(object):
 		# TODO: If possible, verify that the Authorization Code has not been previously used.
 
 		# Verify client credentials if required
-		client_id = await self._authenticate_client(session, request)
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=session.OAuth2.ClientId)
 
 		# Ensure the Authorization Code was issued to the authenticated Client
 		if client_id != session.OAuth2.ClientId:
@@ -335,7 +334,8 @@ class TokenHandler(object):
 		# TODO: If possible, verify that the Refresh Token has not been previously used.
 
 		# Verify client credentials if required
-		client_id = await self._authenticate_client(session, request)
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=session.OAuth2.ClientId)
 
 		# Ensure the Authorization Code was issued to the authenticated Client
 		if client_id != session.OAuth2.ClientId:
@@ -343,37 +343,6 @@ class TokenHandler(object):
 				"Client ID in token request does not match the one used in authorization request.")
 
 		return session
-
-
-	async def _authenticate_client(self, session, request) -> str:
-		"""
-		Verify client credentials and check that the Authorization Code was issued to the authenticated Client.
-
-		@param session: Session object
-		@param request: aiohttp request
-		@return: Client ID
-		"""
-		client_dict = await self.OpenIdConnectService.ClientService.get(session.OAuth2.ClientId)
-		token_endpoint_auth_method = client_dict["token_endpoint_auth_method"]
-		if token_endpoint_auth_method == "none":
-			return session.OAuth2.ClientId
-		elif token_endpoint_auth_method == "client_secret_basic":
-			auth_header = request.headers.get("Authorization")
-			client_id, secret = base64.urlsafe_b64decode(auth_header.encode("ascii")).decode("ascii").split(":")
-			await self.OpenIdConnectService.ClientService.authenticate_client(client_dict, client_id, secret)
-		elif token_endpoint_auth_method == "client_secret_post":
-			post_data = await request.post()
-			client_id = post_data.get("client_id")
-			secret = post_data.get("client_secret")
-			await self.OpenIdConnectService.ClientService.authenticate_client(client_dict, client_id, secret)
-		elif token_endpoint_auth_method == "client_secret_jwt":
-			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
-		elif token_endpoint_auth_method == "private_key_jwt":
-			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
-		else:
-			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
-
-		return client_id
 
 
 	@asab.web.rest.json_schema_handler({
