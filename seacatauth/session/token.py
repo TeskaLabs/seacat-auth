@@ -5,6 +5,7 @@ import hashlib
 import typing
 
 import asab.storage
+import bson
 import pymongo
 
 from ..events import EventTypes
@@ -166,10 +167,10 @@ class SessionTokenService(asab.Service):
 		Delete all of session's auth tokens
 		"""
 		collection = self.StorageService.Database[self.AuthTokenCollection]
-		query_filter = {SessionTokenField.SessionId: session_id}
+		query_filter = {SessionTokenField.SessionId: bson.ObjectId(session_id)}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.info("Session tokens deleted.", struct_data={
+			L.log(asab.LOG_NOTICE, "Session tokens deleted.", struct_data={
 				"sid": session_id,
 				"count": result.deleted_count,
 			})
