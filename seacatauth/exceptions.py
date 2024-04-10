@@ -183,15 +183,6 @@ class NoCookieError(SeacatAuthError):
 		super().__init__(message, *args)
 
 
-class ClientAuthenticationError(SeacatAuthError):
-	"""
-	Failed to authenticate client
-	"""
-	def __init__(self, message, *args, client_id: str | None = None):
-		self.ClientId = client_id
-		super().__init__(message, *args)
-
-
 class URLValidationError(SeacatAuthError):
 	"""
 	Failed to verify requested URL
@@ -200,3 +191,43 @@ class URLValidationError(SeacatAuthError):
 		self.ClientId = client_id
 		self.URL = url
 		super().__init__("Cannot verify requested URL.")
+
+
+class ClientError(SeacatAuthError):
+	def __init__(self, *args, client_id, **kwargs):
+		self.ClientID = client_id
+		self.Key = None
+		self.Value = None
+		if len(kwargs) > 0:
+			self.Key, self.Value = kwargs.popitem()
+			message = "Invalid {key} '{value}' for client '{client_id}'".format(
+				client_id=client_id, key=self.Key, value=self.Value)
+			super().__init__(message, *args)
+		else:
+			super().__init__(*args)
+
+
+class ClientAuthenticationError(ClientError):
+	"""
+	Failed to authenticate client
+	"""
+	def __init__(self, message, *args, client_id: str | None = None):
+		super().__init__(message, *args, client_id=client_id)
+
+
+class InvalidRedirectURI(ClientError):
+	def __init__(self, *args, client_id, redirect_uri):
+		self.RedirectURI = redirect_uri
+		super().__init__(*args, client_id=client_id, redirect_uri=redirect_uri)
+
+
+class InvalidClientSecret(ClientError):
+	def __init__(self, client_id, *args):
+		message = "Invalid client secret for client '{client_id}'".format(client_id=client_id)
+		super().__init__(message, *args, client_id=client_id)
+
+
+class ClientNotFoundError(ClientError, KeyError):
+	def __init__(self, client_id, *args):
+		message = "Client '{client_id}' not found".format(client_id=client_id)
+		super().__init__(message, *args, client_id=client_id)

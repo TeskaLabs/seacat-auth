@@ -290,10 +290,10 @@ class AuthorizeHandler(object):
 			e.State = state
 			e.RedirectUri = redirect_uri
 			raise e
-		except client.exceptions.ClientNotFoundError as e:
+		except exceptions.ClientNotFoundError as e:
 			L.log(asab.LOG_NOTICE, "Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise ClientIdError(client_id) from e
-		except client.exceptions.InvalidRedirectURI as e:
+		except exceptions.InvalidRedirectURI as e:
 			L.log(asab.LOG_NOTICE, "Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise RedirectUriError(redirect_uri, client_id) from e
 
@@ -579,7 +579,7 @@ class AuthorizeHandler(object):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError as e:
-			raise client.exceptions.ClientNotFoundError(client_id) from e
+			raise exceptions.ClientNotFoundError(client_id) from e
 
 		try:
 			await self.OpenIdConnectService.ClientService.validate_client_authorize_options(
@@ -587,9 +587,9 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				response_type=response_type,
 			)
-		except client.exceptions.InvalidRedirectURI as e:
+		except exceptions.InvalidRedirectURI as e:
 			raise e
-		except client.exceptions.ClientError as e:
+		except exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id)
