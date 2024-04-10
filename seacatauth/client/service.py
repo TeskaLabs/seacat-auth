@@ -1,4 +1,3 @@
-import base64
 import datetime
 import logging
 import re
@@ -593,6 +592,7 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 		raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(validation_method))
 
 	return False
+
 
 def is_client_confidential(client: dict):
 	token_endpoint_auth_method = client.get("token_endpoint_auth_method", "none")
