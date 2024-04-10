@@ -120,9 +120,9 @@ class ClientHandler(object):
 			if not self.ClientService._AllowCustomClientID:
 				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
-		result = await self.ClientService.register(**json_data)
+		client_id = await self.ClientService.register(**json_data)
 		data = self._rest_normalize(
-			await self.ClientService.get(result["client_id"]),
+			await self.ClientService.get(client_id),
 			include_client_secret=True)
 		return asab.web.rest.json_response(request, data=data)
 
@@ -181,8 +181,11 @@ class ClientHandler(object):
 		}
 		rest_data["client_id"] = rest_data["_id"]
 		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
-		if include_client_secret and "__client_secret" in client:
-			rest_data["client_secret"] = client["__client_secret"]
+		if "__client_secret" in client:
+			if include_client_secret:
+				rest_data["client_secret"] = client["__client_secret"]
+			else:
+				rest_data["client_secret"] = True
 			if "client_secret_expires_at" in rest_data:
 				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
 		rest_data["cookie_name"] = cookie_service.get_cookie_name(rest_data["_id"])
