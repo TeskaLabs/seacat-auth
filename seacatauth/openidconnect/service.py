@@ -110,6 +110,7 @@ class OpenIdConnectService(asab.Service):
 		self,
 		session: SessionAdapter,
 		requested_scope: typing.Optional[typing.Iterable] = None,
+		expires_in: float | None  = None,
 	):
 		"""
 		Update/rebuild the session according to its authorization parameters
@@ -189,7 +190,9 @@ class OpenIdConnectService(asab.Service):
 
 		session_builders.append(((SessionAdapter.FN.OAuth2.Scope, granted_scope),))
 
-		# TODO: Expiration
+		if expires_in:
+			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)
+			session_builders.append(((SessionAdapter.FN.Session.Expiration, expiration),))
 
 		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
@@ -329,16 +332,12 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def build_userinfo(self, session):
-		# TODO: Session object should only serve as a cache
-		#   After the cache has expired, update session object with fresh credential, authn and authz data
-		#   and rebuild the userinfo
-
 		otp_service = self.App.get_service("seacatauth.OTPService")
 
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			"iat": session.CreatedAt,
+			"iat": session.ModifiedAt,  # "Issued-at" corresponds to the timestamp when the session was last updated
 			"sid": session.SessionId,
 		}
 
@@ -555,8 +554,8 @@ class OpenIdConnectService(asab.Service):
 				session_id=self.SessionService.Algorithmic.serialize(session),
 				expiration=AuthorizationCode.Expiration,
 				is_session_algorithmic=True,
-				code_challenge=code_challenge,
-				code_challenge_method=code_challenge_method,
+				cc=code_challenge,
+				ccm=code_challenge_method,
 			)
 		else:
 			raw_value = await self.TokenService.create(
@@ -565,8 +564,8 @@ class OpenIdConnectService(asab.Service):
 				session_id=session.SessionId,
 				expiration=AuthorizationCode.Expiration,
 				is_session_algorithmic=False,
-				code_challenge=code_challenge,
-				code_challenge_method=code_challenge_method,
+				cc=code_challenge,
+				ccm=code_challenge_method,
 			)
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
@@ -590,7 +589,7 @@ class OpenIdConnectService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
 
 
-	async def create_refresh_token(self, session: SessionAdapter) -> str:
+	async def create_refresh_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
 		"""
 		Create OAuth2 refresh token
 
@@ -598,13 +597,14 @@ class OpenIdConnectService(asab.Service):
 		@return: Base64-encoded token value
 		"""
 		assert not session.is_algorithmic()
+		expires_in = RefreshToken.Expiration
 		raw_value = await self.TokenService.create(
 			token_length=RefreshToken.ByteLength,
 			token_type=RefreshToken.TokenType,
 			session_id=session.SessionId,
 			expiration=RefreshToken.Expiration,
 		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
 
 
 	async def get_session_by_authorization_code(self, code, code_verifier: str | None = None):

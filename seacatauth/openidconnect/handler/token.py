@@ -178,25 +178,27 @@ class TokenHandler(object):
 		# Generate new auth tokens
 		if session.is_algorithmic():
 			new_access_token = await self.SessionService.Algorithmic.serialize(session)
-			expires_in = (session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
-			new_refresh_token = None
+			access_token_expires_in = (
+				session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+			new_refresh_token, refresh_token_expires_in = None, None
 		else:
-			new_access_token, expires_in = await self.OpenIdConnectService.create_access_token(session)
-			new_refresh_token = await self.OpenIdConnectService.create_refresh_token(session)
+			new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
+			new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
 
 		# Refresh the session data
-		session = await self.OpenIdConnectService.refresh_session(session, requested_scope=scope)
+		session = await self.OpenIdConnectService.refresh_session(
+			session, requested_scope=scope, expires_in=refresh_token_expires_in)
 
 		# Response
 		response_payload = {
 			"token_type": "Bearer",
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": new_access_token,
-			"id_token": await self.OpenIdConnectService.issue_id_token(session, expires_in),
-			"expires_in": int(expires_in),
+			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
+			"expires_in": int(access_token_expires_in),
 		}
 
 		if new_refresh_token:
@@ -255,14 +257,15 @@ class TokenHandler(object):
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
 		# Generate new auth tokens
-		new_access_token, expires_in = await self.OpenIdConnectService.create_access_token(session)
-		new_refresh_token = await self.OpenIdConnectService.create_refresh_token(session)
+		new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
+		new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
 
 		# Refresh the session data
-		session = await self.OpenIdConnectService.refresh_session(session, requested_scope=scope)
+		session = await self.OpenIdConnectService.refresh_session(
+			session, requested_scope=scope, expires_in=refresh_token_expires_in)
 
 		# Response
 		response_payload = {
@@ -270,8 +273,8 @@ class TokenHandler(object):
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": new_access_token,
 			"refresh_token": new_refresh_token,
-			"id_token": await self.OpenIdConnectService.issue_id_token(session, expires_in),
-			"expires_in": int(expires_in),
+			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
+			"expires_in": int(access_token_expires_in),
 		}
 
 		headers = {
