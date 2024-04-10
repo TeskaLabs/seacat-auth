@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha11`
 - `v24.06-alpha10`
 - `v24.06-beta3`
 - `v24.06-alpha9`
@@ -29,6 +30,7 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- Client secret management (#359, `v24.06-alpha11`)
 - External login provider label contains just the display name (#352, `v24.06-alpha10`)
 - ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7.2`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
