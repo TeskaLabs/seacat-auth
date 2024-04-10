@@ -19,9 +19,9 @@ L = logging.getLogger(__name__)
 
 class AuthTokenType:
 	OAuthRefreshToken = "ort"
-	OAuthAuthorizationCode = "oac"  # TODO: Move authorization code here
-	OAuthAccessToken = "oat"  # TODO: Move access tokens here (consider performance first!)
-	Cookie = "c"  # TODO: Move auth cookies here (consider performance first!)
+	OAuthAuthorizationCode = "oac"
+	OAuthAccessToken = "oat"
+	Cookie = "c"
 
 
 class AuthTokenField:
