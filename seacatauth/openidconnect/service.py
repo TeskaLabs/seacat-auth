@@ -110,7 +110,7 @@ class OpenIdConnectService(asab.Service):
 		self,
 		session: SessionAdapter,
 		requested_scope: typing.Optional[typing.Iterable] = None,
-		expires_in: float | None  = None,
+		expires_in: float | None = None,
 	):
 		"""
 		Update/rebuild the session according to its authorization parameters

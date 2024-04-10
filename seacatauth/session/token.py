@@ -178,8 +178,8 @@ class SessionTokenService(asab.Service):
 
 def _is_token_valid(token_data: dict):
 	return (
-			SessionTokenField.ExpiresAt in token_data
-			and token_data[SessionTokenField.ExpiresAt] > datetime.datetime.now(datetime.UTC)
+		SessionTokenField.ExpiresAt in token_data
+		and token_data[SessionTokenField.ExpiresAt] > datetime.datetime.now(datetime.UTC)
 	)
 
 

@@ -1,4 +1,3 @@
-import base64
 import logging
 import datetime
 
@@ -41,8 +40,6 @@ class TokenHandler(object):
 
 		self.ValidateRedirectUri = asab.Config.getboolean(
 			"openidconnect:token_request", "validate_redirect_uri", fallback=False)
-		self.AccessTokenExpiration = 3*60
-		self.RefreshTokenExpiration = 60*60
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post(self.OpenIdConnectService.TokenPath, self.token_request)

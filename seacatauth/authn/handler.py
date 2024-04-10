@@ -173,7 +173,7 @@ class AuthenticationHandler(object):
 
 		try:
 			login_session = await self.AuthenticationService.get_login_session(lsid)
-		except KeyError as e:
+		except KeyError:
 			L.log(asab.LOG_NOTICE, "Login failed: Invalid login session ID", struct_data={
 				"lsid": lsid
 			})
