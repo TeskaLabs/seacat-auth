@@ -264,7 +264,7 @@ class AuthenticationHandler(object):
 		self.CookieService.set_session_cookie(
 			response=response,
 			cookie_value=session.Cookie.Id,
-			client_id=session.OAuth.ClientId,
+			client_id=session.OAuth2.ClientId,
 			cookie_domain=cookie_domain
 		)
 
@@ -312,7 +312,7 @@ class AuthenticationHandler(object):
 					self.CookieService.set_session_cookie(
 						response=response,
 						cookie_value=impersonator_session.Cookie.Id,
-						client_id=impersonator_session.OAuth.ClientId,
+						client_id=impersonator_session.OAuth2.ClientId,
 					)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
@@ -534,7 +534,7 @@ class AuthenticationHandler(object):
 		self.CookieService.set_session_cookie(
 			response=response,
 			cookie_value=session.Cookie.Id,
-			client_id=session.OAuth.ClientId,
+			client_id=session.OAuth2.ClientId,
 		)
 		return response
 

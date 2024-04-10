@@ -264,7 +264,7 @@ class CookieHandler(object):
 			self.CookieService.set_session_cookie(
 				response=response,
 				cookie_value=session.Cookie.Id,
-				client_id=session.OAuth.ClientId,
+				client_id=session.OAuth2.ClientId,
 				cookie_domain=cookie_domain
 			)
 
@@ -483,15 +483,9 @@ class CookieHandler(object):
 			# TODO: Why is this here????????? Add comment!
 			pass
 		else:
-			# Generate a new cookie
-			session_cookie_value = await self.SessionService.TokenService.create_cookie(
-				session_id=session.SessionId,
-				expiration=(session.Expiration - datetime.datetime.now(datetime.UTC)).seconds,
-				is_session_algorithmic=True,
-			)
 			self.CookieService.set_session_cookie(
 				response=response,
-				cookie_value=session_cookie_value,
+				cookie_value=session.Cookie.Id,
 				client_id=client_id,
 				cookie_domain=cookie_domain
 			)

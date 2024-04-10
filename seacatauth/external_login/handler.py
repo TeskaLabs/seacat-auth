@@ -158,7 +158,7 @@ class ExternalLoginHandler(object):
 		self.CookieService.set_session_cookie(
 			response=response,
 			cookie_value=session.Cookie.Id,
-			client_id=session.OAuth.ClientId,
+			client_id=session.OAuth2.ClientId,
 			cookie_domain=cookie_domain
 		)
 

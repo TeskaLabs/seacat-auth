@@ -131,8 +131,7 @@ class CookieService(asab.Service):
 				"Cookie value is not base64", query={"cookie_value": cookie_value}) from e
 
 		try:
-			token_data = await self.SessionService.TokenService.get_cookie(cookie_value)
-			session = await self.SessionService.get(token_data["sid"])
+			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, cookie_value)
 		except KeyError as e:
 			raise exceptions.SessionNotFoundError(
 				"Session not found", query={"cookie_value": cookie_value}) from e
@@ -180,6 +179,7 @@ class CookieService(asab.Service):
 				tenants=tenants,
 				exclude_resources=exclude_resources,
 			),
+			cookie_session_builder(),
 		]
 
 		if "batman" in scope:
