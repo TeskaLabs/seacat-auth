@@ -472,6 +472,8 @@ class SessionService(asab.Service):
 		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
 		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
 
+		# Delete all the session's tokens
+		await self.TokenService.delete_tokens_by_session_id(session_id)
 		# TODO: Publish pubsub message for session deletion
 
 
