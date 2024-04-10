@@ -91,6 +91,7 @@ class TokenIntrospectionHandler(object):
 			session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 		except exceptions.SessionNotFoundError:
 			L.log(asab.LOG_NOTICE, "Access token matched no session.")
+			return None
 		return session
 
 

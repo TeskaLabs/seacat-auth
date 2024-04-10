@@ -68,6 +68,7 @@ class OpenIdConnectService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.TokenService = app.get_service("seacatauth.SessionTokenService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
@@ -432,7 +433,7 @@ class OpenIdConnectService(asab.Service):
 		return userinfo
 
 
-	async def build_id_token(self, session):
+	async def issue_id_token(self, session, expires_in: float | None = None):
 		"""
 		Wrap authentication data and userinfo in a JWT token
 		"""
@@ -445,6 +446,11 @@ class OpenIdConnectService(asab.Service):
 		# TODO: ID token should always contain info about "what happened during authentication"
 		#   User info is optional and its parts should be included (or not) based on SCOPE
 		payload = await self.build_userinfo(session)
+
+		payload["iat"] = int(datetime.datetime.now(datetime.UTC).timestamp())
+		if expires_in:
+			payload["exp"] = int(
+				(datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)).timestamp())
 
 		token = jwcrypto.jwt.JWT(
 			header=header,
@@ -543,7 +549,7 @@ class OpenIdConnectService(asab.Service):
 		@return: Base64-encoded token value
 		"""
 		if session.is_algorithmic():
-			raw_value = await self.SessionService.TokenService.create(
+			raw_value = await self.TokenService.create(
 				token_length=AuthorizationCode.ByteLength,
 				token_type=AuthorizationCode.TokenType,
 				session_id=self.SessionService.Algorithmic.serialize(session),
@@ -553,7 +559,7 @@ class OpenIdConnectService(asab.Service):
 				code_challenge_method=code_challenge_method,
 			)
 		else:
-			raw_value = await self.SessionService.TokenService.create(
+			raw_value = await self.TokenService.create(
 				token_length=AuthorizationCode.ByteLength,
 				token_type=AuthorizationCode.TokenType,
 				session_id=session.SessionId,
@@ -565,22 +571,23 @@ class OpenIdConnectService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_access_token(self, session: SessionAdapter) -> str:
+	async def create_access_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
 		"""
 		Create OAuth2 access token
 
 		@param session: Target session
-		@return: Base64-encoded token value
+		@return: Base64-encoded token and its expiration
 		"""
 		client = await self.ClientService.get(session.OAuth2.ClientId)
-		raw_value = await self.SessionService.TokenService.create(
+		expires_in = client.get("session_expiration") or AccessToken.Expiration
+		raw_value = await self.TokenService.create(
 			token_length=AccessToken.ByteLength,
 			token_type=AccessToken.TokenType,
 			session_id=session.SessionId,
-			expiration=client.get("session_expiration") or AccessToken.Expiration,
+			expiration=expires_in,
 			is_session_algorithmic=session.is_algorithmic(),
 		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
 
 
 	async def create_refresh_token(self, session: SessionAdapter) -> str:
@@ -591,7 +598,7 @@ class OpenIdConnectService(asab.Service):
 		@return: Base64-encoded token value
 		"""
 		assert not session.is_algorithmic()
-		raw_value = await self.SessionService.TokenService.create(
+		raw_value = await self.TokenService.create(
 			token_length=RefreshToken.ByteLength,
 			token_type=RefreshToken.TokenType,
 			session_id=session.SessionId,
@@ -605,7 +612,7 @@ class OpenIdConnectService(asab.Service):
 		Retrieve session by its temporary authorization code.
 		"""
 		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
-		token_data = await self.SessionService.TokenService.get(token_bytes, token_type=AuthorizationCode.TokenType)
+		token_data = await self.TokenService.get(token_bytes, token_type=AuthorizationCode.TokenType)
 		if "cc" in token_data:
 			self.PKCE.evaluate_code_challenge(
 				code_challenge_method=token_data["ccm"],
@@ -626,7 +633,7 @@ class OpenIdConnectService(asab.Service):
 		"""
 		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		try:
-			token_data = await self.SessionService.TokenService.get(token_bytes, token_type=AccessToken.TokenType)
+			token_data = await self.TokenService.get(token_bytes, token_type=AccessToken.TokenType)
 		except KeyError:
 			raise exceptions.SessionNotFoundError("Invalid or expired access token")
 		try:
@@ -634,7 +641,7 @@ class OpenIdConnectService(asab.Service):
 		except KeyError:
 			L.error("Integrity error: Access token points to a nonexistent session.", struct_data={
 				"sid": token_data["sid"]})
-			await self.SessionService.TokenService.delete_token(token_bytes)
+			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
 
 		return session
@@ -646,7 +653,7 @@ class OpenIdConnectService(asab.Service):
 		"""
 		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		try:
-			token_data = await self.SessionService.TokenService.get(token_bytes, token_type=RefreshToken.TokenType)
+			token_data = await self.TokenService.get(token_bytes, token_type=RefreshToken.TokenType)
 		except KeyError:
 			raise exceptions.SessionNotFoundError("Invalid or expired access token")
 		try:
@@ -654,7 +661,15 @@ class OpenIdConnectService(asab.Service):
 		except KeyError:
 			L.error("Integrity error: Refresh token points to a nonexistent session.", struct_data={
 				"sid": token_data["sid"]})
-			await self.SessionService.TokenService.delete_token(token_bytes)
+			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Refresh token points to a nonexistent session")
 
 		return session
+
+
+	async def delete_authorization_code(self, code: str):
+		"""
+		Delete temporary authorization code.
+		"""
+		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		await self.TokenService.delete(token_bytes)

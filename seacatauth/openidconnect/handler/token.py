@@ -100,9 +100,9 @@ class TokenHandler(object):
 		# 3.1.3.2.  Token Request Validation
 		grant_type = form_data.get("grant_type")
 		if grant_type == "authorization_code":
-			return await self._authorization_code_grant(request, form_data, from_ip)
+			return await self._authorization_code_grant(request, from_ip)
 		elif grant_type == "refresh_token":
-			return await self._refresh_token_grant(request, form_data, from_ip)
+			return await self._refresh_token_grant(request, from_ip)
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
 				"from_ip": from_ip,
@@ -113,10 +113,12 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.UnsupportedGrantType)
 
 
-	async def _authorization_code_grant(self, request, form_data, from_ip):
+	async def _authorization_code_grant(self, request, from_ip):
+		form_data = await request.post()
+
 		# Get session by code
 		try:
-			session = await self._get_session_by_authorization_code(request, form_data)
+			session = await self._get_session_by_authorization_code(request)
 
 		except (exceptions.SessionNotFoundError, KeyError):
 			AuditLogger.log(
@@ -176,9 +178,10 @@ class TokenHandler(object):
 		# Generate new auth tokens
 		if session.is_algorithmic():
 			new_access_token = await self.SessionService.Algorithmic.serialize(session)
+			expires_in = (session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
 			new_refresh_token = None
 		else:
-			new_access_token = await self.OpenIdConnectService.create_access_token(session)
+			new_access_token, expires_in = await self.OpenIdConnectService.create_access_token(session)
 			new_refresh_token = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
@@ -192,15 +195,12 @@ class TokenHandler(object):
 			"token_type": "Bearer",
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": new_access_token,
-			"id_token": await self.OpenIdConnectService.build_id_token(session),
+			"id_token": await self.OpenIdConnectService.issue_id_token(session, expires_in),
+			"expires_in": int(expires_in),
 		}
 
 		if new_refresh_token:
 			response_payload["refresh_token"] = new_refresh_token
-
-		if session.Session.Expiration:
-			response_payload["expires_in"] = int(
-				(session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
 
 		headers = {
 			"Cache-Control": "no-store",
@@ -210,10 +210,12 @@ class TokenHandler(object):
 		return asab.web.rest.json_response(request, response_payload, headers=headers)
 
 
-	async def _refresh_token_grant(self, request, form_data, from_ip):
+	async def _refresh_token_grant(self, request, from_ip):
+		form_data = await request.post()
+
 		# Get session by refresh token
 		try:
-			session = await self._get_session_by_refresh_token(request, form_data)
+			session = await self._get_session_by_refresh_token(request)
 
 		except (exceptions.SessionNotFoundError, KeyError):
 			AuditLogger.log(
@@ -253,7 +255,7 @@ class TokenHandler(object):
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
 		# Generate new auth tokens
-		new_access_token = await self.OpenIdConnectService.create_access_token(session)
+		new_access_token, expires_in = await self.OpenIdConnectService.create_access_token(session)
 		new_refresh_token = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
@@ -268,12 +270,9 @@ class TokenHandler(object):
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": new_access_token,
 			"refresh_token": new_refresh_token,
-			"id_token": await self.OpenIdConnectService.build_id_token(session),
+			"id_token": await self.OpenIdConnectService.issue_id_token(session, expires_in),
+			"expires_in": int(expires_in),
 		}
-
-		if session.Session.Expiration:
-			response_payload["expires_in"] = int(
-				(session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
 
 		headers = {
 			"Cache-Control": "no-store",
@@ -283,7 +282,9 @@ class TokenHandler(object):
 		return asab.web.rest.json_response(request, response_payload, headers=headers)
 
 
-	async def _get_session_by_authorization_code(self, request, form_data):
+	async def _get_session_by_authorization_code(self, request):
+		form_data = await request.post()
+
 		authorization_code = form_data.get("code")
 		if not authorization_code:
 			raise asab.exceptions.ValidationError("No authorization code in request.")
@@ -295,7 +296,7 @@ class TokenHandler(object):
 		# TODO: If possible, verify that the Authorization Code has not been previously used.
 
 		# Verify client credentials if required
-		client_id = await self._authenticate_client(session, request, form_data)
+		client_id = await self._authenticate_client(session, request)
 
 		# Ensure the Authorization Code was issued to the authenticated Client
 		if client_id != session.OAuth2.ClientId:
@@ -313,10 +314,14 @@ class TokenHandler(object):
 				raise exceptions.ClientAuthenticationError(
 					"Redirect URI in token request does not match the one used in authorization request.")
 
+		# Request valid, code is consumed
+		await self.OpenIdConnectService.delete_authorization_code(authorization_code)
+
 		return session
 
 
-	async def _get_session_by_refresh_token(self, request, form_data):
+	async def _get_session_by_refresh_token(self, request):
+		form_data = await request.post()
 		refresh_token = form_data.get("refresh_token")
 		if not refresh_token:
 			raise asab.exceptions.ValidationError("No refresh token in request.")
@@ -327,7 +332,7 @@ class TokenHandler(object):
 		# TODO: If possible, verify that the Refresh Token has not been previously used.
 
 		# Verify client credentials if required
-		client_id = await self._authenticate_client(session, request, form_data)
+		client_id = await self._authenticate_client(session, request)
 
 		# Ensure the Authorization Code was issued to the authenticated Client
 		if client_id != session.OAuth2.ClientId:
@@ -337,14 +342,13 @@ class TokenHandler(object):
 		return session
 
 
-	async def _authenticate_client(self, session, request, post_data: dict):
+	async def _authenticate_client(self, session, request) -> str:
 		"""
 		Verify client credentials and check that the Authorization Code was issued to the authenticated Client.
 
-		@param session:
-		@param request:
-		@param post_data:
-		@return:
+		@param session: Session object
+		@param request: aiohttp request
+		@return: Client ID
 		"""
 		client_dict = await self.OpenIdConnectService.ClientService.get(session.OAuth2.ClientId)
 		token_endpoint_auth_method = client_dict["token_endpoint_auth_method"]
@@ -353,18 +357,18 @@ class TokenHandler(object):
 		elif token_endpoint_auth_method == "client_secret_basic":
 			auth_header = request.headers.get("Authorization")
 			client_id, secret = base64.urlsafe_b64decode(auth_header.encode("ascii")).decode("ascii").split(":")
+			await self.OpenIdConnectService.ClientService.authenticate_client(client_dict, client_id, secret)
 		elif token_endpoint_auth_method == "client_secret_post":
+			post_data = await request.post()
 			client_id = post_data.get("client_id")
 			secret = post_data.get("client_secret")
+			await self.OpenIdConnectService.ClientService.authenticate_client(client_dict, client_id, secret)
 		elif token_endpoint_auth_method == "client_secret_jwt":
 			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
 		elif token_endpoint_auth_method == "private_key_jwt":
 			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
 		else:
 			raise ValueError("Unsupported token_endpoint_auth_method value: {}".format(token_endpoint_auth_method))
-
-		# Authenticate the Client if it was issued Client Credentials or if it uses another Client Authentication method
-		await self.OpenIdConnectService.ClientService.authenticate_client(client_dict, client_id, secret)
 
 		return client_id
 
