@@ -178,12 +178,8 @@ class TokenHandler(object):
 			new_access_token = await self.SessionService.Algorithmic.serialize(session)
 			new_refresh_token = None
 		else:
-			new_access_token = await self.SessionService.TokenService.create_oauth2_access_token(
-				session.SessionId, expiration=self.AccessTokenExpiration)
-			new_refresh_token = await self.SessionService.TokenService.create_oauth2_refresh_token(
-				session.SessionId, expiration=self.RefreshTokenExpiration)
-
-		t = await self.SessionService.TokenService.get_oauth2_refresh_token(new_refresh_token)
+			new_access_token = await self.OpenIdConnectService.create_access_token(session)
+			new_refresh_token = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
@@ -257,10 +253,8 @@ class TokenHandler(object):
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
 		# Generate new auth tokens
-		new_access_token = await self.SessionService.TokenService.create_oauth2_access_token(
-			session.SessionId, expiration=self.AccessTokenExpiration)
-		new_refresh_token = await self.SessionService.TokenService.create_oauth2_refresh_token(
-			session.SessionId, expiration=self.RefreshTokenExpiration)
+		new_access_token = await self.OpenIdConnectService.create_access_token(session)
+		new_refresh_token = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
@@ -452,8 +446,9 @@ class TokenHandler(object):
 			# Obtain the old session by request access token or cookie
 			token_value = generic.get_bearer_token_value(request)
 			if token_value is not None:
-				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-				if old_session is None:
+				try:
+					old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
 					AuditLogger.log(
 						asab.LOG_NOTICE,
 						"Token request denied: Track ID transfer failed because of invalid Authorization header",

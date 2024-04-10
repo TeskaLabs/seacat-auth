@@ -17,19 +17,11 @@ L = logging.getLogger(__name__)
 #
 
 
-class AuthTokenType:
-	OAuthRefreshToken = "ort"
-	OAuthAuthorizationCode = "oac"
-	OAuthAccessToken = "oat"
-	Cookie = "c"
-
-
 class AuthTokenField:
 	TokenType = "t"
 	SessionId = "sid"
 	IsSessionAlgorithmic = "sa"
 	ExpiresAt = "exp"
-	AccessTokenHash = "ath"
 	CodeChallenge = "cc"
 	CodeChallengeMethod = "ccm"
 	Version = "_v"
@@ -64,101 +56,7 @@ class AuthTokenService(asab.Service):
 		await self._delete_expired_tokens()
 
 
-	async def create_oauth2_authorization_code(
-		self, session_id: str, expiration: float,
-		is_session_algorithmic: bool = False,
-		code_challenge: str | None = None,
-		code_challenge_method: str | None = None
-	) -> str:
-		"""
-		Create OAuth2 authorization code
-
-		@param session_id: Session identifier
-		@param expiration: Expiration in seconds
-		@param is_session_algorithmic: Whether the session is algorithmic
-		@param code_challenge: PKCE challenge string
-		@param code_challenge_method: PKCE verification method
-		@return: Base64-encoded token value
-		"""
-		raw_value = await self._create_token(
-			token_length=self.OAuthAuthorizationCodeLength,
-			token_type=AuthTokenType.OAuthAuthorizationCode,
-			session_id=session_id,
-			expiration=expiration,
-			is_session_algorithmic=is_session_algorithmic,
-			cc=code_challenge,
-			ccm=code_challenge_method,
-		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii")
-
-
-	async def create_oauth2_access_token(
-		self, session_id: str, expiration: float,
-		is_session_algorithmic: bool = False
-	) -> str:
-		"""
-		Create OAuth2 access token
-
-		@param session_id: Session identifier
-		@param expiration: Expiration in seconds
-		@param is_session_algorithmic: Whether the session is algorithmic
-		@return: Base64-encoded token value
-		"""
-		raw_value = await self._create_token(
-			token_length=self.OAuthAccessTokenLength,
-			token_type=AuthTokenType.OAuthAccessToken,
-			session_id=session_id,
-			expiration=expiration,
-			is_session_algorithmic=is_session_algorithmic,
-		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii")
-
-
-	async def create_oauth2_refresh_token(
-		self, session_id: str, expiration: float,
-		is_session_algorithmic: bool = False
-	) -> str:
-		"""
-		Create OAuth2 refresh token
-
-		@param session_id: Session identifier
-		@param expiration: Expiration in seconds
-		@param is_session_algorithmic: Whether the session is algorithmic
-		@return: Base64-encoded token value
-		"""
-		raw_value = await self._create_token(
-			token_length=self.OAuthRefreshTokenLength,
-			token_type=AuthTokenType.OAuthRefreshToken,
-			session_id=session_id,
-			expiration=expiration,
-			is_session_algorithmic=is_session_algorithmic,
-		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii")
-
-
-	async def create_cookie(
-		self, session_id: str, expiration: float,
-		is_session_algorithmic: bool = False
-	) -> str:
-		"""
-		Create HTTP cookie value
-
-		@param session_id: Session identifier
-		@param expiration: Expiration in seconds
-		@param is_session_algorithmic: Whether the session is algorithmic
-		@return: Base64-encoded token value
-		"""
-		raw_value = await self._create_token(
-			token_length=self.CookieLength,
-			token_type=AuthTokenType.OAuthAccessToken,
-			session_id=session_id,
-			expiration=expiration,
-			is_session_algorithmic=is_session_algorithmic,
-		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii")
-
-
-	async def _create_token(
+	async def create(
 		self, token_length: int, token_type: str, session_id: str,
 		expiration: typing.Optional[float] = None,
 		is_session_algorithmic: bool = False,
@@ -195,71 +93,27 @@ class AuthTokenService(asab.Service):
 		return token
 
 
-	async def get_oauth2_access_token(self, token: str):
-		"""
-		Get session ID by access token
-
-		@param token: Token string (base64-encoded)
-		@return:
-		"""
-		token = base64.urlsafe_b64decode(token.encode("ascii"))
-		return await self._get(token, AuthTokenType.OAuthAccessToken)
-
-
-	async def get_oauth2_refresh_token(self, token: str):
-		"""
-		Get session ID by refresh token
-
-		@param token: Token string (base64-encoded)
-		@return:
-		"""
-		token = base64.urlsafe_b64decode(token.encode("ascii"))
-		return await self._get(token, AuthTokenType.OAuthRefreshToken)
-
-
-	async def get_oauth2_authorization_code(self, token: str):
-		"""
-		Get session ID by authorization code
-
-		@param token: Token string (base64-encoded)
-		@return:
-		"""
-		token = base64.urlsafe_b64decode(token.encode("ascii"))
-		return await self._get(token, AuthTokenType.OAuthAuthorizationCode)
-
-
-	async def get_cookie(self, token: str):
-		"""
-		Get session ID by cookie
-
-		@param token: Token string (base64-encoded)
-		@return:
-		"""
-		token = base64.urlsafe_b64decode(token.encode("ascii"))
-		return await self._get(token, AuthTokenType.Cookie)
-
-
-	async def _get(
+	async def get(
 		self, token: bytes,
 		token_type: typing.Optional[str] = None,
 	):
 		"""
 		Get auth token
 
-		@param token: Raw token bytes
+		@param token: Token bytes
 		@param token_type: Type of the token
 		@return:
 		"""
 		token_hash = _hash_token(token)
 		data = await self.StorageService.get(self.AuthTokenCollection, token_hash)
-		if not _is_valid(data):
+		if not _is_token_valid(data):
 			raise KeyError("Auth token expired.")
 		if token_type is not None and data["t"] != token_type:
 			raise KeyError("Auth token type does not match.")
 		return data
 
 
-	async def extend_token(self, token: bytes, expiration: float):
+	async def extend(self, token: bytes, expiration: float):
 		"""
 		Extend auth token validity
 
@@ -281,25 +135,14 @@ class AuthTokenService(asab.Service):
 		return data
 
 
-	async def delete(self, token: str):
+	async def delete(self, token: bytes):
 		"""
 		Delete auth token
 
-		@param token: Raw token value
+		@param token: Token bytes
 		@return:
 		"""
-		token = base64.urlsafe_b64decode(token.encode("ascii"))
-		await self.delete_by_hash(_hash_token(token))
-
-
-	async def delete_by_hash(self, token: bytes):
-		"""
-		Delete auth token
-
-		@param token: Hashed token value
-		@return:
-		"""
-		await self.StorageService.delete(self.AuthTokenCollection, token)
+		await self.StorageService.delete(self.AuthTokenCollection, _hash_token(token))
 
 
 	async def _delete_expired_tokens(self):
@@ -329,7 +172,7 @@ class AuthTokenService(asab.Service):
 			})
 
 
-def _is_valid(token_data: dict):
+def _is_token_valid(token_data: dict):
 	return (
 		AuthTokenField.ExpiresAt in token_data
 		and token_data[AuthTokenField.ExpiresAt] > datetime.datetime.now(datetime.UTC)

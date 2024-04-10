@@ -439,8 +439,9 @@ class CookieHandler(object):
 
 			token_value = generic.get_bearer_token_value(request)
 			if old_session is None and token_value is not None:
-				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
-				if old_session is None:
+				try:
+					old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
 					# Invalid access token should result in error
 					AuditLogger.log(
 						asab.LOG_NOTICE,

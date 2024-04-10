@@ -669,7 +669,7 @@ class AuthorizeHandler(object):
 			url_qs["state"] = state
 
 		# Add the Authorization Code into the response
-		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(
+		url_qs["code"] = await self.OpenIdConnectService.create_authorization_code(
 			session,
 			code_challenge=code_challenge,
 			code_challenge_method=code_challenge_method

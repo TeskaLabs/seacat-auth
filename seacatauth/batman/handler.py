@@ -55,8 +55,9 @@ class BatmanHandler(object):
 			token_value = generic.get_access_token_value_from_websocket(request)
 
 		if token_value is not None:
-			session = await oidc_service.get_session_by_access_token(token_value)
-			if session is None:
+			try:
+				session = await oidc_service.get_session_by_access_token(token_value)
+			except exceptions.SessionNotFoundError:
 				L.log(asab.LOG_NOTICE, "Session not found by access token")
 				return aiohttp.web.HTTPUnauthorized()
 		else:
