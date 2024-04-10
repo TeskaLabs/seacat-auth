@@ -7,7 +7,7 @@ import aiohttp.web
 import asab
 
 from ...authz import build_credentials_authz
-from ... import client, generic, AuditLogger
+from ... import generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError

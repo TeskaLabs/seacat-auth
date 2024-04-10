@@ -1,5 +1,3 @@
-import secrets
-
 from ..session.adapter import SessionAdapter
 
 
