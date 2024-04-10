@@ -32,7 +32,7 @@ class SessionTokenService(asab.Service):
 	Create and manage securely hashed session identifiers (tokens)
 	"""
 
-	AuthTokenCollection = "at"
+	SessionTokenCollection = "st"
 	OAuthRefreshTokenLength = 36
 	OAuthAuthorizationCodeLength = 36
 	OAuthAccessTokenLength = 36
@@ -45,12 +45,12 @@ class SessionTokenService(asab.Service):
 
 
 	async def initialize(self, app):
-		collection = await self.StorageService.collection(self.AuthTokenCollection)
+		collection = await self.StorageService.collection(self.SessionTokenCollection)
 		try:
 			await collection.create_index([(SessionTokenField.SessionId, pymongo.ASCENDING)])
 		except Exception as e:
 			L.error("Failed to create secondary index (session ID): {}".format(e), struct_data={
-				"collection": self.AuthTokenCollection})
+				"collection": self.SessionTokenCollection})
 
 
 	async def _on_housekeeping(self, event_name):
@@ -75,7 +75,7 @@ class SessionTokenService(asab.Service):
 		"""
 		token = _generate_token(token_length)
 		token_hash = _hash_token(token)
-		upsertor = self.StorageService.upsertor(self.AuthTokenCollection, obj_id=token_hash)
+		upsertor = self.StorageService.upsertor(self.SessionTokenCollection, obj_id=token_hash)
 
 		upsertor.set(SessionTokenField.TokenType, token_type)
 		upsertor.set(SessionTokenField.SessionId, session_id)
@@ -106,7 +106,7 @@ class SessionTokenService(asab.Service):
 		@return:
 		"""
 		token_hash = _hash_token(token)
-		data = await self.StorageService.get(self.AuthTokenCollection, token_hash)
+		data = await self.StorageService.get(self.SessionTokenCollection, token_hash)
 		if not _is_token_valid(data):
 			raise KeyError("Auth token expired.")
 		if token_type is not None and data["t"] != token_type:
@@ -122,9 +122,9 @@ class SessionTokenService(asab.Service):
 		@param expiration: Expiration in seconds
 		@return:
 		"""
-		data = await self.StorageService.get(self.AuthTokenCollection, _hash_token(token))
+		data = await self.StorageService.get(self.SessionTokenCollection, _hash_token(token))
 		upsertor = self.StorageService.upsertor(
-			self.AuthTokenCollection,
+			self.SessionTokenCollection,
 			obj_id=_hash_token(token),
 			version=data[SessionTokenField.Version]
 		)
@@ -143,7 +143,7 @@ class SessionTokenService(asab.Service):
 		@param token: Token bytes
 		@return:
 		"""
-		collection = self.StorageService.Database[self.AuthTokenCollection]
+		collection = self.StorageService.Database[self.SessionTokenCollection]
 		token_data = await collection.find_one_and_delete(filter={"_id": _hash_token(token)})
 		L.info("Session token deleted.", struct_data={
 			"sid": token_data[SessionTokenField.SessionId], "type": token_data[SessionTokenField.TokenType]})
@@ -153,7 +153,7 @@ class SessionTokenService(asab.Service):
 		"""
 		Delete expired auth tokens
 		"""
-		collection = self.StorageService.Database[self.AuthTokenCollection]
+		collection = self.StorageService.Database[self.SessionTokenCollection]
 		query_filter = {SessionTokenField.ExpiresAt: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
@@ -166,7 +166,7 @@ class SessionTokenService(asab.Service):
 		"""
 		Delete all of session's auth tokens
 		"""
-		collection = self.StorageService.Database[self.AuthTokenCollection]
+		collection = self.StorageService.Database[self.SessionTokenCollection]
 		query_filter = {SessionTokenField.SessionId: bson.ObjectId(session_id)}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
