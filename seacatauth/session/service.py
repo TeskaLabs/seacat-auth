@@ -17,7 +17,7 @@ from .. import exceptions
 from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
-from .token import AuthTokenService, AuthTokenType
+from .token import AuthTokenService
 
 #
 

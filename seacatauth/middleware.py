@@ -62,7 +62,10 @@ def private_auth_middleware_factory(app):
 			except ValueError:
 				# If the token cannot be parsed as ID token, it may be an Access token
 				if _allow_access_token_auth:
-					request.Session = await oidc_service.get_session_by_access_token(token_value)
+					try:
+						request.Session = await oidc_service.get_session_by_access_token(token_value)
+					except exceptions.SessionNotFoundError:
+						request.Session = None
 				else:
 					L.info("Invalid Bearer token")
 
@@ -122,10 +125,16 @@ def public_auth_middleware_factory(app):
 				# If the token cannot be parsed as ID token, it may be an Access token
 				# OIDC endpoints allow authorization via Access token
 				if request.path.startswith("/openidconnect/"):
-					request.Session = await oidc_service.get_session_by_access_token(token_value)
-				# Allow authorization via Access token on all public endpoints if enabled in config
+					try:
+						request.Session = await oidc_service.get_session_by_access_token(token_value)
+					except exceptions.SessionNotFoundError:
+						request.Session = None
+					# Allow authorization via Access token on all public endpoints if enabled in config
 				elif _allow_access_token_auth:
-					request.Session = await oidc_service.get_session_by_access_token(token_value)
+					try:
+						request.Session = await oidc_service.get_session_by_access_token(token_value)
+					except exceptions.SessionNotFoundError:
+						request.Session = None
 				else:
 					L.log(asab.LOG_NOTICE, "Invalid bearer token")
 					return aiohttp.web.HTTPUnauthorized()
