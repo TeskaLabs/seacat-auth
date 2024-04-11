@@ -52,7 +52,7 @@ class ClientHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: p
+		-	name: f
 			in: query
 			description: Filter
 			schema:
