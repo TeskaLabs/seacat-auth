@@ -138,11 +138,6 @@ class TenantHandler(object):
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
-
-		---
-		security:
-		- oAuth:
-			- authz:superuser
 		"""
 		role_service = self.App.get_service("seacatauth.RoleService")
 		tenant_id = json_data["id"]
@@ -190,10 +185,6 @@ class TenantHandler(object):
 	async def update_tenant(self, request, *, json_data, tenant):
 		"""
 		Update tenant description and/or its structured data
-		---
-		security:
-		- oAuth:
-			- seacat:tenant:edit
 		"""
 		result = await self.TenantService.update_tenant(tenant, **json_data)
 		return asab.web.rest.json_response(request, data=result)
@@ -203,11 +194,6 @@ class TenantHandler(object):
 	async def delete(self, request, *, tenant):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
-
-		---
-		security:
-		- oAuth:
-			- authz:superuser
 		"""
 		await self.TenantService.delete_tenant(tenant)
 		return asab.web.rest.json_response(request, {"result": "OK"})
@@ -242,11 +228,6 @@ class TenantHandler(object):
 	async def assign_tenant(self, request, *, tenant):
 		"""
 		Grant specified tenant access to requested credentials
-
-		---
-		security:
-		- oAuth:
-			- authz:tenant:assign
 		"""
 		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
@@ -261,11 +242,6 @@ class TenantHandler(object):
 		Revoke specified tenant access to requested credentials
 
 		The tenant's roles are unassigned in the process.
-
-		---
-		security:
-		- oAuth:
-			- authz:tenant:assign
 		"""
 		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],
@@ -314,11 +290,6 @@ class TenantHandler(object):
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
 		Grant tenant access and/or assign roles to a list of credentials
-
-		---
-		security:
-		- oAuth:
-			- authz:superuser
 		"""
 		credential_service = self.TenantService.App.get_service("seacatauth.CredentialsService")
 		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
@@ -395,11 +366,6 @@ class TenantHandler(object):
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
 		Revoke tenant access and/or unassign roles from a list of credentials
-
-		---
-		security:
-		- oAuth:
-			- authz:superuser
 		"""
 		role_service = self.TenantService.App.get_service("seacatauth.RoleService")
 
