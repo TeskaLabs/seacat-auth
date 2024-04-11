@@ -465,7 +465,8 @@ class CredentialsHandler(object):
 		"properties": {
 			"factors": {
 				"type": "array",
-				"description": "Factors to enforce/reset"
+				"description": "Factors to enforce/reset",
+				"items": {"type": "string"}
 			}
 		}
 	})

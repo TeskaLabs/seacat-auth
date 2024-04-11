@@ -122,6 +122,8 @@ class CookieHandler(object):
 				Original request URI. In case of auth failure (401 or 403), it can be internally stored during the
 				authorization process and then used for redirection to the original location. If this header is
 				present, the response will include `X-State` header, which should be added to the OAuth Authorize query.
+			schema:
+				type: string
 		-	name: verify
 			in: query
 			description: Resources to authorize
@@ -136,15 +138,10 @@ class CookieHandler(object):
 				headers:
 					Authorization:
 						description: Bearer <JWT_ID_TOKEN>
+						schema:
+							type: string
 			401:
 				description: Authentication failed
-				headers:
-					X-State:
-						description:
-							Random string which should be passed in the OAuth Authorize request's `state` query
-							parameter to ensure correct redirection after successful authorization.
-							*This header is only present if the request contains an `X-Request-Uri` header
-							with a redirect URI that is valid for the Client.*
 			403:
 				description:
 					Authorization failed because of the End-User's or the Client's insufficient permissions.
@@ -287,10 +284,14 @@ class CookieHandler(object):
 			in: query
 			description: OAuth Client ID
 			required: true
+			schema:
+				type: string
 		-	name: redirect_uri
 			in: query
 			description: Original request URI
 			required: true
+			schema:
+				type: string
 		-	name: grant_type
 			in: query
 			description: OAuth Grant Type
@@ -301,6 +302,8 @@ class CookieHandler(object):
 			in: query
 			description: OAuth Authorization code returned by the authorize endpoint
 			required: true
+			schema:
+				type: string
 		"""
 		params = request.query
 		return await self._bouncer(request, params)

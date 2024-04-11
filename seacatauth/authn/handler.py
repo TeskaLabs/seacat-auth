@@ -26,7 +26,7 @@ L = logging.getLogger(__name__)
 JWK_PARAMS = {
 	"crv": {"type": "string"},
 	"ext": {"type": "boolean"},
-	"key_ops": {"type": "array"},
+	"key_ops": {"type": "array", "items": {"type": "string"}},
 	"kty": {"type": "string"},
 	"x": {"type": "string"},
 	"y": {"type": "string"}
@@ -467,7 +467,7 @@ class AuthenticationHandler(object):
 								description: Credentials ID of the impersonation target.
 							client_id:
 								type: string
-								description:
+								description: Client ID
 							redirect_uri:
 								type: string
 								description:
