@@ -6,6 +6,7 @@ import aiohttp
 import aiohttp.web
 import asab
 
+from ..service import AuthorizationCode
 from ...authz import build_credentials_authz
 from ... import generic, AuditLogger
 from ... import exceptions
@@ -360,8 +361,6 @@ class AuthorizeHandler(object):
 					struct_data={"reason": "anonymous_access_not_allowed"})
 			granted_scope.add("anonymous")
 
-		session_expiration = client_dict.get("session_expiration")
-
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
 			if prompt == "login":
@@ -459,7 +458,8 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+					struct_data={"reason": "tenant_not_found"}
+				)
 
 			if auth_token_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
@@ -467,14 +467,16 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					redirect_uri=redirect_uri,
 					tenants=[authorized_tenant] if authorized_tenant else None,
-					requested_expiration=session_expiration)
+					requested_expiration=AuthorizationCode.Expiration
+				)
 			elif auth_token_type == "cookie":
 				new_session = await self.CookieService.create_cookie_client_session(
 					root_session, client_id, requested_scope,
 					nonce=nonce,
 					redirect_uri=redirect_uri,
 					tenants=[authorized_tenant] if authorized_tenant else None,
-					requested_expiration=session_expiration)
+					requested_expiration=AuthorizationCode.Expiration
+				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 			else:
