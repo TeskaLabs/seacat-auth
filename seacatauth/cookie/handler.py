@@ -79,6 +79,9 @@ class CookieHandler(object):
 		}
 	}
 	```
+
+	---
+	tags: ["HTTP Cookies"]
 	"""
 
 	def __init__(self, app, cookie_svc, session_svc, credentials_svc):
@@ -115,6 +118,7 @@ class CookieHandler(object):
 		**Internal endpoint for Nginx auth_request.**
 
 		---
+		tags: ["Nginx"]
 		parameters:
 		-	name: X-Request-Uri
 			in: header
@@ -185,6 +189,7 @@ class CookieHandler(object):
 		Optionally check for resource access and/or add requested user info to headers.
 
 		---
+		tags: ["Nginx"]
 		parameters:
 		-	name: client_id
 			in: query

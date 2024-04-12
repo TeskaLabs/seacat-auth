@@ -17,7 +17,7 @@ class RBACHandler(object):
 	Resource-based access control
 
 	---
-	tags: ["Resource access"]
+	tags: ["Authorization"]
 	"""
 
 	def __init__(self, app, rbac_svc):

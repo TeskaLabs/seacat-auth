@@ -22,7 +22,7 @@ class RegistrationHandler(object):
 	Credential registration
 
 	---
-	tags: ["Register or invite credentials"]
+	tags: ["User registration"]
 	"""
 
 	def __init__(self, app, registration_svc, credentials_svc):

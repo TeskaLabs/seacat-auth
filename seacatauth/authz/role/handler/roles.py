@@ -19,7 +19,7 @@ class RolesHandler(object):
 	Assign or unassign roles
 
 	---
-	tags: ["Assign or unassign roles"]
+	tags: ["Roles"]
 	"""
 
 	def __init__(self, app, role_svc):
@@ -71,7 +71,9 @@ class RolesHandler(object):
 	@access_control("seacat:role:assign")
 	async def set_roles(self, request, *, json_data, tenant, resources):
 		"""
-		For given credentials, assign listed roles and unassign existing roles that are not in the list
+		Set credentials' roles
+
+		For given credentials ID, assign listed roles and unassign existing roles that are not in the list
 
 		Cases:
 		1) The requester is superuser AND requested `tenant` is "*":
