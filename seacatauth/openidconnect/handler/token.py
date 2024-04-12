@@ -239,9 +239,9 @@ class TokenHandler(object):
 	})
 	async def token_revoke(self, request, *, json_data):
 		"""
-		https://tools.ietf.org/html/rfc7009
+		OAuth 2.0 Token revocation
 
-		2.1.  Revocation Request
+		https://tools.ietf.org/html/rfc7009
 		"""
 		# TODO: Confidential clients must authenticate (query params or Authorization header)
 		# TODO: Public clients are not allowed to revoke other clients' tokens

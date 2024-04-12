@@ -110,12 +110,14 @@ class CookieHandler(object):
 
 	async def nginx(self, request):
 		"""
+		Cookie introspection
+
+		**Internal endpoint for Nginx auth_request**
+
 		Authenticate (and optionally authorize) the incoming request by its Cookie + Client ID and respond with
 		corresponding ID token. If the auth fails, respond with 401 or 403.
 
 		Optionally check for resource access and/or add requested user info to headers.
-
-		**Internal endpoint for Nginx auth_request.**
 
 		---
 		tags: ["Nginx"]
@@ -179,7 +181,10 @@ class CookieHandler(object):
 
 	async def nginx_anonymous(self, request):
 		"""
-		**Internal endpoint for Nginx auth_request.**
+		Anonymous (guest) cookie introspection
+
+		**Internal endpoint for Nginx auth_request**
+
 		Authenticate (and optionally authorize) the incoming request by its Cookie + Client ID and respond with
 		corresponding ID token. If the auth fails with 401, initialize an "unauthenticated" anonymous session
 		and set a session cookie in the response.

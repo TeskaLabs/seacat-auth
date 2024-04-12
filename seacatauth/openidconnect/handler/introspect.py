@@ -94,7 +94,7 @@ class TokenIntrospectionHandler(object):
 
 	async def introspect_nginx(self, request):
 		"""
-		Access token introspection for Nginx
+		Access token introspection
 
 		Non-standard version of RFC7662 chapter 2.Introspection Endpoint that is usable with Nginx auth_request module.
 
