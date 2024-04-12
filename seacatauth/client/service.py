@@ -226,7 +226,7 @@ class ClientService(asab.Service):
 
 		self.Cache: typing.Optional[typing.Dict[str, typing.Tuple[dict, datetime.datetime]]] = {}
 		self.CacheExpiration = asab.Config.getseconds(
-			"seacatauth:client", "client_cache_expiration", fallback=30)
+			"seacatauth:client", "cache_expiration", fallback=30)
 		if self.CacheExpiration == 0:
 			# Disable cache
 			self.Cache = None
