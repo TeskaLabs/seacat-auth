@@ -11,12 +11,14 @@ _EDITABLE_TENANT_PROPERTIES = {
 		"description":
 			"Custom tenant data. Shallow JSON object that maps string keys "
 			"to non-structured values.",
-		"patternProperties": {
-			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-				{"type": "string"},
-				{"type": "number"},
-				{"type": "boolean"},
-				{"type": "null"}]}}}}
+		# "patternProperties": {
+		# 	"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
+		# 		{"type": "string"},
+		# 		{"type": "number"},
+		# 		{"type": "boolean"},
+		# 		{"type": "null"}]}}
+	}
+}
 
 CREATE_TENANT = {
 	"type": "object",
@@ -79,11 +81,13 @@ BULK_ASSIGN_TENANTS = {
 				"To grant tenant access without assigning any roles, "
 				"leave the role array empty. \n\n"
 				"To assign global roles, list them under the `'*'` key.",
-			"patternProperties": {
-				r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
-					"type": "array",
-					"description": "List of the tenant's roles to be assigned",
-					"items": {"type": "string"}}}}},
+			# "patternProperties": {
+			# 	r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
+			# 		"type": "array",
+			# 		"description": "List of the tenant's roles to be assigned",
+			# 		"items": {"type": "string"}}}
+		}
+	},
 	"example": {
 		"credential_ids": [
 			"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
@@ -110,12 +114,14 @@ BULK_UNASSIGN_TENANTS = {
 				"To completely revoke credentials' access to the tenant, provide `\"UNASSIGN-TENANT\"` as the "
 				"tenant value, instead of the array of roles. \n\n"
 				"To unassign global roles, list them under the `\"*\"` key.",
-			"patternProperties": {
-				r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
-					"anyOf": [
-						{"type": "array", "items": {"type": "string"}},
-						{"type": "string", "enum": ["UNASSIGN-TENANT"]}
-					]}}}},
+			# "patternProperties": {
+			# 	r"^\*$|^[a-z][a-z0-9._-]{2,31}$": {
+			# 		"anyOf": [
+			# 			{"type": "array", "items": {"type": "string"}},
+			# 			{"type": "string", "enum": ["UNASSIGN-TENANT"]}
+			# 		]}}
+		}
+	},
 	"example": {
 		"credential_ids": [
 			"mongodb:default:abc123def456", "htpasswd:local:zdenek"],
