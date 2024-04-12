@@ -17,7 +17,7 @@ class RBACHandler(object):
 	Resource-based access control
 
 	---
-	tags: ["Authorization"]
+	tags: ["Resources"]
 	"""
 
 	def __init__(self, app, rbac_svc):
@@ -28,9 +28,9 @@ class RBACHandler(object):
 		web_app.router.add_get("/rbac/{tenant}/{resources}", self.rbac)
 
 	@access_control()
-	async def rbac(self, request, *, tenant):
+	async def rbac(self, request, *, tenant=None):
 		"""
-		Validate the current credentials' access to requested resources
+		Verify whether the current session is authorized to access requested resources
 
 		Multiple resources must be separated by `+`.
 		"""
