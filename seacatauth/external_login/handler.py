@@ -20,7 +20,7 @@ class ExternalLoginHandler(object):
 	External login
 
 	---
-	tags: ["External login"]
+	tags: ["Login with external provider"]
 	"""
 
 	def __init__(self, app, external_login_svc: ExternalLoginService):

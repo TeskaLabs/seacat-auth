@@ -77,7 +77,8 @@ CLIENT_METADATA_SCHEMA = {
 			"Public URI of the client's cookie entrypoint."},
 	"redirect_uris": {
 		"type": "array",
-		"description": "Array of Redirection URI values used by the Client."},
+		"description": "Array of Redirection URI values used by the Client.",
+		"items": {"type": "string"}},
 	#  "contacts": {},
 	# "custom_data": {  # NON-CANONICAL
 	# 	"type": "object", "description": "(Non-canonical) Additional client data."},

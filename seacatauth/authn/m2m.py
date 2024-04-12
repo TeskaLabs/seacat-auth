@@ -122,7 +122,9 @@ class M2MIntrospectHandler(object):
 
 	async def nginx(self, request):
 		"""
-		Authenticate M2M call
+		M2M (machine-to-machine) introspection
+
+		**Internal endpoint for Nginx auth_request**
 
 		If introspection is successful, Basic auth header is replaced with Bearer token.
 
@@ -144,6 +146,9 @@ class M2MIntrospectHandler(object):
 			proxy_pass            http://seacat-auth-svc:8081/m2m/nginx;
 		}
 		```
+
+		---
+		tags: ["Nginx"]
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth
