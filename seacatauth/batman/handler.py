@@ -19,9 +19,6 @@ class BatmanHandler(object):
 	Batman (Basic auth)
 
 	Translates Seacat Auth cookies into Basic auth headers for applications that only support Basic auth (Kibana, Grafana).
-
-	---
-	tags: ["Batman (Basic auth)"]
 	"""
 
 	def __init__(self, app, batman_svc):
@@ -42,6 +39,9 @@ class BatmanHandler(object):
 		Validate Batman cookie and respond with Basic Authorization header
 
 		**Internal endpoint for Nginx auth_request.**
+
+		---
+		tags: ["Nginx"]
 		"""
 		cookie_service = self.App.get_service("seacatauth.CookieService")
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")

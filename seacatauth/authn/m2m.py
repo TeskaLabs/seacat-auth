@@ -144,6 +144,9 @@ class M2MIntrospectHandler(object):
 			proxy_pass            http://seacat-auth-svc:8081/m2m/nginx;
 		}
 		```
+
+		---
+		tags: ["Nginx"]
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth
