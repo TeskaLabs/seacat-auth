@@ -25,7 +25,7 @@ L = logging.getLogger(__name__)
 JWK_PARAMS = {
 	"crv": {"type": "string"},
 	"ext": {"type": "boolean"},
-	"key_ops": {"type": "array"},
+	"key_ops": {"type": "array", "items": {"type": "string"}},
 	"kty": {"type": "string"},
 	"x": {"type": "string"},
 	"y": {"type": "string"}
@@ -93,7 +93,9 @@ class AuthenticationHandler(object):
 	})
 	async def login_prologue(self, request, *, json_data):
 		"""
-		Locate credentials by `ident` and establish an encrypted login session
+		Initiate a new login process
+
+		Locate credentials by `ident` and establish an encrypted login session.
 
 		Flow:
 		- Locate credentials by ident
@@ -160,7 +162,9 @@ class AuthenticationHandler(object):
 
 	async def login(self, request):
 		"""
-		Perform an encrypted login request
+		Submit login
+
+		Perform an encrypted login request.
 
 		Flow:
 		- Locate login session by it ID
@@ -275,7 +279,9 @@ class AuthenticationHandler(object):
 
 	async def logout(self, request):
 		"""
-		Log out of the current session and all its subsessions
+		Log out
+
+		Terminate current Single Sign-On session and all client subsessions.
 		"""
 		try:
 			session = await self.CookieService.get_session_by_request_cookie(request)
@@ -323,7 +329,9 @@ class AuthenticationHandler(object):
 
 	async def prepare_smslogin_challenge(self, request):
 		"""
-		Generate a one-time passcode and send it via SMS
+		Prepare authentication via SMS code
+
+		Generate a one-time passcode and send it via SMS.
 		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
@@ -357,7 +365,9 @@ class AuthenticationHandler(object):
 
 	async def prepare_webauthn_login_challenge(self, request):
 		"""
-		Initialize WebAuthn challenge and return WebAuthn authentication options object
+		Prepare authentication via FIDO2/WebAuthn
+
+		Initialize WebAuthn challenge and return WebAuthn authentication options object.
 		"""
 		# Decode JSON request
 		lsid = request.match_info["lsid"]
@@ -428,10 +438,10 @@ class AuthenticationHandler(object):
 	@access_control("authz:impersonate")
 	async def impersonate(self, request, *, json_data):
 		"""
-		Open a root session impersonated as a different user.
-		Response contains a Set-Cookie header with the new root session cookie.
+		Impersonate another user
 
-		Requires `authz:impersonate`.
+		Open an SSO session impersonated as a different user.
+		Response contains a Set-Cookie header with the new root session cookie.
 		"""
 		from_info = [request.remote]
 		ff = request.headers.get("X-Forwarded-For")
@@ -460,12 +470,12 @@ class AuthenticationHandler(object):
 	@access_control("authz:impersonate")
 	async def impersonate_and_redirect(self, request):
 		"""
-		Open a root session impersonated as a different user. Response contains a Set-Cookie header with the new
+		Impersonate another user
+
+		Open an SSO session impersonated as a different user. Response contains a Set-Cookie header with the new
 		root session cookie and redirection to the authorize endpoint. This effectively overwrites user's current
 		root cookie. Reference to current root session is kept in the impersonated session.
 		On logout, the original root cookie is set again.
-
-		Requires `authz:impersonate`.
 		---
 		requestBody:
 			content:
@@ -478,7 +488,7 @@ class AuthenticationHandler(object):
 								description: Credentials ID of the impersonation target.
 							client_id:
 								type: string
-								description:
+								description: Client ID
 							redirect_uri:
 								type: string
 								description:
