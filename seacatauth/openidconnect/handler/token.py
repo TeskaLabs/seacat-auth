@@ -271,7 +271,9 @@ class TokenHandler(object):
 
 	async def validate_id_token(self, request):
 		"""
-		Read the JWT token either from the request body or from the Authorization header.
+		Check the validity of a JWToken
+
+		Read the JWToken either from the request body or from the Authorization header.
 		Validate the token: send back the contents if successful; otherwise respond with error.
 		"""
 		body = await request.read()
