@@ -18,7 +18,7 @@ class OTPHandler(object):
 	Manage TOTP
 
 	---
-	tags: ["Manage TOTP"]
+	tags: ["One-Time PIN (TOTP)"]
 	"""
 
 	def __init__(self, app, otp_svc):

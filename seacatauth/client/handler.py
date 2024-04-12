@@ -19,8 +19,7 @@ class ClientHandler(object):
 	Client management
 
 	---
-	tags:
-	- Client management
+	tags: ["Clients (Applications)"]
 	"""
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
@@ -52,7 +51,7 @@ class ClientHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: p
+		-	name: f
 			in: query
 			description: Filter
 			schema:
