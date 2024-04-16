@@ -22,7 +22,7 @@ class RegistrationHandler(object):
 	Credential registration
 
 	---
-	tags: ["Register or invite credentials"]
+	tags: ["User registration"]
 	"""
 
 	def __init__(self, app, registration_svc, credentials_svc):
@@ -103,7 +103,8 @@ class RegistrationHandler(object):
 			"expiration": {
 				"oneOf": [{"type": "string"}, {"type": "number"}],
 				"description": "How long until the invitation expires.",
-				"examples": ["6 h", "3d", "1w", 7200]},
+				"example": "6 h",
+			},
 		},
 	})
 	@access_control("seacat:tenant:assign")

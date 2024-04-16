@@ -58,6 +58,7 @@ jobs:
         pip install bson
         pip install pymongo
         pip install jwcrypto
+        pip install passlib
         pip install git+https://github.com/TeskaLabs/asab.git#egg=asab[encryption]
     
     - name: Test with unittest
