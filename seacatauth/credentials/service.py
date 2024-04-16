@@ -284,7 +284,6 @@ class CredentialsService(asab.Service):
 				return {"count": 0, "data": []}
 
 			credentials = []
-			total_count = estimated_count
 			filtered_cids = sorted(filtered_cids)
 
 			offset = search_params.Page * search_params.ItemsPerPage
@@ -312,7 +311,7 @@ class CredentialsService(asab.Service):
 
 			return {
 				"data": credentials,
-				"count": total_count,
+				"count": estimated_count,
 			}
 
 		# Search without external filters
