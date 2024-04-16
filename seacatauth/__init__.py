@@ -49,6 +49,10 @@ asab.Config.add_defaults({
 	"seacatauth:client": {
 		# How long until the secret expires
 		"client_secret_expiration": "0",
+
+		# Validity period of local client metadata cache
+		# Set to "0" to disable cache.
+		"cache_expiration": "30 s",
 	},
 
 	"seacatauth:cookie": {
