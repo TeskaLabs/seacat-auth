@@ -217,6 +217,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {
 			"data": result["data"],
 			"count": result["count"],
+			"result": "OK",
 		})
 
 
