@@ -64,9 +64,9 @@ class TenantHandler(object):
 	async def search(self, request):
 		"""
 		Search tenants.
-		Results include only the tenants that are authorized in the current session with
-		`seacat:tenant:access` resource. To search all tenants, access to `authz:superuser` or `authz:tenant:access`
-		is required.
+
+		Results include only the tenants that are authorized in the current session.
+		To search all tenants, access to `authz:superuser` or `authz:tenant:access` is required.
 
 		---
 		parameters:
