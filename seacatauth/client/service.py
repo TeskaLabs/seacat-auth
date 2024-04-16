@@ -2,6 +2,7 @@ import datetime
 import logging
 import re
 import secrets
+import typing
 import urllib.parse
 import passlib.hash
 
@@ -218,10 +219,18 @@ class ClientService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.OIDCService = None
-		self.ClientSecretExpiration = asab.Config.getseconds(
-			"seacatauth:client", "client_secret_expiration", fallback=None)
+		self.ClientSecretExpiration = asab.Config.getseconds("seacatauth:client", "client_secret_expiration")
 		if self.ClientSecretExpiration <= 0:
 			self.ClientSecretExpiration = None
+
+		self.Cache: typing.Optional[typing.Dict[str, typing.Tuple[dict, datetime.datetime]]] = None
+		self.CacheExpiration = asab.Config.getseconds("seacatauth:client", "cache_expiration")
+		if self.CacheExpiration <= 0:
+			# Disable cache
+			self.Cache = None
+		else:
+			self.Cache = {}
+			self.CacheExpiration = datetime.timedelta(seconds=self.CacheExpiration)
 
 		# DEV OPTIONS
 		# _allow_custom_client_ids
@@ -238,6 +247,8 @@ class ClientService(asab.Service):
 
 		if not self._AllowCustomClientID:
 			CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
+
+		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
 
 	async def initialize(self, app):
@@ -281,9 +292,24 @@ class ClientService(asab.Service):
 
 
 	async def get(self, client_id: str):
+		"""
+		Get client metadata
+
+		@param client_id:
+		@return:
+		"""
+		# Try to get client from cache
+		client = self._get_from_cache(client_id)
+		if client:
+			return client
+
+		# Get from the database
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client = await self.StorageService.get(self.ClientCollection, client_id)
 		client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
+
+		self._store_in_cache(client_id, client)
+
 		return client
 
 
@@ -383,7 +409,9 @@ class ClientService(asab.Service):
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_SECRET_RESET)
+		self._delete_from_cache(client_id)
 		L.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
+
 		return client_secret, client_secret_expires_at
 
 
@@ -424,6 +452,7 @@ class ClientService(asab.Service):
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
+		self._delete_from_cache(client_id)
 		L.log(asab.LOG_NOTICE, "Client updated.", struct_data={
 			"client_id": client_id,
 			"fields": " ".join(client_update.keys())
@@ -432,6 +461,7 @@ class ClientService(asab.Service):
 
 	async def delete(self, client_id: str):
 		await self.StorageService.delete(self.ClientCollection, client_id)
+		self._delete_from_cache(client_id)
 		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
 
 
@@ -566,6 +596,45 @@ class ClientService(asab.Service):
 		else:
 			client_secret_expires_at = None
 		return client_secret, client_secret_expires_at
+
+
+	def _get_from_cache(self, client_id: str):
+		if self.Cache is None:
+			return None
+		if client_id not in self.Cache:
+			return None
+		client, expires_at = self.Cache[client_id]
+		if datetime.datetime.now(datetime.UTC) > expires_at:
+			del self.Cache[client_id]
+			return None
+		return client
+
+
+	def _store_in_cache(self, client_id, client):
+		if self.Cache is None:
+			return
+		self.Cache[client_id] = (
+			client,
+			datetime.datetime.now(datetime.UTC) + self.CacheExpiration
+		)
+
+
+	def _delete_from_cache(self, client_id: str):
+		if self.Cache is None:
+			return
+		if client_id in self.Cache:
+			del self.Cache[client_id]
+
+
+	def _clear_expired_cache(self, event_name):
+		if not self.Cache:
+			return
+		valid = {}
+		now = datetime.datetime.now(datetime.UTC)
+		for k, (v, exp) in self.Cache.items():
+			if now < exp:
+				valid[k] = v, exp
+		self.Cache = valid
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
