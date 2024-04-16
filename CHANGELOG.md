@@ -3,6 +3,8 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha13`
+- `v24.06-alpha12`
 - `v24.06-alpha11`
 - `v24.06-alpha10`
 - `v24.06-beta3`
@@ -19,6 +21,7 @@
 - `v24.06-alpha1`
 
 ### Breaking changes
+- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha13`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
@@ -30,6 +33,8 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
+- List credentials from authorized tenant only (#348, `v24.06-alpha13`)
 - Client cache (#361, `v24.06-alpha13`)
 - Update OpenAPI specs (#360, `v24.06-alpha12`)
 - Client secret management (#359, `v24.06-alpha11`)
