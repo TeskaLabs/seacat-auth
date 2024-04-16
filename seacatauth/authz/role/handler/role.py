@@ -20,7 +20,7 @@ class RoleHandler(object):
 	Manage roles
 
 	---
-	tags: ["Manage roles"]
+	tags: ["Roles"]
 	"""
 	def __init__(self, app, role_svc):
 		self.App = app

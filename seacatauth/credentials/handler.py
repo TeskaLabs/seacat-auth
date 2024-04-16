@@ -26,7 +26,7 @@ class CredentialsHandler(object):
 	Credential management
 
 	---
-	tags: ["Credential management"]
+	tags: ["Users and credentials"]
 	"""
 
 	def __init__(self, app, credentials_svc):
@@ -378,7 +378,8 @@ class CredentialsHandler(object):
 		"properties": {
 			"factors": {
 				"type": "array",
-				"description": "Factors to enforce/reset"
+				"description": "Factors to enforce/reset",
+				"items": {"type": "string"}
 			}
 		}
 	})
