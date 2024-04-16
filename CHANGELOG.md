@@ -30,6 +30,7 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- Client cache (#361, `v24.06-alpha13`)
 - Update OpenAPI specs (#360, `v24.06-alpha12`)
 - Client secret management (#359, `v24.06-alpha11`)
 - External login provider label contains just the display name (#352, `v24.06-alpha10`)
