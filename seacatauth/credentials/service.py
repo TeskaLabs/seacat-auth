@@ -300,8 +300,8 @@ class CredentialsService(asab.Service):
 							"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
 						continue
 					if (
-							cred_data.get("username", "").startswith(search_params.SimpleFilter)
-							or cred_data.get("email", "").startswith(search_params.SimpleFilter)
+						cred_data.get("username", "").startswith(search_params.SimpleFilter)
+						or cred_data.get("email", "").startswith(search_params.SimpleFilter)
 					):
 						if offset > 0:
 							# Skip until offset is reached
