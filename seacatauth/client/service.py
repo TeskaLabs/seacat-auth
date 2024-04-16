@@ -219,18 +219,17 @@ class ClientService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.OIDCService = None
-		self.ClientSecretExpiration = asab.Config.getseconds(
-			"seacatauth:client", "client_secret_expiration", fallback=None)
+		self.ClientSecretExpiration = asab.Config.getseconds("seacatauth:client", "client_secret_expiration")
 		if self.ClientSecretExpiration <= 0:
 			self.ClientSecretExpiration = None
 
-		self.Cache: typing.Optional[typing.Dict[str, typing.Tuple[dict, datetime.datetime]]] = {}
-		self.CacheExpiration = asab.Config.getseconds(
-			"seacatauth:client", "cache_expiration", fallback=30)
-		if self.CacheExpiration == 0:
+		self.Cache: typing.Optional[typing.Dict[str, typing.Tuple[dict, datetime.datetime]]] = None
+		self.CacheExpiration = asab.Config.getseconds("seacatauth:client", "cache_expiration")
+		if self.CacheExpiration <= 0:
 			# Disable cache
 			self.Cache = None
 		else:
+			self.Cache = {}
 			self.CacheExpiration = datetime.timedelta(seconds=self.CacheExpiration)
 
 		# DEV OPTIONS
@@ -309,11 +308,8 @@ class ClientService(asab.Service):
 		client = await self.StorageService.get(self.ClientCollection, client_id)
 		client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
 
-		# Store in cache
-		self.Cache[client_id] = (
-			client,
-			datetime.datetime.now(datetime.UTC) + self.CacheExpiration
-		)
+		self._store_in_cache(client_id, client)
+
 		return client
 
 
@@ -614,8 +610,19 @@ class ClientService(asab.Service):
 		return client
 
 
+	def _store_in_cache(self, client_id, client):
+		if self.Cache is None:
+			return
+		self.Cache[client_id] = (
+			client,
+			datetime.datetime.now(datetime.UTC) + self.CacheExpiration
+		)
+
+
 	def _delete_from_cache(self, client_id: str):
-		if self.Cache is not None and client_id in self.Cache:
+		if self.Cache is None:
+			return
+		if client_id in self.Cache:
 			del self.Cache[client_id]
 
 
