@@ -195,8 +195,10 @@ class CredentialsHandler(object):
 		mode = request.query.get("m", "default")
 		if mode == "role":
 			search.AdvancedFilter["role"] = request.query.get("f")
+			search.SimpleFilter = None
 		elif mode == "tenant":
 			search.AdvancedFilter["tenant"] = request.query.get("f")
+			search.SimpleFilter = None
 		elif mode == "default":
 			search.SimpleFilter = request.query.get("f")
 
