@@ -32,7 +32,7 @@ class BatmanService(asab.Service):
 			raise ValueError(
 				"Config section 'batman:elk' has been renamed to 'batman:elasticsearch'. Please update your config.")
 
-		if "batman:elasticsearch" in asab.Config.sections() or "batman:elk" in asab.Config.sections():
+		if "batman:elasticsearch" in asab.Config.sections():
 			from .elasticsearch import ElasticSearchIntegration
 			self.Integrations.append(
 				ElasticSearchIntegration(self)
