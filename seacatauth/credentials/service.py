@@ -317,7 +317,7 @@ class CredentialsService(asab.Service):
 					try:
 						provider = self.CredentialProviders[provider_id]
 						credentials.append(await provider.get(cid))
-					except None:
+					except KeyError:
 						L.info("Found an assignment of nonexisting credentials", struct_data={
 							"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
 
