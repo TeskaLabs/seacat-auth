@@ -268,23 +268,27 @@ class CredentialsHandler(object):
 		credentials_id = request.match_info["credentials_id"]
 
 		# Check authorization:
-		#   the requester must be authorized for any of the tenants that the requested is a member of
+		#   the requester must be authorized in at least one of the tenants that the requested is a member of
 		if not request.Session.is_superuser():
 			for tenant in request.Session.Authorization.Authz:
-				if tenant != "*":
+				if tenant == "*":
 					continue
-				if self.TenantService.has_tenant_assigned(credentials_id, tenant):
+				if await self.TenantService.has_tenant_assigned(credentials_id, tenant):
+					# Found a common tenant
 					break
 				else:
 					continue
 			else:
 				# No tenant in common
-				return asab.web.rest.json_response(request, {"result": "FORBIDDEN"}, code=403)
+				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 		_, provider_id, _ = credentials_id.split(':', 2)
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
-		credentials = await provider.get(request.match_info["credentials_id"])
+		try:
+			credentials = await provider.get(request.match_info["credentials_id"])
+		except KeyError:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
 			credentials["_ll"] = await self.LastActivityService.get_last_logins(credentials_id)
