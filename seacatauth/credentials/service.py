@@ -288,38 +288,27 @@ class CredentialsService(asab.Service):
 			filtered_cids = sorted(filtered_cids)
 
 			offset = search_params.Page * search_params.ItemsPerPage
-			if search_params.SimpleFilter:
-				# String filter is specified
-				for cid in filtered_cids:
-					_, provider_id, _ = cid.split(":", 2)
-					try:
-						provider = self.CredentialProviders[provider_id]
-						cred_data = await provider.get(cid)
-					except KeyError:
-						L.info("Found an assignment of nonexisting credentials", struct_data={
-							"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
+			for cid in filtered_cids:
+				_, provider_id, _ = cid.split(":", 2)
+				try:
+					provider = self.CredentialProviders[provider_id]
+					cred_data = await provider.get(cid)
+				except KeyError:
+					L.info("Found an assignment of nonexisting credentials", struct_data={
+						"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
+					continue
+				if not search_params.SimpleFilter or (
+					cred_data.get("username", "").startswith(search_params.SimpleFilter)
+					or cred_data.get("email", "").startswith(search_params.SimpleFilter)
+				):
+					if offset > 0:
+						# Skip until offset is reached
+						offset -= 1
 						continue
-					if (
-						cred_data.get("username", "").startswith(search_params.SimpleFilter)
-						or cred_data.get("email", "").startswith(search_params.SimpleFilter)
-					):
-						if offset > 0:
-							# Skip until offset is reached
-							offset -= 1
-							continue
-						credentials.append(cred_data)
-						if len(credentials) >= search_params.ItemsPerPage:
-							# Page is full
-							break
-			else:
-				for cid in filtered_cids[offset:offset + search_params.ItemsPerPage]:
-					_, provider_id, _ = cid.split(":", 2)
-					try:
-						provider = self.CredentialProviders[provider_id]
-						credentials.append(await provider.get(cid))
-					except KeyError:
-						L.info("Found an assignment of nonexisting credentials", struct_data={
-							"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
+					credentials.append(cred_data)
+					if len(credentials) >= search_params.ItemsPerPage:
+						# Page is full
+						break
 
 			return {
 				"data": credentials,
