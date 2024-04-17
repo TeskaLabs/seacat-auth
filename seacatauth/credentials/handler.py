@@ -317,12 +317,24 @@ class CredentialsHandler(object):
 
 		if password_link:
 			# TODO: Separate password creation from password reset
-			crd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
+			change_pwd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
+			credentials = await self.CredentialsService.get(credentials_id)
+			password_reset_token = await change_pwd_svc.create_password_reset_token(
+				credentials, expiration=json_data.get("expiration"))
 			try:
-				await crd_svc.init_password_change(credentials_id, is_new_user=True)
+				await change_pwd_svc.send_password_reset_message(credentials, password_reset_token)
 			except exceptions.CommunicationError:
-				L.error("Password reset failed: Failed to send password change link", struct_data={
-					"cid": credentials_id})
+				L.error("Failed to send password change link.", struct_data={"cid": credentials_id})
+				if request.is_superuser:
+					# If the message failed and the requester is superuser, return the link in the response
+					response_data = {
+						"result": "OK",
+						"warning": "Failed to send message with password reset link.",
+						"password_reset_url": change_pwd_svc.format_password_reset_url(password_reset_token)
+					}
+					return asab.web.rest.json_response(request, response_data)
+				else:
+					return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
 		return asab.web.rest.json_response(request, {
 			"status": "OK",
