@@ -4,8 +4,9 @@ import re
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.exceptions
 
-from seacatauth.decorators import access_control
+from ...decorators import access_control
 
 #
 
