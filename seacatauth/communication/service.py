@@ -7,6 +7,7 @@ import urllib.parse
 
 from .abc import CommunicationProviderABC
 from .builders import MessageBuilderABC
+from .. import exceptions
 
 #
 
@@ -89,11 +90,13 @@ class CommunicationService(asab.Service):
 		if len(self.CommunicationProviders) == 0:
 			L.error("No communication provider configured.")
 
+
 	def get_communication_provider(self, channel):
 		provider = self.CommunicationProviders.get(channel)
 		if provider is None:
 			raise KeyError("No communication provider for '{}' channel configured.".format(channel))
 		return provider
+
 
 	def get_message_builder(self, channel):
 		builder = self.MessageBuilders.get(channel)
@@ -101,162 +104,78 @@ class CommunicationService(asab.Service):
 			raise KeyError("No message builder for '{}' channel configured.".format(channel))
 		return builder
 
-	def parse_channels(self, channels):
-		# TODO: proper bool operator handling:
-		#   if any channel of the or_group returns True (=successful send), break the loop
-		#   Maybe this could be an iterative decorator, e.g.
-		#   ```
-		#   @communication.channels("email&sms")
-		#   async def password_reset(...)
-		#   ```
-		"""
-		Channels will be a string of channel names joined by | and &.
-		It is evaluated in a boolean-like manner from left to right.
-		E.g. The string "sms&slack|email&push" commands the service to send an SMS AND a Slack message.
-		If either fails, it shall both send an email AND a push notification.
-		"""
-		if re.match(r"^[\w&|]+$", channels) is None:
-			raise ValueError("Channel string '{}' contains invalid characters.".format(channels))
-		for or_group in channels.split("|"):
-			for channel in or_group.split("&"):
-				yield channel
 
-	async def password_reset(
-		self, *,
-		phone=None, email=None, locale=None, username=None, reset_url=None, welcome=False
-	):
-		channels = "email&sms"
-		if welcome is True:
-			message_id = "password_reset_welcome"
-		else:
-			message_id = "password_reset"
-		locale = locale or self.DefaultLocale
-
+	async def password_reset(self, *, credentials, reset_url, welcome=False):
+		if not self.CommunicationProviders:
+			raise exceptions.CommunicationNotConfiguredError()
+		channels = ["email", "sms"]
+		template_id = "password_reset_welcome" if welcome else "password_reset"
 		success = []
-		for channel in self.parse_channels(channels):
+		for channel in ["email", "sms"]:
 			try:
-				provider = self.get_communication_provider(channel)
-				message_builder = self.get_message_builder(channel)
-			except KeyError as e:
-				L.error("Cannot send {} message: {}".format(channel, e))
-				continue
-
-			# Template provider produces a message object with "message_body"
-			# and other attributes characteristic for the channel
-			try:
-				message_dict = message_builder.build_message(
-					template_name=message_id,
-					locale=locale,
-					phone=phone,
-					email=email,
-					username=username,
+				await self.build_and_send_message(
+					template_id=template_id,
+					channel=channel,
+					app_name=self.AppName,
+					email=credentials.get("email"),
+					phone=credentials.get("phone"),
+					username=credentials.get("username"),
 					reset_url=reset_url,
-					app_name=self.AppName
 				)
-			except Exception as e:
-				# TODO: custom errors: MessageBuild(CommunicationError)
-				L.error("Message build failed: {} ({})".format(type(e).__name__, str(e)))
+				success.append(channel)
+				continue
+			except exceptions.MessageDeliveryError:
+				L.error("Failed to send message via specified channel.", struct_data={
+					"channel": channel, "template": template_id, "cid": credentials["_id"]})
 				continue
 
-			# Communication provider sends the message
-			try:
-				status = await provider.send_message(**message_dict)
-				success.append(status)
-			except Exception as e:
-				# TODO: custom errors: MessageDelivery(CommunicationError)
-				L.error("Message delivery failed: {} ({})".format(type(e).__name__, str(e)))
-
-		# If no channel succeeds to send the message, raise error
-		# TODO: handle this in the channel iterator once it's implemented
-		if True not in success:
-			L.error("Communication failed on all channels.", struct_data={
-				"channels": channels
-			})
-			return False
-		return True
+		if len(success) == 0:
+			raise exceptions.MessageDeliveryError(
+				"Failed to deliver message on all channels.", template_id=template_id, channel=channels)
 
 
-	async def invitation(
-		self, *,
-		phone=None, email=None, locale=None, username=None, tenants, registration_uri, expires_at=None
-	):
-		channel = "email"
-		message_id = "invitation"
-		locale = locale or self.DefaultLocale
+	async def invitation(self, *, credentials, tenants, registration_uri, expires_at=None):
+		await self.build_and_send_message(
+			template_id="invitation",
+			channel="email",
+			app_name=self.AppName,
+			email=credentials.get("email"),
+			username=credentials.get("username"),
+			tenants=tenants,
+			registration_uri=registration_uri,
+			expires_at=expires_at,
+		)
 
-		success = False
+
+	async def sms_login(self, *, credentials: dict, otp: str):
+		await self.build_and_send_message(
+			template_id="login_otp",
+			channel="sms",
+			phone=credentials.get("phone"),
+			otp=otp
+		)
+
+
+	async def build_and_send_message(self, template_id, channel, **kwargs):
 		try:
 			provider = self.get_communication_provider(channel)
 			message_builder = self.get_message_builder(channel)
-		except KeyError as e:
-			L.error("Cannot send {} message: {}".format(channel, e))
-			return False
+		except KeyError:
+			raise exceptions.MessageDeliveryError("Communication channel not configured.", channel=channel)
 
-		# Template provider produces a message object with "message_body"
-		# and other attributes characteristic for the channel
 		try:
 			message_dict = message_builder.build_message(
-				template_name=message_id,
-				locale=locale,
-				phone=phone,
-				email=email,
-				username=username,
-				tenants=tenants,
-				registration_uri=registration_uri,
-				expires_at=expires_at,
-				app_name=self.AppName
+				template_name=template_id,
+				locale=self.DefaultLocale,
+				app_name=self.AppName,
+				**kwargs
 			)
 		except Exception as e:
-			L.error("Message build failed: {} ({})".format(type(e).__name__, str(e)))
-			return False
+			raise exceptions.MessageDeliveryError(
+				"Failed to build message from template.", template_id=template_id, channel=channel) from e
 
-		# Communication provider sends the message
 		try:
-			success = success or await provider.send_message(**message_dict)
+			await provider.send_message(**message_dict)
 		except Exception as e:
-			L.error("Message delivery failed: {} ({})".format(type(e).__name__, str(e)))
-
-		return True
-
-
-	async def sms_login(
-		self, *,
-		phone=None, locale=None, otp=None
-	):
-		channels = "sms"
-		message_id = "login_otp"
-		locale = locale or self.DefaultLocale
-
-		success = []
-		for channel in self.parse_channels(channels):
-			try:
-				provider = self.get_communication_provider(channel)
-				message_builder = self.get_message_builder(channel)
-			except KeyError as e:
-				L.error("Cannot send {} message: {}".format(channel, e))
-				continue
-
-			try:
-				message_dict = message_builder.build_message(
-					template_name=message_id,
-					locale=locale,
-					phone=phone,
-					otp=otp,
-					app_name=self.AppName
-				)
-			except Exception as e:
-				L.error("Message build failed: {} ({})".format(type(e).__name__, str(e)))
-				continue
-
-			try:
-				status = await provider.send_message(**message_dict)
-				success.append(status)
-			except Exception as e:
-				L.error("Message delivery failed: {} ({})".format(type(e).__name__, str(e)))
-
-		if True not in success:
-			L.error("Communication failed on all channels.", struct_data={
-				"channels": channels
-			})
-			return False
-		return True
+			raise exceptions.MessageDeliveryError(
+				"Failed to deliver message.", template_id=template_id, channel=channel) from e

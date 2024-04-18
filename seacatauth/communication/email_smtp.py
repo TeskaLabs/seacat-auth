@@ -113,4 +113,4 @@ class SMTPProvider(CommunicationProviderABC):
 			)
 			L.log(asab.LOG_NOTICE, "Email sent", struct_data={'result': result[1]})
 
-		return True
+		return
