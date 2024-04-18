@@ -206,6 +206,7 @@ class CredentialsService(asab.Service):
 		List credentials that are members of currently authorized tenants.
 		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
 		"""
+		# TODO: Searching with filters is very inefficient and needs serious optimization
 		if len(search_params.AdvancedFilter) > 1:
 			raise asab.exceptions.ValidationError("No more than one advanced filter at a time is supported.")
 
@@ -260,8 +261,7 @@ class CredentialsService(asab.Service):
 		estimated_count = None
 		if searched_roles:
 			role_svc = self.App.get_service("seacatauth.RoleService")
-			assignments = await role_svc.list_role_assignments(
-				role_id=searched_roles, page=search_params.Page, limit=search_params.ItemsPerPage)
+			assignments = await role_svc.list_role_assignments(role_id=searched_roles)
 			if filtered_cids is None:
 				filtered_cids = set(a["c"] for a in assignments["data"])
 				estimated_count = assignments["count"]
@@ -271,8 +271,7 @@ class CredentialsService(asab.Service):
 		if searched_tenants:
 			tenant_svc = self.App.get_service("seacatauth.TenantService")
 			provider = tenant_svc.get_provider()
-			assignments = await provider.list_tenant_assignments(
-				searched_tenants, page=search_params.Page, limit=search_params.ItemsPerPage)
+			assignments = await provider.list_tenant_assignments(searched_tenants)
 			if filtered_cids is None:
 				filtered_cids = set(a["c"] for a in assignments["data"])
 				estimated_count = assignments["count"]
@@ -285,20 +284,34 @@ class CredentialsService(asab.Service):
 				return {"count": 0, "data": []}
 
 			credentials = []
-			total_count = estimated_count
+			filtered_cids = sorted(filtered_cids)
 
+			offset = search_params.Page * search_params.ItemsPerPage
 			for cid in filtered_cids:
 				_, provider_id, _ = cid.split(":", 2)
 				try:
 					provider = self.CredentialProviders[provider_id]
-					credentials.append(await provider.get(cid))
+					cred_data = await provider.get(cid)
 				except KeyError:
 					L.info("Found an assignment of nonexisting credentials", struct_data={
 						"cid": cid, "role_ids": searched_roles, "tenant_ids": searched_tenants})
+					continue
+				if not search_params.SimpleFilter or (
+					cred_data.get("username", "").startswith(search_params.SimpleFilter)
+					or cred_data.get("email", "").startswith(search_params.SimpleFilter)
+				):
+					if offset > 0:
+						# Skip until offset is reached
+						offset -= 1
+						continue
+					credentials.append(cred_data)
+					if len(credentials) >= search_params.ItemsPerPage:
+						# Page is full
+						break
 
 			return {
 				"data": credentials,
-				"count": total_count,
+				"count": estimated_count,
 			}
 
 		# Search without external filters
