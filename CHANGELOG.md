@@ -3,6 +3,7 @@
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha15`
 - `v24.06-alpha14`
 - `v24.06-alpha13`
 - `v24.06-alpha12`
@@ -26,7 +27,8 @@
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
-- Fix the initialization and updating of built-in resources (#363, `v24.06-alpha14`)
+- Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
+- Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 - Better TOTP error responses (#352, `v24.06-alpha10`)
 - Fix resource editability (#355, `v24.06-alpha9`)
 - Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
