@@ -135,9 +135,11 @@ class ResourceService(asab.Service):
 				await self.create(resource_id, description, is_managed_by_seacat_auth=True)
 				continue
 
-			# Update resource description
-			if description is not None and db_resource.get("description") != description:
-				await self._update(db_resource, description)
+			if (
+				(db_resource.get("managed_by") != "seacat-auth")
+				or (description is not None and db_resource.get("description") != description)
+			):
+				await self._update(db_resource, description, is_managed_by_seacat_auth=True)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -209,7 +211,7 @@ class ResourceService(asab.Service):
 		await self._update(resource, description)
 
 
-	async def _update(self, resource: dict, description: str):
+	async def _update(self, resource: dict, description: str, is_managed_by_seacat_auth=False):
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
 			obj_id=resource["_id"],
@@ -220,6 +222,9 @@ class ResourceService(asab.Service):
 			upsertor.unset("description")
 		else:
 			upsertor.set("description", description)
+
+		if is_managed_by_seacat_auth:
+			upsertor.set("managed_by", "seacat-auth")
 
 		await upsertor.execute(event_type=EventTypes.RESOURCE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Resource updated", struct_data={"resource": resource["_id"]})
