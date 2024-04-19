@@ -102,19 +102,62 @@ class ChangePasswordService(asab.Service):
 		return await self._create_password_reset_token(credentials_id=credentials["_id"], expiration=expiration)
 
 
-	async def send_password_reset_message(self, credentials: dict, password_reset_token: str, is_new_user: bool = False):
-		successful = await self.CommunicationService.password_reset(
-			email=credentials.get("email"),
-			username=credentials.get("username"),
-			phone=credentials.get("phone"),
-			reset_url=self.format_password_reset_url(password_reset_token),
-			welcome=is_new_user
-		)
-		if successful:
+	async def init_password_reset_by_admin(
+		self,
+		credentials: dict,
+		is_new_user: bool = False,
+		expiration: float = None,
+	):
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Deny password reset to suspended credentials
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
+
+		password_reset_token = await self.create_password_reset_token(credentials, expiration=expiration)
+		reset_url = self.format_password_reset_url(password_reset_token)
+
+		if not self.CommunicationService.is_enabled():
+			return reset_url
+
+		# Send the message
+		try:
+			await self.CommunicationService.password_reset(
+				credentials=credentials,
+				reset_url=reset_url,
+				welcome=is_new_user
+			)
 			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
-		else:
-			raise exceptions.CommunicationError(
-				"Failed to send password reset link.", credentials_id=credentials["_id"])
+		except Exception as e:
+			raise e
+
+		return None
+
+
+	async def init_lost_password_reset(self, credentials: dict):
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Deny password reset to suspended credentials
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
+
+		password_reset_token = await self.create_password_reset_token(credentials)
+		reset_url = self.format_password_reset_url(password_reset_token)
+
+		# Send the message
+		try:
+			await self.CommunicationService.password_reset(
+				credentials=credentials,
+				reset_url=reset_url,
+			)
+			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
+		except Exception as e:
+			L.log(asab.LOG_NOTICE, "Failed to send password reset message: {}".format(e), struct_data={
+				"cid": credentials["_id"]})
+			await self.delete_password_reset_token(password_reset_token)
+			raise e
 
 
 	def format_password_reset_url(self, password_reset_token):
