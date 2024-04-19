@@ -91,8 +91,11 @@ class CommunicationService(asab.Service):
 			L.error("No communication provider configured.")
 
 
-	def is_enabled(self):
-		return len(self.CommunicationProviders) > 0
+	def is_enabled(self, channel=None):
+		if not channel:
+			return len(self.CommunicationProviders) > 0
+		else:
+			return channel in self.CommunicationProviders
 
 	def get_communication_provider(self, channel):
 		provider = self.CommunicationProviders.get(channel)
