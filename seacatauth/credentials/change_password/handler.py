@@ -190,29 +190,30 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 		try:
-			password_reset_token = await self.ChangePasswordService.create_password_reset_token(
-				credentials, expiration=json_data.get("expiration"))
-		except exceptions.CredentialsSuspendedError:
-			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended.", struct_data={
+			reset_url = await self.ChangePasswordService.init_password_reset_by_admin(
+				credentials,
+				expiration=json_data.get("expiration")
+			)
+		except exceptions.CredentialsNotFoundError:
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found", struct_data={
 				"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+		except exceptions.CredentialsSuspendedError:
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
+				"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+		except exceptions.MessageDeliveryError as e:
+			L.error("Failed to send password change link: {}".format(e), struct_data={"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
-		try:
-			await self.ChangePasswordService.send_password_reset_message(credentials, password_reset_token)
-		except exceptions.CommunicationError:
-			L.error("Failed to send password change link.", struct_data={"cid": credentials_id})
-			if request.is_superuser:
-				# If the message failed and the requester is superuser, return the link in the response
-				response_data = {
-					"result": "OK",
-					"warning": "Failed to send message with password reset link.",
-					"password_reset_url": self.ChangePasswordService.format_password_reset_url(password_reset_token)
-				}
-				return asab.web.rest.json_response(request, response_data)
-			else:
-				return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
+		response_data = {"result": "OK"}
+		if reset_url:
+			# Password reset URL was not sent because CommunicationService is disabled
+			# Add the URL to admin response
+			response_data["reset_url"] = reset_url
 
-		return asab.web.rest.json_response(request, {"result": "OK"})
+		return asab.web.rest.json_response(request, response_data)
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -247,19 +248,14 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, {"result": "OK"})
 
 		try:
-			password_reset_token = await self.ChangePasswordService.create_password_reset_token(
-				credentials, expiration=json_data.get("expiration"))
+			await self.ChangePasswordService.init_lost_password_reset(credentials)
 		except exceptions.CredentialsSuspendedError:
 			L.error("Lost password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id, "from": access_ips})
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})
-
-		try:
-			await self.ChangePasswordService.send_password_reset_message(credentials, password_reset_token)
-		except exceptions.CommunicationError:
-			await self.ChangePasswordService.delete_password_reset_token(password_reset_token)
-			L.error("Lost password reset failed: Failed to send password change link", struct_data={
+		except exceptions.MessageDeliveryError as e:
+			L.error("Lost password reset failed: Failed to send password change link ({})".format(e), struct_data={
 				"cid": credentials_id, "from": access_ips})
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})

@@ -91,6 +91,9 @@ class CommunicationService(asab.Service):
 			L.error("No communication provider configured.")
 
 
+	def is_enabled(self):
+		return len(self.CommunicationProviders) > 0
+
 	def get_communication_provider(self, channel):
 		provider = self.CommunicationProviders.get(channel)
 		if provider is None:
@@ -106,7 +109,7 @@ class CommunicationService(asab.Service):
 
 
 	async def password_reset(self, *, credentials, reset_url, welcome=False):
-		if not self.CommunicationProviders:
+		if not self.is_enabled():
 			raise exceptions.CommunicationNotConfiguredError()
 		channels = ["email", "sms"]
 		template_id = "password_reset_welcome" if welcome else "password_reset"
@@ -135,6 +138,8 @@ class CommunicationService(asab.Service):
 
 
 	async def invitation(self, *, credentials, tenants, registration_uri, expires_at=None):
+		if not self.is_enabled():
+			raise exceptions.CommunicationNotConfiguredError()
 		await self.build_and_send_message(
 			template_id="invitation",
 			channel="email",
@@ -148,6 +153,8 @@ class CommunicationService(asab.Service):
 
 
 	async def sms_login(self, *, credentials: dict, otp: str):
+		if not self.is_enabled():
+			raise exceptions.CommunicationNotConfiguredError()
 		await self.build_and_send_message(
 			template_id="login_otp",
 			channel="sms",
@@ -157,6 +164,8 @@ class CommunicationService(asab.Service):
 
 
 	async def build_and_send_message(self, template_id, channel, **kwargs):
+		if not self.is_enabled():
+			raise exceptions.CommunicationNotConfiguredError()
 		try:
 			provider = self.get_communication_provider(channel)
 			message_builder = self.get_message_builder(channel)
