@@ -128,11 +128,17 @@ class RegistrationHandler(object):
 		credential_data = json_data["credentials"]
 
 		# Assign tenant
-		invited_credentials_id = await self._create_invitation(
+		invited_credentials_id, registration_uri = await self._create_invitation(
 			tenant, credential_data, expiration, access_ips,
 			invited_by_cid=credentials_id)
 
-		return asab.web.rest.json_response(request, {"credentials_id": invited_credentials_id})
+		response_data = {"credentials_id": invited_credentials_id}
+		if registration_uri:
+			# URL was not sent because CommunicationService is disabled
+			# Add the URL to admin response
+			response_data["registration_url"] = registration_uri
+
+		return asab.web.rest.json_response(request, response_data)
 
 
 	async def _create_invitation(self, tenant, credential_data, expiration, access_ips, invited_by_cid):
@@ -146,17 +152,19 @@ class RegistrationHandler(object):
 
 		# Assign tenant
 		await self.RegistrationService.TenantService.assign_tenant(invited_credentials_id, tenant)
+		registration_uri = self.RegistrationService.format_registration_uri(registration_code)
 
-		# Send invitation
-		await self.RegistrationService.CommunicationService.invitation(
-			email=credential_data.get("email"),
-			registration_uri=self.RegistrationService.format_registration_uri(registration_code),
-			username=credential_data.get("username"),
-			tenants=[tenant],
-			expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
-		)
-
-		return invited_credentials_id
+		if self.RegistrationService.CommunicationService.is_enabled():
+			# Send invitation
+			await self.RegistrationService.CommunicationService.invitation(
+				credentials=credential_data,
+				registration_uri=registration_uri,
+				tenants=[tenant],
+				expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
+			)
+			return invited_credentials_id, None
+		else:
+			return invited_credentials_id, registration_uri
 
 
 	@access_control("seacat:tenant:invite")
