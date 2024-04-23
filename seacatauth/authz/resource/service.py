@@ -136,8 +136,8 @@ class ResourceService(asab.Service):
 				continue
 
 			if (
-					(db_resource.get("managed_by") != "seacat-auth")
-					or (description is not None and db_resource.get("description") != description)
+				(db_resource.get("managed_by") != "seacat-auth")
+				or (description is not None and db_resource.get("description") != description)
 			):
 				await self._update(db_resource, description, is_managed_by_seacat_auth=True)
 

@@ -3,7 +3,7 @@
 ## v24.06
 
 ### Pre-releases
-- `v24.06-beta5`
+- `v24.06-beta6`
 - `v24.06-alpha11`
 - `v24.06-alpha10`
 - `v24.06-beta3`
@@ -23,8 +23,8 @@
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
-- Fix resource initialization (#365, `v24.06-beta5`)
-- Remove seacat:resource:access authorization (#365, `v24.06-beta5`)
+- Fix resource initialization (#365, `v24.06-beta6`)
+- Remove seacat:resource:access authorization (#365, `v24.06-beta6`)
 - Better TOTP error responses (#352, `v24.06-alpha10`)
 - Fix resource editability (#355, `v24.06-alpha9`)
 - Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
