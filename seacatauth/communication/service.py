@@ -87,9 +87,6 @@ class CommunicationService(asab.Service):
 			else:
 				L.error("Unsupported communication provider: '{}'".format(provider_id))
 
-		if len(self.CommunicationProviders) == 0:
-			L.error("No communication provider configured.")
-
 
 	def is_enabled(self, channel=None):
 		if not channel:

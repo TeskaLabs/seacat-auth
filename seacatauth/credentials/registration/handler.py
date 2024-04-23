@@ -37,7 +37,7 @@ class RegistrationHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
 		web_app.router.add_post("/invite/{credentials_id}", self.resend_invitation)
-		web_app.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
+		web_app.router.add_post("/account/{tenant}/invite", self.public_create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
 		web_app.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
@@ -46,11 +46,16 @@ class RegistrationHandler(object):
 
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_post("/public/register", self.request_self_invitation)
-		web_app_public.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
 		web_app_public.router.add_get("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.get_registration)
 		web_app_public.router.add_put("/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.update_registration)
 		web_app_public.router.add_post(
 			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
+
+		# Back-compat; To be removed in next major version
+		# >>>
+		web_app.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
+		web_app_public.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
+		# <<<
 
 
 	@asab.web.rest.json_schema_handler({
@@ -82,13 +87,19 @@ class RegistrationHandler(object):
 
 		credential_data = {"email": json_data.get("email")}
 
+		response_data = {"result": "OK"}
+
 		# Prepare credentials, assign tenant and send invitation email
-		await self._prepare_invitation(
+		invited_credentials_id, registration_url = await self._prepare_invitation(
 			tenant, credential_data, expiration, access_ips,
 			invited_by_cid=credentials_id
 		)
+		if registration_url:
+			L.log(asab.LOG_NOTICE, "Including invitation URL in REST response.", struct_data={
+				"cid": invited_credentials_id, "requested_by": credentials_id})
+			response_data["registration_url"] = registration_url
 
-		return asab.web.rest.json_response(request, {"result": "OK"})
+		return asab.web.rest.json_response(request, response_data)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -132,15 +143,21 @@ class RegistrationHandler(object):
 		credential_data = json_data["credentials"]
 
 		# Prepare credentials and assign tenant
-		invited_credentials_id, registration_uri = await self._prepare_invitation(
+		invited_credentials_id, registration_url = await self._prepare_invitation(
 			tenant, credential_data, expiration, access_ips,
-			invited_by_cid=credentials_id)
+			invited_by_cid=credentials_id
+		)
 
-		response_data = {"credentials_id": invited_credentials_id}
-		if registration_uri:
+		response_data = {
+			"result": "OK",
+			"credentials_id": invited_credentials_id,
+		}
+		if registration_url:
 			# URL was not sent because CommunicationService is disabled
 			# Add the URL to admin response
-			response_data["registration_url"] = registration_uri
+			L.log(asab.LOG_NOTICE, "Including invitation URL in REST response.", struct_data={
+				"cid": invited_credentials_id, "requested_by": credentials_id})
+			response_data["registration_url"] = registration_url
 
 		return asab.web.rest.json_response(request, response_data)
 
@@ -177,15 +194,24 @@ class RegistrationHandler(object):
 			assert e.Value is not None
 			# Credentials already exist
 			# Locate the credentials by the conflicting value and use them
-			credentials_id = await self.CredentialsService.locate(e.Value)
+			credentials_id = await self.CredentialsService.locate(credential_data["email"], stop_at_first=True)
 			credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
 
 			if "__registration" in credentials:
 				# Registration in progress
 				registration_code = credentials["__registration"]["code"]
+			else:
+				L.log(
+					asab.LOG_NOTICE,
+					"Invitation matches credentials that are already registered.",
+					struct_data={"cid": credentials_id, **credential_data}
+				)
 
 		# Assign tenant
-		await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
+		try:
+			await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
+		except asab.exceptions.Conflict:
+			L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={"cid": credentials_id, "t": tenant})
 
 		# Re/send invitation email
 		if registration_code:
@@ -199,6 +225,11 @@ class RegistrationHandler(object):
 				)
 				return credentials_id, None
 			else:
+				L.log(
+					asab.LOG_NOTICE,
+					"Cannot send invitation message: Communication service is disabled.",
+					struct_data={"cid": credentials_id}
+				)
 				return credentials_id, registration_uri
 
 		return credentials_id, None
