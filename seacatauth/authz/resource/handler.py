@@ -4,8 +4,9 @@ import re
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.exceptions
 
-from seacatauth.decorators import access_control
+from ...decorators import access_control
 
 #
 
@@ -34,7 +35,6 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 
-	@access_control("seacat:resource:access")
 	async def list(self, request):
 		"""
 		List resources
@@ -104,7 +104,6 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, resources)
 
 
-	@access_control("seacat:resource:access")
 	async def get(self, request):
 		"""
 		Get resource detail
