@@ -1,6 +1,8 @@
 import datetime
 import json
 import logging
+import typing
+
 import aiohttp.web
 
 import asab
@@ -80,9 +82,11 @@ class RegistrationHandler(object):
 
 		credential_data = {"email": json_data.get("email")}
 
-		await self._create_invitation(
+		# Prepare credentials, assign tenant and send invitation email
+		await self._prepare_invitation(
 			tenant, credential_data, expiration, access_ips,
-			invited_by_cid=credentials_id)
+			invited_by_cid=credentials_id
+		)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
@@ -127,8 +131,8 @@ class RegistrationHandler(object):
 
 		credential_data = json_data["credentials"]
 
-		# Assign tenant
-		invited_credentials_id, registration_uri = await self._create_invitation(
+		# Prepare credentials and assign tenant
+		invited_credentials_id, registration_uri = await self._prepare_invitation(
 			tenant, credential_data, expiration, access_ips,
 			invited_by_cid=credentials_id)
 
@@ -141,30 +145,63 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
-	async def _create_invitation(self, tenant, credential_data, expiration, access_ips, invited_by_cid):
-		# Create invitation
-		invited_credentials_id, registration_code = await self.RegistrationService.draft_credentials(
-			credential_data=credential_data,
-			expiration=expiration,
-			invited_by_cid=invited_by_cid,
-			invited_from_ips=access_ips,
-		)
+	async def _prepare_invitation(
+		self,
+		tenant: str,
+		credential_data: dict,
+		expiration: float,
+		access_ips: list,
+		invited_by_cid: typing.Optional[str]
+	):
+		"""
+		Prepare credentials for registration. Either create a new set of credentials, or locate the existing one.
+
+		@param tenant: Tenant to invite into
+		@param credential_data: Username, email address and/or phone number
+		@param expiration: Invitation expiration in seconds
+		@param access_ips: Source IPs of the invitation request
+		@param invited_by_cid: Credentials ID of the invitation request
+		@return:
+		"""
+		# Prepare credentials and registration code
+		registration_code = None
+		try:
+			credentials_id, registration_code = await self.RegistrationService.draft_credentials(
+				credential_data=credential_data,
+				expiration=expiration,
+				invited_by_cid=invited_by_cid,
+				invited_from_ips=access_ips,
+			)
+
+		except asab.exceptions.Conflict as e:
+			assert e.Value is not None
+			# Credentials already exist
+			# Locate the credentials by the conflicting value and use them
+			credentials_id = await self.CredentialsService.locate(e.Value)
+			credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
+
+			if "__registration" in credentials:
+				# Registration in progress
+				registration_code = credentials["__registration"]["code"]
 
 		# Assign tenant
-		await self.RegistrationService.TenantService.assign_tenant(invited_credentials_id, tenant)
-		registration_uri = self.RegistrationService.format_registration_uri(registration_code)
+		await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
 
-		if self.RegistrationService.CommunicationService.is_enabled():
-			# Send invitation
-			await self.RegistrationService.CommunicationService.invitation(
-				credentials=credential_data,
-				registration_uri=registration_uri,
-				tenants=[tenant],
-				expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
-			)
-			return invited_credentials_id, None
-		else:
-			return invited_credentials_id, registration_uri
+		# Re/send invitation email
+		if registration_code:
+			registration_uri = self.RegistrationService.format_registration_uri(registration_code)
+			if self.RegistrationService.CommunicationService.is_enabled():
+				await self.RegistrationService.CommunicationService.invitation(
+					credentials=credential_data,
+					registration_uri=registration_uri,
+					tenants=[tenant],
+					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
+				)
+				return credentials_id, None
+			else:
+				return credentials_id, registration_uri
+
+		return credentials_id, None
 
 
 	@access_control("seacat:tenant:invite")
