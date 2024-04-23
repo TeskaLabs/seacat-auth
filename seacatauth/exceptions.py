@@ -175,7 +175,7 @@ class CommunicationNotConfiguredError(SeacatAuthError):
 	"""
 	No communication channels are configured
 	"""
-	def __init__(self,  *args):
+	def __init__(self, *args):
 		super().__init__("No communication channels are configured.", *args)
 
 
