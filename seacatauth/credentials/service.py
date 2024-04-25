@@ -394,8 +394,11 @@ class CredentialsService(asab.Service):
 		'''
 		Find detail of credentials for a credentials_id.
 		'''
-		provider = self.get_provider(credentials_id)
-		return await provider.get(credentials_id, include=include)
+		try:
+			provider = self.get_provider(credentials_id)
+			return await provider.get(credentials_id, include=include)
+		except KeyError:
+			raise exceptions.CredentialsNotFoundError(credentials_id=credentials_id)
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:

@@ -91,7 +91,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 					asab.LOG_NOTICE, "SMSBrana.cz provider is in mock mode. Message will not be sent.",
 					struct_data=url_params
 				)
-				return True
+				return
 
 			async with aiohttp.ClientSession() as session:
 				async with session.get(self.URL, params=url_params) as resp:
@@ -105,4 +105,3 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				raise RuntimeError("SMS delivery failed.")
 			else:
 				L.log(asab.LOG_NOTICE, "SMS sent")
-		return True
