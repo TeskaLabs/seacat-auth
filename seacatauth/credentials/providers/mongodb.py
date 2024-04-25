@@ -380,40 +380,32 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			)
 		except KeyError:
 			# Should not occur if login prologue happened correctly
-			L.error("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: Credentials not found.", struct_data={"cid": credentials_id})
 			return False
 
 		if dbcred.get("suspended") is True:
 			# if the user is in suspended state then login no allowed
-			L.info("Authentication failed: Credentials suspended", struct_data={"cid": credentials_id})
+			L.info("Authentication failed: Credentials suspended.", struct_data={"cid": credentials_id})
 			return False
 
-		if "__password" in dbcred:
-			if authn_password(dbcred, credentials):
-				return True
-			else:
-				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
-		else:
+		password = credentials.get("password")
+		if not password:
+			L.error("Authentication failed: Login data contain no password.", struct_data={"cid": credentials_id})
+			return False
+
+		password_hash = dbcred.get("__password")
+		if not password_hash:
 			# Should not occur if login prologue happened correctly
-			L.error("Authentication failed: Login data contain no password", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: User has no password set.", struct_data={"cid": credentials_id})
+			return False
+
+		if self._verify_password(password_hash, password):
+			return True
+		else:
+			L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
 
 		return False
 
 
 	def _create_credential_id(self, username) -> bson.ObjectId:
 		return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
-
-
-def authn_password(dbcred, credentials):
-	# This is here for a cryptoagility, if we migrate to a newer password hashing function,
-	# this if block will be extended
-	if dbcred['__password'].startswith('$2b$') \
-		or dbcred['__password'].startswith('$2a$') \
-		or dbcred['__password'].startswith('$2y$'):
-		if generic.bcrypt_verify(dbcred['__password'], credentials['password']):
-			return True
-		else:
-			return False
-	else:
-		L.error("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
-		return False
