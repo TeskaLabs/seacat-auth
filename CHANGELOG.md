@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-beta1`
 - `v24.17-alpha1`
 
 ### Fix
