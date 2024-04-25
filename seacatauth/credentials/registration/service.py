@@ -255,9 +255,15 @@ class RegistrationService(asab.Service):
 		reg_roles = await self.RoleService.get_roles_by_credentials(
 			reg_credential_id, reg_tenants)
 		for tenant in reg_tenants:
-			await self.TenantService.assign_tenant(credentials_id, tenant)
+			try:
+				await self.TenantService.assign_tenant(credentials_id, tenant)
+			except asab.exceptions.Conflict:
+				L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={"cid": credentials_id, "t": tenant})
 		for role in reg_roles:
-			await self.RoleService.assign_role(credentials_id, role)
+			try:
+				await self.RoleService.assign_role(credentials_id, role)
+			except asab.exceptions.Conflict:
+				L.log(asab.LOG_NOTICE, "Role already assigned.", struct_data={"cid": credentials_id, "r": role})
 		await self.CredentialsService.delete_credentials(reg_credential_id)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Invitation accepted by an existing user", struct_data={
