@@ -4,7 +4,7 @@ import re
 import secrets
 import typing
 import urllib.parse
-import passlib.hash
+import argon2
 
 import asab.storage.exceptions
 import asab.exceptions
@@ -403,7 +403,7 @@ class ClientService(asab.Service):
 		client = await self.get(client_id)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
-		client_secret_hash = passlib.hash.argon2.hash(client_secret)
+		client_secret_hash = argon2.PasswordHasher().hash(client_secret)
 		upsertor.set("__client_secret", client_secret_hash)
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
@@ -517,7 +517,7 @@ class ClientService(asab.Service):
 			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.ClientError("Expired client secret.", client_id=client["_id"])
 
-		if not passlib.hash.argon2.verify(client_secret, client_secret_hash):
+		if not argon2.PasswordHasher().verify(client_secret_hash, client_secret):
 			raise exceptions.ClientError("Incorrect client secret.", client_id=client["_id"])
 		else:
 			return True
