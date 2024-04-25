@@ -4,13 +4,13 @@ from typing import Optional
 
 import asab
 import bson
-import passlib.hash
 import motor
 import motor.motor_asyncio
 import typing
 
 import bson.json_util
 
+from ... import generic
 from .abc import CredentialsProviderABC
 
 #
@@ -216,7 +216,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		if dbcred[self.PasswordField].startswith("$2b$") \
 			or dbcred[self.PasswordField].startswith("$2a$") \
 			or dbcred[self.PasswordField].startswith("$2y$"):
-			if passlib.hash.bcrypt.verify(credentials["password"], dbcred[self.PasswordField]):
+			if generic.bcrypt_verify(dbcred[self.PasswordField], credentials["password"]):
 				return True
 			else:
 				return False

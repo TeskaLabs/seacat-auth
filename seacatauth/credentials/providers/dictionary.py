@@ -4,10 +4,9 @@ import hashlib
 import logging
 from typing import Optional
 
-from passlib.hash import bcrypt
-
 import asab
 from .abc import EditableCredentialsProviderABC
+from ... import generic
 
 #
 
@@ -23,7 +22,6 @@ class DictCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		# TODO: Check bcrypt.get_backend() - see https://passlib.readthedocs.io/en/stable/lib/passlib.hash.bcrypt.html#index-0
 		return DictCredentialsProvider(provider_id, config_section_name)
 
 
@@ -77,7 +75,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		if "phone" in credentials:
 			credentials_object["phone"] = credentials["phone"]
 		if "password" in credentials:
-			credentials_object["__password"] = bcrypt.hash(credentials["password"].encode("utf-8"))
+			credentials_object["__password"] = generic.bcrypt_hash(credentials["password"])
 
 		self.Dictionary[credentials_id] = credentials_object
 		return "{}:{}:{}".format(self.Type, self.ProviderID, credentials_id)
@@ -94,7 +92,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		# Update the password
 		if "password" in update:
 			new_pwd = update.pop("password")
-			credentials["__password"] = bcrypt.hash(new_pwd.encode('utf-8'))
+			credentials["__password"] = generic.bcrypt_hash(new_pwd)
 
 		for k, v in update.items():
 			credentials[k] = v
@@ -154,7 +152,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		if credentials_db is None:
 			return False
 
-		if bcrypt.verify(password, credentials_db["__password"]):
+		if generic.bcrypt_verify(credentials_db["__password"], password):
 			return True
 
 		return False
