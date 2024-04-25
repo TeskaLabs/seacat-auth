@@ -4,6 +4,8 @@ from typing import Optional
 
 import asab
 
+from ... import generic
+
 #
 
 L = logging.getLogger(__name__)
@@ -89,6 +91,22 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
 		return False
+
+
+	def _verify_password(self, hash: str, password: str):
+		if hash.startswith("$2b$") or hash.startswith("$2a$") or hash.startswith("$2y$"):
+			if generic.bcrypt_verify(hash, password):
+				return True
+			else:
+				return False
+		if hash.startswith("$argon2id$"):
+			if generic.argon2_verify(hash, password):
+				return True
+			else:
+				return False
+		else:
+			L.warning("Unknown password hash function: {}".format(hash[:4]))
+			return False
 
 
 
