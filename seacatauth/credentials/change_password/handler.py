@@ -30,7 +30,7 @@ class ChangePasswordHandler(object):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/password", self.admin_request_password_change)
+		web_app.router.add_put("/password", self.admin_request_password_reset)
 		web_app.router.add_put("/account/password-change", self.change_password)
 		web_app.router.add_put("/public/password-reset", self.reset_password)
 		web_app.router.add_put("/public/lost-password", self.lost_password)
@@ -177,7 +177,7 @@ class ChangePasswordHandler(object):
 		}
 	})
 	@access_control("seacat:credentials:edit")
-	async def admin_request_password_change(self, request, *, json_data):
+	async def admin_request_password_reset(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
 		"""
