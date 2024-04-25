@@ -259,10 +259,9 @@ class RegistrationHandler(object):
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
 
 		await self.RegistrationService.CommunicationService.invitation(
-			email=credentials["email"],
-			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
-			username=credentials.get("username"),
+			credentials=credentials,
 			tenants=tenants,
+			registration_uri=self.RegistrationService.format_registration_uri(credentials["__registration"]["code"]),
 			expires_at=expiration,
 		)
 
