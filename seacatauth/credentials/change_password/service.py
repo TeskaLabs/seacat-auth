@@ -61,7 +61,7 @@ class ChangePasswordService(asab.Service):
 			})
 
 
-	async def create_password_reset_token(self, credentials_id: str, expiration: int | None = None):
+	async def _create_password_reset_token(self, credentials_id: str, expiration: int | None = None):
 		"""
 		Create a password reset object
 		"""
@@ -91,36 +91,78 @@ class ChangePasswordService(asab.Service):
 		return token
 
 
-	async def init_password_change(self, credentials_id: str, is_new_user: bool = False, expiration: float = None):
+	async def create_password_reset_token(self, credentials: dict, expiration: float = None):
 		"""
 		Create a password reset link and send it to the user via email or other way
 		"""
-		# Verify that credentials exists
-		creds = await self.CredentialsService.get(credentials_id)
-		if creds is None:
-			raise exceptions.CredentialsNotFoundError(credentials_id)
-
 		# Deny password reset to suspended credentials
-		if creds.get("suspended") is True:
-			raise exceptions.CredentialsSuspendedError(credentials_id)
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
 
-		pwdreset_token = await self.create_password_reset_token(credentials_id=credentials_id, expiration=expiration)
+		return await self._create_password_reset_token(credentials_id=credentials["_id"], expiration=expiration)
+
+
+	async def init_password_reset_by_admin(
+		self,
+		credentials: dict,
+		is_new_user: bool = False,
+		expiration: float = None,
+	):
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Deny password reset to suspended credentials
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
+
+		password_reset_token = await self.create_password_reset_token(credentials, expiration=expiration)
+		reset_url = self.format_password_reset_url(password_reset_token)
+
+		if not self.CommunicationService.is_enabled():
+			return reset_url
 
 		# Send the message
-		email = creds.get("email")
-		username = creds.get("username")
-		phone = creds.get("phone")
-		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, pwdreset_token)
-		successful = await self.CommunicationService.password_reset(
-			email=email, username=username, phone=phone, reset_url=reset_url, welcome=is_new_user
-		)
+		try:
+			await self.CommunicationService.password_reset(
+				credentials=credentials,
+				reset_url=reset_url,
+				welcome=is_new_user
+			)
+			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
+		except Exception as e:
+			raise e
 
-		if successful:
-			L.log(asab.LOG_NOTICE, "Password reset initiated", struct_data={"cid": credentials_id})
-		else:
-			await self.delete_password_reset_token(pwdreset_token)
-			raise exceptions.CommunicationError(
-				"Failed to send password reset link", credentials_id=credentials_id)
+		return None
+
+
+	async def init_lost_password_reset(self, credentials: dict):
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Deny password reset to suspended credentials
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
+
+		password_reset_token = await self.create_password_reset_token(credentials)
+		reset_url = self.format_password_reset_url(password_reset_token)
+
+		# Send the message
+		try:
+			await self.CommunicationService.password_reset(
+				credentials=credentials,
+				reset_url=reset_url,
+			)
+			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
+		except Exception as e:
+			L.log(asab.LOG_NOTICE, "Failed to send password reset message: {}".format(e), struct_data={
+				"cid": credentials["_id"]})
+			await self.delete_password_reset_token(password_reset_token)
+			raise e
+
+
+	def format_password_reset_url(self, password_reset_token):
+		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, password_reset_token)
+		return reset_url
 
 
 	async def change_password(self, credentials_id: str, new_password: str):

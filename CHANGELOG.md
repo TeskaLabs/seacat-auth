@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## v24.17
+
+### Pre-releases
+- `v24.17-alpha1`
+
+### Fix
+- Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
+- Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
+
+### Features
+- When invitation cannot be created because the user already exists, the invitation is re-sent (#364, `v24.17-alpha1`)
+- When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
+- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
+- List credentials from authorized tenant only (#348, `v24.06-alpha13`)
+
+---
+
+
 ## v24.06
 
 ### Pre-releases
@@ -27,8 +45,6 @@
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
-- Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
-- Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 - Better TOTP error responses (#352, `v24.06-alpha10`)
 - Fix resource editability (#355, `v24.06-alpha9`)
 - Make FIDO MDS request non-blocking using TaskService (#354, `v24.06-alpha8`)
@@ -37,8 +53,6 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
-- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
-- List credentials from authorized tenant only (#348, `v24.06-alpha13`)
 - Client cache (#361, `v24.06-alpha13`)
 - Update OpenAPI specs (#360, `v24.06-alpha12`)
 - Client secret management (#359, `v24.06-alpha11`)

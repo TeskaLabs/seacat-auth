@@ -161,13 +161,22 @@ class SessionNotFoundError(SeacatAuthError, KeyError):
 		super().__init__(message, *args)
 
 
-class CommunicationError(SeacatAuthError):
+class MessageDeliveryError(SeacatAuthError):
 	"""
-	Failed to send notification or message
+	Failed to send message
 	"""
-	def __init__(self, message, credentials_id=None, *args):
-		self.CredentialsId = credentials_id
+	def __init__(self, message, channel, template_id=None, *args):
+		self.TemplateId = template_id
+		self.Channel = channel
 		super().__init__(message, *args)
+
+
+class CommunicationNotConfiguredError(SeacatAuthError):
+	"""
+	No communication channels are configured
+	"""
+	def __init__(self, *args):
+		super().__init__("No communication channels are configured.", *args)
 
 
 class NoCookieError(SeacatAuthError):
