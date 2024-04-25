@@ -235,7 +235,7 @@ class RegistrationHandler(object):
 		return credentials_id, None
 
 
-	@access_control("seacat:tenant:invite")
+	@access_control("seacat:tenant:assign")
 	async def resend_invitation(self, request):
 		"""
 		Resend invitation to an already invited user and extend the expiration of the invitation.
