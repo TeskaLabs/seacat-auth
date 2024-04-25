@@ -19,7 +19,7 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 	ConfigDefaults = {
 		'tenants': 'no',
-		'register': 'no',  # Yes, if this credentials provider handles registration
+		'registration': 'no',  # Yes, if this credentials provider handles registration
 	}
 
 	def __init__(self, provider_id, config_section_name, config=None):
