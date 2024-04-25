@@ -190,7 +190,7 @@ class RegistrationHandler(object):
 				invited_from_ips=access_ips,
 			)
 
-		except asab.exceptions.Conflict as e:
+		except asab.exceptions.Conflict:
 			# Credentials already exist
 			# Locate the credentials by the conflicting value and use them
 			credentials_id = await self.CredentialsService.locate(credential_data["email"], stop_at_first=True)
