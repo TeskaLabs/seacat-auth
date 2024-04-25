@@ -191,7 +191,6 @@ class RegistrationHandler(object):
 			)
 
 		except asab.exceptions.Conflict as e:
-			assert e.Value is not None
 			# Credentials already exist
 			# Locate the credentials by the conflicting value and use them
 			credentials_id = await self.CredentialsService.locate(credential_data["email"], stop_at_first=True)
