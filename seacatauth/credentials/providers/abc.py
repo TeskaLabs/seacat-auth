@@ -18,8 +18,8 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 	RegistrationEnabled = False
 
 	ConfigDefaults = {
-		'tenants': 'no',
-		'registration': 'no',  # Yes, if this credentials provider handles registration
+		"tenants": "no",
+		"registration": "no",  # Yes, if this provider allows inviting and registering new users
 	}
 
 	def __init__(self, provider_id, config_section_name, config=None):
