@@ -3,8 +3,6 @@ import logging
 import re
 from typing import Optional
 
-from passlib.hash import bcrypt
-
 import asab
 import asab.storage.mongodb
 import asab.storage.exceptions
@@ -17,7 +15,7 @@ import pymongo
 import pymongo.errors
 
 from .abc import EditableCredentialsProviderABC
-
+from ... import generic
 from ...events import EventTypes
 
 #
@@ -33,7 +31,6 @@ class MongoDBCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		# TODO: Check bcrypt.get_backend() - see https://passlib.readthedocs.io/en/stable/lib/passlib.hash.bcrypt.html#index-0
 		return MongoDBCredentialsProvider(self.App, provider_id, config_section_name)
 
 
@@ -176,7 +173,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		# Update password
 		v = update.pop("password", None)
 		if v is not None:
-			u.set("__password", bcrypt.hash(v.encode('utf-8')))
+			u.set("__password", generic.bcrypt_hash(v))
 
 		# Update basic credentials
 		for key, value in update.items():
@@ -413,7 +410,7 @@ def authn_password(dbcred, credentials):
 	if dbcred['__password'].startswith('$2b$') \
 		or dbcred['__password'].startswith('$2a$') \
 		or dbcred['__password'].startswith('$2y$'):
-		if bcrypt.verify(credentials['password'], dbcred['__password']):
+		if generic.bcrypt_verify(dbcred['__password'], credentials['password']):
 			return True
 		else:
 			return False
