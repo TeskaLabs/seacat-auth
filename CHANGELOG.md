@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha2`
 - `v24.17-alpha1`
 
 ### Fix
@@ -10,6 +11,7 @@
 - Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 
 ### Features
+- User invitations are enabled by default (#367, `v24.17-alpha2`)
 - When invitation cannot be created because the user already exists, the invitation is re-sent (#364, `v24.17-alpha1`)
 - When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
 - Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
