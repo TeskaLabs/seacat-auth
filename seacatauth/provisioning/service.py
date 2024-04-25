@@ -1,7 +1,7 @@
 import json
 import logging
 import urllib.parse
-import passlib.pwd
+import secrets
 
 import asab.exceptions
 import asab.storage.exceptions
@@ -76,7 +76,7 @@ class ProvisioningService(asab.Service):
 			self.CredentialsService.CredentialProviders.move_to_end(existing_provider)
 
 		# Create provisioning user
-		password = passlib.pwd.genword(length=16)
+		password = secrets.token_urlsafe(16)
 		self.SuperuserID = await provider.create({
 			"username": self.SuperuserName,
 			"password": password
