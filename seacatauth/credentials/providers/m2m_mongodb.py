@@ -53,6 +53,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(app, provider_id, config_section_name)
+		self.RegistrationEnabled = False
 		self.RegistrationFeatures = None
 
 	async def initialize(self):
