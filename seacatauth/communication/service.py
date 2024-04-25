@@ -118,7 +118,6 @@ class CommunicationService(asab.Service):
 				await self.build_and_send_message(
 					template_id=template_id,
 					channel=channel,
-					app_name=self.AppName,
 					email=credentials.get("email"),
 					phone=credentials.get("phone"),
 					username=credentials.get("username"),
@@ -142,7 +141,6 @@ class CommunicationService(asab.Service):
 		await self.build_and_send_message(
 			template_id="invitation",
 			channel="email",
-			app_name=self.AppName,
 			email=credentials.get("email"),
 			username=credentials.get("username"),
 			tenants=tenants,
