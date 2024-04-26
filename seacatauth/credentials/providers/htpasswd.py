@@ -146,11 +146,11 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
 
 		if filtr is None:
-			arr = self._Dict
+			arr = list(self._Dict.keys())
 		else:
 			arr = [u for u in self._Dict if filtr in u]
 
-		for username in arr[offset:None if limit == -1 else limit + offset]:
+		for username in arr[offset: None if limit == -1 else limit + offset]:
 			yield {
 				'_id': prefix + username,
 				'_type': self.Type,
