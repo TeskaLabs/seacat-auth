@@ -454,12 +454,19 @@ class RoleService(asab.Service):
 		synced_roles = []
 		async for global_role in self.iterate(tenant=None):
 			resources = set(global_role.get("resources", {}))
-			if global_only_resources := resources.intersection(self.ResourceService.GlobalOnlyResources):
-				# Roles that grant access to one or more global-only resources ("authz:superuser" etc.)
-				# will not be synced
-				L.log(asab.LOG_NOTICE, "Skipping role with access to global-only resources.", struct_data={
-					"role": global_role["_id"], "resources": global_only_resources})
+			# Skip roles with critical resources
+			if "authz:superuser" in resources:
+				L.log(asab.LOG_NOTICE, "Skipping role with access to 'authz:superuser'.", struct_data={
+					"role": global_role["_id"]})
 				continue
+			if "authz:impersonate" in resources:
+				L.log(asab.LOG_NOTICE, "Skipping role with access to 'authz:impersonate'.", struct_data={
+					"role": global_role["_id"]})
+				continue
+
+			# Remove other global-only resources
+			tenant_role_resources = resources.difference(self.ResourceService.GlobalOnlyResources)
+
 			_, role_name = global_role["_id"].split("/")
 			tenant_role_id = "{}/{}".format(tenant_id, role_name)
 			try:
@@ -471,7 +478,7 @@ class RoleService(asab.Service):
 				await self.update(
 					tenant_role_id,
 					description=global_role.get("description"),
-					resources_to_set=global_role.get("resources")
+					resources_to_set=tenant_role_resources
 				)
 			except exceptions.ResourceNotFoundError as e:
 				L.error("Role has access to an unknown resource.", struct_data={
