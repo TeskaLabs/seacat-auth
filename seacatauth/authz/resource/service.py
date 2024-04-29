@@ -5,6 +5,7 @@ import asab.storage.exceptions
 import asab
 import asab.exceptions
 
+from ... import exceptions
 from ...events import EventTypes
 
 #
@@ -83,7 +84,7 @@ class ResourceService(asab.Service):
 		},
 	}
 	GlobalOnlyResources = frozenset({
-		"authz:superuser", "authz:impersonate", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
+		"authz:superuser", "authz:impersonate", "authz:tenant:access", "seacat:credentials:edit",
 		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
 		"seacat:client:access", "seacat:client:edit", "seacat:tenant:create"})
 
@@ -170,7 +171,10 @@ class ResourceService(asab.Service):
 
 
 	async def get(self, resource_id: str):
-		data = await self.StorageService.get(self.ResourceCollection, resource_id)
+		try:
+			data = await self.StorageService.get(self.ResourceCollection, resource_id)
+		except KeyError:
+			raise exceptions.ResourceNotFoundError(resource_id)
 		if not await self.is_editable_resource(data):
 			data["editable"] = False
 		if self.is_global_only_resource(data["_id"]):
