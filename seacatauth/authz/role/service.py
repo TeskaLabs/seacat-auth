@@ -454,9 +454,11 @@ class RoleService(asab.Service):
 		synced_roles = []
 		async for global_role in self.iterate(tenant=None):
 			resources = set(global_role.get("resources", {}))
-			if resources.intersection(self.ResourceService.GlobalOnlyResources):
+			if global_only_resources := resources.intersection(self.ResourceService.GlobalOnlyResources):
 				# Roles that grant access to one or more global-only resources ("authz:superuser" etc.)
 				# will not be synced
+				L.log(asab.LOG_NOTICE, "Skipping role with access to global-only resources.", struct_data={
+					"role": global_role["_id"], "resources": global_only_resources})
 				continue
 			_, role_name = global_role["_id"].split("/")
 			tenant_role_id = "{}/{}".format(tenant_id, role_name)
