@@ -160,14 +160,19 @@ class TenantHandler(object):
 				struct_data={"cid": credentials_id, "tenant": tenant_id})
 
 		# Create role
-		role = "{}/admin".format(tenant_id)
+		role = "{}/auth-admin".format(tenant_id)
 		try:
 			# Create admin role in tenant
 			await role_service.create(role)
 			# Assign tenant management resources
-			await role_service.update(role, resources_to_set=[
-				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
-				"seacat:role:access", "seacat:role:edit", "seacat:role:assign"])
+			await role_service.update(
+				role,
+				description="Manage tenant access, create, edit and assign tenant roles.",
+				resources_to_set=[
+					"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
+					"seacat:role:access", "seacat:role:edit", "seacat:role:assign"
+				]
+			)
 		except Exception as e:
 			L.error("Error creating admin role: {}".format(e), exc_info=True, struct_data={"role": role})
 
