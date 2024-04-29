@@ -149,7 +149,7 @@ class ResourceService(asab.Service):
 			query_filter = {}
 		cursor = collection.find(query_filter)
 
-		cursor.sort("_c", -1)
+		cursor.sort("_id", 1)
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
