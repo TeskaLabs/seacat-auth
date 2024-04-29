@@ -85,6 +85,29 @@ class RoleService(asab.Service):
 		}
 
 
+	async def iterate(
+		self, tenant: str | None, page: int = 0, limit: int = None, filter: str = None, *, resource: str = None,
+	):
+		assert tenant != "*"  # Use tenant=None
+		query_filter = {"tenant": tenant}
+		if filter:
+			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
+			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
+		if resource is not None:
+			query_filter["resources"] = resource
+
+		collection = self.StorageService.Database[self.RoleCollection]
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		async for role in cursor:
+			yield role
+
+
 	async def get(self, role_id: str):
 		try:
 			result = await self.StorageService.get(self.RoleCollection, role_id)
@@ -180,19 +203,13 @@ class RoleService(asab.Service):
 		else:
 			resources_to_set = set(resources_to_set)
 			for res_id in resources_to_set:
-				try:
-					resource = await self.ResourceService.get(res_id)
-				except KeyError:
-					raise KeyError(res_id)
+				resource = await self.ResourceService.get(res_id)
 				if resource.get("deleted") is True:
-					raise KeyError(res_id)
+					raise exceptions.ResourceNotFoundError(res_id)
 
 		if resources_to_add is not None:
 			for res_id in resources_to_add:
-				try:
-					await self.ResourceService.get(res_id)
-				except KeyError:
-					raise KeyError(res_id)
+				await self.ResourceService.get(res_id)
 				resources_to_set.add(res_id)
 
 		if resources_to_remove is not None:
@@ -428,3 +445,35 @@ class RoleService(asab.Service):
 			await self.TenantService.get_tenant(tenant)
 
 		return tenant
+
+
+	async def sync_global_roles_into_tenant(self, tenant_id):
+		"""
+		Copy/sync global roles into tenant space
+		"""
+		synced_roles = []
+		async for global_role in self.iterate(tenant=None):
+			resources = set(global_role.get("resources", {}))
+			if resources.intersection(self.ResourceService.GlobalOnlyResources):
+				# Roles that grant access to one or more global-only resources ("authz:superuser" etc.)
+				# will not be synced
+				continue
+			_, role_name = global_role["_id"].split("/")
+			tenant_role_id = "{}/{}".format(tenant_id, role_name)
+			try:
+				await self.create(tenant_role_id)
+			except asab.exceptions.Conflict:
+				# Role already exists
+				pass
+			try:
+				await self.update(
+					tenant_role_id,
+					description=global_role.get("description"),
+					resources_to_set=global_role.get("resources")
+				)
+			except exceptions.ResourceNotFoundError as e:
+				L.error("Role has access to an unknown resource.", struct_data={
+					"role": global_role["_id"], "resource": e.ResourceId})
+			synced_roles.append(tenant_role_id)
+
+		return synced_roles

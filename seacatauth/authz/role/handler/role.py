@@ -33,6 +33,7 @@ class RoleHandler(object):
 		web_app.router.add_post("/role/{tenant}/{role_name}", self.create)
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
+		web_app.router.add_put("/sync-roles/{tenant}", self.sync_global_roles_into_tenant)
 
 
 	@access_control("authz:superuser")
@@ -206,3 +207,12 @@ class RoleHandler(object):
 			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": e.Role})
 			return aiohttp.web.HTTPNotFound()
 		return asab.web.rest.json_response(request, data={"result": result})
+
+
+	@access_control("seacat:role:edit")
+	async def sync_global_roles_into_tenant(self, request, *, tenant):
+		"""
+		Copy/sync global roles into tenant space
+		"""
+		synced_roles = await self.RoleService.sync_global_roles_into_tenant(tenant)
+		return asab.web.rest.json_response(request, data={"result": "OK", "roles": synced_roles})
