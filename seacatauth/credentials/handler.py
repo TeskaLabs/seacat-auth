@@ -361,6 +361,19 @@ class CredentialsHandler(object):
 		"""
 		credentials_id = request.match_info["credentials_id"]
 
+		if not request.Session.is_superuser():
+			# Verify that the target user is a member of the request's currently authorized tenant
+			for tenant_id in request.Session.Authorization.Authz.keys():
+				if tenant_id == "*":
+					continue
+				if await self.TenantService.has_tenant_assigned(credentials_id, tenant_id):
+					# User is member of currently authorized tenant
+					break
+			else:
+				# The request and the target credentials have no tenant in common
+				L.error("Denied request to edit credentials from unauthorized tenant.", struct_data={
+					"cid": credentials_id})
+
 		# Update credentials
 		result = await self.CredentialsService.update_credentials(credentials_id, json_data, request.Session)
 
@@ -426,7 +439,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	@access_control("seacat:credentials:edit")
+	@access_control("authz:superuser")
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials
