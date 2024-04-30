@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha4`
 - `v24.17-alpha3`
 - `v24.17-alpha2`
 - `v24.17-beta1`
@@ -19,6 +20,10 @@
 - When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
 - Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
 - List credentials from authorized tenant only (#348, `v24.06-alpha13`)
+
+### Refactoring
+- Deprecate passlib (#368, `v24.17-alpha4`)
+- Utility functions for password verification (#368, `v24.17-alpha4`)
 
 ---
 
