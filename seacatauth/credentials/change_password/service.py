@@ -219,11 +219,11 @@ class ChangePasswordService(asab.Service):
 
 		if len(re.findall(r"[a-z]", password)) < self.PasswordMinLowerCount:
 			raise exceptions.WeakPasswordError(
-				"Password must contain at least {} uppercase letters.".format(self.PasswordMinLowerCount))
+				"Password must contain at least {} lowercase letters.".format(self.PasswordMinLowerCount))
 
 		if len(re.findall(r"[A-Z]", password)) < self.PasswordMinUpperCount:
 			raise exceptions.WeakPasswordError(
-				"Password must contain at least {} lowercase letters.".format(self.PasswordMinUpperCount))
+				"Password must contain at least {} uppercase letters.".format(self.PasswordMinUpperCount))
 
 		if len(re.findall(r"[0-9]", password)) < self.PasswordMinDigitCount:
 			raise exceptions.WeakPasswordError(
