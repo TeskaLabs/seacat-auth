@@ -84,7 +84,7 @@ class ResourceService(asab.Service):
 		},
 	}
 	GlobalOnlyResources = frozenset({
-		"authz:superuser", "authz:impersonate", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
+		"authz:superuser", "authz:impersonate", "authz:tenant:access",
 		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
 		"seacat:client:access", "seacat:client:edit", "seacat:tenant:create"})
 
