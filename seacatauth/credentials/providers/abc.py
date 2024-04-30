@@ -45,10 +45,10 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 
 	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> str:
-		'''
+		"""
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
 		Return credentials_id or return None if not found.
-		'''
+		"""
 		return None
 
 	async def get_by(self, key: str, value) -> Optional[dict]:
@@ -58,9 +58,9 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 		return None
 
 	async def get_login_descriptors(self, credentials_id) -> list:
-		'''
+		"""
 		Create a descriptor for the allowed login configurations
-		'''
+		"""
 		return []
 
 
@@ -71,12 +71,12 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 	@abc.abstractmethod
 	async def count(self, filtr: str = None) -> int:
-		'''
+		"""
 		Non-authoritative count of the credentials managed by the provider.
 		It is used for indicative information on the UI.
 
 		Should return None if unable to count credentials managed.
-		'''
+		"""
 		return None
 
 
@@ -93,17 +93,14 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 		return False
 
 
-	def _verify_password(self, hash: str, password: str):
+	def _verify_password(self, hash: str, password: str) -> bool:
+		"""
+		Check if the password matches the hash.
+		"""
 		if hash.startswith("$2b$") or hash.startswith("$2a$") or hash.startswith("$2y$"):
-			if generic.bcrypt_verify(hash, password):
-				return True
-			else:
-				return False
-		if hash.startswith("$argon2id$"):
-			if generic.argon2_verify(hash, password):
-				return True
-			else:
-				return False
+			return generic.bcrypt_verify(hash, password)
+		elif hash.startswith("$argon2id$"):
+			return generic.argon2_verify(hash, password)
 		else:
 			L.warning("Unknown password hash function: {}".format(hash[:4]))
 			return False
