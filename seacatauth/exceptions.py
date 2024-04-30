@@ -1,5 +1,7 @@
 import typing
 
+import asab.exceptions
+
 
 class SeacatAuthError(Exception):
 	"""
@@ -96,6 +98,14 @@ class CredentialsSuspendedError(SeacatAuthError):
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials {!r} suspended".format(self.CredentialsId), *args)
+
+
+class WeakPasswordError(SeacatAuthError, asab.exceptions.ValidationError):
+	"""
+	Password does not comply with configured policies
+	"""
+	def __init__(self, message, *args):
+		super().__init__(message, *args)
 
 
 class UnauthorizedTenantAccessError(AccessDeniedError):
