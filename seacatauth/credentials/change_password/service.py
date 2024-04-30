@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import datetime
+import re
 
 import asab
 
@@ -25,6 +26,12 @@ class ChangePasswordService(asab.Service):
 
 	def __init__(self, app, cred_service, service_name="seacatauth.ChangePasswordService"):
 		super().__init__(app, service_name)
+
+		self.PasswordMinLength = asab.Config.getint("seacatauth:password", "min_length")
+		self.PasswordMinLowerCount = asab.Config.getint("seacatauth:password", "min_lowercase_count")
+		self.PasswordMinUpperCount = asab.Config.getint("seacatauth:password", "min_uppercase_count")
+		self.PasswordMinDigitCount = asab.Config.getint("seacatauth:password", "min_digit_count")
+		self.PasswordMinSpecialCount = asab.Config.getint("seacatauth:password", "min_special_count")
 
 		self.CredentialsService = cred_service
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
@@ -174,6 +181,8 @@ class ChangePasswordService(asab.Service):
 		if credentials.get("suspended") is True:
 			raise exceptions.CredentialsSuspendedError(credentials_id)
 
+		self.verify_password_strength(new_password)
+
 		# Remove "password" from enforced factors
 		enforce_factors = set(credentials.get("enforce_factors", []))
 		if "password" in enforce_factors:
@@ -188,3 +197,25 @@ class ChangePasswordService(asab.Service):
 
 	async def _token_id_from_token_string(self, password_reset_token):
 		return hashlib.sha256(password_reset_token.encode("ascii")).digest()
+
+
+	def verify_password_strength(self, password: str):
+		if len(password) < self.PasswordMinLength:
+			raise exceptions.WeakPasswordError(
+				"Password must be {} or more characters long.".format(self.PasswordMinLength))
+
+		if len(re.findall(r"[a-z]", password)) < self.PasswordMinLowerCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} uppercase letters.".format(self.PasswordMinLowerCount))
+
+		if len(re.findall(r"[A-Z]", password)) < self.PasswordMinUpperCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} lowercase letters.".format(self.PasswordMinUpperCount))
+
+		if len(re.findall(r"[0-9]", password)) < self.PasswordMinDigitCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} digits.".format(self.PasswordMinDigitCount))
+
+		if len(re.findall(r"[^a-zA-Z0-9]", password)) < self.PasswordMinSpecialCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} special characters.".format(self.PasswordMinSpecialCount))
