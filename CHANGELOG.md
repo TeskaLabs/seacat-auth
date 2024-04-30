@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha5`
 - `v24.17-alpha4`
 - `v24.17-alpha3`
 - `v24.17-alpha2`
@@ -23,6 +24,7 @@
 - List credentials from authorized tenant only (#348, `v24.06-alpha13`)
 
 ### Refactoring
+- Consistent use of item-specific not-found exceptions (#371, `v24.17-alpha5`)
 - Deprecate passlib (#368, `v24.17-alpha4`)
 - Utility functions for password verification (#368, `v24.17-alpha4`)
 
