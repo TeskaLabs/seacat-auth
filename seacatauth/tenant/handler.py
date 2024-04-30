@@ -64,9 +64,9 @@ class TenantHandler(object):
 	async def search(self, request):
 		"""
 		Search tenants.
-		Results include only the tenants that are authorized in the current session with
-		`seacat:tenant:access` resource. To search all tenants, access to `authz:superuser` or `authz:tenant:access`
-		is required.
+
+		Results include only the tenants that are authorized in the current session.
+		To search all tenants, access to `authz:superuser` or `authz:tenant:access` is required.
 
 		---
 		parameters:
@@ -250,27 +250,37 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("seacat:tenant:access")
 	async def get_tenants_by_credentials(self, request):
 		"""
-		Get list of authorized tenants for requested credentials
+		Get list of tenants memberships of the requested credentials
 		"""
-		result = await self.TenantService.get_tenants(request.match_info["credentials_id"])
+		tenants = set(await self.TenantService.get_tenants(request.match_info["credentials_id"]))
+		if not request.can_access_all_tenants:
+			my_tenants = await self.TenantService.get_tenants(request.Session.Credentials.Id)
+			tenants.intersection_update(my_tenants)
+
 		return asab.web.rest.json_response(
-			request, result
+			request, list(tenants)
 		)
 
 
 	@asab.web.rest.json_schema_handler(schemas.GET_TENANTS_BATCH)
-	@access_control("seacat:tenant:access")
 	async def get_tenants_batch(self, request, *, json_data):
 		"""
-		Get list of authorized tenants for each listed credential ID
+		Get list of tenant memberships for each listed credential ID
 		"""
-		response = {
-			cid: await self.TenantService.get_tenants(cid)
-			for cid in json_data
-		}
+		if not request.can_access_all_tenants:
+			my_tenants = await self.TenantService.get_tenants(request.Session.Credentials.Id)
+		else:
+			my_tenants = True  # All tenants
+
+		response = {}
+		for cid in json_data:
+			tenants = set(await self.TenantService.get_tenants(cid))
+			if not request.can_access_all_tenants:
+				tenants.intersection_update(my_tenants)
+			response[cid] = list(tenants)
+
 		return asab.web.rest.json_response(request, response)
 
 

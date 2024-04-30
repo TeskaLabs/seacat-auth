@@ -4,8 +4,9 @@ import re
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.exceptions
 
-from seacatauth.decorators import access_control
+from ...decorators import access_control
 
 #
 
@@ -34,7 +35,6 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 
-	@access_control("seacat:resource:access")
 	async def list(self, request):
 		"""
 		List resources
@@ -75,8 +75,9 @@ class ResourceHandler(object):
 
 		# Filter by ID.startswith()
 		query_filter = {}
-		if "f" in request.query:
-			query_filter["_id"] = {"$regex": "^{}".format(re.escape(request.query["f"]))}
+		name_filter = request.query.get("f")
+		if name_filter:
+			query_filter["_id"] = {"$regex": re.escape(name_filter)}
 
 		# Get the types of resources to exclude from the results
 		# By default, exclude only deleted resources
@@ -104,7 +105,6 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, resources)
 
 
-	@access_control("seacat:resource:access")
 	async def get(self, request):
 		"""
 		Get resource detail

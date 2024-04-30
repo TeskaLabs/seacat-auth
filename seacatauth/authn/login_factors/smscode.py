@@ -14,6 +14,10 @@ class SMSCodeFactor(LoginFactorABC):
 	Type = "smscode"
 
 	async def is_eligible(self, login_data) -> bool:
+		if not self.AuthenticationService.CommunicationService.is_enabled("sms"):
+			# SMS provider is not configured
+			return False
+
 		cred_svc = self.AuthenticationService.CredentialsService
 		cred_id = login_data["credentials_id"]
 		if cred_id == "":
@@ -52,9 +56,10 @@ class SMSCodeFactor(LoginFactorABC):
 
 		# Send SMS
 		comm_svc = self.AuthenticationService.CommunicationService
-		success = await comm_svc.sms_login(phone=phone, otp=token)
-		if not success:
-			L.error("Unable to send SMS login code.", struct_data={
+		try:
+			await comm_svc.sms_login(credentials=credentials, otp=token)
+		except Exception as e:
+			L.error("Unable to send SMS login code: {}".format(e), struct_data={
 				"cid": login_session.SeacatLogin.CredentialsId,
 				"lsid": login_session.Id,
 				"phone": phone,
