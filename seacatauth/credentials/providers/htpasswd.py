@@ -35,9 +35,9 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		self._Path = self.Config["path"]
 		self._Dict = {}
 		self._MTime = 0
-		self._refresh_credentials()
+		self._refresh()
 
-	def _refresh_credentials(self):
+	def _refresh(self):
 		if self._Dict and self._MTime == os.path.getmtime(self._Path):
 			# Reload not needed
 			return
@@ -53,7 +53,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		"""
 		Locate search for the exact match of provided ident and the username in the htpasswd file
 		"""
-		self._refresh_credentials()
+		self._refresh()
 		if ident not in self._Dict:
 			return None
 		return "{}:{}:{}".format(self.Type, self.ProviderID, ident)
@@ -78,7 +78,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		if not credentials_id.startswith(prefix):
 			raise KeyError("Credentials '{}' not found".format(credentials_id))
 
-		self._refresh_credentials()
+		self._refresh()
 
 		username = credentials_id[len(prefix):]
 		if username not in self._Dict:
@@ -103,7 +103,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 
 		password = credentials.get('password', '')
 
-		self._refresh_credentials()
+		self._refresh()
 		password_hash = self._Dict.get(username)
 		if not password_hash:
 			return False
@@ -115,6 +115,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 
 
 	async def count(self, filtr=None) -> int:
+		self._refresh()
 		if filtr is None:
 			return len(self._Dict)
 
@@ -128,7 +129,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 
 
 	async def search(self, filter: dict = None, **kwargs) -> list:
-		# TODO: Implement filtering and pagination
+		self._refresh()
 		if filter is not None:
 			return []
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
@@ -143,6 +144,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
+		self._refresh()
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
 
 		if filtr is None:
