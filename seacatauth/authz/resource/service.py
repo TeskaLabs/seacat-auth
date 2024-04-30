@@ -6,6 +6,7 @@ import asab
 import asab.exceptions
 
 from ...events import EventTypes
+from ... import exceptions
 
 #
 
@@ -170,7 +171,10 @@ class ResourceService(asab.Service):
 
 
 	async def get(self, resource_id: str):
-		data = await self.StorageService.get(self.ResourceCollection, resource_id)
+		try:
+			data = await self.StorageService.get(self.ResourceCollection, resource_id)
+		except KeyError:
+			raise exceptions.ResourceNotFoundError(resource_id)
 		if not await self.is_editable_resource(data):
 			data["editable"] = False
 		if self.is_global_only_resource(data["_id"]):
