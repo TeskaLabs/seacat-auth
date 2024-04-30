@@ -29,7 +29,7 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_name": "provisioning-superuser",
 	"credentials_provider_id": "provisioning",
 	"role_name": "superuser",
-	"tenant": "provisioning-tenant",
+	"tenant": "provisioningtenant",
 	"admin_ui_url": "",
 	"admin_ui_client_id": "asab-webui-auth",
 	"admin_ui_client_name": "ASAB WebUI",
