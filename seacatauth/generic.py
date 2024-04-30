@@ -5,6 +5,8 @@ import typing
 import urllib.parse
 import aiohttp.web
 import asab
+import bcrypt
+import argon2
 
 from .session import SessionAdapter
 
@@ -276,6 +278,28 @@ def get_request_access_ips(request) -> list:
 	if ff is not None:
 		access_ips.extend(ff.split(", "))
 	return access_ips
+
+
+def bcrypt_hash(secret: bytes | str) -> str:
+	if isinstance(secret, str):
+		secret = secret.encode("utf-8")
+	return bcrypt.hashpw(secret, bcrypt.gensalt()).decode("utf-8")
+
+
+def bcrypt_verify(hash: bytes | str, secret: bytes | str) -> bool:
+	if isinstance(hash, str):
+		hash = hash.encode("utf-8")
+	if isinstance(secret, str):
+		secret = secret.encode("utf-8")
+	return bcrypt.checkpw(secret, hash)
+
+
+def argon2_hash(secret: bytes | str) -> str:
+	return argon2.PasswordHasher().hash(secret)
+
+
+def argon2_verify(hash: bytes | str, secret: bytes | str) -> bool:
+	return argon2.PasswordHasher().verify(hash, secret)
 
 
 def generate_ergonomic_token(length: int):

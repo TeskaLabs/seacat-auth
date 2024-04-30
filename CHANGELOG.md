@@ -3,12 +3,14 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha4`
 - `v24.17-alpha3`
 - `v24.17-alpha2`
 - `v24.17-beta1`
 - `v24.17-alpha1`
 
 ### Fix
+- Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
 - Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
 - Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 
@@ -19,6 +21,10 @@
 - When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
 - Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
 - List credentials from authorized tenant only (#348, `v24.06-alpha13`)
+
+### Refactoring
+- Deprecate passlib (#368, `v24.17-alpha4`)
+- Utility functions for password verification (#368, `v24.17-alpha4`)
 
 ---
 

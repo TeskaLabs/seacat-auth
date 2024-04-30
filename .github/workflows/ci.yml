@@ -57,8 +57,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install bson
         pip install pymongo
+        pip install bcrypt
+        pip install argon2
         pip install jwcrypto
-        pip install passlib
         pip install git+https://github.com/TeskaLabs/asab.git#egg=asab[encryption]
     
     - name: Test with unittest
