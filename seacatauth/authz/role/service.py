@@ -335,10 +335,7 @@ class RoleService(asab.Service):
 
 		tenant, _ = role_id.split("/", 1)
 		if verify_tenant and tenant != "*":
-			try:
-				await self.TenantService.get_tenant(tenant)
-			except KeyError:
-				raise exceptions.TenantNotFoundError(tenant)
+			await self.TenantService.get_tenant(tenant)
 
 		if verify_credentials:
 			try:
