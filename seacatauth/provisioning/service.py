@@ -1,7 +1,7 @@
 import json
 import logging
 import urllib.parse
-import passlib.pwd
+import secrets
 
 import asab.exceptions
 import asab.storage.exceptions
@@ -29,7 +29,7 @@ _PROVISIONING_CONFIG_DEFAULTS = {
 	"credentials_name": "provisioning-superuser",
 	"credentials_provider_id": "provisioning",
 	"role_name": "superuser",
-	"tenant": "provisioning-tenant",
+	"tenant": "provisioningtenant",
 	"admin_ui_url": "",
 	"admin_ui_client_id": "asab-webui-auth",
 	"admin_ui_client_name": "ASAB WebUI",
@@ -76,7 +76,7 @@ class ProvisioningService(asab.Service):
 			self.CredentialsService.CredentialProviders.move_to_end(existing_provider)
 
 		# Create provisioning user
-		password = passlib.pwd.genword(length=16)
+		password = secrets.token_urlsafe(16)
 		self.SuperuserID = await provider.create({
 			"username": self.SuperuserName,
 			"password": password
