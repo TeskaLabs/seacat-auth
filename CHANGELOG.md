@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha3`
 - `v24.17-alpha2`
 - `v24.17-beta1`
 - `v24.17-alpha1`
@@ -12,6 +13,7 @@
 - Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 
 ### Features
+- Improve resource sorting and filtering (#370, `v24.17-alpha3`)
 - User invitations are enabled by default (#367, `v24.17-alpha2`)
 - When invitation cannot be created because the user already exists, the invitation is re-sent (#364, `v24.17-alpha1`)
 - When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
