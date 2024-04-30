@@ -109,6 +109,19 @@ class ChangePasswordService(asab.Service):
 		return await self._create_password_reset_token(credentials_id=credentials["_id"], expiration=expiration)
 
 
+	async def password_policy(self) -> dict:
+		"""
+		Password validation requirements
+		"""
+		return {
+			"min_length": self.PasswordMinLength,
+			"min_lowercase_count": self.PasswordMinLowerCount,
+			"min_uppercase_count": self.PasswordMinUpperCount,
+			"min_digit_count": self.PasswordMinDigitCount,
+			"min_special_count": self.PasswordMinSpecialCount,
+		}
+
+
 	async def init_password_reset_by_admin(
 		self,
 		credentials: dict,

@@ -31,11 +31,14 @@ class ChangePasswordHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_put("/password", self.admin_request_password_reset)
+		web_app.router.add_get("/account/password/policy", self.password_policy)
 		web_app.router.add_put("/account/password-change", self.change_password)
+		web_app.router.add_get("/public/password/policy", self.password_policy)
 		web_app.router.add_put("/public/password-reset", self.reset_password)
 		web_app.router.add_put("/public/lost-password", self.lost_password)
 
 		web_app_public = app.PublicWebContainer.WebApp
+		web_app_public.router.add_get("/public/password/policy", self.password_policy)
 		web_app_public.router.add_put("/public/password-reset", self.reset_password)
 		web_app_public.router.add_put("/public/lost-password", self.lost_password)
 
@@ -44,6 +47,14 @@ class ChangePasswordHandler(object):
 		web_app.router.add_put("/public/password-change", self.change_password)
 		web_app_public.router.add_put("/public/password-change", self.change_password)
 		# <<<
+
+
+	async def password_policy(self, request):
+		"""
+		Get minimum password requirements
+		"""
+		response_data = await self.ChangePasswordService.password_policy()
+		return asab.web.rest.json_response(request, response_data)
 
 
 	@asab.web.rest.json_schema_handler({
