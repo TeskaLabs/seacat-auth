@@ -4,6 +4,8 @@ import base64
 import datetime
 import typing
 
+from ..authz.rbac.service import RBACService
+
 #
 
 L = logging.getLogger(__name__)
@@ -277,11 +279,59 @@ class SessionAdapter:
 		session_dict = self.serialize()
 		return rest_get(session_dict)
 
-	def is_algorithmic(self):
+	def is_algorithmic(self) -> bool:
+		"""
+		Is the session algorithmic (i.e. not stored in the database)?
+		"""
 		return self.SessionId == self.ALGORITHMIC_SESSION_ID
 
-	def is_anonymous(self):
+	def is_anonymous(self) -> bool:
+		"""
+		Is this session anonymous (guest session, without authentication)?
+		"""
 		return self.Authentication is not None and bool(self.Authentication.IsAnonymous)
+
+	def is_superuser(self) -> bool:
+		"""
+		Does this session have superuser authorization?
+		"""
+		return (
+			self.Authorization is not None
+			and self.Authorization.Authz is not None
+			and RBACService.is_superuser(self.Authorization.Authz)
+		)
+
+	def has_tenant_access(self, tenant_id: str) -> bool:
+		"""
+		Is this session authorized to access the tenant?
+		"""
+		assert tenant_id != "*"
+		return (
+			self.Authorization is not None
+			and self.Authorization.Authz is not None
+			and tenant_id in self.Authorization.Authz
+		)
+
+	def has_resource_access(self, tenant_id: str, resource_id: str) -> bool:
+		"""
+		Is this session authorized to access the resource under the tenant?
+		"""
+		assert tenant_id != "*"
+		return (
+			self.Authorization is not None
+			and self.Authorization.Authz is not None
+			and RBACService.has_resource_access(self.Authorization.Authz, tenant_id, {resource_id})
+		)
+
+	def has_global_resource_access(self, resource_id: str) -> bool:
+		"""
+		Is this session authorized to access the resource globally?
+		"""
+		return (
+			self.Authorization is not None
+			and self.Authorization.Authz is not None
+			and RBACService.has_resource_access(self.Authorization.Authz, None, {resource_id})
+		)
 
 	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
 		# Decrypt sensitive fields

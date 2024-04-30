@@ -30,7 +30,7 @@ class ChangePasswordHandler(object):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/password", self.admin_request_password_change)
+		web_app.router.add_put("/password", self.admin_request_password_reset)
 		web_app.router.add_put("/account/password-change", self.change_password)
 		web_app.router.add_put("/public/password-reset", self.reset_password)
 		web_app.router.add_put("/public/lost-password", self.lost_password)
@@ -177,14 +177,21 @@ class ChangePasswordHandler(object):
 		}
 	})
 	@access_control("seacat:credentials:edit")
-	async def admin_request_password_change(self, request, *, json_data):
+	async def admin_request_password_reset(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
 		"""
 		credentials_id = json_data.get("credentials_id")
 		try:
-			await self.ChangePasswordService.init_password_change(
-				credentials_id,
+			credentials = await self.CredentialsService.get(credentials_id)
+		except exceptions.CredentialsNotFoundError:
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found.", struct_data={
+				"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+
+		try:
+			reset_url = await self.ChangePasswordService.init_password_reset_by_admin(
+				credentials,
 				expiration=json_data.get("expiration")
 			)
 		except exceptions.CredentialsNotFoundError:
@@ -195,12 +202,18 @@ class ChangePasswordHandler(object):
 			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
-		except exceptions.CommunicationError:
-			# TODO: If no communication provider is configured, return the link in the response
-			L.error("Failed to send password change link", struct_data={"cid": credentials_id})
+		except exceptions.MessageDeliveryError as e:
+			L.error("Failed to send password change link: {}".format(e), struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
-		return asab.web.rest.json_response(request, {"result": "OK"})
+		response_data = {"result": "OK"}
+		if reset_url:
+			# Password reset URL was not sent because CommunicationService is disabled
+			# Add the URL to admin response
+			response_data["reset_url"] = reset_url
+
+		return asab.web.rest.json_response(request, response_data)
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -227,18 +240,24 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, {"result": "OK"})
 
 		try:
-			await self.ChangePasswordService.init_password_change(credentials_id)
-			AuditLogger.log(asab.LOG_NOTICE, "Lost password reset initiated", struct_data={
-				"cid": credentials_id, "from": access_ips})
+			credentials = await self.CredentialsService.get(credentials_id)
 		except exceptions.CredentialsNotFoundError:
 			L.error("Lost password reset denied: Credentials not found", struct_data={
 				"cid": credentials_id, "from": access_ips})
+			# Avoid information disclosure
+			return asab.web.rest.json_response(request, {"result": "OK"})
+
+		try:
+			await self.ChangePasswordService.init_lost_password_reset(credentials)
 		except exceptions.CredentialsSuspendedError:
 			L.error("Lost password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id, "from": access_ips})
-		except exceptions.CommunicationError:
-			L.error("Lost password reset failed: Failed to send password change link", struct_data={
-				"cid": credentials_id, "from": access_ips})
-		finally:
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})
+		except exceptions.MessageDeliveryError as e:
+			L.error("Lost password reset failed: Failed to send password change link ({})".format(e), struct_data={
+				"cid": credentials_id, "from": access_ips})
+			# Avoid information disclosure
+			return asab.web.rest.json_response(request, {"result": "OK"})
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
