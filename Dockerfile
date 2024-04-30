@@ -35,7 +35,6 @@ RUN apk add --no-cache  \
     cryptography \
     jwcrypto>=0.9.1 \
     fastjsonschema \
-    passlib \
     bcrypt \
     argon2_cffi \
     python-ldap \

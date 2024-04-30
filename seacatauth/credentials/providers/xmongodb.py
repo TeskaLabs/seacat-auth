@@ -4,7 +4,6 @@ from typing import Optional
 
 import asab
 import bson
-import passlib.hash
 import motor
 import motor.motor_asyncio
 import typing
@@ -160,20 +159,28 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		try:
 			dbcred = await self.get(credentials_id, include=[self.PasswordField])
 		except KeyError:
-			L.error("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: Credentials not found.", struct_data={"cid": credentials_id})
 			return False
 
 		if dbcred.get("suspended") is True:
-			L.info("Authentication failed: Credentials suspended", struct_data={"cid": credentials_id})
+			L.info("Authentication failed: Credentials suspended.", struct_data={"cid": credentials_id})
 			return False
 
-		if self.PasswordField not in dbcred:
-			L.error("Authentication failed: Login data contain no password", struct_data={"cid": credentials_id})
+		password = credentials.get("password")
+		if not password:
+			L.error("Authentication failed: Login data contain no password.", struct_data={"cid": credentials_id})
 			return False
 
-		if not self._authenticate_password(dbcred, credentials):
+		password_hash = dbcred.get(self.PasswordField)
+		if not password_hash:
+			# Should not occur if login prologue happened correctly
+			L.error("Authentication failed: User has no password set.", struct_data={"cid": credentials_id})
+			return False
+
+		if self._verify_password(password_hash, password):
+			return True
+		else:
 			L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
-			return False
 
 		return True
 
@@ -208,18 +215,3 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 					normalized[field] = db_obj[field]
 
 		return normalized
-
-
-	def _authenticate_password(self, dbcred, credentials):
-		# This is here for cryptoagility: if we migrate to a newer password hashing function,
-		# this if block will be extended
-		if dbcred[self.PasswordField].startswith("$2b$") \
-			or dbcred[self.PasswordField].startswith("$2a$") \
-			or dbcred[self.PasswordField].startswith("$2y$"):
-			if passlib.hash.bcrypt.verify(credentials["password"], dbcred[self.PasswordField]):
-				return True
-			else:
-				return False
-		else:
-			L.warning("Unknown password hash function: {}".format(dbcred[self.PasswordField][:4]))
-			return False
