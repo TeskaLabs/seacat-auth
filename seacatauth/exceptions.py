@@ -72,6 +72,15 @@ class RoleNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Role {!r} not found".format(self.Role), *args)
 
 
+class ResourceNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Resource not found
+	"""
+	def __init__(self, resource_id, *args):
+		self.ResourceId = resource_id
+		super().__init__("Resource {!r} not found".format(self.ResourceId), *args)
+
+
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Credentials not found

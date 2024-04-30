@@ -512,6 +512,7 @@ class CredentialsService(asab.Service):
 			"credentials_id": credentials_id,
 		}
 
+
 	# TODO: Implement editing for M2M credentials
 	async def update_credentials(self, credentials_id: str, update_dict: dict, session: SessionAdapter = None):
 		"""
@@ -525,6 +526,10 @@ class CredentialsService(asab.Service):
 		"""
 		# Record the requester's ID for logging purposes
 		agent_cid = session.Credentials.Id if session is not None else None
+
+		# Credentials outside the current tenant are invisible (except if superuser)
+		if not await self.can_access_credentials(session, credentials_id):
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		# Disallow sensitive field updates
 		for key in update_dict:
@@ -722,3 +727,21 @@ class CredentialsService(asab.Service):
 			]
 
 		return info
+
+
+	async def can_access_credentials(self, session, credentials_id: str) -> bool:
+		"""
+		Check if the target user is a member of currently authorized tenant
+		"""
+		if not session:
+			return False
+		if session.is_superuser():
+			return True
+		for tenant_id in session.Authorization.Authz.keys():
+			if tenant_id == "*":
+				continue
+			if await self.TenantService.has_tenant_assigned(credentials_id, tenant_id):
+				# User is member of currently authorized tenant
+				return True
+		# The request and the target credentials have no tenant in common
+		return False

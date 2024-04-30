@@ -62,7 +62,10 @@ class TenantService(asab.Service):
 
 
 	async def get_tenant(self, tenant_id: str):
-		return await self.TenantsProvider.get(tenant_id)
+		try:
+			return await self.TenantsProvider.get(tenant_id)
+		except KeyError:
+			raise exceptions.TenantNotFoundError(tenant_id)
 
 
 	async def create_tenant(
@@ -241,10 +244,7 @@ class TenantService(asab.Service):
 		assert tenant != "*"
 
 		if verify_tenant:
-			try:
-				await self.get_tenant(tenant)
-			except KeyError:
-				raise exceptions.TenantNotFoundError(tenant)
+			await self.get_tenant(tenant)
 
 		if verify_credentials:
 			credential_service = self.App.get_service("seacatauth.CredentialsService")
@@ -317,11 +317,8 @@ class TenantService(asab.Service):
 			elif tenant in user_tenants:
 				tenants.add(tenant)
 			elif has_access_to_all_tenants:
-				try:
-					await self.get_tenant(tenant)
-					tenants.add(tenant)
-				except KeyError:
-					raise exceptions.TenantNotFoundError(tenant)
+				await self.get_tenant(tenant)
+				tenants.add(tenant)
 			else:
 				raise exceptions.TenantAccessDeniedError(tenant, credential_id)
 
