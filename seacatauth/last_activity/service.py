@@ -30,7 +30,6 @@ class LastActivityService(asab.Service):
 
 
 	async def update_last_activity(self, event_code: EventCode, credentials_id: str, **kwargs):
-		print(event_code, kwargs)
 		assert isinstance(credentials_id, str)
 		kwargs["_c"] = datetime.datetime.now(datetime.timezone.utc)
 
