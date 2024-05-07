@@ -283,7 +283,6 @@ class AuthorizeHandler(object):
 		Authentication Code Flow
 		"""
 		scope = scope.split(" ")
-		print(scope)
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
