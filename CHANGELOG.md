@@ -12,7 +12,7 @@
 - `v24.17-alpha1`
 
 ### Fix
--Authorize into last active tenant (#373, `v24.17-alpha6`)
+- Authorize into last active tenant (#373, `v24.17-alpha6`)
 - Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
 - Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
 - Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
