@@ -86,8 +86,8 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id, "from_ip": from_ip})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
-			return asab.web.rest.json_response(request, status=400, data={
-				"result": "FAILED",
+			return asab.web.rest.json_response(request, status=401, data={
+				"result": "UNAUTHORIZED",
 				"tech_message": "Authentication failed.",
 			})
 
