@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha7`
 - `v24.17-alpha6`
 - `v24.17-alpha5`
 - `v24.17-alpha4`
@@ -12,6 +13,7 @@
 - `v24.17-alpha1`
 
 ### Fix
+- Deny password change when old password verification fails (#374, `v24.17-alpha7`)
 - Authorize into last active tenant (#373, `v24.17-alpha6`)
 - Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
 - Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
