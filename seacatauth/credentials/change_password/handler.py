@@ -91,6 +91,18 @@ class ChangePasswordHandler(object):
 				"tech_message": "Authentication failed.",
 			})
 
+		# Verify that the new password is different from the old one
+		# TODO: Users should not reuse their last 10 passwords at least
+		if new_password == old_password:
+			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: Reusing old passwords is not allowed.", struct_data={
+				"cid": credentials_id, "from_ip": from_ip})
+			await self.LastActivityService.update_last_activity(
+				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "FAILED",
+				"tech_message": "Reusing old passwords is not allowed.",
+			})
+
 		# Change the password
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
