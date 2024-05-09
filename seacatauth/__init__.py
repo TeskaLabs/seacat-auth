@@ -186,7 +186,8 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:password": {
-		# Minimum password requirements
+		# Password requirements
+		"max_length": 64,
 		"min_length": 10,
 		"min_lowercase_count": 1,
 		"min_uppercase_count": 1,

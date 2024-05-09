@@ -4,6 +4,7 @@ import datetime
 import re
 
 import asab
+import asab.exceptions
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
@@ -27,6 +28,7 @@ class ChangePasswordService(asab.Service):
 	def __init__(self, app, cred_service, service_name="seacatauth.ChangePasswordService"):
 		super().__init__(app, service_name)
 
+		self.PasswordMaxLength = asab.Config.getint("seacatauth:password", "max_length")
 		self.PasswordMinLength = asab.Config.getint("seacatauth:password", "min_length")
 		self.PasswordMinLowerCount = asab.Config.getint("seacatauth:password", "min_lowercase_count")
 		self.PasswordMinUpperCount = asab.Config.getint("seacatauth:password", "min_uppercase_count")
@@ -213,6 +215,10 @@ class ChangePasswordService(asab.Service):
 
 
 	def verify_password_strength(self, password: str):
+		if len(password) > self.PasswordMaxLength:
+			raise asab.exceptions.ValidationError(
+				"Password cannot be longer than {} characters.".format(self.PasswordMaxLength))
+
 		if len(password) < self.PasswordMinLength:
 			raise exceptions.WeakPasswordError(
 				"Password must be {} or more characters long.".format(self.PasswordMinLength))
