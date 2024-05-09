@@ -70,6 +70,7 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id, "from_ip": from_ip})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 
 		# Change the password
 		try:
