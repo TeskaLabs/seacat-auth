@@ -3,6 +3,7 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha9`
 - `v24.17-alpha8`
 - `v24.17-alpha7`
 - `v24.17-alpha6`
@@ -14,6 +15,7 @@
 - `v24.17-alpha1`
 
 ### Fix
+- Fix AttributeError in failed login (#376, `v24.17-alpha9`)
 - Deny password change when old password verification fails (#374, `v24.17-alpha7`)
 - Authorize into last active tenant (#373, `v24.17-alpha6`)
 - Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
