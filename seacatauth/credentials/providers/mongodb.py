@@ -173,7 +173,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		# Update password
 		v = update.pop("password", None)
 		if v is not None:
-			u.set("__password", generic.bcrypt_hash(v))
+			u.set("__password", generic.argon2_hash(v))
 
 		# Update basic credentials
 		for key, value in update.items():
