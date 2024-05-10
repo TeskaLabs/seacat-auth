@@ -79,7 +79,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		u = self.MongoDBStorageService.upsertor(self.CredentialsCollection, obj_id)
 
 		u.set("username", credentials["username"])
-		u.set("__password", generic.bcrypt_hash(credentials["password"]))
+		u.set("__password", generic.argon2_hash(credentials["password"]))
 
 		credentials_id = await u.execute(event_type=EventTypes.M2M_CREDENTIALS_CREATED)
 
