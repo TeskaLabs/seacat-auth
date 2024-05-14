@@ -3,6 +3,8 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha9`
+- `v24.17-alpha8`
 - `v24.17-alpha7`
 - `v24.17-alpha6`
 - `v24.17-alpha5`
@@ -13,6 +15,7 @@
 - `v24.17-alpha1`
 
 ### Fix
+- Fix AttributeError in failed login (#376, `v24.17-alpha9`)
 - Deny password change when old password verification fails (#374, `v24.17-alpha7`)
 - Authorize into last active tenant (#373, `v24.17-alpha6`)
 - Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
@@ -20,6 +23,7 @@
 - Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 
 ### Features
+- Hash passwords using argon2 instead of bcrypt (#375, `v24.17-alpha8`)
 - Improve resource sorting and filtering (#370, `v24.17-alpha3`)
 - User invitations are enabled by default (#367, `v24.17-alpha2`)
 - When invitation cannot be created because the user already exists, the invitation is re-sent (#364, `v24.17-alpha1`)
