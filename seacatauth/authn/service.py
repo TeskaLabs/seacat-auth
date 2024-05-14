@@ -298,7 +298,7 @@ class AuthenticationService(asab.Service):
 
 		# Fail if we have a fake login session
 		if login.CredentialsId == "":
-			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login.Id})
+			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login_session.Id})
 			return False
 
 		# First make sure that the user is not suspended
