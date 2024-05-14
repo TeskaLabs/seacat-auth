@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v24.20
+
+### Pre-releases
+- `v24.20-alpha1`
+
+### Breaking changes
+- Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
+
+### Features
+- Configurable password criteria (#372, `v24.20-alpha1`)
+
+---
+
+
 ## v24.17
 
 ### Pre-releases
