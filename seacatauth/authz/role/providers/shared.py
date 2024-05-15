@@ -6,6 +6,10 @@ from .abc import RoleProvider
 
 
 class SharedRoleProvider(RoleProvider):
+	"""
+	Manage shared tenant roles that are projected from global roles.
+	Not editable.
+	"""
 	def __init__(self, storage_service, collection_name, tenant_id):
 		super().__init__(storage_service, collection_name)
 		self.TenantId = tenant_id
@@ -46,15 +50,16 @@ class SharedRoleProvider(RoleProvider):
 	) -> typing.AsyncGenerator:
 		query = self._build_query(name_filter=name_filter, resource_filter=resource_filter)
 		async for role in self._iterate(offset, limit, query, sort):
-			yield role
+			yield self._normalize_role(role)
 
 
 	async def get(self, role_id: str) -> dict:
-		assert self.role_tenant_matches(role_id)
-		return await self.StorageService.get(self.CollectionName, self._tenant_id_to_global(role_id))
+		assert self._role_tenant_matches(role_id)
+		return self._normalize_role(
+			await self.StorageService.get(self.CollectionName, self._tenant_id_to_global(role_id)))
 
 
-	def role_tenant_matches(self, role_id: str):
+	def _role_tenant_matches(self, role_id: str):
 		return role_id.split("/")[0] == self.TenantId
 
 
@@ -66,7 +71,7 @@ class SharedRoleProvider(RoleProvider):
 		return "*" + role_id.split("/")[1]
 
 
-	def _project_role_into_tenant(self, role: dict):
+	def _normalize_role(self, role: dict):
 		role["global_id"] = role["_id"]
 		role["_id"] = self._global_id_to_tenant(role["_id"])
 		role["editable"] = False

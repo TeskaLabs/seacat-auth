@@ -46,7 +46,7 @@ class TenantRoleProvider(RoleProvider):
 	) -> typing.AsyncGenerator:
 		query = self._build_query(name_filter=name_filter, resource_filter=resource_filter)
 		async for role in self._iterate(offset, limit, query, sort):
-			yield role
+			yield self._normalize_role(role)
 
 
 	async def create(
@@ -54,7 +54,7 @@ class TenantRoleProvider(RoleProvider):
 		role_id: str,
 		description: typing.Optional[str] = None,
 		resources: typing.Optional[list] = None,
-		is_projectable: bool = False,
+		managed_by: typing.Optional[str] = None,
 		**kwargs
 	):
 		assert role_id.split("/")[0] == self.TenantId
@@ -63,15 +63,15 @@ class TenantRoleProvider(RoleProvider):
 		upsertor.set("resources", resources or [])
 		if description:
 			upsertor.set("description", description)
-		if is_projectable:
-			upsertor.set("projectable", True)
+		if managed_by:
+			upsertor.set("managed_by", managed_by)
 		role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 		return role_id
 
 
 	async def get(self, role_id: str) -> dict:
-		assert self.role_tenant_matches(role_id)
-		return await self.StorageService.get(self.CollectionName, role_id)
+		assert self._role_tenant_matches(role_id)
+		return self._normalize_role(await self.StorageService.get(self.CollectionName, role_id))
 
 
 	async def update(
@@ -79,23 +79,29 @@ class TenantRoleProvider(RoleProvider):
 		role_id: str,
 		description: typing.Optional[str] = None,
 		resources: typing.Optional[list] = None,
+		managed_by: typing.Optional[str] = None,
 		**kwargs
 	):
-		assert self.role_tenant_matches(role_id)
+		assert self._role_tenant_matches(role_id)
 		role = await self.get(role_id)
 		upsertor = self.StorageService.upsertor(self.CollectionName, role_id, version=role["_v"])
 		if resources is not None:
 			upsertor.set("resources", list(resources))
 		if description is not None:
 			upsertor.set("description", description)
+		if managed_by is not None:
+			if not managed_by:
+				upsertor.unset("managed_by")
+			else:
+				upsertor.set("managed_by", managed_by)
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 
 
 	async def delete(self, role_id: str) -> dict:
-		assert self.role_tenant_matches(role_id)
+		assert self._role_tenant_matches(role_id)
 		return await self.StorageService.delete(self.CollectionName, role_id)
 
 
-	def role_tenant_matches(self, role_id: str):
+	def _role_tenant_matches(self, role_id: str):
 		return role_id.split("/")[0] == self.TenantId
 

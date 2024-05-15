@@ -45,7 +45,7 @@ class GlobalRoleProvider(RoleProvider):
 	) -> typing.AsyncGenerator:
 		query = self._build_query(name_filter=name_filter, resource_filter=resource_filter)
 		async for role in self._iterate(offset, limit, query, sort):
-			yield role
+			yield self._normalize_role(role)
 
 	async def create(
 		self,
@@ -53,22 +53,25 @@ class GlobalRoleProvider(RoleProvider):
 		description: typing.Optional[str] = None,
 		resources: typing.Optional[list] = None,
 		is_shared: typing.Optional[bool] = None,
+		managed_by: typing.Optional[str] = None,
 		**kwargs
 	):
-		assert self.role_tenant_matches(role_id)
+		assert self._role_tenant_matches(role_id)
 		upsertor = self.StorageService.upsertor(self.CollectionName, role_id)
 		upsertor.set("resources", resources or [])
 		if description:
 			upsertor.set("description", description)
 		if is_shared:
 			upsertor.set("shared", True)
+		if managed_by:
+			upsertor.set("managed_by", managed_by)
 		role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 		return role_id
 
 
 	async def get(self, role_id: str) -> dict:
-		assert self.role_tenant_matches(role_id)
-		return await self.StorageService.get(self.CollectionName, role_id)
+		assert self._role_tenant_matches(role_id)
+		return self._normalize_role(await self.StorageService.get(self.CollectionName, role_id))
 
 
 	async def update(
@@ -77,9 +80,10 @@ class GlobalRoleProvider(RoleProvider):
 		description: typing.Optional[str] = None,
 		resources: typing.Optional[list] = None,
 		is_shared: typing.Optional[bool] = None,
+		managed_by: typing.Optional[str] = None,
 		**kwargs
 	):
-		assert self.role_tenant_matches(role_id)
+		assert self._role_tenant_matches(role_id)
 		role = await self.get(role_id)
 		upsertor = self.StorageService.upsertor(self.CollectionName, role_id, version=role["_v"])
 		if resources is not None:
@@ -88,6 +92,11 @@ class GlobalRoleProvider(RoleProvider):
 			upsertor.set("description", description)
 		if is_shared is not None:
 			upsertor.set("shared", bool(is_shared))
+		if managed_by is not None:
+			if not managed_by:
+				upsertor.unset("managed_by")
+			else:
+				upsertor.set("managed_by", managed_by)
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 
 
@@ -95,5 +104,5 @@ class GlobalRoleProvider(RoleProvider):
 		return await self.StorageService.delete(self.CollectionName, role_id)
 
 
-	def role_tenant_matches(self, role_id: str):
+	def _role_tenant_matches(self, role_id: str):
 		return role_id.split("/")[0] == "*"
