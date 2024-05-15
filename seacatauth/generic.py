@@ -90,20 +90,28 @@ class SearchParams:
 			for k, v in self.asdict().items()
 		))
 
-	def get(self, key: str, default):
+	def get(self, key: str, default=None):
 		return self.Query.get(key, default)
 
-	def getint(self, key: str, default):
-		return int(self.Query.get(key, default))
+	def getint(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return int(self.Query[key])
 
-	def getfloat(self, key: str, default):
-		return float(self.Query.get(key, default))
+	def getfloat(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return float(self.Query[key])
 
-	def getboolean(self, key: str, default):
-		return asab.utils.string_to_boolean(self.Query.get(key, default))
+	def getboolean(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return asab.utils.string_to_boolean(self.Query[key])
 
-	def getseconds(self, key: str, default):
-		return asab.utils.convert_to_seconds(self.Query.get(key, default))
+	def getseconds(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return asab.utils.convert_to_seconds(self.Query[key])
 
 
 def get_bearer_token_value(request):
