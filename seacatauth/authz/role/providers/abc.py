@@ -46,6 +46,7 @@ class RoleProvider(abc.ABC):
 		role_id: str,
 		description: typing.Optional[str] = None,
 		resources: typing.Optional[list] = None,
+		managed_by: typing.Optional[str] = None,
 		**kwargs
 	):
 		raise NotImplementedError()
@@ -65,5 +66,10 @@ class RoleProvider(abc.ABC):
 	async def delete(self, role_id: str):
 		raise NotImplementedError()
 
-	def role_tenant_matches(self, role_id: str):
+	def _role_tenant_matches(self, role_id: str):
 		raise NotImplementedError()
+
+	def _normalize_role(self, role: dict):
+		if role["managed_by"]:
+			role["editable"] = False
+		return role
