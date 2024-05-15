@@ -5,9 +5,10 @@ from typing import Optional
 
 import asab.storage.exceptions
 import asab.exceptions
-from ... import exceptions
 
+from ... import exceptions
 from ...events import EventTypes
+from .providers import GlobalRoleProvider, SharedRoleProvider, TenantRoleProvider
 
 #
 
@@ -22,7 +23,9 @@ class RoleService(asab.Service):
 	Role object schema:
 	{
 		"_id": str,
-		"resources": [str, str, ...]
+		"description": str,
+		"resources": [str, str, ...],
+		"managed_by": str,
 	}
 	"""
 
@@ -45,42 +48,63 @@ class RoleService(asab.Service):
 		))
 
 
+	def _prepare_providers(self, tenant_id: str | None):
+		assert tenant_id != "*"
+		providers = []
+		if tenant_id:
+			providers.append(SharedRoleProvider(self.StorageService, self.RoleCollection, tenant_id))
+			providers.append(TenantRoleProvider(self.StorageService, self.RoleCollection, tenant_id))
+		providers.append(GlobalRoleProvider(self.StorageService, self.RoleCollection))
+		return providers
+
+
+	def _role_tenant_id(self, role_id: str):
+		tenant_id = role_id.split("/")[0]
+		if tenant_id == "*":
+			return None
+		else:
+			return tenant_id
+
+
 	async def list(
-		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, filter: str = None, *,
-		resource: str = None,
-		active_only: bool = False,
-		exclude_global: bool = False,
+		self,
+		tenant_id: Optional[str] = None,
+		page: int = 0,
+		limit: int = None,
+		name_filter: str = None,
+		resource_filter: str = None,
 	):
-		collection = self.StorageService.Database[self.RoleCollection]
-		query_filter = {}
-		if tenant is not None:
-			if exclude_global:
-				query_filter["tenant"] = {"$in": [tenant]}
-			else:
-				query_filter["tenant"] = {"$in": [tenant, None]}
-		if filter:
-			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
-			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
-		if resource is not None:
-			query_filter["resources"] = resource
-		if active_only is True:
-			query_filter["deleted"] = {"$in": [False, None]}
+		if tenant_id == "*":
+			tenant_id = None
 
-		cursor = collection.find(query_filter)
-
-		cursor.sort("_c", -1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
-
+		providers = self._prepare_providers(tenant_id)
+		counts = [
+			await provider.count(name_filter, resource_filter)
+			for provider in providers
+		]
 		roles = []
-		count = await collection.count_documents(query_filter)
-		async for role_dict in cursor:
-			roles.append(role_dict)
+		offset = (page or 0) * (limit or 0)
+		for count, provider in zip(counts, providers):
+			if offset > count:
+				offset -= count
+				continue
+
+			async for role in provider.iterate(
+					offset=offset,
+					limit=limit - len(roles),
+					sort=("_id", 1),
+					name_filter=name_filter,
+					resource_filter=resource_filter,
+			):
+				roles.append(role)
+
+			if len(roles) >= limit:
+				break
+
+			offset = 0
 
 		return {
-			"result": "OK",
-			"count": count,
+			"count": sum(counts),
 			"data": roles,
 		}
 

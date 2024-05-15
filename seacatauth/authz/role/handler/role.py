@@ -7,6 +7,7 @@ import asab.storage.exceptions
 
 from .... import exceptions
 from ....decorators import access_control
+from .... import generic
 
 #
 
@@ -90,24 +91,17 @@ class RoleHandler(object):
 				enum:
 				- true
 		"""
-		tenant_id = request.match_info["tenant"]
-		if tenant_id == "*":
-			asab.web.rest.json_response(request, {"result": "ACCESS-DENIED"}, status=403)
-		return await self._list(request, tenant_id=tenant_id)
+		return await self._list(request, tenant_id=request.match_info["tenant"])
 
 	async def _list(self, request, *, tenant_id):
-		page = int(request.query.get("p", 1)) - 1
-		limit = request.query.get("i")
-		if limit is not None:
-			limit = int(limit)
-		filter_string = request.query.get("f")
-		resource = request.query.get("resource")
-		exclude_global = request.query.get("exclude_global", "false") == "true"
-
+		search = generic.SearchParams(request.query)
 		result = await self.RoleService.list(
-			tenant_id, page, limit, filter_string,
-			resource=resource,
-			exclude_global=exclude_global)
+			tenant_id=tenant_id,
+			page=search.Page,
+			limit=search.ItemsPerPage,
+			name_filter=search.SimpleFilter,
+			resource_filter=search.get("resource"),
+		)
 		return asab.web.rest.json_response(request, result)
 
 
