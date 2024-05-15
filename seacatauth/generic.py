@@ -5,6 +5,7 @@ import typing
 import urllib.parse
 import aiohttp.web
 import asab
+import asab.utils
 import bcrypt
 import argon2
 
@@ -28,6 +29,7 @@ class SearchParams:
 		simple_filter_default=None
 	):
 		# Set defaults
+		self.Query: typing.Mapping = query
 		self.Page: int | None = page_default
 		self.ItemsPerPage: int | None = items_per_page_default
 		self.SimpleFilter: str | None = simple_filter_default
@@ -35,7 +37,7 @@ class SearchParams:
 		self.SortBy: list = []
 
 		# Load actual parameter values from the query dict
-		for k, v in query.items():
+		for k, v in self.Query.items():
 			if k == "p":
 				try:
 					v = int(v)
@@ -87,6 +89,21 @@ class SearchParams:
 			"{}={}".format(k, repr(v))
 			for k, v in self.asdict().items()
 		))
+
+	def get(self, key: str, default):
+		return self.Query.get(key, default)
+
+	def getint(self, key: str, default):
+		return int(self.Query.get(key, default))
+
+	def getfloat(self, key: str, default):
+		return float(self.Query.get(key, default))
+
+	def getboolean(self, key: str, default):
+		return asab.utils.string_to_boolean(self.Query.get(key, default))
+
+	def getseconds(self, key: str, default):
+		return asab.utils.convert_to_seconds(self.Query.get(key, default))
 
 
 def get_bearer_token_value(request):
