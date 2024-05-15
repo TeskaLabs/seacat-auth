@@ -70,6 +70,6 @@ class RoleProvider(abc.ABC):
 		raise NotImplementedError()
 
 	def _normalize_role(self, role: dict):
-		if role["managed_by"]:
+		if role.get("managed_by"):
 			role["editable"] = False
 		return role
