@@ -43,7 +43,12 @@ asab.Config.add_defaults({
 
 	"openidconnect": {
 		"bearer_realm": "asab",
-		"auth_code_timeout": "60 s",
+		"authorization_code_length": "36",
+		"authorization_code_expiration": "3 m",
+		"access_token_length": "36",
+		"access_token_expiration": "4 h",
+		"refresh_token_length": "36",
+		"refresh_token_expiration": "3 d",
 	},
 
 	"seacatauth:client": {

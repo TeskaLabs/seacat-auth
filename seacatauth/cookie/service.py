@@ -143,12 +143,13 @@ class CookieService(asab.Service):
 
 
 	async def get_session_by_authorization_code(self, code):
-		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
+		return await self.OpenIdConnectService.get_session_by_authorization_code(code)
 
 
 	async def create_cookie_client_session(
 		self, root_session, client_id, scope,
 		nonce=None,
+		redirect_uri=None,
 		tenants=None,
 		requested_expiration=None
 	):
@@ -220,7 +221,7 @@ class CookieService(asab.Service):
 				),
 			))
 
-		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
@@ -236,6 +237,7 @@ class CookieService(asab.Service):
 		self, anonymous_cid: str, client_dict: dict, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
+		redirect_uri: str = None,
 		from_info=None,
 	):
 		"""
@@ -247,7 +249,9 @@ class CookieService(asab.Service):
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
-			scope=scope)
+			scope=scope,
+			redirect_uri=redirect_uri,
+		)
 
 		session.Cookie = CookieData(
 			Id=session_svc.Algorithmic.serialize(session),
@@ -261,3 +265,29 @@ class CookieService(asab.Service):
 			"fi": from_info})
 
 		return session
+
+
+	def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
+		"""
+		Add a Set-Cookie header to the response.
+		The cookie serves as a Seacat Auth session identifier and is used for authentication.
+		"""
+		cookie_name = self.get_cookie_name(client_id)
+		cookie_domain = cookie_domain or self.RootCookieDomain
+		if secure is None:
+			secure = self.CookieSecure
+
+		response.set_cookie(
+			cookie_name,
+			cookie_value,
+			httponly=True,  # Not accessible from Javascript
+			domain=cookie_domain,
+			secure=secure,
+		)
+
+
+	def delete_session_cookie(self, response):
+		"""
+		Add a Set-Cookie header to the response to unset Seacat Session cookie
+		"""
+		response.del_cookie(self.CookieName)

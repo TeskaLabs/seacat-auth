@@ -7,7 +7,6 @@ import asab.web.rest
 
 from .service import ExternalLoginService
 from ..decorators import access_control
-from ..cookie.utils import set_cookie, delete_cookie
 
 #
 
@@ -28,6 +27,7 @@ class ExternalLoginHandler(object):
 		self.App = app
 		self.ExternalLoginService = external_login_svc
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
+		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.ExternalLoginService.ExternalLoginPath, self.login)
@@ -75,14 +75,14 @@ class ExternalLoginHandler(object):
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider")
 			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response)
 			return response
 
 		sub = user_info.get("sub")
 		if sub is None:
 			L.error("Cannot obtain sub id from external login provider")
 			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response)
 			return response
 		sub = str(sub)
 
@@ -103,7 +103,7 @@ class ExternalLoginHandler(object):
 					login_provider_type, authorize_data_safe, user_info)
 		if credentials_id is None:
 			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response)
 			return response
 
 		# Create a placeholder login session
@@ -137,7 +137,7 @@ class ExternalLoginHandler(object):
 		if session is None:
 			L.error("Failed to create session")
 			response = self._login_redirect_response(state=state, error="external_login_failed")
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response)
 			return response
 
 		L.log(asab.LOG_NOTICE, "External login successful", struct_data={
@@ -155,7 +155,12 @@ class ExternalLoginHandler(object):
 			except KeyError:
 				L.error("Client not found.", struct_data={"client_id": login_session.ClientId})
 
-		set_cookie(self.App, response, session, cookie_domain)
+		self.CookieService.set_session_cookie(
+			response=response,
+			cookie_value=session.Cookie.Id,
+			client_id=session.OAuth2.ClientId,
+			cookie_domain=cookie_domain
+		)
 
 		return response
 

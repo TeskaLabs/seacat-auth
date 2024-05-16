@@ -1,8 +1,8 @@
 import datetime
 import json
 import base64
-import secrets
 import logging
+import typing
 
 import asab
 import asab.web.rest
@@ -23,8 +23,7 @@ from ..session import (
 from .session import oauth2_session_builder
 from .. import exceptions
 from . import pkce
-
-from ..events import EventTypes
+from ..authz import build_credentials_authz
 
 #
 
@@ -35,12 +34,29 @@ L = logging.getLogger(__name__)
 # TODO: Use JWA algorithms?
 
 
+class AuthorizationCode:
+	TokenType = "oac"
+	ByteLength = asab.Config.getint("openidconnect", "authorization_code_length")
+	Expiration = asab.Config.getseconds("openidconnect", "authorization_code_expiration")
+
+
+class AccessToken:
+	TokenType = "oat"
+	ByteLength = asab.Config.getint("openidconnect", "access_token_length")
+	Expiration = asab.Config.getseconds("openidconnect", "access_token_expiration")
+
+
+class RefreshToken:
+	TokenType = "ort"
+	ByteLength = asab.Config.getint("openidconnect", "refresh_token_length")
+	Expiration = asab.Config.getseconds("openidconnect", "refresh_token_expiration")
+
+
 class OpenIdConnectService(asab.Service):
 
 	# Bearer token Regex is based on RFC 6750
 	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
 	# Chapter 2.1. Authorization Request Header Field
-	AuthorizationCodeCollection = "ac"
 	AuthorizePath = "/openidconnect/authorize"
 	TokenPath = "/openidconnect/token"
 	TokenRevokePath = "/openidconnect/token/revoke"
@@ -52,6 +68,7 @@ class OpenIdConnectService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
+		self.TokenService = app.get_service("seacatauth.SessionTokenService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
@@ -78,10 +95,6 @@ class OpenIdConnectService(asab.Service):
 			# Default fallback option
 			self.Issuer = self.PublicApiBaseUrl.rstrip("/")
 
-		self.AuthorizationCodeTimeout = datetime.timedelta(
-			seconds=asab.Config.getseconds("openidconnect", "auth_code_timeout")
-		)
-
 		self.DisableRedirectUriValidation = asab.Config.getboolean(
 			"openidconnect", "_disable_redirect_uri_validation", fallback=False)
 		if self.DisableRedirectUriValidation:
@@ -93,100 +106,96 @@ class OpenIdConnectService(asab.Service):
 
 		self.JSONDumper = asab.web.rest.json.JSONDumper(pretty=False)
 
-		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
-
-	async def _on_housekeeping(self, event_name):
-		await self._delete_expired_authorization_codes()
-
-
-	async def generate_authorization_code(
+	async def refresh_session(
 		self,
 		session: SessionAdapter,
-		code_challenge: str = None,
-		code_challenge_method: str = None
+		requested_scope: typing.Optional[typing.Iterable] = None,
+		expires_in: float | None = None,
 	):
 		"""
-		Generates a random authorization code and stores it as a temporary
-		session identifier until the session is retrieved.
-		"""
-		# TODO: Store PKCE challenge here, not in the session object
-		code = secrets.token_urlsafe(36)
-		upsertor = self.StorageService.upsertor(self.AuthorizationCodeCollection, code)
+		Update/rebuild the session according to its authorization parameters
 
-		if session.is_algorithmic():
-			algo_token = self.SessionService.Algorithmic.serialize(session)
-			upsertor.set("alt", algo_token.encode("ascii"), encrypt=True)
-			upsertor.set("client_id", session.OAuth2.ClientId)
-			upsertor.set("scope", session.OAuth2.Scope)
+		@param session:
+		@param track_id:
+		@return:
+		"""
+		# Get parent session
+		root_session = await self.SessionService.get(session.Session.ParentSessionId)
+
+		# Check that the requested scope is a subset of granted scope
+		if requested_scope is not None:
+			requested_scope = set(requested_scope)
+			unauthorized_scope = requested_scope - set(session.OAuth2.Scope)
+			if len(unauthorized_scope) > 0:
+				raise exceptions.AccessDeniedError(
+					"Client requested unauthorized scope.",
+					subject=session.OAuth2.ClientId,
+					resource=unauthorized_scope
+				)
+			granted_scope = requested_scope
 		else:
-			upsertor.set("sid", session.SessionId)
+			granted_scope = session.OAuth2.Scope
 
-		if code_challenge:
-			upsertor.set("cc", code_challenge)
-			upsertor.set("ccm", code_challenge_method)
+		# TODO: Differentiate between the scope granted at authorization time and the sub-scope requested for this token
 
-		upsertor.set("exp", datetime.datetime.now(datetime.timezone.utc) + self.AuthorizationCodeTimeout)
-
-		await upsertor.execute(event_type=EventTypes.OPENID_AUTH_CODE_GENERATED)
-
-		return code
-
-
-	async def _delete_expired_authorization_codes(self):
-		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
-
-		query_filter = {"exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
-		result = await collection.delete_many(query_filter)
-		if result.deleted_count > 0:
-			L.info("Expired login sessions deleted", struct_data={
-				"count": result.deleted_count
-			})
-
-
-	async def pop_session_by_authorization_code(self, code, code_verifier: str = None):
-		"""
-		Retrieves session by its temporary authorization code.
-		"""
-		collection = self.StorageService.Database[self.AuthorizationCodeCollection]
-		data = await collection.find_one_and_delete(filter={"_id": code})
-		if data is None:
-			raise exceptions.SessionNotFoundError("Authorization code not found")
-
-		exp = data["exp"]
-		if exp is None or exp < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.SessionNotFoundError("Authorization code expired")
-
-		if "cc" in data:
-			self.PKCE.evaluate_code_challenge(
-				code_challenge_method=data["ccm"],
-				code_challenge=data["cc"],
-				code_verifier=code_verifier)
-
-		if "sid" in data:
-			return await self.SessionService.get(data["sid"])
-		elif "alt" in data:
-			algo_token = self.StorageService.aes_decrypt(data["alt"])
-			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
+		# Exclude critical resource grants from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
 		else:
-			L.error("Unexpected authorization code object", struct_data=data)
-			raise exceptions.SessionNotFoundError("Invalid authorization code")
+			exclude_resources = set()
 
+		# Authorize tenant
+		authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, root_session.Credentials.Id,
+			tenants=None,
+			exclude_resources=exclude_resources
+		)
+		authorized_tenant = await self.get_accessible_tenant_from_scope(
+			granted_scope, root_session.Credentials.Id,
+			has_access_to_all_tenants=self.RBACService.can_access_all_tenants(authz)
+		)
 
-	async def get_session_by_access_token(self, token_value):
-		# Decode the access token
-		try:
-			access_token = base64.urlsafe_b64decode(token_value)
-		except ValueError:
-			L.info("Access token is not base64: '{}'".format(token_value))
-			return None
+		session_builders = [
+			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, session.OAuth2.Scope),
+			await authz_session_builder(
+				tenant_service=self.TenantService,
+				role_service=self.RoleService,
+				credentials_id=root_session.Credentials.Id,
+				tenants=[authorized_tenant] if authorized_tenant else None,
+				exclude_resources=exclude_resources,
+			)
+		]
 
-		# Locate the session
-		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.OAuth2.AccessToken, access_token)
-		except KeyError:
-			L.info("Session not found by access token: {}".format(access_token))
-			return None
+		if "profile" in granted_scope or "userinfo:authn" in granted_scope or "userinfo:*" in granted_scope:
+			authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
+			available_external_logins = {
+				result["t"]: result["s"]
+				for result in await external_login_service.list(root_session.Credentials.Id)
+			}
+			session_builders.append([
+				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
+				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
+			])
+
+		if "batman" in granted_scope:
+			batman_service = self.App.get_service("seacatauth.BatmanService")
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
+		session_builders.append(((SessionAdapter.FN.OAuth2.Scope, granted_scope),))
+
+		if expires_in:
+			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)
+			session_builders.append(((SessionAdapter.FN.Session.Expiration, expiration),))
+
+		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
 		return session
 
@@ -220,12 +229,6 @@ class OpenIdConnectService(asab.Service):
 		return session
 
 
-	def refresh_token(self, refresh_token, client_id, client_secret, scope):
-		# TODO: this is not implemented
-		L.error("refresh_token is not implemented", struct_data=[refresh_token, client_id, client_secret, scope])
-		return aiohttp.web.HTTPNotImplemented()
-
-
 	def check_access_token(self, bearer_token):
 		# TODO: this is not implemented
 		L.error("check_access_token is not implemented", struct_data={"bearer": bearer_token})
@@ -235,6 +238,7 @@ class OpenIdConnectService(asab.Service):
 	async def create_oidc_session(
 		self, root_session, client_id, scope,
 		nonce=None,
+		redirect_uri=None,
 		tenants=None,
 		requested_expiration=None
 	):
@@ -280,7 +284,7 @@ class OpenIdConnectService(asab.Service):
 				(SessionAdapter.FN.Batman.Token, basic_auth),
 			])
 
-		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
 
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
@@ -313,29 +317,28 @@ class OpenIdConnectService(asab.Service):
 		self, anonymous_cid: str, client_dict: dict, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
-		from_info=None
+		redirect_uri: list = None,
+		from_info=None,
 	):
 		session = await self.SessionService.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
-			scope=scope)
+			scope=scope,
+			redirect_uri=redirect_uri,
+		)
 
 		session.OAuth2.AccessToken = self.SessionService.Algorithmic.serialize(session)
 		return session
 
 
 	async def build_userinfo(self, session):
-		# TODO: Session object should only serve as a cache
-		#   After the cache has expired, update session object with fresh credential, authn and authz data
-		#   and rebuild the userinfo
-
 		otp_service = self.App.get_service("seacatauth.OTPService")
 
 		userinfo = {
 			"iss": self.Issuer,
 			"sub": session.Credentials.Id,  # The sub (subject) Claim MUST always be returned in the UserInfo Response.
-			"iat": session.CreatedAt,
+			"iat": session.ModifiedAt,  # "Issued-at" corresponds to the timestamp when the session was last updated
 			"sid": session.SessionId,
 		}
 
@@ -430,7 +433,7 @@ class OpenIdConnectService(asab.Service):
 		return userinfo
 
 
-	async def build_id_token(self, session):
+	async def issue_id_token(self, session, expires_in: float | None = None):
 		"""
 		Wrap authentication data and userinfo in a JWT token
 		"""
@@ -443,6 +446,11 @@ class OpenIdConnectService(asab.Service):
 		# TODO: ID token should always contain info about "what happened during authentication"
 		#   User info is optional and its parts should be included (or not) based on SCOPE
 		payload = await self.build_userinfo(session)
+
+		payload["iat"] = int(datetime.datetime.now(datetime.UTC).timestamp())
+		if expires_in:
+			payload["exp"] = int(
+				(datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)).timestamp())
 
 		token = jwcrypto.jwt.JWT(
 			header=header,
@@ -491,6 +499,178 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Invalidate a valid token. Currently only access_token type is supported.
 		"""
-		session: SessionAdapter = await self.get_session_by_access_token(token)
-		if session is not None:
-			await self.SessionService.delete(session.SessionId)
+		try:
+			session: SessionAdapter = await self.get_session_by_access_token(token)
+		except exceptions.SessionNotFoundError:
+			return
+
+		await self.SessionService.delete(session.SessionId)
+
+
+	async def get_accessible_tenant_from_scope(
+		self,
+		scope: typing.Iterable,
+		credentials_id: str,
+		has_access_to_all_tenants: bool = False
+	):
+		"""
+		Extract tenants from requested scope and return the first accessible one.
+		"""
+		try:
+			tenants: set = await self.TenantService.get_tenants_by_scope(
+				scope, credentials_id, has_access_to_all_tenants)
+		except exceptions.TenantNotFoundError as e:
+			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			raise exceptions.AccessDeniedError(subject=credentials_id)
+		except exceptions.TenantAccessDeniedError as e:
+			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
+			raise exceptions.AccessDeniedError(subject=credentials_id)
+		except exceptions.NoTenantsError:
+			L.error("Tenant access denied", struct_data={"cid": credentials_id})
+			raise exceptions.AccessDeniedError(subject=credentials_id)
+
+		if tenants:
+			return tenants.pop()
+		else:
+			return None
+
+
+	async def create_authorization_code(
+		self, session: SessionAdapter,
+		code_challenge: str | None = None,
+		code_challenge_method: str | None = None,
+	) -> str:
+		"""
+		Create OAuth2 authorization code
+
+		@param session: Session
+		@param code_challenge: PKCE challenge string
+		@param code_challenge_method: PKCE verification method
+		@return: Base64-encoded token value
+		"""
+		if session.is_algorithmic():
+			raw_value = await self.TokenService.create(
+				token_length=AuthorizationCode.ByteLength,
+				token_type=AuthorizationCode.TokenType,
+				session_id=self.SessionService.Algorithmic.serialize(session),
+				expiration=AuthorizationCode.Expiration,
+				is_session_algorithmic=True,
+				cc=code_challenge,
+				ccm=code_challenge_method,
+			)
+		else:
+			raw_value = await self.TokenService.create(
+				token_length=AuthorizationCode.ByteLength,
+				token_type=AuthorizationCode.TokenType,
+				session_id=session.SessionId,
+				expiration=AuthorizationCode.Expiration,
+				is_session_algorithmic=False,
+				cc=code_challenge,
+				ccm=code_challenge_method,
+			)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
+
+
+	async def create_access_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
+		"""
+		Create OAuth2 access token
+
+		@param session: Target session
+		@return: Base64-encoded token and its expiration
+		"""
+		client = await self.ClientService.get(session.OAuth2.ClientId)
+		expires_in = client.get("session_expiration") or AccessToken.Expiration
+		raw_value = await self.TokenService.create(
+			token_length=AccessToken.ByteLength,
+			token_type=AccessToken.TokenType,
+			session_id=session.SessionId,
+			expiration=expires_in,
+			is_session_algorithmic=session.is_algorithmic(),
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
+
+
+	async def create_refresh_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
+		"""
+		Create OAuth2 refresh token
+
+		@param session: Target session
+		@return: Base64-encoded token value
+		"""
+		assert not session.is_algorithmic()
+		expires_in = RefreshToken.Expiration
+		raw_value = await self.TokenService.create(
+			token_length=RefreshToken.ByteLength,
+			token_type=RefreshToken.TokenType,
+			session_id=session.SessionId,
+			expiration=RefreshToken.Expiration,
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
+
+
+	async def get_session_by_authorization_code(self, code, code_verifier: str | None = None):
+		"""
+		Retrieve session by its temporary authorization code.
+		"""
+		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		token_data = await self.TokenService.get(token_bytes, token_type=AuthorizationCode.TokenType)
+		if "cc" in token_data:
+			self.PKCE.evaluate_code_challenge(
+				code_challenge_method=token_data["ccm"],
+				code_challenge=token_data["cc"],
+				code_verifier=code_verifier)
+		if token_data.get("sa"):
+			# Session is algorithmic (self-encoded token)
+			algo_token = self.StorageService.aes_decrypt(token_data["sid"])
+			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
+		else:
+			# Session is in the DB
+			return await self.SessionService.get(token_data["sid"])
+
+
+	async def get_session_by_access_token(self, token_value: str):
+		"""
+		Retrieve session by its access token.
+		"""
+		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		try:
+			token_data = await self.TokenService.get(token_bytes, token_type=AccessToken.TokenType)
+		except KeyError:
+			raise exceptions.SessionNotFoundError("Invalid or expired access token")
+		try:
+			session = await self.SessionService.get(token_data["sid"])
+		except KeyError:
+			L.error("Integrity error: Access token points to a nonexistent session.", struct_data={
+				"sid": token_data["sid"]})
+			await self.TokenService.delete(token_bytes)
+			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
+
+		return session
+
+
+	async def get_session_by_refresh_token(self, token_value: str):
+		"""
+		Retrieve session by its refresh token.
+		"""
+		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		try:
+			token_data = await self.TokenService.get(token_bytes, token_type=RefreshToken.TokenType)
+		except KeyError:
+			raise exceptions.SessionNotFoundError("Invalid or expired access token")
+		try:
+			session = await self.SessionService.get(token_data["sid"])
+		except KeyError:
+			L.error("Integrity error: Refresh token points to a nonexistent session.", struct_data={
+				"sid": token_data["sid"]})
+			await self.TokenService.delete(token_bytes)
+			raise exceptions.SessionNotFoundError("Refresh token points to a nonexistent session")
+
+		return session
+
+
+	async def delete_authorization_code(self, code: str):
+		"""
+		Delete temporary authorization code.
+		"""
+		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		await self.TokenService.delete(token_bytes)

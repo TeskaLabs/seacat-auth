@@ -3,7 +3,7 @@ import aiohttp
 import aiohttp.web
 import asab
 
-from ... import AuditLogger
+from ... import AuditLogger, exceptions
 from ...generic import get_bearer_token_value
 
 #
@@ -49,7 +49,10 @@ class SessionHandler(object):
 		try:
 			session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
 		except ValueError:
-			session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+			try:
+				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+			except exceptions.SessionNotFoundError:
+				session = None
 		if session is None:
 			return aiohttp.web.HTTPNotFound()
 

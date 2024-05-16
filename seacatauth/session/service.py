@@ -17,6 +17,7 @@ from .. import exceptions
 from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
+from .token import SessionTokenService
 
 #
 
@@ -31,6 +32,7 @@ class SessionService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
+		self.TokenService = SessionTokenService(app, "seacatauth.SessionTokenService")
 		self.StorageService = app.get_service("asab.StorageService")
 		self.Algorithmic = AlgorithmicSessionProvider(app)
 
@@ -470,6 +472,8 @@ class SessionService(asab.Service):
 		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
 		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
 
+		# Delete all the session's tokens
+		await self.TokenService.delete_tokens_by_session_id(session_id)
 		# TODO: Publish pubsub message for session deletion
 
 
@@ -496,6 +500,9 @@ class SessionService(asab.Service):
 					"error": type(e).__name__
 				})
 				failed += 1
+
+			# Delete all the session's tokens
+			await self.TokenService.delete_tokens_by_session_id(session_dict["_id"])
 
 		L.log(asab.LOG_NOTICE, "Sessions deleted", struct_data={
 			"deleted_count": deleted,
