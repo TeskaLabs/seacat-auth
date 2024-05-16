@@ -2,10 +2,10 @@ import re
 import typing
 
 from ....events import EventTypes
-from .abc import RoleProvider
+from .abc import RoleView
 
 
-class GlobalRoleProvider(RoleProvider):
+class GlobalRoleView(RoleView):
 	def __init__(self, storage_service, collection_name):
 		super().__init__(storage_service, collection_name)
 
