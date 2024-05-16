@@ -41,29 +41,7 @@ class RoleView(abc.ABC):
 		async for role in cursor:
 			yield role
 
-	async def create(
-		self,
-		role_id: str,
-		description: typing.Optional[str] = None,
-		resources: typing.Optional[list] = None,
-		managed_by: typing.Optional[str] = None,
-		**kwargs
-	):
-		raise NotImplementedError()
-
 	async def get(self, role_id: str) -> dict:
-		raise NotImplementedError()
-
-	async def update(
-		self,
-		role_id: str,
-		description: typing.Optional[str] = None,
-		resources: typing.Optional[list] = None,
-		**kwargs
-	):
-		raise NotImplementedError()
-
-	async def delete(self, role_id: str):
 		raise NotImplementedError()
 
 	def _role_tenant_matches(self, role_id: str):

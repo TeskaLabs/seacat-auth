@@ -49,57 +49,9 @@ class TenantRoleView(RoleView):
 			yield self._normalize_role(role)
 
 
-	async def create(
-		self,
-		role_id: str,
-		description: typing.Optional[str] = None,
-		resources: typing.Optional[list] = None,
-		managed_by: typing.Optional[str] = None,
-		**kwargs
-	):
-		assert role_id.split("/")[0] == self.TenantId
-		upsertor = self.StorageService.upsertor(self.CollectionName, role_id)
-		upsertor.set("tenant", self.TenantId)
-		upsertor.set("resources", resources or [])
-		if description:
-			upsertor.set("description", description)
-		if managed_by:
-			upsertor.set("managed_by", managed_by)
-		role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
-		return role_id
-
-
 	async def get(self, role_id: str) -> dict:
 		assert self._role_tenant_matches(role_id)
 		return self._normalize_role(await self.StorageService.get(self.CollectionName, role_id))
-
-
-	async def update(
-		self,
-		role_id: str,
-		description: typing.Optional[str] = None,
-		resources: typing.Optional[list] = None,
-		managed_by: typing.Optional[str] = None,
-		**kwargs
-	):
-		assert self._role_tenant_matches(role_id)
-		role = await self.get(role_id)
-		upsertor = self.StorageService.upsertor(self.CollectionName, role_id, version=role["_v"])
-		if resources is not None:
-			upsertor.set("resources", list(resources))
-		if description is not None:
-			upsertor.set("description", description)
-		if managed_by is not None:
-			if not managed_by:
-				upsertor.unset("managed_by")
-			else:
-				upsertor.set("managed_by", managed_by)
-		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
-
-
-	async def delete(self, role_id: str) -> dict:
-		assert self._role_tenant_matches(role_id)
-		return await self.StorageService.delete(self.CollectionName, role_id)
 
 
 	def _role_tenant_matches(self, role_id: str):
