@@ -492,16 +492,12 @@ class CookieHandler(object):
 
 		# TODO: Verify that the request came from the correct domain
 
-		if session.is_algorithmic():
-			# TODO: Why is this here????????? Add comment!
-			pass
-		else:
-			self.CookieService.set_session_cookie(
-				response=response,
-				cookie_value=session.Cookie.Id,
-				client_id=client_id,
-				cookie_domain=cookie_domain
-			)
+		self.CookieService.set_session_cookie(
+			response=response,
+			cookie_value=session.Cookie.Id,
+			client_id=client_id,
+			cookie_domain=cookie_domain
+		)
 
 		# Trigger webhook and set custom client response headers
 		try:
