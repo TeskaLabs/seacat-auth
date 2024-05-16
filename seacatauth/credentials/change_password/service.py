@@ -1,8 +1,10 @@
 import hashlib
 import logging
 import datetime
+import re
 
 import asab
+import asab.exceptions
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
@@ -25,6 +27,13 @@ class ChangePasswordService(asab.Service):
 
 	def __init__(self, app, cred_service, service_name="seacatauth.ChangePasswordService"):
 		super().__init__(app, service_name)
+
+		self.PasswordMaxLength = asab.Config.getint("seacatauth:password", "max_length")
+		self.PasswordMinLength = asab.Config.getint("seacatauth:password", "min_length")
+		self.PasswordMinLowerCount = asab.Config.getint("seacatauth:password", "min_lowercase_count")
+		self.PasswordMinUpperCount = asab.Config.getint("seacatauth:password", "min_uppercase_count")
+		self.PasswordMinDigitCount = asab.Config.getint("seacatauth:password", "min_digit_count")
+		self.PasswordMinSpecialCount = asab.Config.getint("seacatauth:password", "min_special_count")
 
 		self.CredentialsService = cred_service
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
@@ -102,6 +111,19 @@ class ChangePasswordService(asab.Service):
 		return await self._create_password_reset_token(credentials_id=credentials["_id"], expiration=expiration)
 
 
+	async def password_policy(self) -> dict:
+		"""
+		Password validation requirements
+		"""
+		return {
+			"min_length": self.PasswordMinLength,
+			"min_lowercase_count": self.PasswordMinLowerCount,
+			"min_uppercase_count": self.PasswordMinUpperCount,
+			"min_digit_count": self.PasswordMinDigitCount,
+			"min_special_count": self.PasswordMinSpecialCount,
+		}
+
+
 	async def init_password_reset_by_admin(
 		self,
 		credentials: dict,
@@ -174,6 +196,8 @@ class ChangePasswordService(asab.Service):
 		if credentials.get("suspended") is True:
 			raise exceptions.CredentialsSuspendedError(credentials_id)
 
+		self.verify_password_strength(new_password)
+
 		# Remove "password" from enforced factors
 		enforce_factors = set(credentials.get("enforce_factors", []))
 		if "password" in enforce_factors:
@@ -188,3 +212,29 @@ class ChangePasswordService(asab.Service):
 
 	async def _token_id_from_token_string(self, password_reset_token):
 		return hashlib.sha256(password_reset_token.encode("ascii")).digest()
+
+
+	def verify_password_strength(self, password: str):
+		if len(password) > self.PasswordMaxLength:
+			raise asab.exceptions.ValidationError(
+				"Password cannot be longer than {} characters.".format(self.PasswordMaxLength))
+
+		if len(password) < self.PasswordMinLength:
+			raise exceptions.WeakPasswordError(
+				"Password must be {} or more characters long.".format(self.PasswordMinLength))
+
+		if len(re.findall(r"[a-z]", password)) < self.PasswordMinLowerCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} lowercase letters.".format(self.PasswordMinLowerCount))
+
+		if len(re.findall(r"[A-Z]", password)) < self.PasswordMinUpperCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} uppercase letters.".format(self.PasswordMinUpperCount))
+
+		if len(re.findall(r"[0-9]", password)) < self.PasswordMinDigitCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} digits.".format(self.PasswordMinDigitCount))
+
+		if len(re.findall(r"[^a-zA-Z0-9]", password)) < self.PasswordMinSpecialCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} special characters.".format(self.PasswordMinSpecialCount))

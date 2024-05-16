@@ -1,5 +1,7 @@
 import typing
 
+import asab.exceptions
+
 
 class SeacatAuthError(Exception):
 	"""
@@ -72,6 +74,15 @@ class RoleNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Role {!r} not found".format(self.Role), *args)
 
 
+class ResourceNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Resource not found
+	"""
+	def __init__(self, resource_id, *args):
+		self.ResourceId = resource_id
+		super().__init__("Resource {!r} not found".format(self.ResourceId), *args)
+
+
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Credentials not found
@@ -96,6 +107,14 @@ class CredentialsSuspendedError(SeacatAuthError):
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials {!r} suspended".format(self.CredentialsId), *args)
+
+
+class WeakPasswordError(SeacatAuthError, asab.exceptions.ValidationError):
+	"""
+	Password does not comply with configured policies
+	"""
+	def __init__(self, message, *args):
+		super().__init__(message, *args)
 
 
 class UnauthorizedTenantAccessError(AccessDeniedError):
