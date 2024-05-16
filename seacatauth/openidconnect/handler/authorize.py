@@ -551,7 +551,7 @@ class AuthorizeHandler(object):
 		await self.OpenIdConnectService.LastActivityService.update_last_activity(
 			EventCode.AUTHORIZE_SUCCESS,
 			credentials_id=new_session.Credentials.Id,
-			tenants=list(tenants),
+			tenants=[authorized_tenant],
 			scope=list(scope)
 		)
 		return await self.reply_with_successful_response(
