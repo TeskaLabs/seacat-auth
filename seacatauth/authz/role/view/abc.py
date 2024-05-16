@@ -2,7 +2,7 @@ import typing
 import abc
 
 
-class RoleProvider(abc.ABC):
+class RoleView(abc.ABC):
 	def __init__(self, storage_service, collection_name):
 		self.StorageService = storage_service
 		self.CollectionName = collection_name

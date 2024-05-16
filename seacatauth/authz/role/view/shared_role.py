@@ -2,10 +2,10 @@ import re
 import typing
 
 from ....events import EventTypes
-from .abc import RoleProvider
+from .abc import RoleView
 
 
-class SharedRoleProvider(RoleProvider):
+class SharedRoleView(RoleView):
 	"""
 	Manage shared tenant roles that are projected from global roles.
 	Not editable.
@@ -64,11 +64,11 @@ class SharedRoleProvider(RoleProvider):
 
 
 	def _global_id_to_tenant(self, role_id: str):
-		return self.TenantId + role_id.split("/")[1]
+		return "{}/{}".format(self.TenantId, role_id.split("/")[1])
 
 
 	def _tenant_id_to_global(self, role_id: str):
-		return "*" + role_id.split("/")[1]
+		return "*/{}".format(role_id.split("/")[1])
 
 
 	def _normalize_role(self, role: dict):

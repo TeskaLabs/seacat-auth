@@ -8,7 +8,7 @@ import asab.exceptions
 
 from ... import exceptions
 from ...events import EventTypes
-from .providers import GlobalRoleProvider, SharedRoleProvider, TenantRoleProvider
+from .view import GlobalRoleView, SharedRoleView, TenantRoleView
 
 #
 
@@ -52,9 +52,9 @@ class RoleService(asab.Service):
 		assert tenant_id != "*"
 		providers = []
 		if tenant_id:
-			providers.append(SharedRoleProvider(self.StorageService, self.RoleCollection, tenant_id))
-			providers.append(TenantRoleProvider(self.StorageService, self.RoleCollection, tenant_id))
-		providers.append(GlobalRoleProvider(self.StorageService, self.RoleCollection))
+			providers.append(SharedRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			providers.append(TenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+		providers.append(GlobalRoleView(self.StorageService, self.RoleCollection))
 		return providers
 
 
@@ -73,9 +73,13 @@ class RoleService(asab.Service):
 		limit: int = None,
 		name_filter: str = None,
 		resource_filter: str = None,
+		session_context=None,
 	):
-		if tenant_id == "*":
+		if tenant_id in {"*", None}:
 			tenant_id = None
+		elif not (session_context and session_context.has_tenant_access(tenant_id)):
+			raise exceptions.TenantAccessDeniedError(
+				tenant_id, subject=session_context.Credentials.Id if session_context else None)
 
 		providers = self._prepare_providers(tenant_id)
 		counts = [
@@ -90,11 +94,11 @@ class RoleService(asab.Service):
 				continue
 
 			async for role in provider.iterate(
-					offset=offset,
-					limit=limit - len(roles),
-					sort=("_id", 1),
-					name_filter=name_filter,
-					resource_filter=resource_filter,
+				offset=offset,
+				limit=limit - len(roles),
+				sort=("_id", 1),
+				name_filter=name_filter,
+				resource_filter=resource_filter,
 			):
 				roles.append(role)
 
@@ -109,35 +113,20 @@ class RoleService(asab.Service):
 		}
 
 
-	async def iterate(
-		self, tenant: str | None, page: int = 0, limit: int = None, filter: str = None, *, resource: str = None,
-	):
-		assert tenant != "*"  # Use tenant=None
-		query_filter = {"tenant": tenant}
-		if filter:
-			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
-			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
-		if resource is not None:
-			query_filter["resources"] = resource
-
-		collection = self.StorageService.Database[self.RoleCollection]
-		cursor = collection.find(query_filter)
-
-		cursor.sort("_c", -1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
-
-		async for role in cursor:
-			yield role
-
-
-	async def get(self, role_id: str):
+	async def get(self, role_id: str, session_context=None):
+		tenant_id = self._role_tenant_id(role_id)
+		if tenant_id and not (session_context and session_context.has_tenant_access(tenant_id)):
+			raise exceptions.TenantAccessDeniedError(
+				tenant_id, subject=session_context.Credentials.Id if session_context else None)
 		try:
-			result = await self.StorageService.get(self.RoleCollection, role_id)
+			if not tenant_id:
+				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
+			try:
+				return await SharedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+			except KeyError:
+				return await TenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 		except KeyError:
 			raise exceptions.RoleNotFoundError(role_id)
-		return result
 
 
 	async def get_role_resources(self, role_id: str):
@@ -194,6 +183,7 @@ class RoleService(asab.Service):
 	async def update(
 		self, role_id: str, *,
 		description: str = None,
+		shared: bool = None,
 		resources_to_set: list = None,
 		resources_to_add: list = None,
 		resources_to_remove: list = None
@@ -262,6 +252,10 @@ class RoleService(asab.Service):
 		if description is not None:
 			upsertor.set("description", description)
 			log_data["description"] = description
+
+		if shared is not None:
+			upsertor.set("shared", shared)
+			log_data["shared"] = shared
 
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
