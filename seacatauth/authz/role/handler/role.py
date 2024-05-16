@@ -151,8 +151,8 @@ class RoleHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
-			"description": {
-				"type": "string"},
+			"description": {"type": "string"},
+			"shared": {"type": "boolean"},
 			"add": {
 				"type": "array",
 				"items": {"type": "string"},

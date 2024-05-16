@@ -46,6 +46,7 @@ class RoleService(asab.Service):
 		self.RoleIdRegex = re.compile(r"^([^/]+)/({role})$".format(
 			role=self.RoleNamePattern
 		))
+		self.RoleNameRegex = re.compile(self.RoleNamePattern)
 
 
 	def _prepare_providers(self, tenant_id: str | None):
@@ -77,9 +78,8 @@ class RoleService(asab.Service):
 	):
 		if tenant_id in {"*", None}:
 			tenant_id = None
-		elif not (session_context and session_context.has_tenant_access(tenant_id)):
-			raise exceptions.TenantAccessDeniedError(
-				tenant_id, subject=session_context.Credentials.Id if session_context else None)
+		else:
+			self.validate_tenant_access(session_context, tenant_id)
 
 		providers = self._prepare_providers(tenant_id)
 		counts = [
@@ -134,28 +134,37 @@ class RoleService(asab.Service):
 		return role_obj["resources"]
 
 
-	async def create(self, role_id: str):
-		match = self.RoleIdRegex.match(role_id)
-		if match is None:
-			raise asab.exceptions.ValidationError(
-				"Role ID must match the format {tenant_name}/{role_name}, "
-				"where {tenant_name} is either '*' or the name of an existing tenant "
-				"and {role_name} consists only of characters 'a-z0-9_-', "
-				"starts with a letter or underscore, and is between 1 and 32 characters long."
-			)
-		try:
-			tenant = await self.get_role_tenant(role_id)
-		except KeyError:
-			tenant, _ = role_id.split("/", 1)
-			raise KeyError("Tenant {!r} not found.".format(tenant))
+	async def create(
+		self,
+		role_id: str,
+		description: str = None,
+		resources: typing.Optional[typing.Iterable] = None,
+		shared: bool = False,
+		_managed_by: typing.Optional[str] = None,
+		session_context=None
+	):
+		tenant_id, role_name = self.parse_role_id(role_id)
+		self.validate_role_name(role_name)
+		if tenant_id:
+			# Validate that the tenant exists
+			await self.TenantService.get_tenant(tenant_id)
+			self.validate_tenant_access(session_context, tenant_id)
+		else:
+			self.validate_superuser_access(session_context)
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
 			role_id
 		)
-		upsertor.set("resources", [])
-		if tenant != "*":
-			upsertor.set("tenant", tenant)
+		if tenant_id:
+			upsertor.set("tenant", tenant_id)
+		upsertor.set("resources", resources or [])
+		if description:
+			upsertor.set("description", description)
+		if shared:
+			upsertor.set("shared", True)
+		if _managed_by:
+			upsertor.set("managed_by", _managed_by)
 		try:
 			role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
 			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
@@ -164,6 +173,40 @@ class RoleService(asab.Service):
 
 		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
 		return role_id
+
+
+	def validate_tenant_access(self, session, tenant_id: str):
+		if session == "system":
+			return
+		if not (session and session.has_tenant_access(tenant_id)):
+			raise exceptions.TenantAccessDeniedError(
+				tenant_id, subject=session.Credentials.Id if session else None)
+
+
+	def validate_superuser_access(self, session):
+		if session == "system":
+			return
+		if not (session and session.is_superuser()):
+			raise exceptions.AccessDeniedError(
+				subject=session.Credentials.Id if session else None, resource="authz:superuser")
+
+
+	def parse_role_id(self, role_id: str) -> (typing.Optional[str], str):
+		tenant_id, role_name = role_id.split("/", 1)
+		if tenant_id == "*":
+			tenant_id = None
+		return tenant_id, role_name
+
+
+	def validate_role_name(self, role_name: str):
+		match = self.RoleNameRegex.match(role_name)
+		if match is None:
+			raise asab.exceptions.ValidationError(
+				"Role ID must match the format {tenant_name}/{role_name}, "
+				"where {tenant_name} is either '*' or the name of an existing tenant "
+				"and {role_name} consists only of characters 'a-z0-9_-', "
+				"starts with a letter or underscore, and is between 1 and 32 characters long."
+			)
 
 
 	async def delete(self, role_id: str):
@@ -186,7 +229,8 @@ class RoleService(asab.Service):
 		shared: bool = None,
 		resources_to_set: list = None,
 		resources_to_add: list = None,
-		resources_to_remove: list = None
+		resources_to_remove: list = None,
+		_managed_by: typing.Optional[str] = None,
 	):
 		# Verify that role exists
 		role_current = await self.get(role_id)
@@ -254,8 +298,12 @@ class RoleService(asab.Service):
 			log_data["description"] = description
 
 		if shared is not None:
-			upsertor.set("shared", shared)
-			log_data["shared"] = shared
+			upsertor.set("shared", bool(shared))
+		if _managed_by is not None:
+			if not _managed_by:
+				upsertor.unset("managed_by")
+			else:
+				upsertor.set("managed_by", _managed_by)
 
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
