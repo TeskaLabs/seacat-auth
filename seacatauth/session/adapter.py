@@ -303,7 +303,7 @@ class SessionAdapter:
 		Is this session authorized to access the tenant?
 		"""
 		assert tenant_id != "*"
-		return (
+		return self.is_superuser() or (
 			self.Authorization is not None
 			and self.Authorization.Authz is not None
 			and tenant_id in self.Authorization.Authz
