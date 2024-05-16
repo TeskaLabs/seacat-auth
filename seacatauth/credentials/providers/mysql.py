@@ -284,7 +284,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 
 		value = update.pop("password", None)
 		if value is not None:
-			new_credentials["__password"] = generic.bcrypt_hash(value)
+			new_credentials["__password"] = generic.argon2_hash(value)
 
 		value = update.pop("enforce_factors", None)
 		if value is not None:

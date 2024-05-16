@@ -74,6 +74,7 @@ class OpenIdConnectService(asab.Service):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
+		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
 
 		self.PublicApiBaseUrl = app.PublicOpenIdConnectApiUrl
