@@ -201,7 +201,7 @@ async def nginx_introspection(
 	if not session.is_algorithmic():
 		session = await session_service.touch(session)
 
-	id_token = await oidc_service.build_id_token(session)
+	id_token = await oidc_service.issue_id_token(session)
 
 	# Set the authorization header
 	headers = {

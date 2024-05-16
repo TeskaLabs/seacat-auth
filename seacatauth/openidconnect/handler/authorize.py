@@ -6,9 +6,9 @@ import aiohttp
 import aiohttp.web
 import asab
 
+from ..service import AuthorizationCode
 from ...authz import build_credentials_authz
-from ...cookie.utils import delete_cookie
-from ... import client, generic, AuditLogger
+from ... import generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
@@ -282,7 +282,8 @@ class AuthorizeHandler(object):
 
 		Authentication Code Flow
 		"""
-		scope = scope.split(" ")
+		requested_scope = scope.split(" ")
+		granted_scope = set()
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
@@ -291,10 +292,10 @@ class AuthorizeHandler(object):
 			e.State = state
 			e.RedirectUri = redirect_uri
 			raise e
-		except client.exceptions.ClientNotFoundError as e:
+		except exceptions.ClientNotFoundError as e:
 			L.log(asab.LOG_NOTICE, "Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise ClientIdError(client_id) from e
-		except client.exceptions.InvalidRedirectURI as e:
+		except exceptions.InvalidRedirectURI as e:
 			L.log(asab.LOG_NOTICE, "Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
 			raise RedirectUriError(redirect_uri, client_id) from e
 
@@ -303,13 +304,14 @@ class AuthorizeHandler(object):
 
 		# Decide whether this is an openid or cookie request
 		try:
-			authorize_type = await self._get_authorize_type(client_id, scope)
+			auth_token_type = await self._get_auth_token_type(client_id, requested_scope)
 		except OAuthAuthorizeError as e:
 			e.RedirectUri = redirect_uri
 			e.State = state
 			raise e
+		granted_scope.add(auth_token_type)
 
-		if authorize_type == "openid":
+		if auth_token_type == "openid":
 			try:
 				code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
 					client_dict, code_challenge, code_challenge_method)
@@ -329,7 +331,7 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state,
 					struct_data={"reason": "code_challenge_error"})
-		elif code_challenge is not None:
+		elif auth_token_type == "cookie" and code_challenge is not None:
 			L.error("Code challenge not supported for cookie authorization.", struct_data={
 				"client_id": client_id})
 			raise OAuthAuthorizeError(
@@ -350,15 +352,15 @@ class AuthorizeHandler(object):
 				root_session = None
 
 		authenticated = root_session is not None and not root_session.is_anonymous()
-		allow_anonymous = "anonymous" in scope
-		if allow_anonymous and not client_dict.get("authorize_anonymous_users", False):
-			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidScope, client_id,
-				redirect_uri=redirect_uri,
-				state=state,
-				struct_data={"reason": "anonymous_access_not_allowed"})
-
-		session_expiration = client_dict.get("session_expiration")
+		allow_anonymous = "anonymous" in requested_scope
+		if allow_anonymous:
+			if client_dict.get("authorize_anonymous_users", False):
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.InvalidScope, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					struct_data={"reason": "anonymous_access_not_allowed"})
+			granted_scope.add("anonymous")
 
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
@@ -367,7 +369,7 @@ class AuthorizeHandler(object):
 				await self.SessionService.delete(root_session.SessionId)
 				L.log(asab.LOG_NOTICE, "Login prompt requested by client", struct_data={"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
-					scope=scope,
+					scope=requested_scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
@@ -380,7 +382,7 @@ class AuthorizeHandler(object):
 				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client", struct_data={
 					"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
-					scope=scope,
+					scope=requested_scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
@@ -395,7 +397,7 @@ class AuthorizeHandler(object):
 				L.log(asab.LOG_NOTICE, "Account selection or login prompt requested by client", struct_data={
 					"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
-					scope=scope,
+					scope=requested_scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
@@ -414,7 +416,7 @@ class AuthorizeHandler(object):
 			L.log(asab.LOG_NOTICE, "Login required", struct_data={
 				"client_id": client_id})
 			return await self.reply_with_redirect_to_login(
-				scope=scope,
+				scope=requested_scope,
 				client_id=client_id,
 				redirect_uri=redirect_uri,
 				state=state,
@@ -439,7 +441,7 @@ class AuthorizeHandler(object):
 				return await self.reply_with_factor_setup_redirect(
 					missing_factors=factors_to_setup,
 					response_type="code",
-					scope=scope,
+					scope=requested_scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
 					state=state,
@@ -447,31 +449,39 @@ class AuthorizeHandler(object):
 
 			# Authorize access to tenants requested in scope
 			try:
-				tenants = await self.authorize_tenants_by_scope(
-					scope, root_session.Authorization.Authz, root_session.Credentials.Id, client_id)
+				authorized_tenant = await self.OpenIdConnectService.get_accessible_tenant_from_scope(
+					requested_scope, root_session.Credentials.Id,
+					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(
+						root_session.Authorization.Authz)
+				)
 			except exceptions.AccessDeniedError:
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+					struct_data={"reason": "tenant_not_found"}
+				)
 
-			if authorize_type == "openid":
+			if auth_token_type == "openid":
 				new_session = await self.OpenIdConnectService.create_oidc_session(
-					root_session, client_id, scope,
+					root_session, client_id, requested_scope,
 					nonce=nonce,
-					tenants=tenants,
-					requested_expiration=session_expiration)
-			elif authorize_type == "cookie":
+					redirect_uri=redirect_uri,
+					tenants=[authorized_tenant] if authorized_tenant else None,
+					requested_expiration=AuthorizationCode.Expiration
+				)
+			elif auth_token_type == "cookie":
 				new_session = await self.CookieService.create_cookie_client_session(
-					root_session, client_id, scope,
+					root_session, client_id, requested_scope,
 					nonce=nonce,
-					tenants=tenants,
-					requested_expiration=session_expiration)
+					redirect_uri=redirect_uri,
+					tenants=[authorized_tenant] if authorized_tenant else None,
+					requested_expiration=AuthorizationCode.Expiration
+				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 			else:
-				raise ValueError("Unexpected authorize_type: {}".format(authorize_type))
+				raise ValueError("Unexpected auth_token_type: {}".format(auth_token_type))
 
 		else:  # Not authenticated, but it is allowed to open a new anonymous session
 			assert allow_anonymous
@@ -498,8 +508,10 @@ class AuthorizeHandler(object):
 
 			# Authorize access to tenants requested in scope
 			try:
-				tenants = await self.authorize_tenants_by_scope(
-					scope, authz, anonymous_cid, client_id)
+				authorized_tenant = await self.OpenIdConnectService.get_accessible_tenant_from_scope(
+					requested_scope, anonymous_cid,
+					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(authz)
+				)
 			except exceptions.AccessDeniedError:
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.AccessDenied, client_id,
@@ -507,20 +519,24 @@ class AuthorizeHandler(object):
 					state=state,
 					struct_data={"reason": "tenant_not_found"})
 
-			if authorize_type == "openid":
+			if auth_token_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-					anonymous_cid, client_dict, scope,
-					tenants=tenants,
-					from_info=from_info)
-			elif authorize_type == "cookie":
+					anonymous_cid, client_dict, requested_scope,
+					tenants=[authorized_tenant] if authorized_tenant else None,
+					redirect_uri=redirect_uri,
+					from_info=from_info,
+				)
+			elif auth_token_type == "cookie":
 				new_session = await self.CookieService.create_anonymous_cookie_client_session(
-					anonymous_cid, client_dict, scope,
-					tenants=tenants,
-					from_info=from_info)
+					anonymous_cid, client_dict, requested_scope,
+					tenants=[authorized_tenant] if authorized_tenant else None,
+					redirect_uri=redirect_uri,
+					from_info=from_info,
+				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
 			else:
-				raise ValueError("Unexpected authorize_type: {!r}".format(authorize_type))
+				raise ValueError("Unexpected auth_token_type: {!r}".format(auth_token_type))
 
 		AuditLogger.log(asab.LOG_NOTICE, "Authorization successful", struct_data={
 			"psid": new_session.Session.ParentSessionId,
@@ -530,16 +546,16 @@ class AuthorizeHandler(object):
 			"client_id": client_id,
 			"anonymous": new_session.is_anonymous(),
 			"from_ip": from_info,
-			"scope": scope,
+			"scope": requested_scope,
 		})
 		await self.OpenIdConnectService.LastActivityService.update_last_activity(
 			EventCode.AUTHORIZE_SUCCESS,
 			credentials_id=new_session.Credentials.Id,
-			tenants=list(tenants),
+			tenants=[authorized_tenant] if authorized_tenant else None,
 			scope=list(scope)
 		)
 		return await self.reply_with_successful_response(
-			new_session, scope, redirect_uri, state,
+			new_session, requested_scope, redirect_uri, state,
 			code_challenge=code_challenge,
 			code_challenge_method=code_challenge_method,
 			from_info=from_info)
@@ -572,7 +588,7 @@ class AuthorizeHandler(object):
 		try:
 			client_dict = await self.OpenIdConnectService.ClientService.get(client_id)
 		except KeyError as e:
-			raise client.exceptions.ClientNotFoundError(client_id) from e
+			raise exceptions.ClientNotFoundError(client_id) from e
 
 		try:
 			await self.OpenIdConnectService.ClientService.validate_client_authorize_options(
@@ -580,16 +596,16 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				response_type=response_type,
 			)
-		except client.exceptions.InvalidRedirectURI as e:
+		except exceptions.InvalidRedirectURI as e:
 			raise e
-		except client.exceptions.ClientError as e:
+		except exceptions.ClientError as e:
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id)
 		return client_dict
 
 
-	async def _get_authorize_type(self, client_id, scope):
+	async def _get_auth_token_type(self, client_id, scope):
 		"""
 		Extract authorization type - either 'openid' or 'cookie'.
 		"""
@@ -662,7 +678,7 @@ class AuthorizeHandler(object):
 			url_qs["state"] = state
 
 		# Add the Authorization Code into the response
-		url_qs["code"] = await self.OpenIdConnectService.generate_authorization_code(
+		url_qs["code"] = await self.OpenIdConnectService.create_authorization_code(
 			session,
 			code_challenge=code_challenge,
 			code_challenge_method=code_challenge_method
@@ -728,7 +744,7 @@ class AuthorizeHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-		delete_cookie(self.App, response)
+		self.CookieService.delete_session_cookie(response)
 		return response
 
 	async def reply_with_factor_setup_redirect(
@@ -847,31 +863,6 @@ class AuthorizeHandler(object):
 			"client_id": error.ClientId,
 			**error.StructData
 		})
-
-
-	async def authorize_tenants_by_scope(self, scope, authz, credentials_id, client_id):
-		"""
-		Extract requested tenants from scope and verify that the credential has access to all of them.
-		Return a list of the authorized tenants.
-		"""
-		has_access_to_all_tenants = self.OpenIdConnectService.RBACService.has_resource_access(
-			authz, tenant=None, requested_resources=["authz:superuser"]) \
-			or self.OpenIdConnectService.RBACService.has_resource_access(
-			authz, tenant=None, requested_resources=["authz:tenant:access"])
-		try:
-			tenants = await self.OpenIdConnectService.TenantService.get_tenants_by_scope(
-				scope, credentials_id, has_access_to_all_tenants)
-		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-
-		return tenants
 
 
 	def _build_login_uri(self, client_dict, login_query_params):
