@@ -60,7 +60,7 @@ class RoleService(asab.Service):
 				query_filter["tenant"] = {"$in": [tenant, None]}
 		if filter:
 			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
-			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(filter)}
+			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
 		if resource is not None:
 			query_filter["resources"] = resource
 		if active_only is True:
@@ -83,6 +83,29 @@ class RoleService(asab.Service):
 			"count": count,
 			"data": roles,
 		}
+
+
+	async def iterate(
+		self, tenant: str | None, page: int = 0, limit: int = None, filter: str = None, *, resource: str = None,
+	):
+		assert tenant != "*"  # Use tenant=None
+		query_filter = {"tenant": tenant}
+		if filter:
+			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
+			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
+		if resource is not None:
+			query_filter["resources"] = resource
+
+		collection = self.StorageService.Database[self.RoleCollection]
+		cursor = collection.find(query_filter)
+
+		cursor.sort("_c", -1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
+		async for role in cursor:
+			yield role
 
 
 	async def get(self, role_id: str):
@@ -335,10 +358,7 @@ class RoleService(asab.Service):
 
 		tenant, _ = role_id.split("/", 1)
 		if verify_tenant and tenant != "*":
-			try:
-				await self.TenantService.get_tenant(tenant)
-			except KeyError:
-				raise exceptions.TenantNotFoundError(tenant)
+			await self.TenantService.get_tenant(tenant)
 
 		if verify_credentials:
 			try:

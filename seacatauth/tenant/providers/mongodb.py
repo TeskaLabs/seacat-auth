@@ -131,21 +131,17 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 	async def delete(self, tenant_id: str) -> Optional[bool]:
 		"""
-		Delete tenant. Also delete all its roles and assignments.
+		Delete tenant
 		"""
 		await self.MongoDBStorageService.delete(self.TenantsCollection, tenant_id)
 		L.log(asab.LOG_NOTICE, "Tenant deleted.", struct_data={"tenant": tenant_id})
 
 
 	async def get(self, tenant_id) -> Optional[dict]:
-		# Fetch the tenant from a Mongo
-		tenant = await self.MongoDBStorageService.get(
-			self.TenantsCollection,
-			# bson.ObjectId(tenant_id)
-			tenant_id
-		)
-
-		return tenant
+		"""
+		Get tenant
+		"""
+		return await self.MongoDBStorageService.get(self.TenantsCollection, tenant_id)
 
 
 	# async def register(self, register_info, credentials_id):

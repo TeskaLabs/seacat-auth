@@ -12,6 +12,7 @@ from ... import client, generic, AuditLogger
 from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
+from ...last_activity import EventCode
 
 #
 
@@ -531,6 +532,12 @@ class AuthorizeHandler(object):
 			"from_ip": from_info,
 			"scope": scope,
 		})
+		await self.OpenIdConnectService.LastActivityService.update_last_activity(
+			EventCode.AUTHORIZE_SUCCESS,
+			credentials_id=new_session.Credentials.Id,
+			tenants=list(tenants),
+			scope=list(scope)
+		)
 		return await self.reply_with_successful_response(
 			new_session, scope, redirect_uri, state,
 			code_challenge=code_challenge,

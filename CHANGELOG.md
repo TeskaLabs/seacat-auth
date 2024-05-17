@@ -3,18 +3,34 @@
 ## v24.17
 
 ### Pre-releases
+- `v24.17-alpha7`
+- `v24.17-alpha6`
+- `v24.17-alpha5`
+- `v24.17-alpha4`
+- `v24.17-alpha3`
+- `v24.17-alpha2`
 - `v24.17-beta1`
 - `v24.17-alpha1`
 
 ### Fix
+- Deny password change when old password verification fails (#374, `v24.17-alpha7`)
+- Authorize into last active tenant (#373, `v24.17-alpha6`)
+- Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
 - Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
 - Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
 
 ### Features
+- Improve resource sorting and filtering (#370, `v24.17-alpha3`)
+- User invitations are enabled by default (#367, `v24.17-alpha2`)
 - When invitation cannot be created because the user already exists, the invitation is re-sent (#364, `v24.17-alpha1`)
 - When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
 - Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
 - List credentials from authorized tenant only (#348, `v24.06-alpha13`)
+
+### Refactoring
+- Consistent use of item-specific not-found exceptions (#371, `v24.17-alpha5`)
+- Deprecate passlib (#368, `v24.17-alpha4`)
+- Utility functions for password verification (#368, `v24.17-alpha4`)
 
 ---
 
