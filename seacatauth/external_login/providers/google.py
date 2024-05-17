@@ -18,5 +18,5 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 		"authorization_endpoint": "https://accounts.google.com/o/oauth2/auth",
 		"token_endpoint": "https://accounts.google.com/o/oauth2/token",
 		"scope": "openid profile email",
-		"label": "Google",
+		"label": "Sign in with Google",
 	}

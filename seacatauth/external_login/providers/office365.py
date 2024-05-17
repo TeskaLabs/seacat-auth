@@ -20,7 +20,7 @@ class Office365OAuth2Login(GenericOAuth2Login):
 		"token_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
 		"tenant_id": "",
 		"scope": "openid",
-		"label": "Office365",
+		"label": "Sign in with Office365",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
