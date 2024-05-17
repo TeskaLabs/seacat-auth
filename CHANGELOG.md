@@ -3,11 +3,15 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha3`
 - `v24.20-alpha2`
 - `v24.20-alpha1`
 
 ### Breaking changes
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
+
+### Fix
+- Properly handle Argon2 verification error in login call (#378, `v24.20-alpha3`)
 
 ### Features
 - Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
