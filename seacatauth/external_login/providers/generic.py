@@ -232,10 +232,10 @@ class GenericOAuth2Login(asab.Configurable):
 		await self._prepare_jwks()
 
 		id_token_claims = self._get_verified_claims(id_token, expected_nonce)
-		user_info = await self._user_data_from_id_token_claims(id_token_claims)
+		user_info = self._user_data_from_id_token_claims(id_token_claims)
 		return user_info
 
-	async def _user_data_from_id_token_claims(self, id_token_claims: dict):
+	def _user_data_from_id_token_claims(self, id_token_claims: dict):
 		user_info = {
 			k: v
 			for k, v in id_token_claims.items()
