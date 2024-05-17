@@ -33,7 +33,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		"response_type": "code",
 		"scope": "public_profile",
 		"fields": "id,name,email",
-		"label": "Facebook",
+		"label": "Sign in with Facebook",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
@@ -44,8 +44,8 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		self.Fields = self.Config.get("fields")
 		assert self.UserInfoEndpoint not in (None, "")
 
-	def _get_authorize_uri(
-		self, redirect_uri: str,
+	def get_authorize_uri(
+		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	):
@@ -53,8 +53,9 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			("client_id", self.ClientId),
 			("response_type", self.ResponseType),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri),
+			("redirect_uri", redirect_uri or self.CallbackUrl),
 		]
+		# "nonce" is not supported
 		if state is not None:
 			query_params.append(("state", state))
 		return "{authorize_uri}?{query_string}".format(
@@ -62,7 +63,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data, redirect_uri):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Info is not contained in token response, call to userinfo_endpoint is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
@@ -74,7 +75,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 				"query": dict(authorize_data)})
 			return None
 
-		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
+		async with self.token_request(code) as resp:
 			token_data = await resp.json()
 
 		if "access_token" not in token_data:

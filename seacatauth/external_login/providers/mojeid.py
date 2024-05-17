@@ -18,7 +18,7 @@ class MojeIDOAuth2Login(GenericOAuth2Login):
 		"authorization_endpoint": "https://mojeid.cz/oidc/authorization/",
 		"token_endpoint": "https://mojeid.cz/oidc/token/",
 		"scope": "openid email phone",
-		"label": "MojeID",
+		"label": "Sign in with MojeID",
 	}
 
 	# TODO: MojeID provides extensive settings for encryption algorithms and other features.

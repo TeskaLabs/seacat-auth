@@ -35,15 +35,15 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		"token_endpoint": "https://appleid.apple.com/auth/token",
 		"jwks_uri": "https://appleid.apple.com/auth/keys",
 		"scope": "name email",
-		"label": "AppleID",
+		"label": "Sign in with Apple",
 	}
 
 	def __init__(self, external_login_svc, config_section_name, config=None):
 		super().__init__(external_login_svc, config_section_name, config)
 		self.Scope = self.Config.get("scope")
 
-	def _get_authorize_uri(
-		self, redirect_uri: str,
+	def get_authorize_uri(
+		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	) -> str:
@@ -52,7 +52,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			("response_type", "code id_token"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri),
+			("redirect_uri", redirect_uri or self.CallbackUrl),
 		]
 		if state is not None:
 			query_params.append(("state", state))
@@ -63,7 +63,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data: dict, redirect_uri: str) -> typing.Optional[dict]:
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		auth_error = authorize_data.get('error')
 		if auth_error is not None:
 			if auth_error == 'user_cancelled_authorize':
@@ -80,7 +80,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 				return None
 
 		id_token = authorize_data.get("id_token")
-		verified_claims = self._get_verified_claims(id_token)
+		verified_claims = self._get_verified_claims(id_token, expected_nonce)
 		if not verified_claims:
 			return None
 
