@@ -299,7 +299,10 @@ def argon2_hash(secret: bytes | str) -> str:
 
 
 def argon2_verify(hash: bytes | str, secret: bytes | str) -> bool:
-	return argon2.PasswordHasher().verify(hash, secret)
+	try:
+		return argon2.PasswordHasher().verify(hash, secret)
+	except argon2.exceptions.VerifyMismatchError:
+		return False
 
 
 def generate_ergonomic_token(length: int):
