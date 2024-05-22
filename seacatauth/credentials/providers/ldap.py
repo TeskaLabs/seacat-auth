@@ -360,7 +360,8 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		try:
 			lc.simple_bind_s(dn, password)
 		except ldap.INVALID_CREDENTIALS:
-			L.error("LDAP: Invalid credentials", struct_data={"dn": dn})
+			L.log(asab.LOG_NOTICE, "Authentication failed: Invalid LDAP credentials.", struct_data={
+				"cid": credentials_id, "dn": dn})
 			return False
 
 		lc.unbind_s()
