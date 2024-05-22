@@ -26,6 +26,7 @@ class EventTypes:
 	CREDENTIALS_UPDATED = "credentials_updated"
 
 	EXTERNAL_LOGIN_CREATED = "external_login_created"
+	EXTERNAL_LOGIN_STATE_CREATED = "external_login_state_created"
 
 	OPENID_AUTH_CODE_GENERATED = "openid_auth_code_generated"
 
