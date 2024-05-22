@@ -168,9 +168,12 @@ class SeaCatAuthApplication(asab.Application):
 		self.OTPService = OTPService(self)
 		self.OTPHandler = OTPHandler(self, self.OTPService)
 
-		from .external_login import ExternalLoginService, ExternalLoginHandler
+		from .external_login import (
+			ExternalLoginService, ExternalLoginAdminHandler, ExternalLoginAccountHandler, ExternalLoginPublicHandler)
 		self.ExternalLoginService = ExternalLoginService(self)
-		self.ExternalLoginHandler = ExternalLoginHandler(self, self.ExternalLoginService)
+		self.ExternalLoginAdminHandler = ExternalLoginAdminHandler(self, self.ExternalLoginService)
+		self.ExternalLoginAccountHandler = ExternalLoginAccountHandler(self, self.ExternalLoginService)
+		self.ExternalLoginPublicHandler = ExternalLoginPublicHandler(self, self.ExternalLoginService)
 
 		from .feature import FeatureService, FeatureHandler
 		self.FeatureService = FeatureService(self)

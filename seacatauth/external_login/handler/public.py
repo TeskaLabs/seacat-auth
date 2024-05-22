@@ -5,9 +5,9 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-from .service import ExternalLoginService
-from .. import generic, exceptions
-from ..decorators import access_control
+from seacatauth.external_login.service import ExternalLoginService
+from seacatauth import generic, exceptions
+from seacatauth.decorators import access_control
 
 #
 
@@ -16,12 +16,12 @@ L = logging.getLogger(__name__)
 #
 
 
-class ExternalLoginHandler(object):
+class ExternalLoginPublicHandler(object):
 	"""
 	External login
 
 	---
-	tags: ["External login"]
+	tags: ["Public - External login"]
 	"""
 
 	def __init__(self, app, external_login_svc: ExternalLoginService):
@@ -30,45 +30,48 @@ class ExternalLoginHandler(object):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get(
-			self.ExternalLoginService.CallbackEndpointPath, self.login_callback)
-		web_app.router.add_delete(
-			"/account/ext-login/{provider_type}", self.remove_external_login_credential)
-		web_app.router.add_delete(
-			"/account/ext-login/{provider_type}/{sub}", self.remove_external_login_credential)
-
-		# Public endpoints
 		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get(
-			"/public/ext-login/{provider_type}/initialize", self.initialize_login)
-		web_app_public.router.add_get(
-			self.ExternalLoginService.CallbackEndpointPath, self.login_callback)
+
+		web_app.router.add_get("/public/ext-login/{provider_type}/login", self.login_with_external_account)
+		web_app.router.add_get("/public/ext-login/{provider_type}/signup", self.sign_up_with_external_account)
+		web_app.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
+
+		web_app_public.router.add_get("/public/ext-login/{provider_type}/login", self.login_with_external_account)
+		web_app_public.router.add_get("/public/ext-login/{provider_type}/signup", self.sign_up_with_external_account)
+		web_app_public.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
 
 
-	async def initialize_login(self, request):
-		login_session_id = request.query.get("lsid")
+	async def login_with_external_account(self, request):
+		"""
+		Initialize login with external account.
+		Navigable endpoint, redirects to external login page.
+		"""
+		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		try:
-			provider = self.ExternalLoginService.get_provider(provider_type)
-		except KeyError:
-			# Authorization flow broken
-			L.error("Unsupported external login provider type", struct_data={
-				"provider_type": provider_type})
-			return self._error_redirect()
-
-		authorization_url = await self.ExternalLoginService.prepare_external_login_url(
-			provider, login_session_id, request.Session)
+		authorization_url = await self.ExternalLoginService.login_with_external_account_initialize(
+			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(location=authorization_url)
 
 
-	async def login_callback(self, request):
+	async def sign_up_with_external_account(self, request):
 		"""
-		Process external login provider authorization response, negotiate ID token / user info, and
-		- if the user is not logged in and the external credential is known, log the user in;
-		- if the user is not logged in and the external credential is not known, attempt registration;
-		- if the user is logged in, assign the external credential to them.
-		Finally, redirect the user agent to the authorization endpoint and resume the authorization flow.
+		Initialize login with external account.
+		Navigable endpoint, redirects to external login page.
 		"""
+		redirect_uri = request.query.get("redirect_uri")
+		provider_type = request.match_info["provider_type"]
+		authorization_url = await self.ExternalLoginService.sign_up_with_external_account_initialize(
+			provider_type, redirect_uri)
+		return aiohttp.web.HTTPFound(location=authorization_url)
+
+
+	async def external_auth_callback(self, request):
+		"""
+		Finalize external auth.
+		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth client
+		settings at the external account provider.
+		"""
+		# TODO:
 		provider_type = request.match_info["provider_type"]
 		try:
 			provider = self.ExternalLoginService.get_provider(provider_type)
@@ -209,7 +212,7 @@ class ExternalLoginHandler(object):
 
 
 	@access_control()
-	async def remove_external_login_credential(self, request, *, credentials_id):
+	async def remove_my_external_login_credential(self, request, *, credentials_id):
 		"""
 		Unregister an external login credential
 		"""
