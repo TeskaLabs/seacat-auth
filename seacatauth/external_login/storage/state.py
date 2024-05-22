@@ -16,11 +16,17 @@ L = logging.getLogger(__name__)
 
 
 class StateStorage:
-	def __init__(self, storage_service, collection_name: str):
+	def __init__(self, app, storage_service, collection_name: str):
 		self.StorageService = storage_service
 		self.CollectionName = collection_name
 		self.StateExpiration = datetime.timedelta(seconds=asab.Config.getseconds(
 			"seacatauth:external_login", "state_expiration"))
+		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	async def _on_housekeeping(self, event_name):
+		await self._delete_expired()
+
 
 	async def create(
 		self,
@@ -40,7 +46,9 @@ class StateStorage:
 
 
 	async def get(self, state_id):
-		return await self.StorageService.get(self.CollectionName, state_id)
+		state = await self.StorageService.get(self.CollectionName, state_id)
+		if state["_c"] < datetime.datetime.now(datetime.timezone.utc) - self.StateExpiration:
+			raise KeyError(state_id)
 
 
 	async def update(self, state_id):
@@ -49,3 +57,13 @@ class StateStorage:
 
 	async def delete(self, state_id):
 		return await self.StorageService.delete(self.CollectionName, state_id)
+
+
+	async def _delete_expired(self):
+		collection = self.StorageService.Database[self.CollectionName]
+		query = {"_c": {"$lt": datetime.datetime.now(datetime.timezone.utc) - self.StateExpiration}}
+		result = await collection.delete_many(query)
+		if result.deleted_count > 0:
+			L.info("Expired external login states deleted.", struct_data={
+				"count": result.deleted_count
+			})
