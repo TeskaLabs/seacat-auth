@@ -1,11 +1,9 @@
-import datetime
 import pymongo
 import logging
 
 import asab
 import asab.web.rest
 
-from ..utils import AuthOperation
 from ...events import EventTypes
 
 
@@ -58,14 +56,25 @@ class ExternalAccountStorage:
 
 
 	async def get(self, provider_type: str, sub: str):
-		return await self.StorageService.get(self.CollectionName, _make_id(provider_type, sub))
+		account = await self.StorageService.get(self.CollectionName, _make_id(provider_type, sub))
+		account = _add_back_compat_fields(account)
+		return account
 
 
 	async def list(self, credentials_id: str):
-		raise NotImplementedError()
+		collection = self.StorageService.Database[self.CollectionName]
+		query = {"cid": credentials_id}
+		cursor = collection.find(query)
+		cursor.sort("_c", -1)
+
+		accounts = []
+		async for account in cursor:
+			accounts.append(_add_back_compat_fields(account))
+
+		return accounts
 
 
-	async def update(self, state_id):
+	async def update(self, provider_type: str, sub: str, **kwargs):
 		raise NotImplementedError()
 
 
@@ -75,3 +84,12 @@ class ExternalAccountStorage:
 
 def _make_id(provider_type: str, sub: str):
 	return "{} {}".format(provider_type, sub)
+
+def _add_back_compat_fields(account: dict):
+	if "e" in account and "email" not in account:
+		account["email"] = account["e"]
+	if "s" in account and "sub" not in account:
+		account["sub"] = account["s"]
+	if "t" in account and "type" not in account:
+		account["type"] = account["t"]
+	return account
