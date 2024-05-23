@@ -41,7 +41,7 @@ class ExternalLoginAdminHandler(object):
 		List user's external login credentials
 		"""
 		credentials_id = request.match_info["credentials_id"]
-		data = await self.ExternalLoginService.list_accounts(credentials_id)
+		data = await self.ExternalLoginService.list_external_accounts(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -52,7 +52,7 @@ class ExternalLoginAdminHandler(object):
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
-		data = await self.ExternalLoginService.get_account(provider_type, subject)
+		data = await self.ExternalLoginService.get_external_account(provider_type, subject)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -63,5 +63,5 @@ class ExternalLoginAdminHandler(object):
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
-		await self.ExternalLoginService.remove_account(provider_type, subject)
+		await self.ExternalLoginService.remove_external_account(provider_type, subject)
 		return asab.web.rest.json_response(request, {"result": "OK"})

@@ -34,13 +34,13 @@ class ExternalLoginStateStorage:
 		self,
 		state_id: str,
 		provider_type: str,
-		action: AuthOperation,
+		operation: AuthOperation,
 		redirect_uri: str,
 		nonce: str
 	):
 		upsertor = self.StorageService.upsertor(self.ExternalLoginStateCollection, obj_id=state_id)
-		upsertor.set("type", provider_type)
-		upsertor.set("action", action.value)
+		upsertor.set("provider", provider_type)
+		upsertor.set("operation", operation.value)
 		upsertor.set("redirect_uri", redirect_uri)
 		upsertor.set("nonce", nonce)
 		state_id = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_STATE_CREATED)
@@ -51,6 +51,8 @@ class ExternalLoginStateStorage:
 		state = await self.StorageService.get(self.ExternalLoginStateCollection, state_id)
 		if state["_c"] < datetime.datetime.now(datetime.timezone.utc) - self.StateExpiration:
 			raise KeyError(state_id)
+		state["operation"] = AuthOperation.deserialize(state["operation"])
+		return state
 
 
 	async def update(self, state_id):
