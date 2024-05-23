@@ -64,9 +64,9 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		)
 
 	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
-		auth_error = authorize_data.get('error')
+		auth_error = authorize_data.get("error")
 		if auth_error is not None:
-			if auth_error == 'user_cancelled_authorize':
+			if auth_error == "user_cancelled_authorize":
 				L.error(
 					"User has cancelled authorization with identity provider",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
