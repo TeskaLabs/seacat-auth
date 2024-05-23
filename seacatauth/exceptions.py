@@ -101,6 +101,17 @@ class ProviderNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Provider {!r} not found".format(self.ProviderId), *args)
 
 
+class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
+	"""
+	External login account not found
+	"""
+	def __init__(self, provider_id: str, sub: str, *args):
+		self.ProviderId = provider_id
+		self.Subject = sub
+		super().__init__("External login account {!r} not found in provider {!r}".format(
+			self.Subject, self.ProviderId), *args)
+
+
 class LoginPrologueDeniedError(SeacatAuthError):
 	"""
 	Seacat login prologue was denied

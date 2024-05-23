@@ -1,2 +1,2 @@
-from .state import StateStorage
-from .external_account import ExternalAccountStorage
+from .state import ExternalLoginStateStorage
+from .external_account import ExternalLoginAccountStorage

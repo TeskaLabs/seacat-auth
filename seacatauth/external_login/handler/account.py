@@ -43,8 +43,7 @@ class ExternalLoginAccountHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.add_external_account_initialize(
-			request.Session, provider_type, redirect_uri)
+		authorization_url = await self.ExternalLoginService.add_external_account_initialize(provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(location=authorization_url)
 
 
@@ -52,7 +51,7 @@ class ExternalLoginAccountHandler(object):
 		"""
 		List the current user's external login accounts
 		"""
-		data = await self.ExternalLoginService.list_users_external_accounts(request.Session.Credentials.Id)
+		data = await self.ExternalLoginService.list_accounts(request.Session.Credentials.Id)
 		return asab.web.rest.json_response(request, data)
 
 

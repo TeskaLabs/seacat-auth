@@ -14,21 +14,23 @@ L = logging.getLogger(__name__)
 #
 
 
-class ExternalAccountStorage:
-	def __init__(self, storage_service, collection_name: str):
-		self.StorageService = storage_service
-		self.CollectionName = collection_name
+class ExternalLoginAccountStorage:
+
+	ExternalLoginAccountCollection = "ela"
+
+	def __init__(self, app):
+		self.StorageService = app.get_service("asab.StorageService")
 
 
 	async def initialize(self):
-		coll = await self.StorageService.collection(self.CollectionName)
+		coll = await self.StorageService.collection(self.ExternalLoginAccountCollection)
 		await coll.create_index([("cid", pymongo.ASCENDING)])
 
 
 	async def create(self, credentials_id: str, provider_type: str, user_info: dict | None = None):
 		sub = str(user_info["sub"])
 		upsertor = self.StorageService.upsertor(
-			self.CollectionName,
+			self.ExternalLoginAccountCollection,
 			obj_id=_make_id(provider_type, sub)
 		)
 		upsertor.set("type", provider_type)
@@ -56,13 +58,13 @@ class ExternalAccountStorage:
 
 
 	async def get(self, provider_type: str, sub: str):
-		account = await self.StorageService.get(self.CollectionName, _make_id(provider_type, sub))
+		account = await self.StorageService.get(self.ExternalLoginAccountCollection, _make_id(provider_type, sub))
 		account = _add_back_compat_fields(account)
 		return account
 
 
 	async def list(self, credentials_id: str):
-		collection = self.StorageService.Database[self.CollectionName]
+		collection = self.StorageService.Database[self.ExternalLoginAccountCollection]
 		query = {"cid": credentials_id}
 		cursor = collection.find(query)
 		cursor.sort("_c", -1)
@@ -79,7 +81,7 @@ class ExternalAccountStorage:
 
 
 	async def delete(self, provider_type: str, sub: str):
-		return await self.StorageService.delete(self.CollectionName, _make_id(provider_type, sub))
+		return await self.StorageService.delete(self.ExternalLoginAccountCollection, _make_id(provider_type, sub))
 
 
 def _make_id(provider_type: str, sub: str):

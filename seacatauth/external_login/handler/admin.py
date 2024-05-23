@@ -30,21 +30,22 @@ class ExternalLoginAdminHandler(object):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/admin/ext-login/{credentials_id}", self.list_users_external_accounts)
+		web_app.router.add_get("/admin/ext-login/{credentials_id}", self.list_external_accounts)
 		web_app.router.add_get("/admin/ext-login/{provider_type}/{sub}", self.get_external_account)
 		web_app.router.add_delete("/admin/ext-login/{provider_type}/{sub}", self.remove_external_account)
 
 
 	@access_control("authz:superuser")
-	async def list_users_external_accounts(self, request):
+	async def list_external_accounts(self, request):
 		"""
 		List user's external login credentials
 		"""
 		credentials_id = request.match_info["credentials_id"]
-		data = await self.ExternalLoginService.list_users_external_accounts(credentials_id)
+		data = await self.ExternalLoginService.list_accounts(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
+	@access_control("authz:superuser")
 	async def get_external_account(self, request):
 		"""
 		Get external login credentials detail
@@ -55,6 +56,7 @@ class ExternalLoginAdminHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
+	@access_control("authz:superuser")
 	async def remove_external_account(self, request):
 		"""
 		Remove external login credentials
