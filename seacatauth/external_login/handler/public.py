@@ -8,6 +8,7 @@ import asab.web.rest
 from seacatauth.external_login.service import ExternalLoginService
 from seacatauth import generic, exceptions
 from seacatauth.decorators import access_control
+from seacatauth.external_login.utils import AuthOperation
 
 #
 
@@ -63,6 +64,35 @@ class ExternalLoginPublicHandler(object):
 		authorization_url = await self.ExternalLoginService.sign_up_with_external_account_initialize(
 			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(location=authorization_url)
+
+
+	async def external_auth_callback(self, request):
+		"""
+		Finalize external auth.
+		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth client
+		settings at the external account provider.
+		"""
+		if request.method == "POST":
+			authorization_data = dict(await request.post())
+		else:
+			authorization_data = dict(request.query)
+
+		try:
+			operation, result = await self.ExternalLoginService.finalize_external_auth(
+				session_context=request.Session, **authorization_data)
+		except exceptions.ExternalLoginError:
+			return self._error_redirect()
+
+		response = aiohttp.web.HTTPFound(location=result["redirect_uri"])
+		if operation == AuthOperation.LogIn:
+			# Set SSO session cookie
+			assert "session" in result
+			self.ExternalLoginService.CookieService.set_session_cookie(
+				response,
+				cookie_value=result["session"].Cookie.Id,
+				client_id=result["session"].OAuth2.ClientId
+			)
+		return response
 
 
 	async def external_auth_callback(self, request):
@@ -160,12 +190,12 @@ class ExternalLoginPublicHandler(object):
 			new_session = await self.ExternalLoginService.login(
 				login_session, provider_type, subject, from_ip=from_ip)
 
-		elif self.ExternalLoginService.can_register_new_credentials():
+		elif self.ExternalLoginService._can_register_new_credentials():
 			# Register new Seacat Auth credentials, either directly or via webhook
 			# Do not send the authorization code
 			authorize_data_safe = {k: v for k, v in authorization_data.items() if k != "code"}
 			try:
-				credentials_id = await self.ExternalLoginService.create_new_seacat_auth_credentials(
+				credentials_id = await self.ExternalLoginService._create_new_seacat_auth_credentials(
 					provider_type, user_info, authorize_data_safe)
 				new_session = await self.ExternalLoginService.login(
 					login_session, provider_type, subject, from_ip=from_ip)

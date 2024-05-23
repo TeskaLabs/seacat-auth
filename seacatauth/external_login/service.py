@@ -107,6 +107,8 @@ class ExternalLoginService(asab.Service):
 
 
 	async def sign_up_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+		if not self._can_register_new_credentials():
+			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
 		return await self._initialize_external_auth(
 			provider_type, action=AuthOperation.SignUp, redirect_uri=redirect_uri)
 
@@ -124,62 +126,191 @@ class ExternalLoginService(asab.Service):
 		return provider.get_authorize_uri(state=state_id, nonce=nonce)
 
 
-	async def finalize_external_auth(self, state: str, **authorization_data: dict):
+	async def finalize_external_auth(
+		self,
+		session_context,
+		state: str,
+		**authorization_data: dict
+	) -> typing.Tuple[AuthOperation, dict]:
 		state = await self.ExternalLoginStateStorage.get(state)
-		state["action"]
-		state["type"]
+		provider_type = state["provider"]
+		redirect_uri = state.get("redirect_uri")
+		provider = self.get_provider(provider_type)
+
+		user_info = await provider.get_user_info(authorization_data, expected_nonce=state.get("nonce"))
+		if user_info is None:
+			L.error("Cannot obtain user info from external login provider.")
+			raise exceptions.ExternalLoginError("Failed to obtain user info", provider=provider_type)
+
+		if "sub" not in user_info:
+			L.error("User info does not contain the 'sub' (subject ID) claim.")
+			raise exceptions.ExternalLoginError(
+				"User info does not contain the 'sub' (subject ID) claim.", provider=provider_type)
+
+		if state["operation"] == AuthOperation.AddAccount:
+			return (
+				state["operation"],
+				await self._add_external_account(session_context, provider_type, user_info, redirect_uri)
+			)
+		elif state["operation"] == AuthOperation.LogIn:
+			return (
+				state["operation"],
+				await self._login_with_external_account(session_context, provider_type, user_info, redirect_uri)
+			)
+		elif state["operation"] == AuthOperation.SignUp:
+			return (
+				state["operation"],
+				await self._sign_up_with_external_account(session_context, provider_type, user_info, redirect_uri)
+			)
+		else:
+			raise ValueError("Unknown auth operation {!r}".format(state["operation"]))
 
 
-	async def add_account(self, credentials_id: str, provider_type: str, user_info: dict | None = None):
+	async def _login_with_external_account(
+		self,
+		session_context,
+		provider_type: str,
+		user_info: dict,
+		redirect_uri: str
+	) -> dict:
+		try:
+			account = await self.get_external_account(provider_type, subject=user_info["sub"])
+		except exceptions.ExternalAccountNotFoundError:
+			# Unknown external account
+			# TODO: Perhaps the user wanted to sign up instead?
+			if session_context and not session_context.is_anonymous():
+				# Some user is already logged in
+				raise NotImplementedError("Login with external account: Unknown external account with a valid SSO session")
+			else:
+				raise NotImplementedError("Login with external account: Unknown external account")
+
+		credentials_id = account["cid"]
+		if session_context and not session_context.is_anonymous():
+			# Some user is already logged in
+			if session_context.Credentials.Id == credentials_id:
+				# The external account belongs to the user that is already logged in
+				raise NotImplementedError("Login with external account: Re-login")
+			else:
+				# The external account belongs to someone else than who is logged in
+				# TODO: Invalidate current SSO session and create a new one
+				raise NotImplementedError("Login with external account: Login")
+		else:
+			# TODO: Create a new root SSO session
+			raise NotImplementedError("Login with external account: Login")
+		return {"redirect_uri": redirect_uri, "sso_session": sso_session}
+
+
+	async def _sign_up_with_external_account(
+		self,
+		session_context,
+		provider_type: str,
+		user_info: dict,
+		redirect_uri: str
+	) -> dict:
+		if not self._can_register_new_credentials():
+			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
+
+		if session_context and not session_context.is_anonymous():
+			raise NotImplementedError("Sign up with external account: Someone is logged in already")
+
+		try:
+			await self.get_external_account(provider_type, subject=user_info["sub"])
+			# Account already registered
+			# TODO: Perhaps the user wanted to log in instead?
+			raise NotImplementedError("Sign up with external account: External account already registered")
+		except exceptions.ExternalAccountNotFoundError:
+			# Unknown account can be used for signup
+			pass
+
+		# Create Seacat credentials
+		credentials_id = await self._create_new_seacat_auth_credentials(provider_type, user_info)
+		# Add the external account to the just created credentials
 		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
+		# Log the user in
+		raise NotImplementedError("Sign up with external account: Auto login after sign up")
 
-	async def list_accounts(self, credentials_id: str):
+		return {"redirect_uri": redirect_uri, "sso_session": sso_session}
+
+
+	async def _add_external_account(
+		self,
+		session_context,
+		provider_type: str,
+		user_info: dict,
+		redirect_uri: str
+	) -> dict:
+		if not session_context and not session_context.is_anonymous():
+			raise exceptions.AccessDeniedError("Authentication required")
+		credentials_id = session_context.Credentials.Id
+		try:
+			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
+		except asab.exceptions.Conflict as e:
+			raise NotImplementedError("Add external account: External account already registered") from e
+		return {"redirect_uri": redirect_uri}
+
+
+	async def list_external_accounts(self, credentials_id: str):
 		return await self.ExternalLoginAccountStorage.list(credentials_id)
 
 
-	async def get_account(self, provider_type: str, sub: str, credentials_id: typing.Optional[str] = None) -> dict:
+	async def get_external_account(
+		self,
+		provider_type: str,
+		subject: str,
+		credentials_id: typing.Optional[str] = None
+	) -> dict:
 		try:
-			account = await self.ExternalLoginAccountStorage.get(provider_type, sub)
+			account = await self.ExternalLoginAccountStorage.get(provider_type, subject)
 		except KeyError:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
+			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
 		if credentials_id and credentials_id != account["cid"]:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
+			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
 		return account
 
 
-	async def update_account(self, provider_type: str, sub: str, credentials_id: typing.Optional[str] = None, **kwargs):
-		account = await self.get_account(provider_type, sub, credentials_id)
+	async def update_external_account(
+		self,
+		provider_type: str,
+		subject: str,
+		credentials_id: typing.Optional[str] = None,
+		**kwargs
+	):
+		account = await self.get_external_account(provider_type, subject, credentials_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
-		return await self.ExternalLoginAccountStorage.update(provider_type, sub, **kwargs)
+			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
+		return await self.ExternalLoginAccountStorage.update(provider_type, subject, **kwargs)
 
 
-	async def remove_account(self, provider_type: str, sub: str, credentials_id: typing.Optional[str] = None):
-		account = await self.get_account(provider_type, sub, credentials_id)
+	async def remove_external_account(
+		self,
+		provider_type: str,
+		subject: str,
+		credentials_id: typing.Optional[str] = None
+	):
+		account = await self.get_external_account(provider_type, subject, credentials_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
-		return await self.ExternalLoginAccountStorage.delete(provider_type, sub)
+			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
+		return await self.ExternalLoginAccountStorage.delete(provider_type, subject)
 
 
-	def can_register_new_credentials(self):
+	def _can_register_new_credentials(self):
 		return self.RegistrationWebhookUri is not None or self.RegistrationService.SelfRegistrationEnabled
 
 
-	async def create_new_seacat_auth_credentials(
+	async def _create_new_seacat_auth_credentials(
 		self,
 		provider_type: str,
 		user_info: dict,
-		authorization_data: dict,
-	) -> str | None:
+	) -> str:
 		"""
 		Attempt to create new Seacat Auth credentials for external user.
 		"""
 		if self.RegistrationWebhookUri:
 			# Register external user via webhook
-			credentials_id = await self.register_credentials_via_webhook(
-				provider_type, authorization_data, user_info)
-		elif self.RegistrationService.SelfRegistrationEnabled:
+			credentials_id = await self._create_credentials_via_webhook(provider_type, user_info)
+		else:
+			assert self.RegistrationService.SelfRegistrationEnabled
 			# Attempt registration with local credential providers if registration is enabled
 			cred_data = {
 				"username": user_info.get("preferred_username"),
@@ -191,22 +322,16 @@ class ExternalLoginService(asab.Service):
 			except Exception as e:
 				raise exceptions.CredentialsRegistrationError(
 					"Failed to register credentials: {}".format(e), credentials=cred_data)
-		else:
-			raise exceptions.CredentialsRegistrationError("New credential registration via external login is disabled")
 
-		await self.create(
-			credentials_id=credentials_id,
-			provider_type=provider_type,
-			user_info=user_info)
+		assert credentials_id
 		return credentials_id
 
 
-	async def register_credentials_via_webhook(
+	async def _create_credentials_via_webhook(
 		self,
 		provider_type: str,
-		authorize_data: dict,
 		user_info: dict,
-	) -> str | None:
+	) -> str:
 		"""
 		Send external login user_info to webhook for registration.
 		If the server responds with 200 and the JSON body contains 'cid' of the registered credentials,
@@ -217,7 +342,6 @@ class ExternalLoginService(asab.Service):
 
 		request_data = {
 			"provider_type": provider_type,
-			"authorization_response": authorize_data,
 			"user_info": user_info,
 		}
 
