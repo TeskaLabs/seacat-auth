@@ -3,24 +3,16 @@ import logging
 import secrets
 import aiohttp
 import typing
-import pymongo
 
 import asab
 import asab.web.rest
 
-from .providers import create_provider, GenericOAuth2Login
 from .. import exceptions, AuditLogger
-from ..events import EventTypes
 from ..last_activity import EventCode
-from ..session import (
-	credentials_session_builder,
-	authz_session_builder,
-	cookie_session_builder,
-	authentication_session_builder,
-	available_factors_session_builder,
-	external_login_session_builder,
-	SessionAdapter,
-)
+from .utils import AuthOperation
+from .providers import create_provider, GenericOAuth2Login
+from .storage import ExternalLoginStateStorage, ExternalLoginAccountStorage
+
 
 #
 
@@ -34,18 +26,19 @@ asab.Config.add_defaults({
 		# URI for the external registration of unknown accounts from external identity providers.
 		"registration_webhook_uri": "",
 		"state_expiration": "10m",
+		"state_length": 16,
+		"nonce_length": 16,
 		"error_redirect_url": ""
 	}})
 
 
 class ExternalLoginService(asab.Service):
 
-	ExternalLoginCollection = "el"
+	ExternalLoginAccountCollection = "ela"
+	ExternalLoginStateCollection = "els"
 
 	def __init__(self, app, service_name="seacatauth.ExternalLoginService"):
 		super().__init__(app, service_name)
-
-		self.StorageService = app.get_service("asab.StorageService")
 		self.SessionService = None
 		self.AuthenticationService = None
 		self.CredentialsService = None
@@ -53,16 +46,19 @@ class ExternalLoginService(asab.Service):
 		self.TenantService = None
 		self.RoleService = None
 		self.LastActivityService = None
+		self.CookieService = None
 
-		self.StateExpiration = datetime.timedelta(seconds=asab.Config.getseconds(
-			"seacatauth:external_login", "state_expiration"))
+		self.ExternalLoginStateStorage = ExternalLoginStateStorage(self.App)
+		self.ExternalLoginAccountStorage = ExternalLoginAccountStorage(self.App)
+
+		self.StateLength = asab.Config.getint("seacatauth:external_login", "state_length")
+		self.NonceLength = asab.Config.getint("seacatauth:external_login", "nonce_length")
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
-		self.CallbackEndpointPath = "/public/ext-login/callback"
 
-		public_api_base_url = app.PublicSeacatAuthApiUrl
+		self.CallbackEndpointPath = "/public/ext-login/callback"
 		self.CallbackUrlTemplate = "{}{}".format(
-			public_api_base_url,
+			app.PublicSeacatAuthApiUrl,
 			self.CallbackEndpointPath.lstrip("/")
 		)
 		self.MyAccountPageUrl = "{}#/".format(app.AuthWebUiUrl)
@@ -71,9 +67,6 @@ class ExternalLoginService(asab.Service):
 			self.ErrorRedirectUrl = self.MyAccountPageUrl
 
 		self.Providers: typing.Dict[str, GenericOAuth2Login] = self._prepare_providers()
-		self.AcrValues: typing.Dict[str, GenericOAuth2Login] = {
-			provider.acr_value(): provider
-			for provider in self.Providers.values()}
 
 
 	async def initialize(self, app):
@@ -89,8 +82,7 @@ class ExternalLoginService(asab.Service):
 		for provider in self.Providers.values():
 			await provider.initialize(app)
 
-		coll = await self.StorageService.collection(self.ExternalLoginCollection)
-		await coll.create_index([("cid", pymongo.ASCENDING)])
+		await self.ExternalLoginAccountStorage.initialize()
 
 
 	def _prepare_providers(self):
@@ -102,138 +94,72 @@ class ExternalLoginService(asab.Service):
 		return providers
 
 
-	def _make_id(self, provider_type: str, sub: str):
-		return "{} {}".format(provider_type, sub)
-
-
 	def get_provider(self, provider_type: str) -> GenericOAuth2Login:
-		return self.Providers.get(provider_type)
+		try:
+			return self.Providers[provider_type]
+		except KeyError:
+			raise exceptions.ProviderNotFoundError(provider_id=provider_type)
 
 
-	async def prepare_external_login_url(
-		self,
-		provider: GenericOAuth2Login,
-		login_session=None,
-		session=None,
-	):
-		"""
-		Prepare the authorization URL of the requested external login provider
-		"""
-		if not login_session:
-			if session:
-				if session.Session.ParentSessionId:
-					root_session = await self.SessionService.get(session.Session.ParentSessionId)
-				else:
-					root_session = session
-			else:
-				root_session = None
-			login_session = await self.AuthenticationService.create_login_session(root_session)
-
-		nonce = secrets.token_urlsafe()
-		await self.AuthenticationService.initialize_external_login(
-			login_session, provider.Type, {"nonce": nonce})
-
-		authorization_url = provider.get_authorize_uri(
-			state=login_session.Id,
-			nonce=nonce
-		)
-		return authorization_url
+	async def login_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+		return await self._initialize_external_auth(
+			provider_type, action=AuthOperation.LogIn, redirect_uri=redirect_uri)
 
 
-	async def create(self, credentials_id: str, provider_type: str, user_info: dict | None = None):
-		"""
-		Assign an external credential to Seacat Auth credentials
-		"""
-		sub = str(user_info["sub"])
-		upsertor = self.StorageService.upsertor(
-			self.ExternalLoginCollection,
-			obj_id=self._make_id(provider_type, sub)
-		)
-		upsertor.set("type", provider_type)
-		upsertor.set("sub", sub)
-		upsertor.set("cid", credentials_id)
-
-		email = user_info.get("email")
-		if email is not None:
-			upsertor.set("email", email)
-
-		phone = user_info.get("phone_number")
-		if phone is not None:
-			upsertor.set("phone", phone)
-
-		username = user_info.get("preferred_username")
-		if username is not None:
-			upsertor.set("username", username)
-
-		elcid = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_CREATED)
-		L.log(asab.LOG_NOTICE, "External login credential created", struct_data={
-			"id": elcid,
-			"cid": credentials_id,
-		})
+	async def sign_up_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+		return await self._initialize_external_auth(
+			provider_type, action=AuthOperation.SignUp, redirect_uri=redirect_uri)
 
 
-	async def list(self, credentials_id: str):
-		"""
-		List external credentials assigned with Seacat Auth credentials ID
-		"""
-		collection = self.StorageService.Database[self.ExternalLoginCollection]
-
-		query_filter = {"cid": credentials_id}
-		cursor = collection.find(query_filter)
-
-		cursor.sort("_c", -1)
-
-		el_credentials = []
-		async for credential in cursor:
-			el_credentials.append(credential)
-
-		return el_credentials
+	async def add_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+		return await self._initialize_external_auth(
+			provider_type, action=AuthOperation.AddAccount, redirect_uri=redirect_uri)
 
 
-	async def get(self, provider_type: str, sub: str):
-		"""
-		Get external login credential
-		"""
-		cred = await self.StorageService.get(self.ExternalLoginCollection, self._make_id(provider_type, sub))
-		# Back compat fields
-		if "e" in cred and "email" not in cred:
-			cred["email"] = cred["e"]
-		if "s" in cred and "sub" not in cred:
-			cred["sub"] = cred["s"]
-		if "t" in cred and "type" not in cred:
-			cred["type"] = cred["t"]
-		return cred
+	async def _initialize_external_auth(self, provider_type: str, action: AuthOperation, redirect_uri: str) -> str:
+		provider = self.get_provider(provider_type)
+		state_id = secrets.token_urlsafe(16)
+		nonce = secrets.token_urlsafe(16)
+		state_id = await self.ExternalLoginStateStorage.create(state_id, provider_type, action, redirect_uri, nonce)
+		return provider.get_authorize_uri(state=state_id, nonce=nonce)
 
 
-	async def get_by_cid(self, credentials_id: str, provider_type: str):
-		"""
-		Get external login credential by Seacat Auth credentials ID
-		"""
-		collection = self.StorageService.Database[self.ExternalLoginCollection]
-		query_filter = {"cid": credentials_id, "t": provider_type}
-		result = await collection.find_one(query_filter)
-		if result is None:
-			raise KeyError("External login for type {!r} not registered for credentials".format(provider_type))
-		return result
+	async def finalize_external_auth(self, state: str, **authorization_data: dict):
+		state = await self.ExternalLoginStateStorage.get(state)
+		state["action"]
+		state["type"]
 
 
-	async def update(self, provider_type, sub):
-		raise NotImplementedError()
+	async def add_account(self, credentials_id: str, provider_type: str, user_info: dict | None = None):
+		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
 
-	async def delete(self, provider_type: str, sub: str, credentials_id: str = None):
-		"""
-		Remove external login credential
-		"""
-		if credentials_id is not None:
-			el_credential = await self.get(provider_type, sub)
-			if credentials_id != el_credential["cid"]:
-				raise KeyError("External login not found for these credentials")
-		await self.StorageService.delete(self.ExternalLoginCollection, self._make_id(provider_type, sub))
-		L.log(asab.LOG_NOTICE, "External login credential deleted", struct_data={
-			"type": provider_type,
-			"sub": sub,
-		})
+	async def list_accounts(self, credentials_id: str):
+		return await self.ExternalLoginAccountStorage.list(credentials_id)
+
+
+	async def get_account(self, provider_type: str, sub: str, credentials_id: typing.Optional[str] = None) -> dict:
+		try:
+			account = await self.ExternalLoginAccountStorage.get(provider_type, sub)
+		except KeyError:
+			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
+		if credentials_id and credentials_id != account["cid"]:
+			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
+		return account
+
+
+	async def update_account(self, provider_type: str, sub: str, credentials_id: typing.Optional[str] = None, **kwargs):
+		account = await self.get_account(provider_type, sub, credentials_id)
+		if credentials_id and credentials_id != account["cid"]:
+			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
+		return await self.ExternalLoginAccountStorage.update(provider_type, sub, **kwargs)
+
+
+	async def remove_account(self, provider_type: str, sub: str, credentials_id: typing.Optional[str] = None):
+		account = await self.get_account(provider_type, sub, credentials_id)
+		if credentials_id and credentials_id != account["cid"]:
+			raise exceptions.ExternalAccountNotFoundError(provider_type, sub)
+		return await self.ExternalLoginAccountStorage.delete(provider_type, sub)
 
 
 	def can_register_new_credentials(self):
