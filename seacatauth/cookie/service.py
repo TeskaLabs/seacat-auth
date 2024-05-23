@@ -267,6 +267,17 @@ class CookieService(asab.Service):
 		return session
 
 
+	async def extend_session_expiration(self, session: SessionAdapter, client: dict = None):
+		expiration = client.get("session_expiration") if client else None
+		if expiration:
+			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
+		else:
+			expiration = datetime.datetime.now(datetime.UTC) + self.SessionService.Expiration
+		session_builders = (((SessionAdapter.FN.Session.Expiration, expiration),),)
+		# TODO: Also extend root session if needed
+		return await self.SessionService.update_session(session.SessionId, session_builders)
+
+
 	def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
 		"""
 		Add a Set-Cookie header to the response.
