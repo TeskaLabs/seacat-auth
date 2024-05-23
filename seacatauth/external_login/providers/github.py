@@ -77,7 +77,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 
 		user_info = {}
 		if "id" in user_data:
-			user_info["sub"] = user_data["id"]
+			user_info["sub"] = str(user_data["id"])
 		if email:
 			user_info["email"] = email
 		if "login" in user_data:

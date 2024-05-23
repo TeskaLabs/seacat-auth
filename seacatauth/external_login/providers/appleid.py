@@ -85,7 +85,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			return None
 
 		user_info = {
-			"sub": verified_claims.get("sub"),
+			"sub": str(verified_claims.get("sub")),
 			"email": verified_claims.get("email"),
 			"is_proxy_email": bool(verified_claims.get("is_private_email")),
 			"nonce": verified_claims.get("nonce"),

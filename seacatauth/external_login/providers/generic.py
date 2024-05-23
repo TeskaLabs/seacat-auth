@@ -233,6 +233,7 @@ class GenericOAuth2Login(asab.Configurable):
 
 		id_token_claims = self._get_verified_claims(id_token, expected_nonce)
 		user_info = self._user_data_from_id_token_claims(id_token_claims)
+		user_info["sub"] = str(user_info["sub"])
 		return user_info
 
 	def _user_data_from_id_token_claims(self, id_token_claims: dict):
