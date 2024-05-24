@@ -446,7 +446,6 @@ class SessionService(asab.Service):
 
 	def _calculate_extended_expiration(self, session: SessionAdapter, expires: datetime.datetime = None):
 		if session.Session.Expiration >= session.Session.MaxExpiration:
-			print("already maxxed out")
 			return None
 
 		if expires is None:
@@ -458,7 +457,6 @@ class SessionService(asab.Service):
 
 		if expires < session.Session.Expiration:
 			# Do not shorten the session!
-			print("Do not shorten the session!")
 			return None
 		if session.Session.MaxExpiration is not None and expires > session.Session.MaxExpiration:
 			# Do not cross maximum expiration
