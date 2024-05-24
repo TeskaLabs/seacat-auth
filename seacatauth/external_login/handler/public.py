@@ -1,13 +1,11 @@
 import logging
-import urllib.parse
 
 import aiohttp.web
 import asab
 import asab.web.rest
 
 from seacatauth.external_login.service import ExternalLoginService
-from seacatauth import generic, exceptions
-from seacatauth.decorators import access_control
+from seacatauth import exceptions
 from seacatauth.external_login.utils import AuthOperation
 
 #
@@ -56,7 +54,7 @@ class ExternalLoginPublicHandler(object):
 
 	async def sign_up_with_external_account(self, request):
 		"""
-		Initialize login with external account.
+		Initialize sign up with external account.
 		Navigable endpoint, redirects to external login page.
 		"""
 		redirect_uri = request.query.get("redirect_uri")
@@ -77,200 +75,58 @@ class ExternalLoginPublicHandler(object):
 		else:
 			authorization_data = dict(request.query)
 
+		state = authorization_data["state"]
+		operation = state[0]
+		if operation == AuthOperation.LogIn:
+			return await self._login_callback(request, authorization_data)
+		elif operation == AuthOperation.SignUp:
+			return await self._signup_callback(request, authorization_data)
+		elif operation == AuthOperation.AddAccount:
+			return await self._add_account_callback(request, authorization_data)
+		else:
+			raise asab.exceptions.ValidationError("Unknown operation {!r}".format(operation))
+
+
+	async def _login_callback(self, request, authorization_data):
 		try:
-			operation, result = await self.ExternalLoginService.finalize_external_auth(
+			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
 				session_context=request.Session, **authorization_data)
 		except exceptions.ExternalLoginError:
 			return self._error_redirect()
 
-		response = aiohttp.web.HTTPFound(location=result["redirect_uri"])
-		if operation == AuthOperation.LogIn:
-			# Set SSO session cookie
-			assert "session" in result
-			self.ExternalLoginService.CookieService.set_session_cookie(
-				response,
-				cookie_value=result["session"].Cookie.Id,
-				client_id=result["session"].OAuth2.ClientId
-			)
-		return response
-
-
-	async def external_auth_callback(self, request):
-		"""
-		Finalize external auth.
-		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth client
-		settings at the external account provider.
-		"""
-		# TODO:
-		provider_type = request.match_info["provider_type"]
-		try:
-			provider = self.ExternalLoginService.get_provider(provider_type)
-		except KeyError:
-			# Authorization flow broken
-			L.error("Unsupported external login provider type", struct_data={
-				"provider_type": provider_type})
-			return self._error_redirect()
-
-		if request.method == "POST":
-			authorization_data: dict = dict(await request.post())
-		else:
-			authorization_data = dict(request.query)
-		if not authorization_data:
-			# Authorization flow broken
-			L.error("External login provider returned no data in authorize callback")
-			return self._error_redirect()
-
-		login_session_id = authorization_data.get("state")
-		try:
-			login_session = await self.AuthenticationService.get_login_session(login_session_id)
-		except KeyError:
-			# Authorization flow broken
-			L.error("Login session not found", struct_data={
-				"lsid": login_session_id})
-			return self._error_redirect()
-
-		try:
-			provider_data = login_session.ExternalLogin[provider_type]
-		except AttributeError:
-			L.error("External login not initialized", struct_data={
-				"lsid": login_session_id})
-			return self._error_redirect()
-		except KeyError:
-			L.error("External login not initialized", struct_data={
-				"lsid": login_session_id, "provider": provider_type})
-			return self._error_redirect()
-
-		user_info = await provider.get_user_info(authorization_data, expected_nonce=provider_data.get("nonce"))
-		if user_info is None:
-			# Authorization flow broken
-			L.error("Cannot obtain user info from external login provider")
-			return self._error_redirect()
-
-		subject = user_info.get("sub")
-		if subject is None:
-			# Authorization flow broken
-			L.error("User info does not contain 'sub' (subject ID)")
-			return self._error_redirect()
-		subject = str(subject)  # Sometimes sub is an integer
-
-		# Try to find Seacat Auth credentials associated with the subject ID
-		try:
-			external_credentials = await self.ExternalLoginService.get(provider_type, subject)
-			external_cid = external_credentials.get("cid")
-		except KeyError:
-			external_cid = None
-		subject_known = external_cid is not None
-
-		# Check if the request is authenticated (user is already signed in)
-		authenticated_cid = None
-		print("request.Sess", request.Session)
-		if request.Session and not request.Session.is_anonymous():
-			# Verify that the current session is the same as the one that initiated the external login
-			assert request.Session.Id == login_session.InitiatorSessionId
-			assert request.Session.Credentials.Id == login_session.InitiatorCredentialsId
-			print(request.Session.Id, login_session.InitiatorSessionId)
-			print(request.Session.Credentials.Id, login_session.InitiatorCredentialsId)
-			authenticated_cid = login_session.InitiatorCredentialsId
-		signed_in = authenticated_cid is not None
-
-		from_ip = generic.get_request_access_ips(request)
-
-		new_session = None
-		print(f"{subject_known=} {signed_in=} {external_cid=}")
-		if subject_known:
-			# (Re)authentication successful - Create a new root session or update the existing one
-			new_session = await self.ExternalLoginService.login(
-				login_session, provider_type, subject, from_ip=from_ip)
-
-		elif signed_in:
-			# Assign subject ID to the current Seacat Auth credentials and update current root session
-			# TODO: Redirect the user to a page where they can confirm the action.
-			#   e.g. "Hey user ABC, do you want to use Google account "XYZ" to log in?"
-			await self.ExternalLoginService.create(authenticated_cid, provider_type, user_info)
-			new_session = await self.ExternalLoginService.login(
-				login_session, provider_type, subject, from_ip=from_ip)
-
-		elif self.ExternalLoginService._can_register_new_credentials():
-			# Register new Seacat Auth credentials, either directly or via webhook
-			# Do not send the authorization code
-			authorize_data_safe = {k: v for k, v in authorization_data.items() if k != "code"}
-			try:
-				credentials_id = await self.ExternalLoginService._create_new_seacat_auth_credentials(
-					provider_type, user_info, authorize_data_safe)
-				new_session = await self.ExternalLoginService.login(
-					login_session, provider_type, subject, from_ip=from_ip)
-			except exceptions.CredentialsRegistrationError:
-				L.error("Failed to register credential from external login", struct_data={
-					"provider": provider.Type, "sub": subject})
-
-		else:
-			# TODO: Unknown user, cannot register
-			...
-
-		if new_session is None:
-			# External login failed or was denied
-			if login_session.AuthorizationParams:
-				# Resume the authorization flow WITHOUT the acr_values parameter
-				# This will send the user agent to the Seacat Auth login page
-				oauth_query = {
-					k: v
-					for k, v in login_session.AuthorizationParams.items()
-					if k not in {"acr_values", "prompt"}
-				}
-				return self._redirect_to_authorization(oauth_query)
-			else:
-				# The auth flow did not start at the authorization endpoint
-				return self._redirect_to_account_settings()
-
-		if login_session.AuthorizationParams:
-			oauth_query = {
-				k: v
-				for k, v in login_session.AuthorizationParams.items()
-				if k not in {"prompt"}
-			}
-			response = self._redirect_to_authorization(oauth_query)
-		else:
-			response = self._redirect_to_account_settings()
-
+		response = aiohttp.web.HTTPFound(location=redirect_uri)
 		self.ExternalLoginService.CookieService.set_session_cookie(
-			response=response,
-			cookie_value=new_session.Cookie.Id,
-			client_id=new_session.OAuth2.ClientId,
+			response,
+			cookie_value=new_sso_session.Cookie.Id,
+			client_id=new_sso_session.OAuth2.ClientId
 		)
-
 		return response
 
 
-	@access_control()
-	async def remove_my_external_login_credential(self, request, *, credentials_id):
-		"""
-		Unregister an external login credential
-		"""
-		provider_type = request.match_info["provider_type"]
-		sub = request.match_info.get("sub")
-		if not sub:
-			el_credentials = await self.ExternalLoginService.get_by_cid(credentials_id, provider_type)
-			sub = el_credentials["s"]
-		await self.ExternalLoginService.delete(provider_type, sub=sub)
+	async def _signup_callback(self, request, authorization_data):
+		try:
+			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_signup_with_external_account(
+				session_context=request.Session, **authorization_data)
+		except exceptions.ExternalLoginError:
+			return self._error_redirect()
 
-		L.log(asab.LOG_NOTICE, "External login successfully removed", struct_data={
-			"cid": credentials_id,
-			"type": provider_type,
-		})
-
-		response = {"result": "OK"}
-		return asab.web.rest.json_response(request, response)
+		response = aiohttp.web.HTTPFound(location=redirect_uri)
+		self.ExternalLoginService.CookieService.set_session_cookie(
+			response,
+			cookie_value=new_sso_session.Cookie.Id,
+			client_id=new_sso_session.OAuth2.ClientId
+		)
+		return response
 
 
-	def _redirect_to_authorization(self, oauth_query: dict):
-		"""
-		Resume the original authorization flow
-		"""
-		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
-		authorization_uri = "{}?{}".format(
-			oidc_service.authorization_endpoint_url(),
-			urllib.parse.urlencode(oauth_query))
-		response = aiohttp.web.HTTPFound(location=authorization_uri)
+	async def _add_account_callback(self, request, authorization_data):
+		try:
+			redirect_uri = await self.ExternalLoginService.finalize_adding_external_account(
+				session_context=request.Session, **authorization_data)
+		except exceptions.ExternalLoginError:
+			return self._error_redirect()
+
+		response = aiohttp.web.HTTPFound(location=redirect_uri)
 		return response
 
 
@@ -279,8 +135,8 @@ class ExternalLoginPublicHandler(object):
 		Error redirection when the original authorization flow cannot be resumed
 		"""
 		response = aiohttp.web.HTTPNotFound(headers={
-			"Location": self.ExternalLoginService.MyAccountPageUrl,
-			"Refresh": "0;url=" + self.ExternalLoginService.MyAccountPageUrl,
+			"Location": self.ExternalLoginService.ErrorRedirectUrl,
+			"Refresh": "0;url=" + self.ExternalLoginService.ErrorRedirectUrl,
 		})
 		return response
 

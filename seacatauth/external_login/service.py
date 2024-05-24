@@ -1,4 +1,3 @@
-import datetime
 import logging
 import secrets
 import aiohttp
@@ -103,78 +102,70 @@ class ExternalLoginService(asab.Service):
 
 	async def login_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
 		return await self._initialize_external_auth(
-			provider_type, action=AuthOperation.LogIn, redirect_uri=redirect_uri)
+			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
 
 
 	async def sign_up_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
 		if not self._can_register_new_credentials():
 			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
 		return await self._initialize_external_auth(
-			provider_type, action=AuthOperation.SignUp, redirect_uri=redirect_uri)
+			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
 
 
 	async def add_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
 		return await self._initialize_external_auth(
-			provider_type, action=AuthOperation.AddAccount, redirect_uri=redirect_uri)
+			provider_type, operation=AuthOperation.AddAccount, redirect_uri=redirect_uri)
 
 
-	async def _initialize_external_auth(self, provider_type: str, action: AuthOperation, redirect_uri: str) -> str:
+	async def _initialize_external_auth(self, provider_type: str, operation: AuthOperation, redirect_uri: str) -> str:
 		provider = self.get_provider(provider_type)
-		state_id = secrets.token_urlsafe(16)
-		nonce = secrets.token_urlsafe(16)
-		state_id = await self.ExternalLoginStateStorage.create(state_id, provider_type, action, redirect_uri, nonce)
+		state_id = operation.value + secrets.token_urlsafe(self.StateLength - 1)
+		nonce = secrets.token_urlsafe(self.NonceLength)
+		state_id = await self.ExternalLoginStateStorage.create(state_id, provider_type, operation, redirect_uri, nonce)
 		return provider.get_authorize_uri(state=state_id, nonce=nonce)
 
 
-	async def finalize_external_auth(
-		self,
-		session_context,
-		state: str,
-		**authorization_data: dict
-	) -> typing.Tuple[AuthOperation, dict]:
-		state = await self.ExternalLoginStateStorage.get(state)
-		provider_type = state["provider"]
-		redirect_uri = state.get("redirect_uri")
+	async def _get_user_info(self, provider_type: str, authorization_data: dict, expected_nonce: str):
+		"""
+		Obtain user info from external account provider and verify that it contains the mandatory claims.
+		"""
 		provider = self.get_provider(provider_type)
-
-		user_info = await provider.get_user_info(authorization_data, expected_nonce=state.get("nonce"))
+		user_info = await provider.get_user_info(authorization_data, expected_nonce)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider.")
 			raise exceptions.ExternalLoginError("Failed to obtain user info", provider=provider_type)
-
 		if "sub" not in user_info:
 			L.error("User info does not contain the 'sub' (subject ID) claim.")
 			raise exceptions.ExternalLoginError(
 				"User info does not contain the 'sub' (subject ID) claim.", provider=provider_type)
-
-		if state["operation"] == AuthOperation.AddAccount:
-			return (
-				state["operation"],
-				await self._add_external_account(session_context, provider_type, user_info, redirect_uri)
-			)
-		elif state["operation"] == AuthOperation.LogIn:
-			return (
-				state["operation"],
-				await self._login_with_external_account(session_context, provider_type, user_info, redirect_uri)
-			)
-		elif state["operation"] == AuthOperation.SignUp:
-			return (
-				state["operation"],
-				await self._sign_up_with_external_account(session_context, provider_type, user_info, redirect_uri)
-			)
-		else:
-			raise ValueError("Unknown auth operation {!r}".format(state["operation"]))
+		return user_info
 
 
-	async def _login_with_external_account(
+	async def finalize_login_with_external_account(
 		self,
 		session_context,
-		provider_type: str,
-		user_info: dict,
-		redirect_uri: str
-	) -> dict:
+		state: str,
+		**authorization_data: dict
+	) -> typing.Tuple[typing.Any, str]:
+		"""
+		Log the user in using their external account.
+
+		@param session_context: Request session (or None)
+		@param state: State parameter from the authorization response query
+		@param authorization_data: Authorization response query
+		@return: New SSO session object and redirect URI
+		"""
+		state = await self.ExternalLoginStateStorage.get(state)
+		assert state["operation"] == AuthOperation.LogIn
+
+		# Finish the authorization flow by obtaining user info from the external login provider
+		provider_type = state["provider"]
+		user_info = await self._get_user_info(provider_type, authorization_data, expected_nonce=state.get("nonce"))
+
+		# Find the external account and its associated Seacat credentials ID
 		try:
 			account = await self.get_external_account(provider_type, subject=user_info["sub"])
+			credentials_id = account["cid"]
 		except exceptions.ExternalAccountNotFoundError:
 			# Unknown external account
 			# TODO: Perhaps the user wanted to sign up instead?
@@ -184,7 +175,7 @@ class ExternalLoginService(asab.Service):
 			else:
 				raise NotImplementedError("Login with external account: Unknown external account")
 
-		credentials_id = account["cid"]
+		# Log the user in
 		if session_context and not session_context.is_anonymous():
 			# Some user is already logged in
 			if session_context.Credentials.Id == credentials_id:
@@ -197,22 +188,38 @@ class ExternalLoginService(asab.Service):
 		else:
 			# TODO: Create a new root SSO session
 			raise NotImplementedError("Login with external account: Login")
-		return {"redirect_uri": redirect_uri, "sso_session": sso_session}
+
+		return sso_session, state["redirect_uri"]
 
 
-	async def _sign_up_with_external_account(
+	async def finalize_signup_with_external_account(
 		self,
 		session_context,
-		provider_type: str,
-		user_info: dict,
-		redirect_uri: str
-	) -> dict:
+		state: str,
+		**authorization_data: dict
+	) -> typing.Tuple[typing.Any, str]:
+		"""
+		Sign up a new user using their external account.
+
+		@param session_context: Request session (or None)
+		@param state: State parameter from the authorization response query
+		@param authorization_data: Authorization response query
+		@return: New SSO session object and redirect URI
+		"""
 		if not self._can_register_new_credentials():
 			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
 
 		if session_context and not session_context.is_anonymous():
 			raise NotImplementedError("Sign up with external account: Someone is logged in already")
 
+		state = await self.ExternalLoginStateStorage.get(state)
+		assert state["operation"] == AuthOperation.SignUp
+
+		# Finish the authorization flow by obtaining user info from the external login provider
+		provider_type = state["provider"]
+		user_info = await self._get_user_info(provider_type, authorization_data, expected_nonce=state.get("nonce"))
+
+		# Verify that the external account is not registered already
 		try:
 			await self.get_external_account(provider_type, subject=user_info["sub"])
 			# Account already registered
@@ -230,24 +237,41 @@ class ExternalLoginService(asab.Service):
 		# Log the user in
 		raise NotImplementedError("Sign up with external account: Auto login after sign up")
 
-		return {"redirect_uri": redirect_uri, "sso_session": sso_session}
+		return sso_session, state["redirect_uri"]
 
 
-	async def _add_external_account(
+	async def finalize_adding_external_account(
 		self,
 		session_context,
-		provider_type: str,
-		user_info: dict,
-		redirect_uri: str
-	) -> dict:
-		if not session_context and not session_context.is_anonymous():
+		state: str,
+		**authorization_data: dict
+	) -> str:
+		"""
+		Add a new external account to the current user's credentials
+
+		@param session_context: Request session
+		@param state: State parameter from the authorization response query
+		@param authorization_data: Authorization response query
+		@return: Redirect URI
+		"""
+		if not session_context or session_context.is_anonymous():
 			raise exceptions.AccessDeniedError("Authentication required")
 		credentials_id = session_context.Credentials.Id
+
+		state = await self.ExternalLoginStateStorage.get(state)
+		assert state["operation"] == AuthOperation.AddAccount
+
+		# Finish the authorization flow by obtaining user info from the external login provider
+		provider_type = state["provider"]
+		user_info = await self._get_user_info(provider_type, authorization_data, expected_nonce=state.get("nonce"))
+
+		# TODO: Require fresh authentication and user confirmation
 		try:
 			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict as e:
 			raise NotImplementedError("Add external account: External account already registered") from e
-		return {"redirect_uri": redirect_uri}
+
+		return state["redirect_uri"]
 
 
 	async def list_external_accounts(self, credentials_id: str):
