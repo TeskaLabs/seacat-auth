@@ -273,9 +273,8 @@ class CookieService(asab.Service):
 			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
 		else:
 			expiration = datetime.datetime.now(datetime.UTC) + self.SessionService.Expiration
-		session_builders = (((SessionAdapter.FN.Session.Expiration, expiration),),)
-		# TODO: Also extend root session if needed
-		return await self.SessionService.update_session(session.SessionId, session_builders)
+
+		return await self.SessionService.touch(session, expiration, override_cooldown=True)
 
 
 	def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
