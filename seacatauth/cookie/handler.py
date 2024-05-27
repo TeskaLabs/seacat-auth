@@ -474,6 +474,8 @@ class CookieHandler(object):
 				L.error("Failed to produce session track ID")
 				raise aiohttp.web.HTTPBadRequest() from e
 
+		session = await self.CookieService.extend_session_expiration(session, client)
+
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):
 			cookie_domain = client["cookie_domain"]
