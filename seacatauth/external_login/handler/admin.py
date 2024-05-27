@@ -50,8 +50,11 @@ class ExternalLoginAdminHandler(object):
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
-		data = await self.ExternalLoginService.get_external_account(provider_type, subject)
-		return asab.web.rest.json_response(request, data)
+		try:
+			data = await self.ExternalLoginService.get_external_account(provider_type, subject)
+			return asab.web.rest.json_response(request, data)
+		except exceptions.ExternalAccountNotFoundError:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 
 	@access_control("authz:superuser")
@@ -61,5 +64,8 @@ class ExternalLoginAdminHandler(object):
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
-		await self.ExternalLoginService.remove_external_account(provider_type, subject)
+		try:
+			await self.ExternalLoginService.remove_external_account(provider_type, subject)
+		except exceptions.ExternalAccountNotFoundError:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		return asab.web.rest.json_response(request, {"result": "OK"})
