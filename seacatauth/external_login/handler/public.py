@@ -6,7 +6,7 @@ import asab.web.rest
 
 from ...decorators import access_control
 from ..service import ExternalLoginService
-from ... import exceptions
+from ... import exceptions, generic
 from ..utils import AuthOperation
 
 #
@@ -103,9 +103,10 @@ class ExternalLoginPublicHandler(object):
 
 
 	async def _login_callback(self, request, authorization_data):
+		access_ips = generic.get_request_access_ips(request)
 		try:
 			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
-				session_context=request.Session, **authorization_data)
+				session_context=request.Session, from_ip=access_ips, **authorization_data)
 		except exceptions.ExternalLoginError:
 			return self._error_redirect()
 
