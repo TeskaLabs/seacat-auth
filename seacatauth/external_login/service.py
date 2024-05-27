@@ -222,7 +222,9 @@ class ExternalLoginService(asab.Service):
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
 
-		return sso_session, state["redirect_uri"]
+		redirect_uri = self._get_final_redirect_uri(state)
+
+		return sso_session, redirect_uri
 
 
 	async def finalize_signup_with_external_account(
@@ -272,7 +274,9 @@ class ExternalLoginService(asab.Service):
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
 
-		return sso_session, state["redirect_uri"]
+		redirect_uri = self._get_final_redirect_uri(state)
+
+		return sso_session, redirect_uri
 
 
 	async def finalize_adding_external_account(
@@ -308,7 +312,9 @@ class ExternalLoginService(asab.Service):
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
 
-		return state["redirect_uri"]
+		redirect_uri = self._get_final_redirect_uri(state)
+
+		return redirect_uri
 
 
 	async def list_external_accounts(self, credentials_id: str):
@@ -461,3 +467,10 @@ class ExternalLoginService(asab.Service):
 			EventCode.LOGIN_SUCCESS, credentials_id, from_ip=from_ip, authn_by=login_descriptor)
 
 		return sso_session
+
+
+	def _get_final_redirect_uri(self, state: dict):
+		if "redirect_uri" in state and state["redirect_uri"]:
+			return state["redirect_uri"]
+		# No redirect_uri was specified; redirect to default URL
+		return self.MyAccountPageUrl
