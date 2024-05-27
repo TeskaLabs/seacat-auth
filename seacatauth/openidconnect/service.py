@@ -173,7 +173,7 @@ class OpenIdConnectService(asab.Service):
 			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
 			available_external_logins = {
 				result["t"]: result["s"]
-				for result in await external_login_service.list(root_session.Credentials.Id)
+				for result in await external_login_service.list_external_accounts(root_session.Credentials.Id)
 			}
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
@@ -266,7 +266,7 @@ class OpenIdConnectService(asab.Service):
 			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
 			available_external_logins = {
 				result["t"]: result["s"]
-				for result in await external_login_service.list(root_session.Credentials.Id)
+				for result in await external_login_service.list_external_accounts(root_session.Credentials.Id)
 			}
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
