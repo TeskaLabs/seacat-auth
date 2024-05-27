@@ -39,7 +39,7 @@ async def credentials_session_builder(credentials_service, credentials_id, scope
 
 async def external_login_session_builder(external_login_service, credentials_id):
 	external_logins = {}
-	for result in await external_login_service.list(credentials_id):
+	for result in await external_login_service.list_external_accounts(credentials_id):
 		external_logins[result["t"]] = result["s"]
 	return ((SessionAdapter.FN.Authentication.ExternalLoginOptions, external_logins),)
 
