@@ -279,3 +279,17 @@ class ClientNotFoundError(ClientError, KeyError):
 	def __init__(self, client_id, *args):
 		message = "Client '{client_id}' not found".format(client_id=client_id)
 		super().__init__(message, *args, client_id=client_id)
+
+
+class ExternalLoginError(SeacatAuthError):
+	def __init__(
+		self,
+		message: str,
+		*args,
+		credentials_id: str = None,
+		provider_type: str = None,
+		**kwargs
+	):
+		self.CredentialsID: str = credentials_id
+		self.ProviderType: str = provider_type
+		super().__init__(message, *args)
