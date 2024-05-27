@@ -92,15 +92,6 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
 
 
-class ProviderNotFoundError(SeacatAuthError, KeyError):
-	"""
-	Provider not found
-	"""
-	def __init__(self, provider_id: str, *args):
-		self.ProviderId = provider_id
-		super().__init__("Provider {!r} not found".format(self.ProviderId), *args)
-
-
 class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
 	"""
 	External login account not found

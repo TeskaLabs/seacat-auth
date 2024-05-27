@@ -118,7 +118,7 @@ class ExternalLoginService(asab.Service):
 
 
 	async def _initialize_external_auth(self, provider_type: str, operation: AuthOperation, redirect_uri: str) -> str:
-		provider = self.get_provider(provider_type)
+		provider = self.Providers[provider_type]
 		state_id = operation.value + secrets.token_urlsafe(self.StateLength - 1)
 		nonce = secrets.token_urlsafe(self.NonceLength)
 		state_id = await self.ExternalLoginStateStorage.create(state_id, provider_type, operation, redirect_uri, nonce)
@@ -129,7 +129,7 @@ class ExternalLoginService(asab.Service):
 		"""
 		Obtain user info from external account provider and verify that it contains the mandatory claims.
 		"""
-		provider = self.get_provider(provider_type)
+		provider = self.Providers[provider_type]
 		user_info = await provider.get_user_info(authorization_data, expected_nonce)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider.")
