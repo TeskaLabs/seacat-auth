@@ -27,7 +27,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		"userinfo_endpoint": "https://api.github.com/user",
 		"user_emails_endpoint": "https://api.github.com/user/emails",
 		"scope": "user:email",  # Scope is not used
-		"label": "Sign in with Github",
+		"label": "GitHub",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
