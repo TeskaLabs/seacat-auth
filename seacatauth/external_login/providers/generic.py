@@ -197,7 +197,7 @@ class GenericOAuth2Login(asab.Configurable):
 				else:
 					yield resp
 
-	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Obtain the authenticated user's profile info, with the claims normalized to be in line with
 		OpenID UserInfo response.
