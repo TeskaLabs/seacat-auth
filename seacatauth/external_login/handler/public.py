@@ -4,9 +4,10 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-from seacatauth.external_login.service import ExternalLoginService
-from seacatauth import exceptions
-from seacatauth.external_login.utils import AuthOperation
+from ...decorators import access_control
+from ..service import ExternalLoginService
+from ... import exceptions
+from ..utils import AuthOperation
 
 #
 
@@ -31,13 +32,27 @@ class ExternalLoginPublicHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app_public = app.PublicWebContainer.WebApp
 
+		web_app.router.add_get("/public/ext-login/{provider_type}/add", self.add_external_account)
 		web_app.router.add_get("/public/ext-login/{provider_type}/login", self.login_with_external_account)
 		web_app.router.add_get("/public/ext-login/{provider_type}/signup", self.sign_up_with_external_account)
 		web_app.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
 
+		web_app_public.router.add_get("/public/ext-login/{provider_type}/add", self.add_external_account)
 		web_app_public.router.add_get("/public/ext-login/{provider_type}/login", self.login_with_external_account)
 		web_app_public.router.add_get("/public/ext-login/{provider_type}/signup", self.sign_up_with_external_account)
 		web_app_public.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
+
+
+	@access_control()
+	async def add_external_account(self, request):
+		"""
+		Initialize adding an external account into the current user's credentials.
+		Navigable endpoint, redirects to external login page.
+		"""
+		redirect_uri = request.query.get("redirect_uri")
+		provider_type = request.match_info["provider_type"]
+		authorization_url = await self.ExternalLoginService.add_external_account_initialize(provider_type, redirect_uri)
+		return aiohttp.web.HTTPFound(authorization_url)
 
 
 	async def login_with_external_account(self, request):
@@ -49,7 +64,7 @@ class ExternalLoginPublicHandler(object):
 		provider_type = request.match_info["provider_type"]
 		authorization_url = await self.ExternalLoginService.login_with_external_account_initialize(
 			provider_type, redirect_uri)
-		return aiohttp.web.HTTPFound(location=authorization_url)
+		return aiohttp.web.HTTPFound(authorization_url)
 
 
 	async def sign_up_with_external_account(self, request):
@@ -61,7 +76,7 @@ class ExternalLoginPublicHandler(object):
 		provider_type = request.match_info["provider_type"]
 		authorization_url = await self.ExternalLoginService.sign_up_with_external_account_initialize(
 			provider_type, redirect_uri)
-		return aiohttp.web.HTTPFound(location=authorization_url)
+		return aiohttp.web.HTTPFound(authorization_url)
 
 
 	async def external_auth_callback(self, request):
@@ -94,7 +109,7 @@ class ExternalLoginPublicHandler(object):
 		except exceptions.ExternalLoginError:
 			return self._error_redirect()
 
-		response = aiohttp.web.HTTPFound(location=redirect_uri)
+		response = aiohttp.web.HTTPFound(redirect_uri)
 		self.ExternalLoginService.CookieService.set_session_cookie(
 			response,
 			cookie_value=new_sso_session.Cookie.Id,
@@ -110,7 +125,7 @@ class ExternalLoginPublicHandler(object):
 		except exceptions.ExternalLoginError:
 			return self._error_redirect()
 
-		response = aiohttp.web.HTTPFound(location=redirect_uri)
+		response = aiohttp.web.HTTPFound(redirect_uri)
 		self.ExternalLoginService.CookieService.set_session_cookie(
 			response,
 			cookie_value=new_sso_session.Cookie.Id,
@@ -126,7 +141,7 @@ class ExternalLoginPublicHandler(object):
 		except exceptions.ExternalLoginError:
 			return self._error_redirect()
 
-		response = aiohttp.web.HTTPFound(location=redirect_uri)
+		response = aiohttp.web.HTTPFound(redirect_uri)
 		return response
 
 
@@ -145,5 +160,5 @@ class ExternalLoginPublicHandler(object):
 		"""
 		Redirect to Seacat Account webui
 		"""
-		response = aiohttp.web.HTTPFound(location=self.ExternalLoginService.MyAccountPageUrl)
+		response = aiohttp.web.HTTPFound(self.ExternalLoginService.MyAccountPageUrl)
 		return response
