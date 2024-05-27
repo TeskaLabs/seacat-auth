@@ -391,14 +391,22 @@ class SessionService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def touch(self, session: SessionAdapter, expires: datetime.datetime = None):
+	async def touch(
+		self,
+		session: SessionAdapter,
+		expires: datetime.datetime = None,
+		*,
+		override_cooldown: bool = False
+	):
 		"""
 		Update session modification time to record activity.
 		Also extend session expiration if possible.
 
 		Return the updated session object.
 		"""
-		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown:
+		if not override_cooldown and (
+			datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown
+		):
 			# Session has been touched recently
 			return session
 
@@ -408,7 +416,7 @@ class SessionService(asab.Service):
 		if session.Session.ParentSessionId is not None:
 			try:
 				root_session = await self.get(session.Session.ParentSessionId)
-				await self.touch(root_session, expires)
+				await self.touch(root_session, expires, override_cooldown=override_cooldown)
 			except exceptions.SessionNotFoundError:
 				L.info("Will not extend subsession expiration: Root session not found.", struct_data={
 					"sid": session.Session.Id, "psid": session.Session.ParentSessionId})

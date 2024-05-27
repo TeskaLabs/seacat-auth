@@ -471,12 +471,16 @@ class AuthorizeHandler(object):
 					requested_expiration=AuthorizationCode.Expiration
 				)
 			elif auth_token_type == "cookie":
+				# Use client-defined expiration instead of AuthorizationCode.Expiration so that the session gets
+				# extended properly at the introspection later
+				# TODO: Revise this once cookies are moved to the token collection
+				expiration = client_dict.get("session_expiration")
 				new_session = await self.CookieService.create_cookie_client_session(
 					root_session, client_id, requested_scope,
 					nonce=nonce,
 					redirect_uri=redirect_uri,
 					tenants=[authorized_tenant] if authorized_tenant else None,
-					requested_expiration=AuthorizationCode.Expiration
+					requested_expiration=expiration
 				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
 				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
