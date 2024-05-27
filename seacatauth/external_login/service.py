@@ -100,19 +100,19 @@ class ExternalLoginService(asab.Service):
 			raise exceptions.ProviderNotFoundError(provider_id=provider_type)
 
 
-	async def login_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+	async def initialize_login_with_external_account(self, provider_type: str, redirect_uri: str) -> str:
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
 
 
-	async def sign_up_with_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+	async def initialize_signup_with_external_account(self, provider_type: str, redirect_uri: str) -> str:
 		if not self._can_register_new_credentials():
 			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
 
 
-	async def add_external_account_initialize(self, provider_type: str, redirect_uri: str) -> str:
+	async def initialize_adding_external_account(self, provider_type: str, redirect_uri: str) -> str:
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.AddAccount, redirect_uri=redirect_uri)
 

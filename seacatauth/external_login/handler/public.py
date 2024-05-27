@@ -51,7 +51,7 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.add_external_account_initialize(provider_type, redirect_uri)
+		authorization_url = await self.ExternalLoginService.initialize_adding_external_account(provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(authorization_url)
 
 
@@ -62,7 +62,7 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.login_with_external_account_initialize(
+		authorization_url = await self.ExternalLoginService.initialize_login_with_external_account(
 			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(authorization_url)
 
@@ -74,7 +74,7 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.sign_up_with_external_account_initialize(
+		authorization_url = await self.ExternalLoginService.initialize_signup_with_external_account(
 			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(authorization_url)
 
