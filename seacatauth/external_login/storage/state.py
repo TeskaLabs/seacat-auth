@@ -1,5 +1,6 @@
 import datetime
 import logging
+import typing
 
 import asab
 import asab.web.rest
@@ -35,14 +36,16 @@ class ExternalLoginStateStorage:
 		state_id: str,
 		provider_type: str,
 		operation: AuthOperation,
-		redirect_uri: str,
-		nonce: str
+		redirect_uri: typing.Optional[str],
+		nonce: typing.Optional[str]
 	):
 		upsertor = self.StorageService.upsertor(self.ExternalLoginStateCollection, obj_id=state_id)
 		upsertor.set("provider", provider_type)
 		upsertor.set("operation", operation.value)
-		upsertor.set("redirect_uri", redirect_uri)
-		upsertor.set("nonce", nonce)
+		if redirect_uri:
+			upsertor.set("redirect_uri", redirect_uri)
+		if nonce:
+			upsertor.set("nonce", nonce)
 		state_id = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_STATE_CREATED)
 		return state_id
 

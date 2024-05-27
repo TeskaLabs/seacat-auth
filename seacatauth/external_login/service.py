@@ -100,24 +100,41 @@ class ExternalLoginService(asab.Service):
 			raise exceptions.ProviderNotFoundError(provider_id=provider_type)
 
 
-	async def initialize_login_with_external_account(self, provider_type: str, redirect_uri: str) -> str:
+	async def initialize_login_with_external_account(
+		self,
+		provider_type: str,
+		redirect_uri: typing.Optional[str]
+	) -> str:
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
 
 
-	async def initialize_signup_with_external_account(self, provider_type: str, redirect_uri: str) -> str:
+	async def initialize_signup_with_external_account(
+		self,
+		provider_type: str,
+		redirect_uri: typing.Optional[str]
+	) -> str:
 		if not self._can_register_new_credentials():
 			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
 
 
-	async def initialize_adding_external_account(self, provider_type: str, redirect_uri: str) -> str:
+	async def initialize_adding_external_account(
+		self,
+		provider_type: str,
+		redirect_uri: typing.Optional[str]
+	) -> str:
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.AddAccount, redirect_uri=redirect_uri)
 
 
-	async def _initialize_external_auth(self, provider_type: str, operation: AuthOperation, redirect_uri: str) -> str:
+	async def _initialize_external_auth(
+		self,
+		provider_type: str,
+		operation: AuthOperation,
+		redirect_uri: typing.Optional[str],
+	) -> str:
 		provider = self.Providers[provider_type]
 		state_id = operation.value + secrets.token_urlsafe(self.StateLength - 1)
 		nonce = secrets.token_urlsafe(self.NonceLength)
@@ -145,6 +162,7 @@ class ExternalLoginService(asab.Service):
 		self,
 		session_context,
 		state: str,
+		from_ip: typing.Optional[list] = None,
 		**authorization_data: dict
 	) -> typing.Tuple[typing.Any, str]:
 		"""
@@ -176,20 +194,33 @@ class ExternalLoginService(asab.Service):
 				raise NotImplementedError("Login with external account: Unknown external account")
 
 		# Log the user in
-		if session_context and not session_context.is_anonymous():
+		if session_context:
 			# Some user is already logged in
 			if session_context.Credentials.Id == credentials_id:
 				# The external account belongs to the user that is already logged in
-				raise NotImplementedError("Login with external account: Re-login")
+				# Re-log in
+				sso_session = await self._login(
+					credentials_id=credentials_id,
+					provider_type=provider_type,
+					current_sso_session=session_context,
+					from_ip=from_ip,
+				)
 			else:
 				# The external account belongs to someone else than who is logged in
-				# TODO: Invalidate current SSO session and create a new one
-				raise NotImplementedError("Login with external account: Login")
+				# Ignore the current SSO session and log in, its cookie will be overwritten
+				sso_session = await self._login(
+					credentials_id=credentials_id,
+					provider_type=provider_type,
+					from_ip=from_ip,
+				)
 		else:
-			# TODO: Create a new root SSO session
-			raise NotImplementedError("Login with external account: Login")
+			sso_session = await self._login(
+				credentials_id=credentials_id,
+				provider_type=provider_type,
+				from_ip=from_ip,
+			)
 
-		await self.ExternalLoginStateStorage.delete(state)
+		await self.ExternalLoginStateStorage.delete(state["_id"])
 
 		return sso_session, state["redirect_uri"]
 
@@ -239,7 +270,7 @@ class ExternalLoginService(asab.Service):
 		# Log the user in
 		raise NotImplementedError("Sign up with external account: Auto login after sign up")
 
-		await self.ExternalLoginStateStorage.delete(state)
+		await self.ExternalLoginStateStorage.delete(state["_id"])
 
 		return sso_session, state["redirect_uri"]
 
@@ -275,7 +306,7 @@ class ExternalLoginService(asab.Service):
 		except asab.exceptions.Conflict as e:
 			raise NotImplementedError("Add external account: External account already registered") from e
 
-		await self.ExternalLoginStateStorage.delete(state)
+		await self.ExternalLoginStateStorage.delete(state["_id"])
 
 		return state["redirect_uri"]
 
@@ -400,76 +431,33 @@ class ExternalLoginService(asab.Service):
 		return credentials_id
 
 
-	async def login(
+	async def _login(
 		self,
-		login_session,
+		credentials_id: str,
 		provider_type: str,
-		subject: str,
-		from_ip: typing.Iterable | None = None
-	) -> dict:
-		ext_credentials = await self.get(provider_type, subject)
-		credentials_id = ext_credentials["cid"]
-
+		current_sso_session = None,
+		from_ip: typing.Optional[typing.Iterable] = None
+	):
 		# Create ad-hoc login descriptor
 		login_descriptor = {
 			"id": "!external",
 			"factors": [{"type": "ext:{}".format(provider_type)}]
 		}
 
-		if login_session.InitiatorSessionId:
-			try:
-				root_session = await self.SessionService.get(login_session.InitiatorSessionId)
-			except exceptions.SessionNotFoundError as e:
-				L.log(
-					asab.LOG_NOTICE,
-					"The session that initiated the login session no longer exists",
-					struct_data={"sid": login_session.InitiatorSessionId, "lsid": login_session.Id}
-				)
-				root_session = None
-		else:
-			root_session = None
-
-		scope = frozenset(["profile", "email", "phone"])
-
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, credentials_id, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=credentials_id,
-				tenants=None  # Root session is tenant-agnostic
-			),
-			authentication_session_builder(login_descriptor),
-			await available_factors_session_builder(self.AuthenticationService, credentials_id),
-			await external_login_session_builder(ext_login_svc, credentials_id),
-		]
-
-		if root_session and not root_session.is_anonymous():
-			# Update existing root session
-			new_session = await self.SessionService.update_session(
-				root_session.SessionId,
-				session_builders=session_builders
-			)
-		else:
-			# Create a new root session
-			session_builders.append(cookie_session_builder())
-			new_session = await self.SessionService.create_session(
-				session_type="root",
-				session_builders=session_builders,
-			)
+		sso_session = await self.AuthenticationService.upsert_sso_root_session(
+			credentials_id=credentials_id,
+			login_descriptor=login_descriptor,
+			current_sso_session=current_sso_session,
+		)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"cid": credentials_id,
-			"lsid": login_session.Id,
-			"sid": str(new_session.Session.Id),
+			"lsid": "(external-login)",
+			"sid": str(sso_session.Session.Id),
 			"from_ip": from_ip,
 			"authn_by": login_descriptor,
 		})
 		await self.LastActivityService.update_last_activity(
 			EventCode.LOGIN_SUCCESS, credentials_id, from_ip=from_ip, authn_by=login_descriptor)
 
-		# Delete login session
-		await self.AuthenticationService.delete_login_session(login_session.Id)
-
-		return new_session
+		return sso_session
