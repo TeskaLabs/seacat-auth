@@ -1,13 +1,11 @@
 import logging
-import urllib.parse
 
-import aiohttp.web
 import asab
 import asab.web.rest
 
-from seacatauth.external_login.service import ExternalLoginService
-from seacatauth import generic, exceptions
-from seacatauth.decorators import access_control
+from ..service import ExternalLoginService
+from ... import generic, exceptions
+from ...decorators import access_control
 
 #
 
