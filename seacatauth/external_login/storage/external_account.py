@@ -3,6 +3,8 @@ import logging
 
 import asab
 import asab.web.rest
+import asab.exceptions
+import asab.storage.exceptions
 
 from ...events import EventTypes
 
@@ -49,8 +51,11 @@ class ExternalLoginAccountStorage:
 		if username is not None:
 			upsertor.set("username", username)
 
-		external_account_id = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_CREATED)
-		L.log(asab.LOG_NOTICE, "External login credential created", struct_data={
+		try:
+			external_account_id = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_CREATED)
+		except asab.storage.exceptions.DuplicateError as e:
+			raise asab.exceptions.Conflict("External account already registered") from e
+		L.log(asab.LOG_NOTICE, "External login account added", struct_data={
 			"id": external_account_id,
 			"cid": credentials_id,
 		})
