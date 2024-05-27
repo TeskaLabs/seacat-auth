@@ -1,4 +1,5 @@
 import logging
+import typing
 import urllib.parse
 import aiohttp
 
@@ -36,7 +37,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		assert self.UserInfoEndpoint not in (None, "")
 		self.UserEmailsURI = self.Config.get("user_emails_endpoint")
 
-	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		User info is not contained in token response,
 		call to https://api.github.com/user is needed.
@@ -57,6 +58,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		if access_token is None:
 			L.error("Token response does not contain access token.", struct_data={
 				"provider": self.Type, "response": params})
+			return None
 
 		access_token = access_token[0]
 		authorization = "bearer {}".format(access_token)
