@@ -33,7 +33,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		"response_type": "code",
 		"scope": "public_profile",
 		"fields": "id,name,email",
-		"label": "Sign in with Facebook",
+		"label": "Facebook",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
