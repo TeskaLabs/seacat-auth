@@ -189,6 +189,8 @@ class ExternalLoginService(asab.Service):
 			# TODO: Create a new root SSO session
 			raise NotImplementedError("Login with external account: Login")
 
+		await self.ExternalLoginStateStorage.delete(state)
+
 		return sso_session, state["redirect_uri"]
 
 
@@ -237,6 +239,8 @@ class ExternalLoginService(asab.Service):
 		# Log the user in
 		raise NotImplementedError("Sign up with external account: Auto login after sign up")
 
+		await self.ExternalLoginStateStorage.delete(state)
+
 		return sso_session, state["redirect_uri"]
 
 
@@ -270,6 +274,8 @@ class ExternalLoginService(asab.Service):
 			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict as e:
 			raise NotImplementedError("Add external account: External account already registered") from e
+
+		await self.ExternalLoginStateStorage.delete(state)
 
 		return state["redirect_uri"]
 
