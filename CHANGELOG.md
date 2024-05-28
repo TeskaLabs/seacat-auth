@@ -3,6 +3,7 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha7`
 - `v24.20-alpha6`
 - `v24.20-alpha5`
 - `v24.20-alpha4`
@@ -22,6 +23,9 @@
 ### Features
 - Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
 - Configurable password criteria (#372, `v24.20-alpha1`)
+
+### Refactoring
+- Refactor duplicate code in session build (#386, `v24.20-alpha7`)
 
 ---
 
