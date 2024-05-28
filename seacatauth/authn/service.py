@@ -340,13 +340,13 @@ class AuthenticationService(asab.Service):
 			# Update existing SSO root session (re-login)
 			assert root_session.Session.Type == "root"
 			assert root_session.Credentials.Id == login_session.SeacatLogin.CredentialsId
-			new_sso_session = await self.update_session(
+			new_sso_session = await self.SessionService.update_session(
 				root_session.SessionId,
 				session_builders=session_builders
 			)
 		else:
 			# Create a new root session
-			new_sso_session = await self.create_session(
+			new_sso_session = await self.SessionService.create_session(
 				session_type="root",
 				session_builders=session_builders,
 			)
