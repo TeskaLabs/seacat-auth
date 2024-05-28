@@ -172,7 +172,7 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
-			self.CookieService.delete_session_cookie(response)
+			self.CookieService.delete_session_cookie(response, client_id)
 			return response
 
 		return response
@@ -263,7 +263,7 @@ class CookieHandler(object):
 		cookie_domain = client.get("cookie_domain") or None
 
 		if response.status_code != 200:
-			self.CookieService.delete_session_cookie(response)
+			self.CookieService.delete_session_cookie(response, client_id)
 			return response
 
 		if anonymous_session_created:
