@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import re
+import typing
 import urllib.parse
 
 import asab
@@ -328,44 +329,20 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
+
 	async def login(self, login_session, root_session: SessionAdapter | None = None, from_info: list = None):
 		"""
-		Build and create a root session
+		Build and create an SSO root session
 		"""
-		scope = frozenset(["profile", "email", "phone"])
-
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, login_session.SeacatLogin.CredentialsId, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=login_session.SeacatLogin.CredentialsId,
-				tenants=None  # Root session is tenant-agnostic
-			),
-			authentication_session_builder(login_session.SeacatLogin.AuthenticatedVia),
-			await available_factors_session_builder(self, login_session.SeacatLogin.CredentialsId),
-			await external_login_session_builder(ext_login_svc, login_session.SeacatLogin.CredentialsId),
-		]
-
-		if root_session and not root_session.is_anonymous():
-			# Update existing root session
-			session = await self.SessionService.update_session(
-				root_session.SessionId,
-				session_builders=session_builders
-			)
-		else:
-			# Create a new root session
-			session_builders.append(cookie_session_builder())
-			session = await self.SessionService.create_session(
-				session_type="root",
-				session_builders=session_builders,
-			)
-
+		sso_session = await self.SessionService.build_and_upsert_sso_root_session(
+			credentials_id=login_session.SeacatLogin.CredentialsId,
+			login_descriptor=login_session.SeacatLogin.AuthenticatedVia,
+			current_sso_session=root_session,
+		)
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"cid": login_session.SeacatLogin.CredentialsId,
 			"lsid": login_session.Id,
-			"sid": str(session.Session.Id),
+			"sid": str(sso_session.Session.Id),
 			"from_ip": from_info,
 		})
 		await self.LastActivityService.update_last_activity(
@@ -374,7 +351,7 @@ class AuthenticationService(asab.Service):
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
 
-		return session
+		return sso_session
 
 
 	async def create_m2m_session(
