@@ -450,23 +450,36 @@ class ExternalLoginService(asab.Service):
 			"factors": [{"type": "ext:{}".format(provider_type)}]
 		}
 
-		sso_session = await self.AuthenticationService.upsert_sso_root_session(
+		session_builders = await self.SessionService.build_sso_root_session(
 			credentials_id=credentials_id,
 			login_descriptor=login_descriptor,
-			current_sso_session=current_sso_session,
 		)
+		if current_sso_session and not current_sso_session.is_anonymous():
+			# Update existing SSO root session (re-login)
+			assert current_sso_session.Session.Type == "root"
+			assert current_sso_session.Credentials.Id == credentials_id
+			new_sso_session = await self.SessionService.update_session(
+				current_sso_session.SessionId,
+				session_builders=session_builders
+			)
+		else:
+			# Create a new root session
+			new_sso_session = await self.SessionService.create_session(
+				session_type="root",
+				session_builders=session_builders,
+			)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"cid": credentials_id,
-			"lsid": "(external-login)",
-			"sid": str(sso_session.Session.Id),
+			"lsid": "<external-login>",
+			"sid": str(new_sso_session.Session.Id),
 			"from_ip": from_ip,
 			"authn_by": login_descriptor,
 		})
 		await self.LastActivityService.update_last_activity(
 			EventCode.LOGIN_SUCCESS, credentials_id, from_ip=from_ip, authn_by=login_descriptor)
 
-		return sso_session
+		return new_sso_session
 
 
 	def _get_final_redirect_uri(self, state: dict):
