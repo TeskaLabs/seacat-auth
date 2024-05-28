@@ -93,13 +93,6 @@ class ExternalLoginService(asab.Service):
 		return providers
 
 
-	def get_provider(self, provider_type: str) -> GenericOAuth2Login:
-		try:
-			return self.Providers[provider_type]
-		except KeyError:
-			raise exceptions.ProviderNotFoundError(provider_id=provider_type)
-
-
 	async def initialize_login_with_external_account(
 		self,
 		provider_type: str,
