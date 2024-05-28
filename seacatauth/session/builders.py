@@ -78,3 +78,12 @@ def cookie_session_builder():
 	# TODO: Shorten back to 32 bytes once unencrypted cookies are obsoleted
 	token_length = 16 + 32  # The first part is AES CBC init vector, the second is the actual token
 	yield (SessionAdapter.FN.Cookie.Id, secrets.token_bytes(token_length))
+
+
+def oauth2_session_builder(client_id: str, scope: frozenset | None, nonce: str = None, redirect_uri: str = None):
+	yield (SessionAdapter.FN.OAuth2.Scope, scope)
+	yield (SessionAdapter.FN.OAuth2.ClientId, client_id)
+	if redirect_uri is not None:
+		yield (SessionAdapter.FN.OAuth2.RedirectUri, redirect_uri)
+	if nonce is not None:
+		yield (SessionAdapter.FN.OAuth2.Nonce, nonce)
