@@ -16,10 +16,9 @@ from ..authz import build_credentials_authz
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
-	cookie_session_builder,
 	authentication_session_builder,
 	available_factors_session_builder,
-	external_login_session_builder, SessionAdapter,
+	SessionAdapter,
 )
 
 from ..events import EventTypes
