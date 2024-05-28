@@ -186,11 +186,12 @@ class ExternalLoginService(asab.Service):
 			credentials_id = account["cid"]
 		except exceptions.ExternalAccountNotFoundError:
 			# Unknown external account
-			# TODO: Perhaps the user wanted to sign up instead?
 			if session_context and not session_context.is_anonymous():
 				# Some user is already logged in
+				# TODO: Offer the user to add the new external account
 				raise NotImplementedError("Login with external account: Unknown external account with a valid SSO session")
 			else:
+				# TODO: Offer the user to sign up
 				raise NotImplementedError("Login with external account: Unknown external account")
 
 		# Log the user in
@@ -361,6 +362,51 @@ class ExternalLoginService(asab.Service):
 		return await self.ExternalLoginAccountStorage.delete(provider_type, subject)
 
 
+	async def _login(
+		self,
+		credentials_id: str,
+		provider_type: str,
+		current_sso_session = None,
+		from_ip: typing.Optional[typing.Iterable] = None
+	):
+		# Create ad-hoc login descriptor
+		login_descriptor = {
+			"id": "!external",
+			"factors": [{"type": "ext:{}".format(provider_type)}]
+		}
+
+		session_builders = await self.SessionService.build_sso_root_session(
+			credentials_id=credentials_id,
+			login_descriptor=login_descriptor,
+		)
+		if current_sso_session and not current_sso_session.is_anonymous():
+			# Update existing SSO root session (re-login)
+			assert current_sso_session.Session.Type == "root"
+			assert current_sso_session.Credentials.Id == credentials_id
+			new_sso_session = await self.SessionService.update_session(
+				current_sso_session.SessionId,
+				session_builders=session_builders
+			)
+		else:
+			# Create a new root session
+			new_sso_session = await self.SessionService.create_session(
+				session_type="root",
+				session_builders=session_builders,
+			)
+
+		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+			"cid": credentials_id,
+			"lsid": "<external-login>",
+			"sid": str(new_sso_session.Session.Id),
+			"from_ip": from_ip,
+			"authn_by": login_descriptor,
+		})
+		await self.LastActivityService.update_last_activity(
+			EventCode.LOGIN_SUCCESS, credentials_id, from_ip=from_ip, authn_by=login_descriptor)
+
+		return new_sso_session
+
+
 	def _can_register_new_credentials(self):
 		return self.RegistrationWebhookUri is not None or self.RegistrationService.SelfRegistrationEnabled
 
@@ -435,51 +481,6 @@ class ExternalLoginService(asab.Service):
 			raise exceptions.CredentialsRegistrationError("Returned credential ID not found")
 
 		return credentials_id
-
-
-	async def _login(
-		self,
-		credentials_id: str,
-		provider_type: str,
-		current_sso_session = None,
-		from_ip: typing.Optional[typing.Iterable] = None
-	):
-		# Create ad-hoc login descriptor
-		login_descriptor = {
-			"id": "!external",
-			"factors": [{"type": "ext:{}".format(provider_type)}]
-		}
-
-		session_builders = await self.SessionService.build_sso_root_session(
-			credentials_id=credentials_id,
-			login_descriptor=login_descriptor,
-		)
-		if current_sso_session and not current_sso_session.is_anonymous():
-			# Update existing SSO root session (re-login)
-			assert current_sso_session.Session.Type == "root"
-			assert current_sso_session.Credentials.Id == credentials_id
-			new_sso_session = await self.SessionService.update_session(
-				current_sso_session.SessionId,
-				session_builders=session_builders
-			)
-		else:
-			# Create a new root session
-			new_sso_session = await self.SessionService.create_session(
-				session_type="root",
-				session_builders=session_builders,
-			)
-
-		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
-			"cid": credentials_id,
-			"lsid": "<external-login>",
-			"sid": str(new_sso_session.Session.Id),
-			"from_ip": from_ip,
-			"authn_by": login_descriptor,
-		})
-		await self.LastActivityService.update_last_activity(
-			EventCode.LOGIN_SUCCESS, credentials_id, from_ip=from_ip, authn_by=login_descriptor)
-
-		return new_sso_session
 
 
 	def _get_final_redirect_uri(self, state: dict):
