@@ -33,7 +33,7 @@ asab.Config.add_defaults({
 
 class ExternalLoginService(asab.Service):
 
-	ExternalLoginAccountCollection = "ela"
+	ExternalLoginAccountCollection = "el"
 	ExternalLoginStateCollection = "els"
 
 	def __init__(self, app, service_name="seacatauth.ExternalLoginService"):
@@ -259,7 +259,7 @@ class ExternalLoginService(asab.Service):
 		try:
 			await self.get_external_account(provider_type, subject=user_info["sub"])
 			# Account already registered
-			# TODO: Perhaps the user wanted to log in instead?
+			# TODO: Offer the user to log in instead
 			raise NotImplementedError("Sign up with external account: External account already registered")
 		except exceptions.ExternalAccountNotFoundError:
 			# Unknown account can be used for signup
