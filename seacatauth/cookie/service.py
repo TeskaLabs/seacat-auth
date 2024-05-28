@@ -10,14 +10,8 @@ import asab.exceptions
 import jwcrypto.jws
 
 from .. import exceptions
-from ..session import SessionAdapter
-from ..session.adapter import CookieData
-from ..session import (
-	credentials_session_builder,
-	authz_session_builder,
-	cookie_session_builder
-)
-from ..openidconnect.session import oauth2_session_builder
+from ..session.adapter import SessionAdapter, CookieData
+from ..session.builders import cookie_session_builder
 from .. import AuditLogger
 
 #
@@ -163,65 +157,16 @@ class CookieService(asab.Service):
 		except KeyError:
 			raise KeyError("Client '{}' not found".format(client_id))
 
-		# Make sure dangerous resources are removed from impersonated sessions
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			exclude_resources = {"authz:superuser", "authz:impersonate"}
-		else:
-			exclude_resources = None
-
 		# Build the session
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
-				tenants=tenants,
-				exclude_resources=exclude_resources,
-			),
-			cookie_session_builder(),
-		]
-
-		if "batman" in scope:
-			batman_service = self.OpenIdConnectService.App.get_service("seacatauth.BatmanService")
-			password = batman_service.generate_password(root_session.Credentials.Id)
-			username = root_session.Credentials.Username
-			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
-			session_builders.append([
-				(SessionAdapter.FN.Batman.Token, basic_auth),
-			])
-
-		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
-			available_factors = await self.AuthenticationService.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {
-				result["t"]: result["s"]
-				for result in await external_login_service.list(root_session.Credentials.Id)
-			}
-			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
-			])
-
-		if root_session.TrackId is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
-
-		# Transfer impersonation data
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			session_builders.append((
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
-					root_session.Authentication.ImpersonatorSessionId
-				),
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
-					root_session.Authentication.ImpersonatorCredentialsId
-				),
-			))
-
-		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
+		session_builders = await self.SessionService.build_client_session(
+			root_session,
+			client_id=client_id,
+			scope=scope,
+			tenants=tenants,
+			nonce=nonce,
+			redirect_uri=redirect_uri,
+		)
+		session_builders.append(cookie_session_builder())
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
