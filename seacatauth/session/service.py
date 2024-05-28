@@ -20,7 +20,13 @@ from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
 from .token import SessionTokenService
-from .builders import oauth2_session_builder, credentials_session_builder, authz_session_builder
+from .builders import (
+	oauth2_session_builder,
+	credentials_session_builder,
+	authz_session_builder,
+	external_login_session_builder,
+	available_factors_session_builder
+)
 
 #
 
@@ -682,19 +688,13 @@ class SessionService(asab.Service):
 		]
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {}
-			for result in await external_login_service.list(root_session.Credentials.Id):
-				try:
-					available_external_logins[result["type"]] = result["sub"]
-				except KeyError:
-					# BACK COMPAT
-					available_external_logins[result["t"]] = result["s"]
+			session_builders.append(
+				await external_login_session_builder(external_login_service, root_session.Credentials.Id))
+			session_builders.append(
+				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
 				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
 			])
 
 		if "batman" in scope:
