@@ -409,7 +409,6 @@ class AuthenticationService(asab.Service):
 		"""
 		Create a new root session as a different user. Equivalent to logging in as the target user.
 		"""
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
 		impersonator_cid = impersonator_session.Credentials.Id
 
 		# Check if target exists
