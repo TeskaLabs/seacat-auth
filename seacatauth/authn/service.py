@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 import re
-import typing
 import urllib.parse
 
 import asab
