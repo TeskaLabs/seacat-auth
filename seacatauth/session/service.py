@@ -20,7 +20,15 @@ from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
 from .token import SessionTokenService
-from .builders import oauth2_session_builder, credentials_session_builder, authz_session_builder
+from .builders import (
+	oauth2_session_builder,
+	credentials_session_builder,
+	authz_session_builder,
+	authentication_session_builder,
+	available_factors_session_builder,
+	external_login_session_builder,
+	cookie_session_builder
+)
 
 #
 
@@ -647,6 +655,35 @@ class SessionService(asab.Service):
 		return await self.get(dst_session.SessionId)
 
 
+	async def build_sso_root_session(
+		self,
+		credentials_id: str,
+		login_descriptor: dict,
+	):
+		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		role_service = self.App.get_service("seacatauth.RoleService")
+
+		scope = frozenset(["profile", "email", "phone"])
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		session_builders = [
+			await credentials_session_builder(credentials_service, credentials_id, scope),
+			authentication_session_builder(login_descriptor),
+			await available_factors_session_builder(authentication_service, credentials_id),
+			await external_login_session_builder(ext_login_svc, credentials_id),
+			# TODO: SSO session should not need to have Authz data
+			await authz_session_builder(
+				tenant_service=tenant_service,
+				role_service=role_service,
+				credentials_id=credentials_id,
+				tenants=None,  # Root session is tenant-agnostic
+			),
+			cookie_session_builder(),
+		]
+		return session_builders
+
+
 	async def build_client_session(
 		self,
 		root_session: SessionAdapter,
@@ -682,19 +719,13 @@ class SessionService(asab.Service):
 		]
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {}
-			for result in await external_login_service.list(root_session.Credentials.Id):
-				try:
-					available_external_logins[result["type"]] = result["sub"]
-				except KeyError:
-					# BACK COMPAT
-					available_external_logins[result["t"]] = result["s"]
+			session_builders.append(
+				await external_login_session_builder(external_login_service, root_session.Credentials.Id))
+			session_builders.append(
+				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
 				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
 			])
 
 		if "batman" in scope:
