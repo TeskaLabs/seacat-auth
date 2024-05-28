@@ -1,5 +1,7 @@
+import base64
 import datetime
 import logging
+import typing
 import uuid
 
 import bson
@@ -18,6 +20,7 @@ from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
 from .token import SessionTokenService
+from .builders import oauth2_session_builder, credentials_session_builder, authz_session_builder
 
 #
 
@@ -642,6 +645,86 @@ class SessionService(asab.Service):
 			await self.update_session(dst_session.SessionId, session_builders)
 
 		return await self.get(dst_session.SessionId)
+
+
+	async def build_client_session(
+		self,
+		root_session: SessionAdapter,
+		client_id: str,
+		scope: typing.Iterable[str],
+		tenants: typing.Iterable[str] = None,
+		nonce: typing.Optional[str] = None,
+		redirect_uri: typing.Optional[str] = None,
+	):
+		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+		external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		role_service = self.App.get_service("seacatauth.RoleService")
+		batman_service = self.App.get_service("seacatauth.BatmanService")
+
+		# TODO: Choose builders based on scope
+		# Make sure dangerous resources are removed from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
+		else:
+			exclude_resources = set()
+
+		session_builders = [
+			await credentials_session_builder(credentials_service, root_session.Credentials.Id, scope),
+			await authz_session_builder(
+				tenant_service=tenant_service,
+				role_service=role_service,
+				credentials_id=root_session.Credentials.Id,
+				tenants=tenants,
+				exclude_resources=exclude_resources,
+			)
+		]
+
+		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
+			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
+			available_external_logins = {}
+			for result in await external_login_service.list(root_session.Credentials.Id):
+				try:
+					available_external_logins[result["type"]] = result["sub"]
+				except KeyError:
+					# BACK COMPAT
+					available_external_logins[result["t"]] = result["s"]
+			session_builders.append([
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
+				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
+				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
+			])
+
+		if "batman" in scope:
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
+
+		# Obtain Track ID if there is any in the root session
+		if root_session.TrackId is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
+
+		# Transfer impersonation data
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			session_builders.append((
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					root_session.Authentication.ImpersonatorSessionId
+				),
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					root_session.Authentication.ImpersonatorCredentialsId
+				),
+			))
+
+		return session_builders
 
 
 	def aes_encrypt(self, raw_bytes: bytes):

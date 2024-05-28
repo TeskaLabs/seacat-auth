@@ -15,12 +15,7 @@ import jwcrypto.jwk
 import jwcrypto.jws
 
 from ..generic import add_params_to_url_query
-from ..session import SessionAdapter
-from ..session import (
-	credentials_session_builder,
-	authz_session_builder,
-)
-from .session import oauth2_session_builder
+from ..session.adapter import SessionAdapter
 from .. import exceptions
 from . import pkce
 from ..authz import build_credentials_authz
@@ -156,40 +151,14 @@ class OpenIdConnectService(asab.Service):
 			has_access_to_all_tenants=self.RBACService.can_access_all_tenants(authz)
 		)
 
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, session.OAuth2.Scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
-				tenants=[authorized_tenant] if authorized_tenant else None,
-				exclude_resources=exclude_resources,
-			)
-		]
-
-		if "profile" in granted_scope or "userinfo:authn" in granted_scope or "userinfo:*" in granted_scope:
-			authentication_service = self.App.get_service("seacatauth.AuthenticationService")
-			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
-			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {
-				result["t"]: result["s"]
-				for result in await external_login_service.list_external_accounts(root_session.Credentials.Id)
-			}
-			session_builders.append([
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
-			])
-
-		if "batman" in granted_scope:
-			batman_service = self.App.get_service("seacatauth.BatmanService")
-			password = batman_service.generate_password(root_session.Credentials.Id)
-			username = root_session.Credentials.Username
-			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
-			session_builders.append([
-				(SessionAdapter.FN.Batman.Token, basic_auth),
-			])
-
-		session_builders.append(((SessionAdapter.FN.OAuth2.Scope, granted_scope),))
+		session_builders = await self.SessionService.build_client_session(
+			root_session,
+			client_id=session.OAuth2.ClientId,
+			scope=granted_scope,
+			tenants=[authorized_tenant] if authorized_tenant else None,
+			nonce=session.OAuth2.Nonce,
+			redirect_uri=session.OAuth2.RedirectUri,
+		)
 
 		if expires_in:
 			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)
@@ -242,74 +211,20 @@ class OpenIdConnectService(asab.Service):
 		tenants=None,
 		requested_expiration=None
 	):
-		# TODO: Choose builders based on scope
-		# Make sure dangerous resources are removed from impersonated sessions
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			exclude_resources = {"authz:superuser", "authz:impersonate"}
-		else:
-			exclude_resources = set()
-
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
-				tenants=tenants,
-				exclude_resources=exclude_resources,
-			)
-		]
-
-		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			authentication_service = self.App.get_service("seacatauth.AuthenticationService")
-			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
-			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {
-				result["t"]: result["s"]
-				for result in await external_login_service.list_external_accounts(root_session.Credentials.Id)
-			}
-			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
-			])
-
-		if "batman" in scope:
-			batman_service = self.App.get_service("seacatauth.BatmanService")
-			password = batman_service.generate_password(root_session.Credentials.Id)
-			username = root_session.Credentials.Username
-			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
-			session_builders.append([
-				(SessionAdapter.FN.Batman.Token, basic_auth),
-			])
-
-		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
-
-		# Obtain Track ID if there is any in the root session
-		if root_session.TrackId is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
-
-		# Transfer impersonation data
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			session_builders.append((
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
-					root_session.Authentication.ImpersonatorSessionId
-				),
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
-					root_session.Authentication.ImpersonatorCredentialsId
-				),
-			))
-
+		session_builders = await self.SessionService.build_client_session(
+			root_session,
+			client_id,
+			scope=scope,
+			tenants=tenants,
+			nonce=nonce,
+			redirect_uri=redirect_uri
+		)
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session_id=root_session.SessionId,
 			expiration=requested_expiration,
 			session_builders=session_builders,
 		)
-
 		return session
 
 
