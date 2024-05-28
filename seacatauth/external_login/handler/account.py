@@ -4,7 +4,7 @@ import asab
 import asab.web.rest
 
 from ..service import ExternalLoginService
-from ... import generic, exceptions
+from ..exceptions import ExternalAccountNotFoundError
 
 #
 
@@ -50,7 +50,7 @@ class ExternalLoginAccountHandler(object):
 			data = await self.ExternalLoginService.get_external_account(
 				provider_type, subject, credentials_id=request.Session.Credentials.Id)
 			return asab.web.rest.json_response(request, data)
-		except exceptions.ExternalAccountNotFoundError:
+		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 
@@ -64,5 +64,5 @@ class ExternalLoginAccountHandler(object):
 			await self.ExternalLoginService.remove_external_account(
 				provider_type, subject, credentials_id=request.Session.Credentials.Id)
 			return asab.web.rest.json_response(request, {"result": "OK"})
-		except exceptions.ExternalAccountNotFoundError:
+		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)

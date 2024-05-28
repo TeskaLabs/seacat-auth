@@ -92,17 +92,6 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
 
 
-class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
-	"""
-	External login account not found
-	"""
-	def __init__(self, provider_id: str, sub: str, *args):
-		self.ProviderId = provider_id
-		self.Subject = sub
-		super().__init__("External login account {!r} not found in provider {!r}".format(
-			self.Subject, self.ProviderId), *args)
-
-
 class LoginPrologueDeniedError(SeacatAuthError):
 	"""
 	Seacat login prologue was denied
@@ -284,3 +273,21 @@ class ExternalLoginError(SeacatAuthError):
 		self.CredentialsID: str = credentials_id
 		self.ProviderType: str = provider_type
 		super().__init__(message, *args)
+
+
+class RegistrationNotOpenError(SeacatAuthError):
+	pass
+
+
+class CredentialsRegistrationError(SeacatAuthError):
+	def __init__(
+		self,
+		message: str,
+		*args,
+		credentials: dict = None,
+		**kwargs
+	):
+		self.Credentials: typing.Optional[str] = credentials
+		super().__init__(message, *args)
+
+
