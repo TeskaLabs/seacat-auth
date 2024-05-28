@@ -11,6 +11,11 @@ from ..last_activity import EventCode
 from .utils import AuthOperation
 from .providers import create_provider, GenericOAuth2Login
 from .storage import ExternalLoginStateStorage, ExternalLoginAccountStorage
+from .exceptions import (
+	ExternalLoginError,
+	ExternalAccountAlreadyUsedError,
+	ExternalAccountNotFoundError
+)
 
 
 #
@@ -107,8 +112,8 @@ class ExternalLoginService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> str:
-		if not self._can_register_new_credentials():
-			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
+		if not self._can_sign_up_new_credentials():
+			raise exceptions.RegistrationNotOpenError()
 		return await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
 
@@ -143,10 +148,10 @@ class ExternalLoginService(asab.Service):
 		user_info = await provider.get_user_info(authorization_data, expected_nonce)
 		if user_info is None:
 			L.error("Cannot obtain user info from external login provider.")
-			raise exceptions.ExternalLoginError("Failed to obtain user info", provider=provider_type)
+			raise ExternalLoginError("Failed to obtain user info", provider=provider_type)
 		if "sub" not in user_info:
 			L.error("User info does not contain the 'sub' (subject ID) claim.")
-			raise exceptions.ExternalLoginError(
+			raise ExternalLoginError(
 				"User info does not contain the 'sub' (subject ID) claim.", provider=provider_type)
 		return user_info
 
@@ -177,15 +182,17 @@ class ExternalLoginService(asab.Service):
 		try:
 			account = await self.get_external_account(provider_type, subject=user_info["sub"])
 			credentials_id = account["cid"]
-		except exceptions.ExternalAccountNotFoundError:
+		except ExternalAccountNotFoundError as e:
+			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={
+				"type": e.ProviderType, "sub": e.SubjectID})
 			# Unknown external account
 			if session_context and not session_context.is_anonymous():
 				# Some user is already logged in
 				# TODO: Offer the user to add the new external account
-				raise NotImplementedError("Login with external account: Unknown external account with a valid SSO session")
+				raise ExternalLoginError("Login with external account failed: Unknown external account")
 			else:
 				# TODO: Offer the user to sign up
-				raise NotImplementedError("Login with external account: Unknown external account")
+				raise ExternalLoginError("Login with external account failed: Unknown external account")
 
 		# Log the user in
 		if session_context:
@@ -225,6 +232,7 @@ class ExternalLoginService(asab.Service):
 		self,
 		session_context,
 		state: str,
+		from_ip: typing.Optional[list] = None,
 		**authorization_data: dict
 	) -> typing.Tuple[typing.Any, str]:
 		"""
@@ -235,8 +243,8 @@ class ExternalLoginService(asab.Service):
 		@param authorization_data: Authorization response query
 		@return: New SSO session object and redirect URI
 		"""
-		if not self._can_register_new_credentials():
-			raise NotImplementedError("Sign up with external account: Sign up is not allowed")
+		if not self._can_sign_up_new_credentials():
+			raise exceptions.RegistrationNotOpenError()
 
 		if session_context and not session_context.is_anonymous():
 			raise NotImplementedError("Sign up with external account: Someone is logged in already")
@@ -253,8 +261,8 @@ class ExternalLoginService(asab.Service):
 			await self.get_external_account(provider_type, subject=user_info["sub"])
 			# Account already registered
 			# TODO: Offer the user to log in instead
-			raise NotImplementedError("Sign up with external account: External account already registered")
-		except exceptions.ExternalAccountNotFoundError:
+			raise ExternalAccountAlreadyUsedError(provider_type=provider_type, subject_id=user_info.get("sub"))
+		except ExternalAccountNotFoundError:
 			# Unknown account can be used for signup
 			pass
 
@@ -264,7 +272,11 @@ class ExternalLoginService(asab.Service):
 		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
 		# Log the user in
-		raise NotImplementedError("Sign up with external account: Auto login after sign up")
+		sso_session = await self._login(
+			credentials_id=credentials_id,
+			provider_type=provider_type,
+			from_ip=from_ip,
+		)
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
 
@@ -302,7 +314,11 @@ class ExternalLoginService(asab.Service):
 		try:
 			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict as e:
-			raise NotImplementedError("Add external account: External account already registered") from e
+			raise ExternalAccountAlreadyUsedError(
+				subject_id=user_info.get("sub"),
+				credentials_id=credentials_id,
+				provider_type=provider_type,
+			) from e
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
 
@@ -324,9 +340,9 @@ class ExternalLoginService(asab.Service):
 		try:
 			account = await self.ExternalLoginAccountStorage.get(provider_type, subject)
 		except KeyError:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject)
 		if credentials_id and credentials_id != account["cid"]:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject)
 		return account
 
 
@@ -339,7 +355,7 @@ class ExternalLoginService(asab.Service):
 	):
 		account = await self.get_external_account(provider_type, subject, credentials_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject)
 		return await self.ExternalLoginAccountStorage.update(provider_type, subject, **kwargs)
 
 
@@ -351,7 +367,7 @@ class ExternalLoginService(asab.Service):
 	):
 		account = await self.get_external_account(provider_type, subject, credentials_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise exceptions.ExternalAccountNotFoundError(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject)
 		return await self.ExternalLoginAccountStorage.delete(provider_type, subject)
 
 
@@ -400,7 +416,7 @@ class ExternalLoginService(asab.Service):
 		return new_sso_session
 
 
-	def _can_register_new_credentials(self):
+	def _can_sign_up_new_credentials(self):
 		return self.RegistrationWebhookUri is not None or self.RegistrationService.SelfRegistrationEnabled
 
 

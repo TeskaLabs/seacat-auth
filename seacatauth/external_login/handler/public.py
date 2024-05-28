@@ -3,11 +3,17 @@ import logging
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.exceptions
 
 from ...decorators import access_control
 from ..service import ExternalLoginService
-from ... import exceptions, generic
+from ... import exceptions, generic, AuditLogger
 from ..utils import AuthOperation
+from ..exceptions import (
+	ExternalLoginError,
+	ExternalAccountAlreadyUsedError,
+	ExternalAccountNotFoundError,
+)
 
 #
 
@@ -101,8 +107,12 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.initialize_signup_with_external_account(
-			provider_type, redirect_uri)
+		try:
+			authorization_url = await self.ExternalLoginService.initialize_signup_with_external_account(
+				provider_type, redirect_uri)
+		except exceptions.RegistrationNotOpenError:
+			L.error("Registration is not open.")
+			return self._error_redirect()
 		return aiohttp.web.HTTPFound(authorization_url)
 
 
@@ -150,7 +160,19 @@ class ExternalLoginPublicHandler(object):
 		try:
 			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
 				session_context=request.Session, from_ip=access_ips, **authorization_data)
-		except exceptions.ExternalLoginError:
+		except ExternalAccountNotFoundError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+				"ext_provider_type": e.ProviderType,
+				"subject_id": e.SubjectId,
+				"from_ip": access_ips
+			})
+			return self._error_redirect()
+		except ExternalLoginError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+				"ext_provider_type": e.ProviderType,
+				"subject_id": e.SubjectID,
+				"from_ip": access_ips
+			})
 			return self._error_redirect()
 
 		response = aiohttp.web.HTTPFound(redirect_uri)
@@ -163,10 +185,17 @@ class ExternalLoginPublicHandler(object):
 
 
 	async def _signup_callback(self, request, authorization_data):
+		access_ips = generic.get_request_access_ips(request)
 		try:
 			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_signup_with_external_account(
-				session_context=request.Session, **authorization_data)
-		except exceptions.ExternalLoginError:
+				session_context=request.Session, from_ip=access_ips, **authorization_data)
+		except exceptions.RegistrationNotOpenError:
+			L.error("Signup with external account denied: Registration is not open.")
+			return self._error_redirect()
+		except exceptions.CredentialsRegistrationError:
+			L.error("Signup with external account failed: Failed to register new credentials.")
+			return self._error_redirect()
+		except ExternalLoginError:
 			return self._error_redirect()
 
 		response = aiohttp.web.HTTPFound(redirect_uri)
@@ -182,7 +211,11 @@ class ExternalLoginPublicHandler(object):
 		try:
 			redirect_uri = await self.ExternalLoginService.finalize_adding_external_account(
 				session_context=request.Session, **authorization_data)
-		except exceptions.ExternalLoginError:
+		except ExternalAccountAlreadyUsedError as e:
+			L.log(asab.LOG_NOTICE, "Adding external account denied: Account already used.", struct_data={
+				"cid": e.CredentialsId, "type": e.ProviderType, "sub": e.SubjectID})
+			return self._error_redirect()
+		except ExternalLoginError:
 			return self._error_redirect()
 
 		response = aiohttp.web.HTTPFound(redirect_uri)
