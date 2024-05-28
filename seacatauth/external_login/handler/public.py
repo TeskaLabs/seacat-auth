@@ -48,6 +48,15 @@ class ExternalLoginPublicHandler(object):
 		"""
 		Initialize adding an external account into the current user's credentials.
 		Navigable endpoint, redirects to external login page.
+
+		---
+		parameters:
+		-	name: redirect_uri
+			in: query
+			description:
+				Where to redirect the user after successful login.
+			schema:
+				type: string
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
@@ -59,6 +68,15 @@ class ExternalLoginPublicHandler(object):
 		"""
 		Initialize login with external account.
 		Navigable endpoint, redirects to external login page.
+
+		---
+		parameters:
+		-	name: redirect_uri
+			in: query
+			description:
+				Where to redirect the user after successful login.
+			schema:
+				type: string
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
@@ -71,6 +89,15 @@ class ExternalLoginPublicHandler(object):
 		"""
 		Initialize sign up with external account.
 		Navigable endpoint, redirects to external login page.
+
+		---
+		parameters:
+		-	name: redirect_uri
+			in: query
+			description:
+				Where to redirect the user after successful login.
+			schema:
+				type: string
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
@@ -84,6 +111,22 @@ class ExternalLoginPublicHandler(object):
 		Finalize external auth.
 		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth client
 		settings at the external account provider.
+
+		---
+		parameters:
+		-	name: code
+			in: query
+			description:
+				OAuth authorization code.
+			schema:
+				type: string
+		parameters:
+		-	name: state
+			in: query
+			description:
+				OAuth state variable.
+			schema:
+				type: string
 		"""
 		if request.method == "POST":
 			authorization_data = dict(await request.post())
