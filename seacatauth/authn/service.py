@@ -333,15 +333,29 @@ class AuthenticationService(asab.Service):
 		"""
 		Build and create an SSO root session
 		"""
-		sso_session = await self.SessionService.build_and_upsert_sso_root_session(
+		session_builders = await self.SessionService.build_sso_root_session(
 			credentials_id=login_session.SeacatLogin.CredentialsId,
 			login_descriptor=login_session.SeacatLogin.AuthenticatedVia,
-			current_sso_session=root_session,
 		)
+		if root_session and not root_session.is_anonymous():
+			# Update existing SSO root session (re-login)
+			assert root_session.Session.Type == "root"
+			assert root_session.Credentials.Id == login_session.SeacatLogin.CredentialsId
+			new_sso_session = await self.update_session(
+				root_session.SessionId,
+				session_builders=session_builders
+			)
+		else:
+			# Create a new root session
+			new_sso_session = await self.create_session(
+				session_type="root",
+				session_builders=session_builders,
+			)
+
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"cid": login_session.SeacatLogin.CredentialsId,
 			"lsid": login_session.Id,
-			"sid": str(sso_session.Session.Id),
+			"sid": str(new_sso_session.Session.Id),
 			"from_ip": from_info,
 		})
 		await self.LastActivityService.update_last_activity(
@@ -350,7 +364,7 @@ class AuthenticationService(asab.Service):
 		# Delete login session
 		await self.delete_login_session(login_session.Id)
 
-		return sso_session
+		return new_sso_session
 
 
 	async def create_m2m_session(
@@ -417,24 +431,18 @@ class AuthenticationService(asab.Service):
 				"from the impersonated session's authorization scope.",
 				struct_data={"impersonator_cid": impersonator_cid, "target_cid": target_cid})
 
-		scope = frozenset(["profile", "email", "phone"])
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, target_cid, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=target_cid,
-				tenants=None,  # Root session is tenant-agnostic
-				exclude_resources={"authz:superuser", "authz:impersonate"},
-			),
-			cookie_session_builder(),
-			await available_factors_session_builder(self, target_cid),
-			await external_login_session_builder(ext_login_svc, target_cid),
-			(
-				(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId, impersonator_cid),
-				(SessionAdapter.FN.Authentication.ImpersonatorSessionId, impersonator_session.SessionId)
-			)
-		]
+		session_builders = await self.SessionService.build_sso_root_session(
+			credentials_id=target_cid,
+			# Use default login descriptor
+			login_descriptor={
+				"id": "default",
+				"factors": [{"id": "password", "type": "password"}]
+			},
+		)
+		session_builders.append((
+			(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId, impersonator_cid),
+			(SessionAdapter.FN.Authentication.ImpersonatorSessionId, impersonator_session.SessionId),
+		))
 
 		session = await self.SessionService.create_session(
 			session_type="root",

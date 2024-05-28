@@ -655,11 +655,10 @@ class SessionService(asab.Service):
 		return await self.get(dst_session.SessionId)
 
 
-	async def build_and_upsert_sso_root_session(
+	async def build_sso_root_session(
 		self,
 		credentials_id: str,
 		login_descriptor: dict,
-		current_sso_session: typing.Optional[SessionAdapter] = None,
 	):
 		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
 		credentials_service = self.App.get_service("seacatauth.CredentialsService")
@@ -678,27 +677,11 @@ class SessionService(asab.Service):
 				tenant_service=tenant_service,
 				role_service=role_service,
 				credentials_id=credentials_id,
-				tenants=None  # Root session is tenant-agnostic
+				tenants=None,  # Root session is tenant-agnostic
 			),
+			cookie_session_builder(),
 		]
-
-		if current_sso_session and not current_sso_session.is_anonymous():
-			# Update existing SSO root session (re-login)
-			assert current_sso_session.Session.Type == "root"
-			assert current_sso_session.Credentials.Id == credentials_id
-			new_sso_session = await self.update_session(
-				current_sso_session.SessionId,
-				session_builders=session_builders
-			)
-		else:
-			# Create a new root session
-			session_builders.append(cookie_session_builder())
-			new_sso_session = await self.create_session(
-				session_type="root",
-				session_builders=session_builders,
-			)
-		return new_sso_session
-
+		return session_builders
 
 
 	async def build_client_session(
@@ -736,19 +719,13 @@ class SessionService(asab.Service):
 		]
 
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			available_factors = await authentication_service.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {}
-			for result in await external_login_service.list(root_session.Credentials.Id):
-				try:
-					available_external_logins[result["type"]] = result["sub"]
-				except KeyError:
-					# BACK COMPAT
-					available_external_logins[result["t"]] = result["s"]
+			session_builders.append(
+				await external_login_session_builder(external_login_service, root_session.Credentials.Id))
+			session_builders.append(
+				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
 			session_builders.append([
 				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
 				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
 			])
 
 		if "batman" in scope:
