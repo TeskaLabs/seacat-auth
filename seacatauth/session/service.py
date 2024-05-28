@@ -24,8 +24,10 @@ from .builders import (
 	oauth2_session_builder,
 	credentials_session_builder,
 	authz_session_builder,
+	authentication_session_builder,
+	available_factors_session_builder,
 	external_login_session_builder,
-	available_factors_session_builder
+	cookie_session_builder
 )
 
 #
@@ -651,6 +653,35 @@ class SessionService(asab.Service):
 			await self.update_session(dst_session.SessionId, session_builders)
 
 		return await self.get(dst_session.SessionId)
+
+
+	async def build_sso_root_session(
+		self,
+		credentials_id: str,
+		login_descriptor: dict,
+	):
+		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		role_service = self.App.get_service("seacatauth.RoleService")
+
+		scope = frozenset(["profile", "email", "phone"])
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		session_builders = [
+			await credentials_session_builder(credentials_service, credentials_id, scope),
+			authentication_session_builder(login_descriptor),
+			await available_factors_session_builder(authentication_service, credentials_id),
+			await external_login_session_builder(ext_login_svc, credentials_id),
+			# TODO: SSO session should not need to have Authz data
+			await authz_session_builder(
+				tenant_service=tenant_service,
+				role_service=role_service,
+				credentials_id=credentials_id,
+				tenants=None,  # Root session is tenant-agnostic
+			),
+			cookie_session_builder(),
+		]
+		return session_builders
 
 
 	async def build_client_session(
