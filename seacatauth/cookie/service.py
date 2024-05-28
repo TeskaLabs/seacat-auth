@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import re
 import logging
+import typing
 
 import asab
 import asab.storage
@@ -296,8 +297,9 @@ class CookieService(asab.Service):
 		)
 
 
-	def delete_session_cookie(self, response):
+	def delete_session_cookie(self, response, client_id: typing.Optional[str] = None):
 		"""
 		Add a Set-Cookie header to the response to unset Seacat Session cookie
 		"""
-		response.del_cookie(self.CookieName)
+		cookie_name = self.get_cookie_name(client_id)
+		response.del_cookie(cookie_name)
