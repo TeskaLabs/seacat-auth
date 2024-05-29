@@ -267,7 +267,7 @@ class ExternalLoginService(asab.Service):
 			pass
 
 		# Create Seacat credentials
-		credentials_id = await self._create_new_seacat_auth_credentials(provider_type, user_info)
+		credentials_id = await self._create_new_seacat_auth_credentials(provider_type, user_info, authorization_data)
 		# Add the external account to the just created credentials
 		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
@@ -424,13 +424,19 @@ class ExternalLoginService(asab.Service):
 		self,
 		provider_type: str,
 		user_info: dict,
+		authorization_data: dict,
 	) -> str:
 		"""
 		Attempt to create new Seacat Auth credentials for external user.
 		"""
+		authorization_data_safe = {
+			k: v
+			for k, v in authorization_data.items()
+			if k != "code"
+		}
 		if self.RegistrationWebhookUri:
 			# Register external user via webhook
-			credentials_id = await self._create_credentials_via_webhook(provider_type, user_info)
+			credentials_id = await self._create_credentials_via_webhook(provider_type, user_info, authorization_data_safe)
 		else:
 			assert self.RegistrationService.SelfRegistrationEnabled
 			# Attempt registration with local credential providers if registration is enabled
@@ -453,6 +459,7 @@ class ExternalLoginService(asab.Service):
 		self,
 		provider_type: str,
 		user_info: dict,
+		authorization_data: dict,
 	) -> str:
 		"""
 		Send external login user_info to webhook for registration.
@@ -465,6 +472,7 @@ class ExternalLoginService(asab.Service):
 		request_data = {
 			"provider_type": provider_type,
 			"user_info": user_info,
+			"authorization_response": authorization_data,
 		}
 
 		async with aiohttp.ClientSession() as session:
