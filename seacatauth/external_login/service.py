@@ -180,7 +180,7 @@ class ExternalLoginService(asab.Service):
 
 		# Find the external account and its associated Seacat credentials ID
 		try:
-			account = await self.get_external_account(provider_type, subject=user_info["sub"])
+			account = await self.get_external_account(provider_type, subject_id=user_info["sub"])
 			credentials_id = account["cid"]
 		except ExternalAccountNotFoundError as e:
 			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={
@@ -258,7 +258,7 @@ class ExternalLoginService(asab.Service):
 
 		# Verify that the external account is not registered already
 		try:
-			await self.get_external_account(provider_type, subject=user_info["sub"])
+			await self.get_external_account(provider_type, subject_id=user_info["sub"])
 			# Account already registered
 			# TODO: Offer the user to log in instead
 			raise ExternalAccountAlreadyUsedError(provider_type=provider_type, subject_id=user_info.get("sub"))
@@ -334,41 +334,41 @@ class ExternalLoginService(asab.Service):
 	async def get_external_account(
 		self,
 		provider_type: str,
-		subject: str,
+		subject_id: str,
 		credentials_id: typing.Optional[str] = None
 	) -> dict:
 		try:
-			account = await self.ExternalLoginAccountStorage.get(provider_type, subject)
+			account = await self.ExternalLoginAccountStorage.get(provider_type, subject_id)
 		except KeyError:
-			raise ExternalAccountNotFoundError(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise ExternalAccountNotFoundError(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject_id)
 		return account
 
 
 	async def update_external_account(
 		self,
 		provider_type: str,
-		subject: str,
+		subject_id: str,
 		credentials_id: typing.Optional[str] = None,
 		**kwargs
 	):
-		account = await self.get_external_account(provider_type, subject, credentials_id)
+		account = await self.get_external_account(provider_type, subject_id, credentials_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise ExternalAccountNotFoundError(provider_type, subject)
-		return await self.ExternalLoginAccountStorage.update(provider_type, subject, **kwargs)
+			raise ExternalAccountNotFoundError(provider_type, subject_id)
+		return await self.ExternalLoginAccountStorage.update(provider_type, subject_id, **kwargs)
 
 
 	async def remove_external_account(
 		self,
 		provider_type: str,
-		subject: str,
-		credentials_id: typing.Optional[str] = None
+		subject_id: str,
+		credentials_id: typing.Optional[str] = None,
 	):
-		account = await self.get_external_account(provider_type, subject, credentials_id)
+		account = await self.get_external_account(provider_type, subject_id, credentials_id)
 		if credentials_id and credentials_id != account["cid"]:
-			raise ExternalAccountNotFoundError(provider_type, subject)
-		return await self.ExternalLoginAccountStorage.delete(provider_type, subject)
+			raise ExternalAccountNotFoundError(provider_type, subject_id)
+		return await self.ExternalLoginAccountStorage.delete(provider_type, subject_id)
 
 
 	async def _login(
