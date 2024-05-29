@@ -66,7 +66,7 @@ class ExternalLoginService(asab.Service):
 			self.CallbackEndpointPath.lstrip("/")
 		)
 		self.MyAccountPageUrl = "{}#/".format(app.AuthWebUiUrl)
-		self.ErrorRedirectUrl = asab.Config.get("seacatauth:external_login", "error_redirect_url")
+		self.ErrorRedirectUrl = asab.Config.get("seacatauth:external_login", "error_redirect_uri", fallback=None)
 		if not self.ErrorRedirectUrl:
 			self.ErrorRedirectUrl = self.MyAccountPageUrl
 
