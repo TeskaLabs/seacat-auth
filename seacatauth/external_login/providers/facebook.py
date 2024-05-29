@@ -20,9 +20,10 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	# Facebook uses a custom OAuth implementation. The flow is described here:
 	https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow
 
-	Redirect URI should be set to the following:
-	https://{my_domain}/seacat-auth/public/ext-login/facebook
-	https://{my_domain}/seacat-auth/public/ext-login-add/facebook
+	Seacat Auth external login callback endpoint (/public/ext-login/callback) must be allowed as a redirect URIs
+	in the OAuth client settings at the external login account provider.
+	The full callback URL is canonically in the following format:
+	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
 	Type = "facebook"
 	ConfigDefaults = {

@@ -40,6 +40,11 @@ class GenericOAuth2Login(asab.Configurable):
 	scope=openid name email
 	label=Login via provider.auth
 	```
+
+	Seacat Auth external login callback endpoint (/public/ext-login/callback) must be allowed as a redirect URIs
+	in the OAuth client settings at the external login account provider.
+	The full callback URL is canonically in the following format:
+	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
 
 	Type = None
