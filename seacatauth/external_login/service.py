@@ -267,7 +267,8 @@ class ExternalLoginService(asab.Service):
 			pass
 
 		# Create Seacat credentials
-		credentials_id = await self._create_new_seacat_auth_credentials(provider_type, user_info, authorization_data)
+		credentials_id, redirect_uri = await self._create_new_seacat_auth_credentials(
+			provider_type, user_info, authorization_data)
 		# Add the external account to the just created credentials
 		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
@@ -280,7 +281,7 @@ class ExternalLoginService(asab.Service):
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
 
-		redirect_uri = self._get_final_redirect_uri(state)
+		redirect_uri = redirect_uri or self._get_final_redirect_uri(state)
 
 		return sso_session, redirect_uri
 
@@ -425,18 +426,20 @@ class ExternalLoginService(asab.Service):
 		provider_type: str,
 		user_info: dict,
 		authorization_data: dict,
-	) -> str:
+	) -> typing.Tuple[str, typing.Optional[str]]:
 		"""
 		Attempt to create new Seacat Auth credentials for external user.
 		"""
-		authorization_data_safe = {
-			k: v
-			for k, v in authorization_data.items()
-			if k != "code"
-		}
+		redirect_uri = None
 		if self.RegistrationWebhookUri:
 			# Register external user via webhook
-			credentials_id = await self._create_credentials_via_webhook(provider_type, user_info, authorization_data_safe)
+			authorization_data_safe = {
+				k: v
+				for k, v in authorization_data.items()
+				if k != "code"
+			}
+			credentials_id, redirect_uri = await self._create_credentials_via_webhook(
+				provider_type, user_info, authorization_data_safe)
 		else:
 			assert self.RegistrationService.SelfRegistrationEnabled
 			# Attempt registration with local credential providers if registration is enabled
@@ -452,7 +455,7 @@ class ExternalLoginService(asab.Service):
 					"Failed to register credentials: {}".format(e), credentials=cred_data)
 
 		assert credentials_id
-		return credentials_id
+		return credentials_id, redirect_uri
 
 
 	async def _create_credentials_via_webhook(
@@ -460,7 +463,7 @@ class ExternalLoginService(asab.Service):
 		provider_type: str,
 		user_info: dict,
 		authorization_data: dict,
-	) -> str:
+	) -> typing.Tuple[str, typing.Optional[str]]:
 		"""
 		Send external login user_info to webhook for registration.
 		If the server responds with 200 and the JSON body contains 'cid' of the registered credentials,
@@ -484,9 +487,9 @@ class ExternalLoginService(asab.Service):
 					raise exceptions.CredentialsRegistrationError("Webhook responded with error")
 				response_data = await resp.json()
 
-		credentials_id = response_data.get("credential_id")
+		credentials_id = response_data.get("credentials_id")
 		if not credentials_id:
-			L.error("Webhook response does not contain valid 'credential_id'", struct_data={
+			L.error("Webhook response does not contain required 'credentials_id' field", struct_data={
 				"response_data": response_data})
 			raise exceptions.CredentialsRegistrationError("Unexpected webhook response")
 
@@ -495,9 +498,9 @@ class ExternalLoginService(asab.Service):
 			await self.CredentialsService.get(credentials_id)
 		except KeyError:
 			L.error("Returned credential ID not found", struct_data={"response_data": response_data})
-			raise exceptions.CredentialsRegistrationError("Returned credential ID not found")
+			raise exceptions.CredentialsRegistrationError("Returned credentials ID not found")
 
-		return credentials_id
+		return credentials_id, response_data.get("redirect_uri")
 
 
 	def _get_final_redirect_uri(self, state: dict):
