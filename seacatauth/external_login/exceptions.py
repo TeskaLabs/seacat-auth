@@ -22,16 +22,6 @@ class ExternalAccountError(SeacatAuthError):
 		self.SubjectId = subject_id
 		self.RedirectUri = redirect_uri
 
-	def get_log_struct_data(self):
-		struct_data = {}
-		if self.CredentialsId:
-			struct_data["cid"] = self.CredentialsId
-		if self.ProviderType:
-			struct_data["provider"] = self.ProviderType
-		if self.SubjectId:
-			struct_data["sub"] = self.SubjectId
-		return struct_data or None
-
 
 class LoginWithExternalAccountError(ExternalAccountError):
 	Result = "login_error"
