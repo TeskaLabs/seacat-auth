@@ -18,7 +18,7 @@ L = logging.getLogger(__name__)
 
 class ExternalLoginAccountStorage:
 
-	ExternalLoginAccountCollection = "ela"
+	ExternalLoginAccountCollection = "el"
 
 	def __init__(self, app):
 		self.StorageService = app.get_service("asab.StorageService")

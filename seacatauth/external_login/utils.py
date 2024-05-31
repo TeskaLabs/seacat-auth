@@ -2,17 +2,17 @@ import enum
 
 
 class AuthOperation(enum.StrEnum):
-	AddAccount = "a"
+	PairAccount = "p"
 	LogIn = "l"
 	SignUp = "s"
 
 	@classmethod
 	def deserialize(cls, value: str):
-		if value == "a":
-			return cls.AddAccount
-		elif value == "l":
+		if value == cls.PairAccount:
+			return cls.PairAccount
+		elif value == cls.LogIn:
 			return cls.LogIn
-		elif value == "s":
+		elif value == cls.SignUp:
 			return cls.SignUp
 		else:
 			raise KeyError(value)
