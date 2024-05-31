@@ -261,20 +261,6 @@ class ClientNotFoundError(ClientError, KeyError):
 		super().__init__(message, *args, client_id=client_id)
 
 
-class ExternalLoginError(SeacatAuthError):
-	def __init__(
-		self,
-		message: str,
-		*args,
-		credentials_id: str = None,
-		provider_type: str = None,
-		**kwargs
-	):
-		self.CredentialsID: str = credentials_id
-		self.ProviderType: str = provider_type
-		super().__init__(message, *args)
-
-
 class RegistrationNotOpenError(SeacatAuthError):
 	pass
 
