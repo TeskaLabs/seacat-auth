@@ -209,13 +209,14 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:external_login": {
-		# URI for the external registration of unknown accounts from external identity providers
+		# URI for delegated sign-up of unknown accounts from external identity providers.
+		# Must accept POST requests with JSON body.
 		"registration_webhook_uri": "",
 
 		# Where to redirect the user when there is no redirect URI in the request
 		"default_redirect_uri": "",
 
-		# Maximum lifetime of external login process
+		# Maximum lifespan of external login process
 		"state_expiration": "10m",
 
 		# Length of OAuth state string
