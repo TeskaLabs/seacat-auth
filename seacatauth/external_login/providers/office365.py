@@ -13,10 +13,9 @@ class Office365OAuth2Login(GenericOAuth2Login):
 	"""
 	Type = "office365"
 	ConfigDefaults = {
-		"issuer": "https://sts.windows.net/{tenant_id}",
-		"discovery_uri": "https://sts.windows.net/{tenant_id}/.well-known/openid-configuration",
-		# also available at "https://login.microsoftonline.com/{tenant_id}/.well-known/openid-configuration",
-		"jwks_uri": "https://login.microsoftonline.com/common/discovery/keys",
+		"issuer": "https://login.microsoftonline.com/{tenant_id}/v2.0",
+		"discovery_uri": "https://login.microsoftonline.com/{tenant_id}/v2.0/.well-known/openid-configuration",
+		"jwks_uri": "https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys",
 		"authorization_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize",
 		"token_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
 		"tenant_id": "",
@@ -31,4 +30,5 @@ class Office365OAuth2Login(GenericOAuth2Login):
 
 		self.Issuer = self.Issuer.format(tenant_id=self.TenantID)
 		self.AuthorizationEndpoint = self.AuthorizationEndpoint.format(tenant_id=self.TenantID)
+		self.JwksUri = self.JwksUri.format(tenant_id=self.TenantID)
 		self.TokenEndpoint = self.TokenEndpoint.format(tenant_id=self.TenantID)
