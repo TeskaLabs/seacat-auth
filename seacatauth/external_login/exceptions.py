@@ -46,10 +46,9 @@ class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
 			self.SubjectId, self.ProviderType), *args)
 
 
-class ExternalOAuthCodeFlowError(SeacatAuthError):
+class ExternalOAuthFlowError(SeacatAuthError):
 	"""
 	Failed to complete OAuth 2.0 Authorization Code flow at external identity provider
 	"""
-	def __init__(self, message: str, *args, provider_type: str):
-		self.ProviderType = provider_type
+	def __init__(self, message: str, *args):
 		super().__init__(message, *args)

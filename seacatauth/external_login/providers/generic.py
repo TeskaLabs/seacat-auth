@@ -12,6 +12,8 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from ..exceptions import ExternalOAuthFlowError
+
 #
 
 L = logging.getLogger(__name__)
@@ -193,12 +195,12 @@ class GenericOAuth2Login(asab.Configurable):
 			async with session.post(self.TokenEndpoint, data=query_string, headers=headers) as resp:
 				if resp.status != 200:
 					text = await resp.text()
-					L.error("Error response from external auth provider", struct_data={
+					L.error("Error response from external auth provider.", struct_data={
 						"status": resp.status,
 						"url": resp.url,
 						"text": text
 					})
-					yield None
+					raise ExternalOAuthFlowError("Token request failed.")
 				else:
 					yield resp
 
@@ -221,7 +223,7 @@ class GenericOAuth2Login(asab.Configurable):
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
 				"query": dict(authorize_data)})
-			return None
+			raise ExternalOAuthFlowError("No 'code' parameter in request.")
 
 		async with self.token_request(code) as resp:
 			token_data = await resp.json()
@@ -229,7 +231,7 @@ class GenericOAuth2Login(asab.Configurable):
 		if "id_token" not in token_data:
 			L.error("Token response does not contain 'id_token'", struct_data={
 				"provider": self.Type, "resp": token_data})
-			return None
+			raise ExternalOAuthFlowError("No 'id_token' in token response.")
 
 		id_token = token_data["id_token"]
 		await self._prepare_jwks()
@@ -260,12 +262,12 @@ class GenericOAuth2Login(asab.Configurable):
 			claims = json.loads(id_token.claims)
 		except jwcrypto.jws.InvalidJWSSignature:
 			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
-			return None
+			raise ExternalOAuthFlowError("Invalid ID token signature.")
 		except jwcrypto.jwt.JWTExpired:
 			L.error("Expired ID token.", struct_data={"provider": self.Type})
-			return None
+			raise ExternalOAuthFlowError("Expired ID token.")
 		except Exception as e:
 			L.error("Error reading ID token claims.", struct_data={
 				"provider": self.Type, "error": str(e)})
-			return None
+			raise ExternalOAuthFlowError("Error reading ID token claims.")
 		return claims

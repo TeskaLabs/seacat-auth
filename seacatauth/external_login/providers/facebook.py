@@ -4,6 +4,7 @@ import urllib.parse
 import aiohttp
 
 from .generic import GenericOAuth2Login
+from ..exceptions import ExternalOAuthFlowError
 
 #
 
@@ -74,7 +75,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
 				"query": dict(authorize_data)})
-			return None
+			raise ExternalOAuthFlowError("No 'code' parameter in request.")
 
 		async with self.token_request(code) as resp:
 			token_data = await resp.json()
@@ -82,7 +83,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		if "access_token" not in token_data:
 			L.error("Token response does not contain 'access_token'.", struct_data={
 				"provider": self.Type, "resp": token_data})
-			return None
+			raise ExternalOAuthFlowError("No 'access_token' in token response.")
 
 		access_token = token_data["access_token"]
 
@@ -97,7 +98,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 						"data": data,
 						"url": resp.url
 					})
-					return None
+					raise ExternalOAuthFlowError("Token request failed.")
 
 		user_info = {}
 		if "id" in data:

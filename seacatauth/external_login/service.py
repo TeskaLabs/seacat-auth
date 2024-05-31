@@ -16,6 +16,7 @@ from .exceptions import (
 	SignupWithExternalAccountError,
 	PairingExternalAccountError,
 	ExternalAccountNotFoundError,
+	ExternalOAuthFlowError,
 )
 
 
@@ -143,14 +144,10 @@ class ExternalLoginService(asab.Service):
 		"""
 		provider = self.Providers[provider_type]
 		user_info = await provider.get_user_info(authorization_data, expected_nonce)
-		if user_info is None:
-			L.error("Error obtaining user info from external login provider.", struct_data={
-				"provider": provider_type})
-			raise ValueError("Failed to obtain user info")
 		if "sub" not in user_info:
-			L.error("User info does not contain the 'sub' (subject ID) claim.", struct_data={
+			L.error("User info is missing the mandatory 'sub' claim.", struct_data={
 				"provider": provider_type})
-			raise ValueError("User info does not contain the 'sub' (subject ID) claim.")
+			raise ExternalOAuthFlowError("User info is missing the mandatory 'sub' claim.")
 		return user_info
 
 
@@ -178,7 +175,7 @@ class ExternalLoginService(asab.Service):
 		provider_type = state["provider"]
 		try:
 			user_info = await self._get_user_info(provider_type, authorization_data, expected_nonce=state.get("nonce"))
-		except ValueError as e:
+		except ExternalOAuthFlowError as e:
 			raise LoginWithExternalAccountError(
 				"Failed to obtain user info from external provider.",
 				provider_type=provider_type,
@@ -273,7 +270,7 @@ class ExternalLoginService(asab.Service):
 		provider_type = state["provider"]
 		try:
 			user_info = await self._get_user_info(provider_type, authorization_data, expected_nonce=state.get("nonce"))
-		except ValueError as e:
+		except ExternalOAuthFlowError as e:
 			raise SignupWithExternalAccountError(
 				"Failed to obtain user info from external provider.",
 				provider_type=provider_type,
@@ -348,7 +345,7 @@ class ExternalLoginService(asab.Service):
 		provider_type = state["provider"]
 		try:
 			user_info = await self._get_user_info(provider_type, authorization_data, expected_nonce=state.get("nonce"))
-		except ValueError as e:
+		except ExternalOAuthFlowError as e:
 			raise PairingExternalAccountError(
 				"Failed to obtain user info from external provider.",
 				provider_type=provider_type,

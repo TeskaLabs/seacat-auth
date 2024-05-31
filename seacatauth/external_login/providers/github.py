@@ -4,6 +4,7 @@ import urllib.parse
 import aiohttp
 
 from .generic import GenericOAuth2Login
+from ..exceptions import ExternalOAuthFlowError
 
 #
 
@@ -49,7 +50,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
 				"query": dict(authorize_data)})
-			return None
+			raise ExternalOAuthFlowError("No 'code' parameter in request.")
 
 		async with self.token_request(code) as resp:
 			response_text = await resp.text()
@@ -58,9 +59,9 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		access_token = params.get("access_token")
 
 		if access_token is None:
-			L.error("Token response does not contain access token.", struct_data={
+			L.error("Token response does not contain 'access_token'.", struct_data={
 				"provider": self.Type, "response": params})
-			return None
+			raise ExternalOAuthFlowError("Token response does not contain 'access_token'.")
 
 		access_token = access_token[0]
 		authorization = "bearer {}".format(access_token)
@@ -73,7 +74,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 						"provider": self.Type,
 						"status": resp.status,
 						"data": user_data})
-					return None
+					raise ExternalOAuthFlowError("User info request failed.")
 
 		email = user_data.get("email")
 		if not email:
