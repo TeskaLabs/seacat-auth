@@ -5,6 +5,7 @@ import urllib.parse
 
 from typing import Optional
 from .generic import GenericOAuth2Login
+from ..exceptions import ExternalOAuthFlowError
 
 #
 
@@ -71,18 +72,16 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 					"User has cancelled authorization with identity provider",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
 				)
-				return None
+				raise ExternalOAuthFlowError("User cancelled authorization.")
 			else:
 				L.error(
 					"An unknown error has occurred during authorization flow",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
 				)
-				return None
+				raise ExternalOAuthFlowError("Unknown error during authorization flow.")
 
 		id_token = authorize_data.get("id_token")
 		verified_claims = self._get_verified_claims(id_token, expected_nonce)
-		if not verified_claims:
-			return None
 
 		user_info = {
 			"sub": str(verified_claims.get("sub")),
