@@ -89,8 +89,11 @@ class ExternalLoginService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> str:
-		return await self._initialize_external_auth(
+		authorization_uri = await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
+		L.log(asab.LOG_NOTICE, "Initialized login with external account.", struct_data={
+			"provider": provider_type})
+		return authorization_uri
 
 
 	async def initialize_signup_with_external_account(
@@ -101,8 +104,12 @@ class ExternalLoginService(asab.Service):
 		if not self._can_sign_up_new_credentials():
 			L.error("Signup with external account is not enabled.")
 			raise exceptions.RegistrationNotOpenError()
-		return await self._initialize_external_auth(
+		authorization_uri = await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
+		L.log(asab.LOG_NOTICE, "Initialized sign-up with external account.", struct_data={
+			"provider": provider_type})
+		return authorization_uri
+
 
 
 	async def initialize_pairing_external_account(
@@ -110,8 +117,11 @@ class ExternalLoginService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> str:
-		return await self._initialize_external_auth(
+		authorization_uri = await self._initialize_external_auth(
 			provider_type, operation=AuthOperation.PairAccount, redirect_uri=redirect_uri)
+		L.log(asab.LOG_NOTICE, "Initialized pairing external account.", struct_data={
+			"provider": provider_type})
+		return authorization_uri
 
 
 	async def _initialize_external_auth(
@@ -134,12 +144,13 @@ class ExternalLoginService(asab.Service):
 		provider = self.Providers[provider_type]
 		user_info = await provider.get_user_info(authorization_data, expected_nonce)
 		if user_info is None:
-			L.error("Cannot obtain user info from external login provider.")
+			L.error("Error obtaining user info from external login provider.", struct_data={
+				"provider": provider_type})
 			raise ValueError("Failed to obtain user info")
 		if "sub" not in user_info:
-			L.error("User info does not contain the 'sub' (subject ID) claim.")
-			raise ValueError(
-				"User info does not contain the 'sub' (subject ID) claim.")
+			L.error("User info does not contain the 'sub' (subject ID) claim.", struct_data={
+				"provider": provider_type})
+			raise ValueError("User info does not contain the 'sub' (subject ID) claim.")
 		return user_info
 
 
@@ -155,6 +166,7 @@ class ExternalLoginService(asab.Service):
 
 		@param session_context: Request session (or None)
 		@param state: State parameter from the authorization response query
+		@param from_ip: Where the request came from
 		@param authorization_data: Authorization response query
 		@return: New SSO session object and redirect URI
 		"""
@@ -191,7 +203,7 @@ class ExternalLoginService(asab.Service):
 			# Create Seacat credentials
 			credentials_id, redirect_uri = await self._create_new_seacat_auth_credentials(
 				provider_type, user_info, authorization_data)
-			# Add the external account to the just created credentials
+			# Pair the external account with the created credentials
 			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
 			# Log the user in
@@ -280,7 +292,8 @@ class ExternalLoginService(asab.Service):
 		# Verify that the external account is not registered already
 		try:
 			await self.get_external_account(provider_type, subject_id=user_info["sub"])
-			# Account already registered
+			L.log(asab.LOG_NOTICE, "Cannot sign up with external account: Account already paired.", struct_data={
+				"provider": provider_type, "sub": user_info.get("sub")})
 			raise SignupWithExternalAccountError(
 				"External account already signed up.",
 				provider_type=provider_type,
@@ -294,7 +307,7 @@ class ExternalLoginService(asab.Service):
 		# Create Seacat credentials
 		credentials_id = await self._create_new_seacat_auth_credentials(
 			provider_type, user_info, authorization_data)
-		# Add the external account to the just created credentials
+		# Pair the external account with the created credentials
 		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
 		# Log the user in
@@ -346,6 +359,11 @@ class ExternalLoginService(asab.Service):
 		try:
 			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict as e:
+			L.log(asab.LOG_NOTICE, "Cannot pair external account: Already paired.", struct_data={
+				"cid": credentials_id,
+				"provider": provider_type,
+				"sub": user_info.get("sub"),
+			})
 			raise PairingExternalAccountError(
 				"External account already paired.",
 				subject_id=user_info.get("sub"),

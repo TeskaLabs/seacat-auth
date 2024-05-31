@@ -68,7 +68,8 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.initialize_pairing_external_account(provider_type, redirect_uri)
+		authorization_url = await self.ExternalLoginService.initialize_pairing_external_account(
+			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(authorization_url)
 
 
@@ -163,17 +164,17 @@ class ExternalLoginPublicHandler(object):
 			operation, new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
 				session_context=request.Session, from_ip=access_ips, **authorization_data)
 		except LoginWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
-				"from_ip": access_ips
+				"from_ip": access_ips,
 			})
 			return self._error_redirect(e, result=e.Result)
 		except SignupWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
-				"from_ip": access_ips
+				"from_ip": access_ips,
 			})
 			return self._error_redirect(e, result=e.Result)
 
@@ -192,16 +193,27 @@ class ExternalLoginPublicHandler(object):
 			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_signup_with_external_account(
 				session_context=request.Session, from_ip=access_ips, **authorization_data)
 		except SignupWithExternalAccountError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Sign-up failed.", struct_data={
+				"ext_provider_type": e.ProviderType,
+				"subject_id": e.SubjectId,
+				"from_ip": access_ips,
+			})
 			return self._error_redirect(e, result=e.Result)
 
 		return self._success_response(redirect_uri, result="signup_success", sso_session=new_sso_session)
 
 
 	async def _pair_account_callback(self, request, authorization_data):
+		access_ips = generic.get_request_access_ips(request)
 		try:
 			redirect_uri = await self.ExternalLoginService.finalize_pairing_external_account(
 				session_context=request.Session, **authorization_data)
 		except PairingExternalAccountError as e:
+			L.log(asab.LOG_NOTICE, "Failed to pair external account.", struct_data={
+				"ext_provider_type": e.ProviderType,
+				"subject_id": e.SubjectId,
+				"from_ip": access_ips,
+			})
 			return self._error_redirect(e, result=e.Result)
 
 		return self._success_response(redirect_uri, result="pairing_success")
