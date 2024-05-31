@@ -96,11 +96,6 @@ class GenericOAuth2Login(asab.Configurable):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
-		self.IDClaimsToVerify = {
-			"iss": self.Issuer,
-			"aud": self.ClientId
-		}
-
 		# Label for "Sign up with {ext_login_provider}" button
 		# TODO: Make this i18n-compatible (like login descriptors)
 		# TODO: Separate label for "Add external login" button
@@ -253,10 +248,9 @@ class GenericOAuth2Login(asab.Configurable):
 		return user_info
 
 	def _get_verified_claims(self, id_token, expected_nonce: str | None = None):
+		check_claims = self._get_claims_to_verify()
 		if expected_nonce:
-			check_claims = {"nonce": expected_nonce, **self.IDClaimsToVerify}
-		else:
-			check_claims = self.IDClaimsToVerify
+			check_claims["nonce"] = expected_nonce
 		try:
 			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=check_claims)
 			claims = json.loads(id_token.claims)
@@ -271,3 +265,10 @@ class GenericOAuth2Login(asab.Configurable):
 				"provider": self.Type, "error": str(e)})
 			raise ExternalOAuthFlowError("Error reading ID token claims.")
 		return claims
+
+
+	def _get_claims_to_verify(self) -> dict:
+		return {
+			"iss": self.Issuer,
+			"aud": self.ClientId
+		}
