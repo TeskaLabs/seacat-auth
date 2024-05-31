@@ -154,7 +154,7 @@ class ExternalLoginPublicHandler(object):
 			return await self._pair_account_callback(request, authorization_data)
 		else:
 			L.error("Cannot determine operation from state.", struct_data={"operation": operation})
-			return self._error_redirect(result="state_error")
+			return aiohttp.web.HTTPBadRequest()
 
 
 	async def _login_callback(self, request, authorization_data):
@@ -178,10 +178,10 @@ class ExternalLoginPublicHandler(object):
 			return self._error_redirect(e, result=e.Result)
 
 		if operation == AuthOperation.SignUp:
-			result = "signup_successful"
+			result = "signup_success"
 		else:
 			assert operation == AuthOperation.LogIn
-			result = "login_successful"
+			result = "login_success"
 
 		return self._success_response(redirect_uri, result=result, sso_session=new_sso_session)
 
@@ -194,7 +194,7 @@ class ExternalLoginPublicHandler(object):
 		except SignupWithExternalAccountError as e:
 			return self._error_redirect(e, result=e.Result)
 
-		return self._success_response(redirect_uri, result="signup_successful", sso_session=new_sso_session)
+		return self._success_response(redirect_uri, result="signup_success", sso_session=new_sso_session)
 
 
 	async def _pair_account_callback(self, request, authorization_data):
@@ -204,7 +204,7 @@ class ExternalLoginPublicHandler(object):
 		except PairingExternalAccountError as e:
 			return self._error_redirect(e, result=e.Result)
 
-		return self._success_response(redirect_uri, result="pairing_successful")
+		return self._success_response(redirect_uri, result="pairing_success")
 
 
 	def _error_redirect(self, error: typing.Optional[ExternalAccountError] = None, result: str = "error"):

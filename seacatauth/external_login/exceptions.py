@@ -2,8 +2,9 @@ import typing
 
 from ..exceptions import SeacatAuthError
 
+
 class ExternalAccountError(SeacatAuthError):
-	Result = None
+	Result: typing.Optional[str] = None
 
 	def __init__(
 		self,
@@ -33,15 +34,15 @@ class ExternalAccountError(SeacatAuthError):
 
 
 class LoginWithExternalAccountError(ExternalAccountError):
-	Result = "login_failed"
+	Result = "login_error"
 
 
 class SignupWithExternalAccountError(ExternalAccountError):
-	Result = "signup_failed"
+	Result = "signup_error"
 
 
 class PairingExternalAccountError(ExternalAccountError):
-	Result = "pairing_failed"
+	Result = "pairing_error"
 
 
 class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
