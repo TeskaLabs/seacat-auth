@@ -289,5 +289,3 @@ class CredentialsRegistrationError(SeacatAuthError):
 	):
 		self.Credentials: typing.Optional[str] = credentials
 		super().__init__(message, *args)
-
-
