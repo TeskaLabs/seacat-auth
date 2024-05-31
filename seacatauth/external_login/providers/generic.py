@@ -224,8 +224,6 @@ class GenericOAuth2Login(asab.Configurable):
 			return None
 
 		async with self.token_request(code) as resp:
-			if resp is None:
-				return None
 			token_data = await resp.json()
 
 		if "id_token" not in token_data:
