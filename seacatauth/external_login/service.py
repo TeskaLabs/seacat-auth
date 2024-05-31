@@ -497,7 +497,7 @@ class ExternalLoginService(asab.Service):
 		Send external login user_info to webhook for registration.
 		If the server responds with 200 and the JSON body contains 'cid' of the registered credentials,
 		create an entry in the external login collection and return the credential ID.
-		Otherwise, return None.
+		Otherwise, raise error.
 		"""
 		assert self.RegistrationWebhookUri is not None
 
