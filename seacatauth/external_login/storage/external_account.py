@@ -92,6 +92,7 @@ class ExternalLoginAccountStorage:
 def _make_id(provider_type: str, sub: str):
 	return "{} {}".format(provider_type, sub)
 
+
 def _add_back_compat_fields(account: dict):
 	if "e" in account and "email" not in account:
 		account["email"] = account["e"]
