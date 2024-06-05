@@ -3,6 +3,7 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha9`
 - `v24.20-alpha8`
 - `v24.20-alpha7`
 - `v24.20-alpha6`
@@ -26,6 +27,7 @@
 - Configurable password criteria (#372, `v24.20-alpha1`)
 
 ### Refactoring
+- Expected client ID is optional for authentication (#390, `v24.20-alpha9`)
 - Move SSO session creation into session service (#387, `v24.20-alpha8`)
 - Refactor duplicate code in session build (#386, `v24.20-alpha7`)
 
