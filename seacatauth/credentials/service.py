@@ -180,9 +180,10 @@ class CredentialsService(asab.Service):
 		return credentials
 
 
-	async def iterate(self, offset: int = 0, limit: int = -1, filter: typing.Optional[str] = None):
+	async def iterate_unstable(self, filter: typing.Optional[str] = None):
 		"""
-		This iterates over all providers and combines their results
+		Iterates over all providers and combine their results.
+		Does not preserve the order of results.
 		"""
 		pending = [provider.iterate(filtr=filter) for provider in self.CredentialProviders.values()]
 		pending_tasks = {
@@ -202,32 +203,40 @@ class CredentialsService(asab.Service):
 				yield credentials_data
 
 
-	async def _filter_by_roles(self, iterator: typing.AsyncIterator, role_ids: typing.Iterable):
-		role_svc = self.App.get_service("seacatauth.RoleService")
-		async for credentials in iterator:
-			for role_id in role_ids:
-				try:
-					await role_svc.get_assigned_role(credentials["_id"], role_id)
-					yield credentials
-					break
-				except KeyError:
+	async def iterate_stable(self, offset: int = 0, filter: typing.Optional[str] = None):
+		"""
+		Iterates over all providers and combine their results.
+		Preserve the order of results.
+		"""
+		for provider in self.CredentialProviders.values():
+			async for credobj in provider.iterate(offset=offset, filtr=filter):
+				if offset > 0:
+					offset -= 1
 					continue
-				except StopAsyncIteration:
-					continue
+				yield credobj
 
 
-	async def _filter_by_tenants(self, iterator: typing.AsyncIterator, tenant_ids: typing.Iterable):
+	async def _tenant_filter(self, credentials_id: str, tenant_ids: typing.Iterable):
+		if tenant_ids is None:
+			return True
 		tenant_svc = self.App.get_service("seacatauth.TenantService")
-		async for credentials in iterator:
-			for tenant_id in tenant_ids:
-				try:
-					await tenant_svc.get_assigned_tenant(credentials["_id"], tenant_id)
-					yield credentials
-					break
-				except KeyError:
-					continue
-				except StopAsyncIteration:
-					continue
+		for tenant_id in tenant_ids:
+			try:
+				await tenant_svc.get_assigned_tenant(credentials_id, tenant_id)
+				return True
+			except KeyError:
+				return False
+
+	async def _role_filter(self, credentials_id: str, role_ids: typing.Iterable):
+		if role_ids is None:
+			return True
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		for role_id in role_ids:
+			try:
+				await role_svc.get_assigned_role(credentials_id, role_id)
+				return True
+			except KeyError:
+				return False
 
 
 	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, try_global_search: bool = False):
@@ -239,16 +248,14 @@ class CredentialsService(asab.Service):
 		searched_roles = _authorize_searched_roles(session, search_params)
 
 		credentials = []
-		skip = search_params.Page * search_params.ItemsPerPage
-		iterator = self.iterate(filter=search_params.SimpleFilter)
-		if searched_roles:
-			iterator = self._filter_by_roles(iterator, role_ids=searched_roles)
-		if searched_tenants:
-			iterator = self._filter_by_tenants(iterator, tenant_ids=searched_tenants)
-
-		async for credentials_data in iterator:
-			if skip > 0:
-				skip -= 1
+		offset = search_params.Page * search_params.ItemsPerPage
+		async for credentials_data in self.iterate_stable(filter=search_params.SimpleFilter):
+			if not await self._role_filter(credentials_data["_id"], searched_roles):
+				continue
+			if not await self._tenant_filter(credentials_data["_id"], searched_tenants):
+				continue
+			if offset > 0:
+				offset -= 1
 				continue
 			credentials.append(credentials_data)
 			if len(credentials) >= search_params.ItemsPerPage:
