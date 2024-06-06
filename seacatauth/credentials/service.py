@@ -257,57 +257,6 @@ class CredentialsService(asab.Service):
 		return {"data": credentials}
 
 
-	async def _list(self, search_params: generic.SearchParams):
-		"""
-		List credentials
-		"""
-		provider_stack = []
-		total_count = 0  # If -1, then total count cannot be determined
-		for provider in self.CredentialProviders.values():
-			try:
-				count = await provider.count(filtr=search_params.SimpleFilter)
-			except Exception as e:
-				L.exception("Exception when getting count from a credentials provider: {}".format(e))
-				continue
-
-			provider_stack.append((count, provider))
-			if count >= 0 and total_count >= 0:
-				total_count += count
-			else:
-				total_count = -1
-
-		credentials = []
-		offset = search_params.Page * search_params.ItemsPerPage
-		remaining_items = search_params.ItemsPerPage
-		for count, provider in provider_stack:
-			if count >= 0:
-				if offset > count:
-					# The offset is beyond the count of the provider, skip to the next one
-					offset -= count
-					continue
-
-				async for credobj in provider.iterate(
-					offset=offset, limit=remaining_items, filtr=search_params.SimpleFilter
-				):
-					credentials.append(credobj)
-					remaining_items -= 1
-
-				if remaining_items <= 0:
-					break
-
-				offset = 0
-
-			else:
-				# TODO: Uncountable branch
-				L.error("Not implemented: Uncountable branch.", struct_data={"provider_id": provider.ProviderID})
-				continue
-
-		return {
-			"data": credentials,
-			"count": total_count,
-		}
-
-
 	def get_provider(self, credentials_id):
 		try:
 			provider_type, provider_id, credentials_subid = credentials_id.split(':', 3)
