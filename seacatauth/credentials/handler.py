@@ -202,9 +202,6 @@ class CredentialsHandler(object):
 		elif mode == "default":
 			search.SimpleFilter = request.query.get("f")
 
-		if len(search.AdvancedFilter) > 1:
-			raise asab.exceptions.ValidationError("No more than one advanced filter at a time is supported.")
-
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
 		try:
@@ -215,9 +212,8 @@ class CredentialsHandler(object):
 				"result": "ACCESS-DENIED",
 			})
 		return asab.web.rest.json_response(request, {
-			"data": result["data"],
-			"count": result["count"],
 			"result": "OK",
+			**result
 		})
 
 
