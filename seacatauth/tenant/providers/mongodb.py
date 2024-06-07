@@ -249,18 +249,3 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		if result is None:
 			raise KeyError("Tenant assignment not found")
 		return result
-
-
-	async def count_assignments(
-		self,
-		*,
-		credentials_id: typing.Optional[str] = None,
-		tenant_ids: typing.Optional[str | list] = None
-	) -> int:
-		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
-		query = {}
-		if credentials_id:
-			query["c"] = credentials_id
-		if tenant_ids:
-			query["t"] = tenant_ids
-		return await collection.count_documents(filter=query)
