@@ -180,10 +180,10 @@ class CredentialsService(asab.Service):
 		return credentials
 
 
-	async def iterate_unstable(self, filter: typing.Optional[str] = None):
+	async def iterate(self, filter: typing.Optional[str] = None):
 		"""
-		Iterates over all providers and combine their results.
-		Does not preserve the order of results.
+		Iterate over all providers and combine their results.
+		Fully asynchronous, but does not preserve the order of documents.
 		"""
 		pending = [provider.iterate(filtr=filter) for provider in self.CredentialProviders.values()]
 		pending_tasks = {
@@ -205,8 +205,8 @@ class CredentialsService(asab.Service):
 
 	async def iterate_stable(self, offset: int = 0, filter: typing.Optional[str] = None):
 		"""
-		Iterates over all providers and combine their results.
-		Preserve the order of results.
+		Iterate over all providers and combine their results.
+		Preserves the order of results.
 		"""
 		for provider in self.CredentialProviders.values():
 			async for credobj in provider.iterate(offset=offset, filtr=filter):
