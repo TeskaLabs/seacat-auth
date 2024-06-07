@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 
 import asab
 import asab.storage.exceptions
@@ -348,3 +349,13 @@ class TenantService(asab.Service):
 
 	async def get_assigned_tenant(self, credatials_id: str, tenant: str):
 		return await self.TenantsProvider.get_assignment(credatials_id, tenant)
+
+
+	async def count_assignments(
+		self,
+		*,
+		credentials_id: typing.Optional[str] = None,
+		tenant_ids: typing.Optional[str | list] = None
+	) -> int:
+		return await self.TenantsProvider.count_assignments(tenant_ids=tenant_ids)
+
