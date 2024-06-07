@@ -453,18 +453,3 @@ class RoleService(asab.Service):
 	async def get_assigned_role(self, credentials_id: str, role_id: str):
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		return await self.StorageService.get(self.CredentialsRolesCollection, assignment_id)
-
-
-	async def count_assignments(
-		self,
-		*,
-		credentials_id: typing.Optional[str] = None,
-		role_ids: typing.Optional[str | list] = None
-	) -> int:
-		collection = await self.StorageService.collection(self.CredentialsRolesCollection)
-		query = {}
-		if credentials_id:
-			query["c"] = credentials_id
-		if role_ids:
-			query["r"] = role_ids
-		return await collection.count_documents(filter=query)
