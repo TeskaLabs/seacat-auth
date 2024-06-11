@@ -1,5 +1,4 @@
 import logging
-import typing
 from typing import Optional
 
 import asab.storage.mongodb
@@ -242,7 +241,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		})
 
 
-	async def get_assignment(self, credatials_id: str, tenant: str):
+	async def get_assignment(self, credatials_id: str, tenant: str) -> dict:
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
 		query = {"c": credatials_id, "t": tenant}
 		result = await collection.find_one(query)
