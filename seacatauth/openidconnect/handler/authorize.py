@@ -454,12 +454,17 @@ class AuthorizeHandler(object):
 					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(
 						root_session.Authorization.Authz)
 				)
-			except exceptions.AccessDeniedError:
+			except exceptions.NoTenantsError:
 				raise OAuthAuthorizeError(
-					AuthErrorResponseCode.AccessDenied, client_id,
+					AuthErrorResponseCode.NoTenants, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"}
+				)
+			except exceptions.AccessDeniedError:
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.TenantAccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
 				)
 
 			if auth_token_type == "openid":
@@ -516,12 +521,18 @@ class AuthorizeHandler(object):
 					requested_scope, anonymous_cid,
 					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(authz)
 				)
-			except exceptions.AccessDeniedError:
+			except exceptions.NoTenantsError:
 				raise OAuthAuthorizeError(
-					AuthErrorResponseCode.AccessDenied, client_id,
+					AuthErrorResponseCode.NoTenants, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+				)
+			except exceptions.AccessDeniedError:
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.TenantAccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+				)
 
 			if auth_token_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
