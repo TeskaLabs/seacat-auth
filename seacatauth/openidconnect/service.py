@@ -427,7 +427,7 @@ class OpenIdConnectService(asab.Service):
 		scope: typing.Iterable,
 		credentials_id: str,
 		has_access_to_all_tenants: bool = False
-	):
+	) -> typing.Optional[str]:
 		"""
 		Extract tenants from requested scope and return the first accessible one.
 		"""
@@ -435,13 +435,10 @@ class OpenIdConnectService(asab.Service):
 			tenants: set = await self.TenantService.get_tenants_by_scope(
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			L.error("Tenant not found.", struct_data={"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": credentials_id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"tenant": e.Tenant, "cid": credentials_id})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 
 		if tenants:
