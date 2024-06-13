@@ -198,7 +198,7 @@ class ExternalLoginService(asab.Service):
 				) from e
 
 			# Create Seacat credentials
-			credentials_id, redirect_uri = await self._create_new_seacat_auth_credentials(
+			credentials_id = await self._create_new_seacat_auth_credentials(
 				provider_type, user_info, authorization_data)
 			# Pair the external account with the created credentials
 			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
