@@ -179,7 +179,7 @@ class ExternalLoginService(asab.Service):
 			raise LoginWithExternalAccountError(
 				"Failed to obtain user info from external provider.",
 				provider_type=provider_type,
-				redirect_uri=redirect_uri
+				redirect_uri=redirect_uri,
 			) from e
 
 		# Find the external account and its associated Seacat credentials ID
@@ -194,7 +194,7 @@ class ExternalLoginService(asab.Service):
 					"Login with unknown external account; sign-up not allowed.",
 					provider_type=provider_type,
 					subject_id=user_info["sub"],
-					redirect_uri=redirect_uri
+					redirect_uri=redirect_uri,
 				) from e
 
 			# Create Seacat credentials
@@ -274,7 +274,7 @@ class ExternalLoginService(asab.Service):
 			raise SignupWithExternalAccountError(
 				"Failed to obtain user info from external provider.",
 				provider_type=provider_type,
-				redirect_uri=redirect_uri
+				redirect_uri=redirect_uri,
 			) from e
 
 		if not self._can_sign_up_new_credentials():
@@ -283,7 +283,7 @@ class ExternalLoginService(asab.Service):
 				"Sign-up with external account not enabled.",
 				provider_type=provider_type,
 				subject_id=user_info["sub"],
-				redirect_uri=redirect_uri
+				redirect_uri=redirect_uri,
 			)
 
 		# Verify that the external account is not registered already
@@ -295,7 +295,7 @@ class ExternalLoginService(asab.Service):
 				"External account already signed up.",
 				provider_type=provider_type,
 				subject_id=user_info["sub"],
-				redirect_uri=redirect_uri
+				redirect_uri=redirect_uri,
 			)
 		except ExternalAccountNotFoundError:
 			# Unknown account can be used for signup
@@ -349,7 +349,7 @@ class ExternalLoginService(asab.Service):
 			raise PairingExternalAccountError(
 				"Failed to obtain user info from external provider.",
 				provider_type=provider_type,
-				redirect_uri=redirect_uri
+				redirect_uri=redirect_uri,
 			) from e
 
 		# TODO: Require fresh authentication and user confirmation
@@ -366,6 +366,7 @@ class ExternalLoginService(asab.Service):
 				subject_id=user_info.get("sub"),
 				credentials_id=credentials_id,
 				provider_type=provider_type,
+				redirect_uri=redirect_uri,
 			) from e
 
 		await self.ExternalLoginStateStorage.delete(state["_id"])
