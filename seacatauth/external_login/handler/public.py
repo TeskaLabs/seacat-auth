@@ -242,10 +242,7 @@ class ExternalLoginPublicHandler(object):
 			redirect_uri,
 			ext_login_result=result,
 		)
-		response = aiohttp.web.HTTPNotFound(headers={
-			"Location": redirect_uri,
-			"Refresh": "0;url={}".format(redirect_uri),
-		})
+		response = aiohttp.web.HTTPFound(redirect_uri)
 		if sso_session:
 			self.ExternalLoginService.CookieService.set_session_cookie(
 				response,
