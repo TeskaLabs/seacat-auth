@@ -14,7 +14,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from ..generic import add_params_to_url_query
+from ..generic import update_url_query_params
 from ..session.adapter import SessionAdapter
 from .. import exceptions
 from . import pkce
@@ -407,7 +407,7 @@ class OpenIdConnectService(asab.Service):
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
-		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
+		return update_url_query_params(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
 	async def revoke_token(self, token, token_type_hint=None):
@@ -427,7 +427,7 @@ class OpenIdConnectService(asab.Service):
 		scope: typing.Iterable,
 		credentials_id: str,
 		has_access_to_all_tenants: bool = False
-	):
+	) -> typing.Optional[str]:
 		"""
 		Extract tenants from requested scope and return the first accessible one.
 		"""
@@ -435,13 +435,10 @@ class OpenIdConnectService(asab.Service):
 			tenants: set = await self.TenantService.get_tenants_by_scope(
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			L.error("Tenant not found.", struct_data={"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": credentials_id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"tenant": e.Tenant, "cid": credentials_id})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 
 		if tenants:
