@@ -260,6 +260,10 @@ class SessionService(asab.Service):
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
+		L.log(asab.LOG_NOTICE, "Session updated.", struct_data={
+			"sid": session_id,
+			"type": session_dict.get(SessionAdapter.FN.Session.Type),
+		})
 		return await self.get(session_id)
 
 
