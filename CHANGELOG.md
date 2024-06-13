@@ -3,7 +3,6 @@
 ## v24.20
 
 ### Pre-releases
-- `v24.20-alpha12`
 - `v24.20-alpha11`
 - `v24.20-alpha10`
 - `v24.20-alpha9`
@@ -20,7 +19,7 @@
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
-- Properly encrypt cookie value in session update (#394, `v24.20-alpha12`)
+- Properly encrypt cookie value in session update (#394, `v24.20-alpha11`)
 - Properly parse URL query before adding new parameters (#393, `v24.20-alpha11`)
 - Delete client cookie on introspection failure (#385, `v24.20-alpha6`)
 - Extend session expiration at cookie entrypoint (#383, `v24.20-alpha5`)
