@@ -18,6 +18,8 @@
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
+- Properly encrypt cookie value in session update (#394, `v24.20-alpha8`)
+- Properly parse URL query before adding new parameters (#393, `v24.20-alpha8`)
 - Delete client cookie on introspection failure (#385, `v24.20-alpha6`)
 - Extend session expiration at cookie entrypoint (#383, `v24.20-alpha5`)
 - Do not log failed LDAP login as error (#381, `v24.20-alpha4`)
@@ -25,10 +27,12 @@
 
 ### Features
 - External login with dynamic redirection (#384, `v24.20-alpha9`)
+- Custom response codes for tenant-related authorization errors (#392, `v24.20-alpha8`)
 - Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
 - Configurable password criteria (#372, `v24.20-alpha1`)
 
 ### Refactoring
+- Expected client ID is optional for authentication (#390, `v24.20-alpha8`)
 - Move SSO session creation into session service (#387, `v24.20-alpha8`)
 - Refactor duplicate code in session build (#386, `v24.20-alpha7`)
 

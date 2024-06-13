@@ -454,12 +454,17 @@ class AuthorizeHandler(object):
 					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(
 						root_session.Authorization.Authz)
 				)
-			except exceptions.AccessDeniedError:
+			except exceptions.NoTenantsError:
 				raise OAuthAuthorizeError(
-					AuthErrorResponseCode.AccessDenied, client_id,
+					AuthErrorResponseCode.NoTenants, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"}
+				)
+			except exceptions.AccessDeniedError:
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.TenantAccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
 				)
 
 			if auth_token_type == "openid":
@@ -516,12 +521,18 @@ class AuthorizeHandler(object):
 					requested_scope, anonymous_cid,
 					has_access_to_all_tenants=self.OpenIdConnectService.RBACService.can_access_all_tenants(authz)
 				)
-			except exceptions.AccessDeniedError:
+			except exceptions.NoTenantsError:
 				raise OAuthAuthorizeError(
-					AuthErrorResponseCode.AccessDenied, client_id,
+					AuthErrorResponseCode.NoTenants, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "tenant_not_found"})
+				)
+			except exceptions.AccessDeniedError:
+				raise OAuthAuthorizeError(
+					AuthErrorResponseCode.TenantAccessDenied, client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+				)
 
 			if auth_token_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
@@ -878,21 +889,18 @@ class AuthorizeHandler(object):
 		if login_uri is None:
 			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
 
-		parsed = generic.urlparse(login_uri)
-		if parsed["fragment"] != "":
+		if "#" in login_uri:
 			# If the Login URI contains fragment, add the login params into the fragment query
+			parsed = generic.urlparse(login_uri)
 			fragment_parsed = generic.urlparse(parsed["fragment"])
-			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query = dict(urllib.parse.parse_qsl(fragment_parsed["query"]))
 			query.update(login_query_params)
 			fragment_parsed["query"] = urllib.parse.urlencode(query)
 			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
+			return generic.urlunparse(**parsed)
 		else:
 			# If the Login URI contains no fragment, add the login params into the regular URL query
-			query = urllib.parse.parse_qs(parsed["query"])
-			query.update(login_query_params)
-			parsed["query"] = urllib.parse.urlencode(query)
-
-		return generic.urlunparse(**parsed)
+			return generic.update_url_query_params(login_uri, **dict(login_query_params))
 
 
 	def _validate_request_parameters(self, request_parameters):
