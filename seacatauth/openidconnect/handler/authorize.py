@@ -889,21 +889,18 @@ class AuthorizeHandler(object):
 		if login_uri is None:
 			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
 
-		parsed = generic.urlparse(login_uri)
-		if parsed["fragment"] != "":
+		if "#" in login_uri:
 			# If the Login URI contains fragment, add the login params into the fragment query
+			parsed = generic.urlparse(login_uri)
 			fragment_parsed = generic.urlparse(parsed["fragment"])
-			query = urllib.parse.parse_qs(fragment_parsed["query"])
+			query = dict(urllib.parse.parse_qsl(fragment_parsed["query"]))
 			query.update(login_query_params)
 			fragment_parsed["query"] = urllib.parse.urlencode(query)
 			parsed["fragment"] = generic.urlunparse(**fragment_parsed)
+			return generic.urlunparse(**parsed)
 		else:
 			# If the Login URI contains no fragment, add the login params into the regular URL query
-			query = urllib.parse.parse_qs(parsed["query"])
-			query.update(login_query_params)
-			parsed["query"] = urllib.parse.urlencode(query)
-
-		return generic.urlunparse(**parsed)
+			return generic.update_url_query_params(login_uri, **dict(login_query_params))
 
 
 	def _validate_request_parameters(self, request_parameters):
