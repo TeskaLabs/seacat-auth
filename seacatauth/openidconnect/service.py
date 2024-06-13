@@ -14,7 +14,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from ..generic import add_params_to_url_query
+from ..generic import update_url_query_params
 from ..session.adapter import SessionAdapter
 from .. import exceptions
 from . import pkce
@@ -407,7 +407,7 @@ class OpenIdConnectService(asab.Service):
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
-		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
+		return update_url_query_params(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
 	async def revoke_token(self, token, token_type_hint=None):
