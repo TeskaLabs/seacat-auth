@@ -221,12 +221,12 @@ class ExternalLoginPublicHandler(object):
 
 	def _error_redirect(self, error: typing.Optional[ExternalAccountError] = None, result: str = "error"):
 		if not error:
-			redirect_uri = generic.add_params_to_url_query(
+			redirect_uri = generic.update_url_query_params(
 				self.ExternalLoginService.DefaultRedirectUri,
 				ext_login_result=result,
 			)
 		else:
-			redirect_uri = generic.add_params_to_url_query(
+			redirect_uri = generic.update_url_query_params(
 				error.RedirectUri or self.ExternalLoginService.DefaultRedirectUri,
 				ext_login_result=result,
 			)
@@ -238,7 +238,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	def _success_response(self, redirect_uri: str, result: str, sso_session: typing.Optional = None):
-		redirect_uri = generic.add_params_to_url_query(
+		redirect_uri = generic.update_url_query_params(
 			redirect_uri,
 			ext_login_result=result,
 		)
