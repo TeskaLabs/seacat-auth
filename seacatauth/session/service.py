@@ -252,7 +252,11 @@ class SessionService(asab.Service):
 
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
+				if key in SessionAdapter.EncryptedIdentifierFields and value is not None:
+					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
+					upsertor.set(key, value)
+				else:
+					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
