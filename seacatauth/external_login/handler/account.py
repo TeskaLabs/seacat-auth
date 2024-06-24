@@ -56,7 +56,7 @@ class ExternalLoginAccountHandler(object):
 
 	async def remove_my_external_account(self, request):
 		"""
-		List the current user's external login accounts
+		Remove the current user's external login account
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject_id = request.match_info["subject_id"]

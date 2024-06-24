@@ -77,6 +77,8 @@ class ExternalLoginPublicHandler(object):
 		"""
 		Initialize login with external account.
 		Navigable endpoint, redirects to external login page.
+		Can also be used as entrypoint for sign-up:
+		When the external account is unknown and sign-up is enabled, Seacat Auth attempts to sign up.
 
 		---
 		parameters:
@@ -120,9 +122,18 @@ class ExternalLoginPublicHandler(object):
 
 	async def external_auth_callback(self, request):
 		"""
-		Finalize external auth.
-		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth client
+		Finalize external account login, sign-up or pairing.
+		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth app/client
 		settings at the external account provider.
+		Finishes with redirect to the URL specified at the external auth entrypoint,
+		appending `ext_login_result` to the URL query.
+		Defined `ext_login_result` values:
+			- `login_success`: User logged in successfully with external account.
+			- `signup_success`: User was signed up and logged in successfully with external account.
+			- `pairing_success`: External account successfully paired with current user's credentials.
+			- `login_error`: Logging in with external account failed.
+			- `signup_error`: Signing up with external account failed.
+			- `pairing_error`: Pairing external account to current user's credentials failed.
 
 		---
 		parameters:
@@ -132,7 +143,6 @@ class ExternalLoginPublicHandler(object):
 				OAuth authorization code.
 			schema:
 				type: string
-		parameters:
 		-	name: state
 			in: query
 			description:

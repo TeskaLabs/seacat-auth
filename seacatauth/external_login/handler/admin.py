@@ -36,7 +36,7 @@ class ExternalLoginAdminHandler(object):
 	@access_control("authz:superuser")
 	async def list_external_accounts(self, request):
 		"""
-		List user's external login credentials
+		List user's external login accounts
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		data = await self.ExternalLoginService.list_external_accounts(credentials_id)
@@ -46,7 +46,7 @@ class ExternalLoginAdminHandler(object):
 	@access_control("authz:superuser")
 	async def get_external_account(self, request):
 		"""
-		Get external login credentials detail
+		Get external login account detail
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
@@ -60,7 +60,7 @@ class ExternalLoginAdminHandler(object):
 	@access_control("authz:superuser")
 	async def remove_external_account(self, request):
 		"""
-		Remove external login credentials
+		Remove external login account
 		"""
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
