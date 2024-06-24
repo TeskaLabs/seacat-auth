@@ -28,16 +28,17 @@ class FeatureService(asab.Service):
 			features["registration"] = registration
 
 		# External login options
-		do_external_login_uris = [
+		login_with_external_account_uris = [
 			{
 				"type": provider.Type,
-				"authorize_uri": provider.get_login_authorize_uri(),
+				"authorize_uri": "{api_base_url}/public/ext-login/{provider_type}/login".format(
+					api_base_url=self.App.PublicSeacatAuthApiUrl.rstrip("/"), provider_type=provider.Type),
 				"label": provider.Label
 			}
 			for provider in self.ExternalLoginService.Providers.values()
 		]
-		if len(do_external_login_uris) > 0:
-			login["external"] = do_external_login_uris
+		if len(login_with_external_account_uris) > 0:
+			login["external"] = login_with_external_account_uris
 
 		if len(login) > 0:
 			features["login"] = login
@@ -46,16 +47,17 @@ class FeatureService(asab.Service):
 
 		my_account = {}
 
-		add_external_login_uris = [
+		pair_external_account_uris = [
 			{
 				"type": provider.Type,
-				"authorize_uri": provider.get_addlogin_authorize_uri(),
-				"label": provider.Label  # TODO: Separate label for adding the login
+				"authorize_uri": "{api_base_url}/public/ext-login/{provider_type}/pair".format(
+					api_base_url=self.App.PublicSeacatAuthApiUrl.rstrip("/"), provider_type=provider.Type),
+				"label": provider.Label
 			}
 			for provider in self.ExternalLoginService.Providers.values()
 		]
-		if len(add_external_login_uris) > 0:
-			my_account["external_login"] = add_external_login_uris
+		if len(pair_external_account_uris) > 0:
+			my_account["external_login"] = pair_external_account_uris
 
 		# TODO: Email, phone etc.
 
