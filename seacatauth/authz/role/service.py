@@ -6,6 +6,7 @@ from typing import Optional
 import asab.storage.exceptions
 import asab.exceptions
 
+from ...generic import SessionContext
 from ... import exceptions
 from ...events import EventTypes
 from .view import GlobalRoleView, SharedRoleView, TenantRoleView
@@ -13,7 +14,6 @@ from .view import GlobalRoleView, SharedRoleView, TenantRoleView
 #
 
 L = logging.getLogger(__name__)
-
 
 #
 
@@ -74,12 +74,11 @@ class RoleService(asab.Service):
 		limit: int = None,
 		name_filter: str = None,
 		resource_filter: str = None,
-		session_context=None,
 	):
 		if tenant_id in {"*", None}:
 			tenant_id = None
 		else:
-			self.validate_tenant_access(session_context, tenant_id)
+			self.validate_tenant_access(tenant_id)
 
 		providers = self._prepare_providers(tenant_id)
 		counts = [
@@ -115,9 +114,9 @@ class RoleService(asab.Service):
 
 	async def get(self, role_id: str, session_context=None):
 		tenant_id = self._role_tenant_id(role_id)
-		if tenant_id and not (session_context and session_context.has_tenant_access(tenant_id)):
-			raise exceptions.TenantAccessDeniedError(
-				tenant_id, subject=session_context.Credentials.Id if session_context else None)
+		# if tenant_id and not (session_context and session_context.has_tenant_access(tenant_id)):
+		# 	raise exceptions.TenantAccessDeniedError(
+		# 		tenant_id, subject=session_context.Credentials.Id if session_context else None)
 		try:
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
@@ -141,16 +140,15 @@ class RoleService(asab.Service):
 		resources: typing.Optional[typing.Iterable] = None,
 		shared: bool = False,
 		_managed_by: typing.Optional[str] = None,
-		session_context=None
 	):
 		tenant_id, role_name = self.parse_role_id(role_id)
 		self.validate_role_name(role_name)
 		if tenant_id:
 			# Validate that the tenant exists
 			await self.TenantService.get_tenant(tenant_id)
-			self.validate_tenant_access(session_context, tenant_id)
+			self.validate_tenant_access(tenant_id)
 		else:
-			self.validate_superuser_access(session_context)
+			self.validate_superuser_access()
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
@@ -175,17 +173,15 @@ class RoleService(asab.Service):
 		return role_id
 
 
-	def validate_tenant_access(self, session, tenant_id: str):
-		if session == "system":
-			return
+	def validate_tenant_access(self, tenant_id: str):
+		session = SessionContext.get()
 		if not (session and session.has_tenant_access(tenant_id)):
 			raise exceptions.TenantAccessDeniedError(
 				tenant_id, subject=session.Credentials.Id if session else None)
 
 
-	def validate_superuser_access(self, session):
-		if session == "system":
-			return
+	def validate_superuser_access(self):
+		session = SessionContext.get()
 		if not (session and session.is_superuser()):
 			raise exceptions.AccessDeniedError(
 				subject=session.Credentials.Id if session else None, resource="authz:superuser")
