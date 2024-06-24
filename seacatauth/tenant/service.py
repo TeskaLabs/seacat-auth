@@ -319,6 +319,8 @@ class TenantService(asab.Service):
 			elif has_access_to_all_tenants:
 				await self.get_tenant(tenant)
 				tenants.add(tenant)
+			elif not user_tenants:
+				raise exceptions.NoTenantsError(credential_id)
 			else:
 				raise exceptions.TenantAccessDeniedError(tenant, credential_id)
 
