@@ -264,9 +264,13 @@ def urlunparse(
 	return urllib.parse.urlunparse((scheme, netloc, path, params, query, fragment))
 
 
-def add_params_to_url_query(url, **params):
+def update_url_query_params(url: str, **params):
 	parsed = urlparse(url)
-	query = urllib.parse.parse_qs(parsed["query"])
+	query = {}
+	for k, v in urllib.parse.parse_qsl(parsed["query"]):
+		if k in query:
+			raise ValueError("Repeated query parameters ({!r}) are not supported.".format(k))
+		query[k] = v
 	query.update(params)
 	parsed["query"] = urllib.parse.urlencode(query)
 	return urlunparse(**parsed)

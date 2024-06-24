@@ -1,8 +1,10 @@
 import logging
+import typing
 import urllib.parse
 import aiohttp
 
 from .generic import GenericOAuth2Login
+from ..exceptions import ExternalOAuthFlowError
 
 #
 
@@ -16,8 +18,10 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 	This app must be registered at Github:
 	https://github.com/settings/developers
 
-	Redirect URI should be set to the following:
-	https://{my_domain}/seacat_auth
+	Seacat Auth external login callback endpoint (/public/ext-login/callback) must be allowed as a redirect URIs
+	in the OAuth client settings at the external login account provider.
+	The full callback URL is canonically in the following format:
+	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
 	Type = "github"
 	ConfigDefaults = {
@@ -27,7 +31,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		"userinfo_endpoint": "https://api.github.com/user",
 		"user_emails_endpoint": "https://api.github.com/user/emails",
 		"scope": "user:email",  # Scope is not used
-		"label": "Github",
+		"label": "GitHub",
 	}
 
 	def __init__(self, external_login_svc, config_section_name):
@@ -36,7 +40,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 		assert self.UserInfoEndpoint not in (None, "")
 		self.UserEmailsURI = self.Config.get("user_emails_endpoint")
 
-	async def _get_user_info(self, authorize_data, redirect_uri):
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		User info is not contained in token response,
 		call to https://api.github.com/user is needed.
@@ -46,17 +50,18 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
 				"query": dict(authorize_data)})
-			return None
+			raise ExternalOAuthFlowError("No 'code' parameter in request.")
 
-		async with self.token_request(code, redirect_uri=redirect_uri) as resp:
+		async with self.token_request(code) as resp:
 			response_text = await resp.text()
 
 		params = urllib.parse.parse_qs(response_text)
 		access_token = params.get("access_token")
 
 		if access_token is None:
-			L.error("Token response does not contain access token.", struct_data={
+			L.error("Token response does not contain 'access_token'.", struct_data={
 				"provider": self.Type, "response": params})
+			raise ExternalOAuthFlowError("Token response does not contain 'access_token'.")
 
 		access_token = access_token[0]
 		authorization = "bearer {}".format(access_token)
@@ -69,7 +74,7 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 						"provider": self.Type,
 						"status": resp.status,
 						"data": user_data})
-					return None
+					raise ExternalOAuthFlowError("User info request failed.")
 
 		email = user_data.get("email")
 		if not email:
@@ -77,11 +82,11 @@ class GitHubOAuth2Login(GenericOAuth2Login):
 
 		user_info = {}
 		if "id" in user_data:
-			user_info["sub"] = user_data["id"]
+			user_info["sub"] = str(user_data["id"])
 		if email:
 			user_info["email"] = email
 		if "login" in user_data:
-			user_info["login"] = user_data["login"]
+			user_info["preferred_username"] = user_data["login"]
 		if "name" in user_data:
 			user_info["name"] = user_data["name"]
 

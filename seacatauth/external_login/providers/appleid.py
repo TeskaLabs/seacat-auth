@@ -5,6 +5,7 @@ import urllib.parse
 
 from typing import Optional
 from .generic import GenericOAuth2Login
+from ..exceptions import ExternalOAuthFlowError
 
 #
 
@@ -42,8 +43,8 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		super().__init__(external_login_svc, config_section_name, config)
 		self.Scope = self.Config.get("scope")
 
-	def _get_authorize_uri(
-		self, redirect_uri: str,
+	def get_authorize_uri(
+		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	) -> str:
@@ -52,7 +53,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			("response_type", "code id_token"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri),
+			("redirect_uri", redirect_uri or self.CallbackUrl),
 		]
 		if state is not None:
 			query_params.append(("state", state))
@@ -63,29 +64,27 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data: dict, redirect_uri: str) -> typing.Optional[dict]:
-		auth_error = authorize_data.get('error')
+	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+		auth_error = authorize_data.get("error")
 		if auth_error is not None:
-			if auth_error == 'user_cancelled_authorize':
+			if auth_error == "user_cancelled_authorize":
 				L.error(
 					"User has cancelled authorization with identity provider",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
 				)
-				return None
+				raise ExternalOAuthFlowError("User cancelled authorization.")
 			else:
 				L.error(
 					"An unknown error has occurred during authorization flow",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
 				)
-				return None
+				raise ExternalOAuthFlowError("Unknown error during authorization flow.")
 
 		id_token = authorize_data.get("id_token")
-		verified_claims = self._get_verified_claims(id_token)
-		if not verified_claims:
-			return None
+		verified_claims = self._get_verified_claims(id_token, expected_nonce)
 
 		user_info = {
-			"sub": verified_claims.get("sub"),
+			"sub": str(verified_claims.get("sub")),
 			"email": verified_claims.get("email"),
 			"is_proxy_email": bool(verified_claims.get("is_private_email")),
 			"nonce": verified_claims.get("nonce"),
