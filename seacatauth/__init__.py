@@ -43,7 +43,12 @@ asab.Config.add_defaults({
 
 	"openidconnect": {
 		"bearer_realm": "asab",
-		"auth_code_timeout": "60 s",
+		"authorization_code_length": "36",
+		"authorization_code_expiration": "3 m",
+		"access_token_length": "36",
+		"access_token_expiration": "4 h",
+		"refresh_token_length": "36",
+		"refresh_token_expiration": "3 d",
 	},
 
 	"seacatauth:client": {
@@ -202,6 +207,24 @@ asab.Config.add_defaults({
 		# Key used for generating Basic auth passwords
 		"password_key": "",
 	},
+
+	"seacatauth:external_login": {
+		# URI for delegated sign-up of unknown accounts from external identity providers.
+		# Must accept POST requests with JSON body.
+		"registration_webhook_uri": "",
+
+		# Where to redirect the user when there is no redirect URI in the request
+		"default_redirect_uri": "",
+
+		# Maximum lifespan of external login process
+		"state_expiration": "10m",
+
+		# Length of OAuth state string
+		"state_length": 16,
+
+		# Length of OAuth nonce string
+		"nonce_length": 16,
+	}
 })
 
 AuditLogger = logging.getLogger("AUDIT")

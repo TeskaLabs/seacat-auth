@@ -39,8 +39,12 @@ async def credentials_session_builder(credentials_service, credentials_id, scope
 
 async def external_login_session_builder(external_login_service, credentials_id):
 	external_logins = {}
-	for result in await external_login_service.list(credentials_id):
-		external_logins[result["t"]] = result["s"]
+	for result in await external_login_service.list_external_accounts(credentials_id):
+		try:
+			external_logins[result["type"]] = result["sub"]
+		except KeyError:
+			# BACK COMPAT
+			external_logins[result["t"]] = result["s"]
 	return ((SessionAdapter.FN.Authentication.ExternalLoginOptions, external_logins),)
 
 
@@ -78,3 +82,12 @@ def cookie_session_builder():
 	# TODO: Shorten back to 32 bytes once unencrypted cookies are obsoleted
 	token_length = 16 + 32  # The first part is AES CBC init vector, the second is the actual token
 	yield (SessionAdapter.FN.Cookie.Id, secrets.token_bytes(token_length))
+
+
+def oauth2_session_builder(client_id: str, scope: frozenset | None, nonce: str = None, redirect_uri: str = None):
+	yield (SessionAdapter.FN.OAuth2.Scope, scope)
+	yield (SessionAdapter.FN.OAuth2.ClientId, client_id)
+	if redirect_uri is not None:
+		yield (SessionAdapter.FN.OAuth2.RedirectUri, redirect_uri)
+	if nonce is not None:
+		yield (SessionAdapter.FN.OAuth2.Nonce, nonce)

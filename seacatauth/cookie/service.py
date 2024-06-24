@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import re
 import logging
+import typing
 
 import asab
 import asab.storage
@@ -10,14 +11,8 @@ import asab.exceptions
 import jwcrypto.jws
 
 from .. import exceptions
-from ..session import SessionAdapter
-from ..session.adapter import CookieData
-from ..session import (
-	credentials_session_builder,
-	authz_session_builder,
-	cookie_session_builder
-)
-from ..openidconnect.session import oauth2_session_builder
+from ..session.adapter import SessionAdapter, CookieData
+from ..session.builders import cookie_session_builder
 from .. import AuditLogger
 
 #
@@ -143,12 +138,13 @@ class CookieService(asab.Service):
 
 
 	async def get_session_by_authorization_code(self, code):
-		return await self.OpenIdConnectService.pop_session_by_authorization_code(code)
+		return await self.OpenIdConnectService.get_session_by_authorization_code(code)
 
 
 	async def create_cookie_client_session(
 		self, root_session, client_id, scope,
 		nonce=None,
+		redirect_uri=None,
 		tenants=None,
 		requested_expiration=None
 	):
@@ -162,65 +158,16 @@ class CookieService(asab.Service):
 		except KeyError:
 			raise KeyError("Client '{}' not found".format(client_id))
 
-		# Make sure dangerous resources are removed from impersonated sessions
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			exclude_resources = {"authz:superuser", "authz:impersonate"}
-		else:
-			exclude_resources = None
-
 		# Build the session
-		session_builders = [
-			await credentials_session_builder(self.CredentialsService, root_session.Credentials.Id, scope),
-			await authz_session_builder(
-				tenant_service=self.TenantService,
-				role_service=self.RoleService,
-				credentials_id=root_session.Credentials.Id,
-				tenants=tenants,
-				exclude_resources=exclude_resources,
-			),
-			cookie_session_builder(),
-		]
-
-		if "batman" in scope:
-			batman_service = self.OpenIdConnectService.App.get_service("seacatauth.BatmanService")
-			password = batman_service.generate_password(root_session.Credentials.Id)
-			username = root_session.Credentials.Username
-			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
-			session_builders.append([
-				(SessionAdapter.FN.Batman.Token, basic_auth),
-			])
-
-		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
-			available_factors = await self.AuthenticationService.get_eligible_factors(root_session.Credentials.Id)
-			available_external_logins = {
-				result["t"]: result["s"]
-				for result in await external_login_service.list(root_session.Credentials.Id)
-			}
-			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
-				(SessionAdapter.FN.Authentication.AvailableFactors, available_factors),
-				(SessionAdapter.FN.Authentication.ExternalLoginOptions, available_external_logins),
-			])
-
-		if root_session.TrackId is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
-
-		# Transfer impersonation data
-		if root_session.Authentication.ImpersonatorSessionId is not None:
-			session_builders.append((
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
-					root_session.Authentication.ImpersonatorSessionId
-				),
-				(
-					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
-					root_session.Authentication.ImpersonatorCredentialsId
-				),
-			))
-
-		session_builders.append(oauth2_session_builder(client_id, scope, nonce))
+		session_builders = await self.SessionService.build_client_session(
+			root_session,
+			client_id=client_id,
+			scope=scope,
+			tenants=tenants,
+			nonce=nonce,
+			redirect_uri=redirect_uri,
+		)
+		session_builders.append(cookie_session_builder())
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
@@ -236,6 +183,7 @@ class CookieService(asab.Service):
 		self, anonymous_cid: str, client_dict: dict, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
+		redirect_uri: str = None,
 		from_info=None,
 	):
 		"""
@@ -247,7 +195,9 @@ class CookieService(asab.Service):
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
 			client_dict=client_dict,
-			scope=scope)
+			scope=scope,
+			redirect_uri=redirect_uri,
+		)
 
 		session.Cookie = CookieData(
 			Id=session_svc.Algorithmic.serialize(session),
@@ -261,3 +211,40 @@ class CookieService(asab.Service):
 			"fi": from_info})
 
 		return session
+
+
+	async def extend_session_expiration(self, session: SessionAdapter, client: dict = None):
+		expiration = client.get("session_expiration") if client else None
+		if expiration:
+			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
+		else:
+			expiration = datetime.datetime.now(datetime.UTC) + self.SessionService.Expiration
+
+		return await self.SessionService.touch(session, expiration, override_cooldown=True)
+
+
+	def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
+		"""
+		Add a Set-Cookie header to the response.
+		The cookie serves as a Seacat Auth session identifier and is used for authentication.
+		"""
+		cookie_name = self.get_cookie_name(client_id)
+		cookie_domain = cookie_domain or self.RootCookieDomain
+		if secure is None:
+			secure = self.CookieSecure
+
+		response.set_cookie(
+			cookie_name,
+			cookie_value,
+			httponly=True,  # Not accessible from Javascript
+			domain=cookie_domain,
+			secure=secure,
+		)
+
+
+	def delete_session_cookie(self, response, client_id: typing.Optional[str] = None):
+		"""
+		Add a Set-Cookie header to the response to unset Seacat Session cookie
+		"""
+		cookie_name = self.get_cookie_name(client_id)
+		response.del_cookie(cookie_name)

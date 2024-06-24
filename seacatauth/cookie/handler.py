@@ -8,7 +8,6 @@ import asab.exceptions
 
 from .. import exceptions, AuditLogger
 from .. import generic
-from .utils import set_cookie, delete_cookie
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
 #
@@ -173,7 +172,7 @@ class CookieHandler(object):
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response, client_id)
 			return response
 
 		return response
@@ -264,11 +263,16 @@ class CookieHandler(object):
 		cookie_domain = client.get("cookie_domain") or None
 
 		if response.status_code != 200:
-			delete_cookie(self.App, response)
+			self.CookieService.delete_session_cookie(response, client_id)
 			return response
 
 		if anonymous_session_created:
-			set_cookie(self.App, response, session, cookie_domain)
+			self.CookieService.set_session_cookie(
+				response=response,
+				cookie_value=session.Cookie.Id,
+				client_id=session.OAuth2.ClientId,
+				cookie_domain=cookie_domain
+			)
 
 			# Trigger webhook and add custom HTTP headers
 			try:
@@ -447,8 +451,9 @@ class CookieHandler(object):
 
 			token_value = generic.get_bearer_token_value(request)
 			if old_session is None and token_value is not None:
-				old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
-				if old_session is None:
+				try:
+					old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
 					# Invalid access token should result in error
 					AuditLogger.log(
 						asab.LOG_NOTICE,
@@ -469,6 +474,8 @@ class CookieHandler(object):
 				L.error("Failed to produce session track ID")
 				raise aiohttp.web.HTTPBadRequest() from e
 
+		session = await self.CookieService.extend_session_expiration(session, client)
+
 		# Construct the response
 		if client.get("cookie_domain") not in (None, ""):
 			cookie_domain = client["cookie_domain"]
@@ -487,10 +494,12 @@ class CookieHandler(object):
 
 		# TODO: Verify that the request came from the correct domain
 
-		if session.is_algorithmic():
-			pass
-		else:
-			set_cookie(self.App, response, session, cookie_domain)
+		self.CookieService.set_session_cookie(
+			response=response,
+			cookie_value=session.Cookie.Id,
+			client_id=client_id,
+			cookie_domain=cookie_domain
+		)
 
 		# Trigger webhook and set custom client response headers
 		try:

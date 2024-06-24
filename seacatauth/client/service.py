@@ -1,3 +1,5 @@
+import base64
+import binascii
 import datetime
 import logging
 import re
@@ -9,7 +11,7 @@ import asab.storage.exceptions
 import asab.exceptions
 from asab.utils import convert_to_seconds
 
-from . import exceptions
+from .. import exceptions
 from .. import generic
 from ..events import EventTypes
 
@@ -37,8 +39,8 @@ APPLICATION_TYPES = [
 ]
 TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none",
-	# "client_secret_basic",
-	# "client_secret_post",
+	"client_secret_basic",
+	"client_secret_post",
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
@@ -218,7 +220,8 @@ class ClientService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.OIDCService = None
-		self.ClientSecretExpiration = asab.Config.getseconds("seacatauth:client", "client_secret_expiration")
+		self.ClientSecretExpiration = asab.Config.getseconds(
+			"seacatauth:client", "client_secret_expiration", fallback=None)
 		if self.ClientSecretExpiration <= 0:
 			self.ClientSecretExpiration = None
 
@@ -487,39 +490,107 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client(self, client: dict, client_id: str, client_secret: str = None):
+	async def authenticate_client_request(
+		self,
+		request,
+		expected_client_id: typing.Optional[str] = None
+	) -> typing.Optional[str]:
 		"""
 		Verify client ID and secret.
 		"""
-		if client_id != client["_id"]:
-			raise exceptions.ClientError(
-				"Client IDs do not match.",
-				client_id=client["_id"],
-				attempted_client_id=client_id
-			)
-		if client_secret is None:
-			# The client MAY omit the parameter if the client secret is an empty string.
-			# [rfc6749#section-2.3.1]
-			client_secret = ""
-
-		client_secret_hash = client.get("__client_secret")
-		if not client_secret_hash:
-			# No client secret is set, none is expected!
-			if not client_secret:
-				return True
+		if expected_client_id:
+			# Client ID is known - Use the pre-configured authentication method
+			client_dict = await self.get(expected_client_id)
+			expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+			if expected_auth_method == "none":
+				return expected_client_id
+			if expected_auth_method == "client_secret_basic":
+				client_id, client_secret = self._get_credentials_from_authorization_header(request)
+			elif expected_auth_method == "client_secret_post":
+				client_id, client_secret = await self._get_credentials_from_post_data(request)
 			else:
-				raise exceptions.ClientError(
-					"Got non-empty secret from non-confidential client.", client_id=client["_id"])
+				raise NotImplementedError("Unsupported client authentication method: {}".format(expected_auth_method))
 
-		if "client_secret_expires_at" in client \
-			and client["client_secret_expires_at"] != 0 \
-			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.ClientError("Expired client secret.", client_id=client["_id"])
+			if not client_id:
+				raise exceptions.ClientAuthenticationError(
+					"Failed to get client credentials from request.",
+					client_id=expected_client_id,
+				)
+			elif client_id != expected_client_id:
+				raise exceptions.ClientAuthenticationError(
+					"Client IDs do not match (expected {!r}).".format(expected_client_id),
+					client_id=client_id,
+				)
 
-		if not generic.argon2_verify(client_secret_hash, client_secret):
-			raise exceptions.ClientError("Incorrect client secret.", client_id=client["_id"])
 		else:
-			return True
+			# Client ID is not known in advance - Try to extract it from the request
+			client_id, client_secret = self._get_credentials_from_authorization_header(request)
+			if client_id and client_secret:
+				auth_method = "client_secret_basic"
+			else:
+				client_id, client_secret = await self._get_credentials_from_post_data(request)
+				if client_id and client_secret:
+					auth_method = "client_secret_post"
+				else:
+					# Public client - Authentication not required
+					# auth_method = "none"
+					return None
+
+			assert client_id
+			client_dict = await self.get(client_id)
+			expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+			if auth_method != expected_auth_method:
+				raise exceptions.ClientAuthenticationError(
+					"Unexpected authentication method (expected {!r}, {!r}).".format(
+						expected_auth_method, auth_method),
+					client_id=client_id,
+				)
+			elif auth_method == "none":
+				# Public client - no secret verification required
+				return client_id
+
+		# Check secret expiration
+		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
+		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=expected_client_id)
+
+		# Verify client secret
+		client_secret_hash = client_dict.get("__client_secret", None)
+		if not generic.argon2_verify(client_secret_hash, client_secret):
+			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
+
+		return client_id
+
+	def _get_credentials_from_authorization_header(
+		self, request
+	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+		auth_header = request.headers.get("Authorization")
+		if not auth_header:
+			return None, None
+		try:
+			token_type, auth_token = auth_header.split(" ")
+		except ValueError:
+			return None, None
+		if token_type != "Basic":
+			return None, None
+		try:
+			auth_token_decoded = base64.urlsafe_b64decode(auth_token.encode("ascii")).decode("ascii")
+		except (binascii.Error, UnicodeDecodeError):
+			return None, None
+		try:
+			client_id, client_secret = auth_token_decoded.split(":")
+		except ValueError:
+			return None, None
+		return client_id, client_secret
+
+
+	async def _get_credentials_from_post_data(
+		self, request
+	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+		post_data = await request.post()
+		if not ("client_id" in post_data and "client_secret" in post_data):
+			return None, None
+		return post_data["client_id"], post_data["client_secret"]
 
 
 	def _check_grant_types(self, grant_types, response_types):

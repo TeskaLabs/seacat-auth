@@ -226,7 +226,7 @@ async def nginx_introspection(
 	if not session.is_algorithmic():
 		session = await session_service.touch(session)
 
-	id_token = await oidc_service.build_id_token(session)
+	id_token = await oidc_service.issue_id_token(session)
 
 	# Set the authorization header
 	headers = {
@@ -289,9 +289,13 @@ def urlunparse(
 	return urllib.parse.urlunparse((scheme, netloc, path, params, query, fragment))
 
 
-def add_params_to_url_query(url, **params):
+def update_url_query_params(url: str, **params):
 	parsed = urlparse(url)
-	query = urllib.parse.parse_qs(parsed["query"])
+	query = {}
+	for k, v in urllib.parse.parse_qsl(parsed["query"]):
+		if k in query:
+			raise ValueError("Repeated query parameters ({!r}) are not supported.".format(k))
+		query[k] = v
 	query.update(params)
 	parsed["query"] = urllib.parse.urlencode(query)
 	return urlunparse(**parsed)
@@ -324,7 +328,10 @@ def argon2_hash(secret: bytes | str) -> str:
 
 
 def argon2_verify(hash: bytes | str, secret: bytes | str) -> bool:
-	return argon2.PasswordHasher().verify(hash, secret)
+	try:
+		return argon2.PasswordHasher().verify(hash, secret)
+	except argon2.exceptions.VerifyMismatchError:
+		return False
 
 
 def generate_ergonomic_token(length: int):
