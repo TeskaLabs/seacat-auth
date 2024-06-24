@@ -1,3 +1,4 @@
+import contextvars
 import random
 import logging
 import re
@@ -9,11 +10,10 @@ import asab.utils
 import bcrypt
 import argon2
 
-from .session import SessionAdapter
-
 #
 
 L = logging.getLogger(__name__)
+SessionContext = contextvars.ContextVar("request_session", default=None)
 
 #
 
@@ -186,7 +186,7 @@ async def add_to_header(headers, attributes_to_add, session, requested_tenant=No
 
 async def nginx_introspection(
 	request: aiohttp.web.Request,
-	session: SessionAdapter,
+	session,
 	app: asab.Application
 ):
 	"""

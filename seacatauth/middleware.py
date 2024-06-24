@@ -1,6 +1,7 @@
 import aiohttp.web
 import asab
 import logging
+from .generic import SessionContext
 
 from . import exceptions
 from .generic import get_bearer_token_value
@@ -80,6 +81,8 @@ def private_auth_middleware_factory(app):
 		request.can_access_all_tenants = rbac_svc.can_access_all_tenants(request.Session.Authorization.Authz) \
 			if request.Session is not None else False
 
+		SessionContext.set(request.Session)
+
 		if require_authentication is False:
 			return await handler(request)
 
@@ -149,6 +152,7 @@ def public_auth_middleware_factory(app):
 				L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
 				request.Session = None
 
+		SessionContext.set(request.Session)
 		return await handler(request)
 
 	return public_auth_middleware
