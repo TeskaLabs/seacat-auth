@@ -1,7 +1,6 @@
 import re
 import typing
 
-from ....events import EventTypes
 from .abc import RoleView
 
 
