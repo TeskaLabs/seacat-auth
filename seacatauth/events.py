@@ -26,6 +26,7 @@ class EventTypes:
 	CREDENTIALS_UPDATED = "credentials_updated"
 
 	EXTERNAL_LOGIN_CREATED = "external_login_created"
+	EXTERNAL_LOGIN_STATE_CREATED = "external_login_state_created"
 
 	OPENID_AUTH_CODE_GENERATED = "openid_auth_code_generated"
 
@@ -35,6 +36,8 @@ class EventTypes:
 	SESSION_CREATED = "session_created"
 	SESSION_UPDATED = "session_updated"
 	SESSION_EXTENDED = "session_extended"
+	AUTH_TOKEN_CREATED = "auth_token_created"
+	AUTH_TOKEN_EXTENDED = "auth_token_extended"
 
 	TENANT_ASSIGNED = "tenant_assigned"
 

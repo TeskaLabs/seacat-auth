@@ -1,5 +1,7 @@
+import base64
 import datetime
 import logging
+import typing
 import uuid
 
 import bson
@@ -17,6 +19,16 @@ from .. import exceptions
 from ..events import EventTypes
 from .adapter import SessionAdapter, rest_get
 from .algorithmic import AlgorithmicSessionProvider
+from .token import SessionTokenService
+from .builders import (
+	oauth2_session_builder,
+	credentials_session_builder,
+	authz_session_builder,
+	authentication_session_builder,
+	available_factors_session_builder,
+	external_login_session_builder,
+	cookie_session_builder
+)
 
 #
 
@@ -31,6 +43,7 @@ class SessionService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.SessionService"):
 		super().__init__(app, service_name)
+		self.TokenService = SessionTokenService(app, "seacatauth.SessionTokenService")
 		self.StorageService = app.get_service("asab.StorageService")
 		self.Algorithmic = AlgorithmicSessionProvider(app)
 
@@ -239,10 +252,18 @@ class SessionService(asab.Service):
 
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
+				if key in SessionAdapter.EncryptedIdentifierFields and value is not None:
+					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
+					upsertor.set(key, value)
+				else:
+					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
+		L.log(asab.LOG_NOTICE, "Session updated.", struct_data={
+			"sid": session_id,
+			"type": session_dict.get(SessionAdapter.FN.Session.Type),
+		})
 		return await self.get(session_id)
 
 
@@ -389,14 +410,22 @@ class SessionService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def touch(self, session: SessionAdapter, expires: datetime.datetime = None):
+	async def touch(
+		self,
+		session: SessionAdapter,
+		expires: datetime.datetime = None,
+		*,
+		override_cooldown: bool = False
+	):
 		"""
 		Update session modification time to record activity.
 		Also extend session expiration if possible.
 
 		Return the updated session object.
 		"""
-		if datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown:
+		if not override_cooldown and (
+			datetime.datetime.now(datetime.timezone.utc) < session.Session.ModifiedAt + self.TouchCooldown
+		):
 			# Session has been touched recently
 			return session
 
@@ -406,7 +435,7 @@ class SessionService(asab.Service):
 		if session.Session.ParentSessionId is not None:
 			try:
 				root_session = await self.get(session.Session.ParentSessionId)
-				await self.touch(root_session, expires)
+				await self.touch(root_session, expires, override_cooldown=override_cooldown)
 			except exceptions.SessionNotFoundError:
 				L.info("Will not extend subsession expiration: Root session not found.", struct_data={
 					"sid": session.Session.Id, "psid": session.Session.ParentSessionId})
@@ -470,6 +499,8 @@ class SessionService(asab.Service):
 		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
 		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
 
+		# Delete all the session's tokens
+		await self.TokenService.delete_tokens_by_session_id(session_id)
 		# TODO: Publish pubsub message for session deletion
 
 
@@ -496,6 +527,9 @@ class SessionService(asab.Service):
 					"error": type(e).__name__
 				})
 				failed += 1
+
+			# Delete all the session's tokens
+			await self.TokenService.delete_tokens_by_session_id(session_dict["_id"])
 
 		L.log(asab.LOG_NOTICE, "Sessions deleted", struct_data={
 			"deleted_count": deleted,
@@ -627,6 +661,109 @@ class SessionService(asab.Service):
 			await self.update_session(dst_session.SessionId, session_builders)
 
 		return await self.get(dst_session.SessionId)
+
+
+	async def build_sso_root_session(
+		self,
+		credentials_id: str,
+		login_descriptor: dict,
+	):
+		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		role_service = self.App.get_service("seacatauth.RoleService")
+
+		scope = frozenset(["profile", "email", "phone"])
+		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		session_builders = [
+			await credentials_session_builder(credentials_service, credentials_id, scope),
+			authentication_session_builder(login_descriptor),
+			await available_factors_session_builder(authentication_service, credentials_id),
+			await external_login_session_builder(ext_login_svc, credentials_id),
+			# TODO: SSO session should not need to have Authz data
+			await authz_session_builder(
+				tenant_service=tenant_service,
+				role_service=role_service,
+				credentials_id=credentials_id,
+				tenants=None,  # Root session is tenant-agnostic
+			),
+			cookie_session_builder(),
+		]
+		return session_builders
+
+
+	async def build_client_session(
+		self,
+		root_session: SessionAdapter,
+		client_id: str,
+		scope: typing.Iterable[str],
+		tenants: typing.Iterable[str] = None,
+		nonce: typing.Optional[str] = None,
+		redirect_uri: typing.Optional[str] = None,
+	):
+		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
+		external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		role_service = self.App.get_service("seacatauth.RoleService")
+		batman_service = self.App.get_service("seacatauth.BatmanService")
+
+		# TODO: Choose builders based on scope
+		# Make sure dangerous resources are removed from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
+		else:
+			exclude_resources = set()
+
+		session_builders = [
+			await credentials_session_builder(credentials_service, root_session.Credentials.Id, scope),
+			await authz_session_builder(
+				tenant_service=tenant_service,
+				role_service=role_service,
+				credentials_id=root_session.Credentials.Id,
+				tenants=tenants,
+				exclude_resources=exclude_resources,
+			)
+		]
+
+		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
+			session_builders.append(
+				await external_login_session_builder(external_login_service, root_session.Credentials.Id))
+			session_builders.append(
+				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
+			session_builders.append([
+				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
+			])
+
+		if "batman" in scope:
+			password = batman_service.generate_password(root_session.Credentials.Id)
+			username = root_session.Credentials.Username
+			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
+			session_builders.append([
+				(SessionAdapter.FN.Batman.Token, basic_auth),
+			])
+
+		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
+
+		# Obtain Track ID if there is any in the root session
+		if root_session.TrackId is not None:
+			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
+
+		# Transfer impersonation data
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			session_builders.append((
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					root_session.Authentication.ImpersonatorSessionId
+				),
+				(
+					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					root_session.Authentication.ImpersonatorCredentialsId
+				),
+			))
+
+		return session_builders
 
 
 	def aes_encrypt(self, raw_bytes: bytes):

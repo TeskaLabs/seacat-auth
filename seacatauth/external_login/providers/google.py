@@ -6,9 +6,10 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 	This app must be first registered at Google Cloud:
 	https://console.cloud.google.com/apis/credentials
 
-	The following Redirect URIs must be allowed in the Google OAuth2:
-	https://{my_domain}/seacat_auth/public/ext-login/google
-	https://{my_domain}/seacat_auth/public/ext-login-add/google
+	Seacat Auth external login callback endpoint (/public/ext-login/callback) must be allowed as a redirect URIs
+	in the OAuth client settings at the external login account provider.
+	The full callback URL is canonically in the following format:
+	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
 	Type = "google"
 	ConfigDefaults = {
