@@ -3,6 +3,7 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha9`
 - `v24.20-alpha8`
 - `v24.20-alpha7`
 - `v24.20-alpha6`
@@ -13,6 +14,7 @@
 - `v24.20-alpha1`
 
 ### Breaking changes
+- External login endpoints changed (#384, `v24.20-alpha9`)
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
@@ -24,6 +26,7 @@
 - Properly handle Argon2 verification error in login call (#378, `v24.20-alpha3`)
 
 ### Features
+- External login with dynamic redirection (#384, `v24.20-alpha9`)
 - Custom response codes for tenant-related authorization errors (#392, `v24.20-alpha8`)
 - Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
 - Configurable password criteria (#372, `v24.20-alpha1`)

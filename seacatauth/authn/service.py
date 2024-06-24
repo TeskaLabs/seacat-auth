@@ -327,10 +327,9 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
-
 	async def login(self, login_session, root_session: SessionAdapter | None = None, from_info: list = None):
 		"""
-		Build and create an SSO root session
+		Build and create a root session
 		"""
 		session_builders = await self.SessionService.build_sso_root_session(
 			credentials_id=login_session.SeacatLogin.CredentialsId,

@@ -6,9 +6,10 @@ class MojeIDOAuth2Login(GenericOAuth2Login):
 	Follow these implementation steps:
 	https://www.mojeid.cz/dokumentace/html/ImplementacePodporyMojeid/OpenidConnect/PrehledKroku.html
 
-	The following Redirect URIs must be allowed in MojeID service settings:
-	https://{my_domain}/seacat_auth/public/ext-login/mojeid
-	https://{my_domain}/seacat_auth/public/ext-login-add/mojeid
+	Seacat Auth external login callback endpoint (/public/ext-login/callback) must be allowed as a redirect URIs
+	in the OAuth client settings at the external login account provider.
+	The full callback URL is canonically in the following format:
+	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
 	Type = "mojeid"
 	ConfigDefaults = {
