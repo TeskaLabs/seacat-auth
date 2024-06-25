@@ -101,9 +101,14 @@ class ResourceNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Resource not found
 	"""
+	I18nMessage = "Resource '{{resource_id}}' not found."
+	TechMessage = "Resource not found."
+	HttpResponseCode = 404
+
 	def __init__(self, resource_id, *args):
 		self.ResourceId = resource_id
-		super().__init__("Resource {!r} not found".format(self.ResourceId), *args)
+		super().__init__(self.TechMessage, *args)
+		self.ErrorDict = {"resource_id": self.ResourceId}
 
 
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
