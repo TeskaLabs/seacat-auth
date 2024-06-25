@@ -112,24 +112,28 @@ class RoleService(asab.Service):
 		}
 
 
-	async def get(self, role_id: str, session_context=None):
+	async def _get(self, role_id: str):
 		tenant_id = self._role_tenant_id(role_id)
-		# if tenant_id and not (session_context and session_context.has_tenant_access(tenant_id)):
-		# 	raise exceptions.TenantAccessDeniedError(
-		# 		tenant_id, subject=session_context.Credentials.Id if session_context else None)
 		try:
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
 			try:
-				return await SharedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
-			except KeyError:
 				return await TenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+			except KeyError:
+				return await SharedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 		except KeyError:
 			raise exceptions.RoleNotFoundError(role_id)
 
 
+	async def get(self, role_id: str):
+		tenant_id = self._role_tenant_id(role_id)
+		if tenant_id:
+			self.validate_tenant_access(tenant_id)
+		return await self._get(role_id)
+
+
 	async def get_role_resources(self, role_id: str):
-		role_obj = await self.get(role_id)
+		role_obj = await self._get(role_id)
 		return role_obj["resources"]
 
 
@@ -150,6 +154,13 @@ class RoleService(asab.Service):
 		else:
 			self.validate_superuser_access()
 
+		# Check existence before creating to prevent shadowing shared roles with tenant roles
+		try:
+			await self._get(role_id)
+			raise asab.exceptions.Conflict(key="_id", value=role_id)
+		except exceptions.RoleNotFoundError:
+			pass
+
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
 			role_id
@@ -163,11 +174,9 @@ class RoleService(asab.Service):
 			upsertor.set("shared", True)
 		if _managed_by:
 			upsertor.set("managed_by", _managed_by)
-		try:
-			role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
-			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
-		except asab.storage.exceptions.DuplicateError:
-			raise asab.exceptions.Conflict(key="role", value=role_id)
+
+		role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
+		L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 
 		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
 		return role_id
@@ -228,7 +237,7 @@ class RoleService(asab.Service):
 		resources_to_remove: list = None,
 		_managed_by: typing.Optional[str] = None,
 	):
-		# Verify that role exists
+		# Verify that role exists and validate access
 		role_current = await self.get(role_id)
 
 		# Verify that role tenant exists
