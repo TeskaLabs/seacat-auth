@@ -441,6 +441,9 @@ class RoleService(asab.Service):
 		verify_credentials: bool = True,
 		verify_credentials_has_tenant: bool = True
 	):
+		"""
+		Check all integrity prerequisites and assign role to credentials
+		"""
 		if verify_role:
 			try:
 				await self.get(role_id)
@@ -468,6 +471,9 @@ class RoleService(asab.Service):
 
 
 	async def _do_assign_role(self, credentials_id: str, role_id: str, tenant: str):
+		"""
+		Assign role to credentials
+		"""
 		assignment_id = "{} {}".format(credentials_id, role_id)
 
 		upsertor = self.StorageService.upsertor(self.CredentialsRolesCollection, obj_id=assignment_id)
@@ -493,6 +499,9 @@ class RoleService(asab.Service):
 
 
 	async def unassign_role(self, credentials_id: str, role_id: str):
+		"""
+		Remove role from credentials
+		"""
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
 		self.App.PubSub.publish("Role.unassigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
