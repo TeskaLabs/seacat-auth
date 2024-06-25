@@ -176,7 +176,7 @@ class RoleService(asab.Service):
 				try:
 					await self.ResourceService.get(resource_id)
 				except exceptions.ResourceNotFoundError as e:
-					L.log(asab.LOG_NOTICE, e.TechMessage, struct_data=e.ErrorDict)
+					L.log(asab.LOG_NOTICE, "Resource not found.", struct_data={"resource_id": resource_id})
 					raise e
 			upsertor.set("resources", resources)
 		else:
