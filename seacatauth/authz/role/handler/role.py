@@ -141,12 +141,25 @@ class RoleHandler(object):
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		role_id = await self.RoleService.create(
-			role_id,
-			label=json_data.get("label"),
-			description=json_data.get("description"),
-			resources=json_data.get("resources"),
-		)
+		try:
+			role_id = await self.RoleService.create(
+				role_id,
+				label=json_data.get("label"),
+				description=json_data.get("description"),
+				resources=json_data.get("resources"),
+			)
+		except exceptions.ResourceNotFoundError as e:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR",
+				"tech_err": "Resource not found.",
+				"err_dict": {"resource_id": e.ResourceId},
+			})
+		except asab.exceptions.Conflict:
+			return asab.web.rest.json_response(request, status=409, data={
+				"result": "ERROR",
+				"tech_err": "Role already exists.",
+				"err_dict": {"role_id": role_id},
+			})
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
 			"id": role_id
