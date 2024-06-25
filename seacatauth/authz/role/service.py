@@ -49,14 +49,14 @@ class RoleService(asab.Service):
 		self.RoleNameRegex = re.compile(self.RoleNamePattern)
 
 
-	def _prepare_providers(self, tenant_id: str | None):
+	def _prepare_views(self, tenant_id: str | None):
 		assert tenant_id != "*"
-		providers = []
+		views = []
 		if tenant_id:
-			providers.append(SharedRoleView(self.StorageService, self.RoleCollection, tenant_id))
-			providers.append(TenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
-		providers.append(GlobalRoleView(self.StorageService, self.RoleCollection))
-		return providers
+			views.append(SharedRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(TenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
+		return views
 
 
 	def _role_tenant_id(self, role_id: str):
@@ -80,19 +80,19 @@ class RoleService(asab.Service):
 		else:
 			self.validate_tenant_access(tenant_id)
 
-		providers = self._prepare_providers(tenant_id)
+		views = self._prepare_views(tenant_id)
 		counts = [
-			await provider.count(name_filter, resource_filter)
-			for provider in providers
+			await view.count(name_filter, resource_filter)
+			for view in views
 		]
 		roles = []
 		offset = (page or 0) * (limit or 0)
-		for count, provider in zip(counts, providers):
+		for count, view in zip(counts, views):
 			if offset > count:
 				offset -= count
 				continue
 
-			async for role in provider.iterate(
+			async for role in view.iterate(
 				offset=offset,
 				limit=limit - len(roles),
 				sort=("_id", 1),
