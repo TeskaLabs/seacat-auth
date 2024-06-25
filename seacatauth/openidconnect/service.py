@@ -1,3 +1,4 @@
+import binascii
 import datetime
 import json
 import base64
@@ -524,7 +525,11 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its temporary authorization code.
 		"""
-		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		try:
+			token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		except binascii.Error as e:
+			L.error("Corrupt authorization code format: Base64 decoding failed.", struct_data={"code": code})
+			raise exceptions.SessionNotFoundError("Corrupt authorization code format") from e
 		token_data = await self.TokenService.get(token_bytes, token_type=AuthorizationCode.TokenType)
 		if "cc" in token_data:
 			self.PKCE.evaluate_code_challenge(
@@ -544,7 +549,11 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its access token.
 		"""
-		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		try:
+			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		except binascii.Error as e:
+			L.error("Corrupt access token format: Base64 decoding failed.", struct_data={"token_value": token_value})
+			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
 		try:
 			token_data = await self.TokenService.get(token_bytes, token_type=AccessToken.TokenType)
 		except KeyError:
@@ -564,11 +573,15 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its refresh token.
 		"""
-		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		try:
+			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		except binascii.Error as e:
+			L.error("Corrupt refresh token format: Base64 decoding failed.", struct_data={"token_value": token_value})
+			raise exceptions.SessionNotFoundError("Corrupt refresh token format") from e
 		try:
 			token_data = await self.TokenService.get(token_bytes, token_type=RefreshToken.TokenType)
 		except KeyError:
-			raise exceptions.SessionNotFoundError("Invalid or expired access token")
+			raise exceptions.SessionNotFoundError("Invalid or expired refresh token")
 		try:
 			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
