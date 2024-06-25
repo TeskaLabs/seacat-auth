@@ -4,6 +4,7 @@ import aiohttp.web
 import asab
 import asab.web.rest
 import asab.storage.exceptions
+import asab.exceptions
 
 from .... import exceptions
 from ....decorators import access_control
@@ -120,15 +121,36 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"additionalProperties": False,
+		"properties": {
+			"label": {"type": "string"},
+			"description": {"type": "string"},
+			"shared": {"type": "boolean"},
+			"resources": {
+				"type": "array",
+				"items": {"type": "string"},
+			},
+		}
+	})
 	@access_control("seacat:role:edit")
-	async def create(self, request, *, tenant):
+	async def create(self, request, *, tenant, json_data):
 		"""
 		Create a new role
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		role_id = await self.RoleService.create(role_id)
-		return asab.web.rest.json_response(request, {"result": "OK", "id": role_id})
+		role_id = await self.RoleService.create(
+			role_id,
+			label=json_data.get("label"),
+			description=json_data.get("description"),
+			resources=json_data.get("resources"),
+		)
+		return asab.web.rest.json_response(request, {
+			"result": "OK",
+			"id": role_id
+		})
 
 
 	@access_control("seacat:role:edit")
@@ -151,6 +173,7 @@ class RoleHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
+			"label": {"type": "string"},
 			"description": {"type": "string"},
 			"shared": {"type": "boolean"},
 			"add": {
@@ -191,6 +214,7 @@ class RoleHandler(object):
 		try:
 			result = await self.RoleService.update(
 				role_id,
+				label=json_data.get("label"),
 				description=json_data.get("description"),
 				resources_to_set=resources_to_set,
 				resources_to_add=resources_to_add,
