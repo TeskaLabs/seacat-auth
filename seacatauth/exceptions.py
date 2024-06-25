@@ -1,13 +1,36 @@
 import typing
 
 import asab.exceptions
+import asab.web.rest
 
 
 class SeacatAuthError(Exception):
 	"""
 	Generic Seacat Auth error
 	"""
-	pass
+	I18nKeyPrefix = "SeacatAuthError|"
+	I18nMessage = "Generic error."
+	ErrorDict = {}
+	HttpResponseCode = 500
+
+	def __init__(self, message=None, *args, **kwargs):
+		self.TechMessage = message
+		super().__init__(message, *args)
+
+	def json_response(self, request, status=None):
+		return asab.web.rest.json_response(
+			request,
+			status=status or self.HttpResponseCode,
+			data=self.rest_payload()
+		)
+
+	def rest_payload(self):
+		return {
+			"result": "ERROR",
+			"error": self.I18nKeyPrefix + self.I18nMessage,
+			"error_dict": self.ErrorDict,
+			"tech_err": self.TechMessage,
+		}
 
 
 class TenantNotSpecifiedError(SeacatAuthError):
