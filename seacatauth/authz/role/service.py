@@ -140,6 +140,7 @@ class RoleService(asab.Service):
 	async def create(
 		self,
 		role_id: str,
+		label: str = None,
 		description: str = None,
 		resources: typing.Optional[typing.Iterable] = None,
 		shared: bool = False,
@@ -148,10 +149,12 @@ class RoleService(asab.Service):
 		tenant_id, role_name = self.parse_role_id(role_id)
 		self.validate_role_name(role_name)
 		if tenant_id:
-			# Validate that the tenant exists
+			# Does tenant exist?
 			await self.TenantService.get_tenant(tenant_id)
+			# Does the user have access to the tenant?
 			self.validate_tenant_access(tenant_id)
 		else:
+			# Only superusers can create global roles
 			self.validate_superuser_access()
 
 		# Check existence before creating to prevent shadowing shared roles with tenant roles
@@ -167,7 +170,19 @@ class RoleService(asab.Service):
 		)
 		if tenant_id:
 			upsertor.set("tenant", tenant_id)
-		upsertor.set("resources", resources or [])
+		if resources:
+			# TODO: Check global resources, check resource access
+			for resource_id in resources:
+				try:
+					await self.ResourceService.get(resource_id)
+				except exceptions.ResourceNotFoundError as e:
+					L.log(asab.LOG_NOTICE, e.TechMessage, struct_data=e.ErrorDict)
+					raise e
+			upsertor.set("resources", resources)
+		else:
+			upsertor.set("resources", [])
+		if label:
+			upsertor.set("label", label)
 		if description:
 			upsertor.set("description", description)
 		if shared:
@@ -230,6 +245,7 @@ class RoleService(asab.Service):
 
 	async def update(
 		self, role_id: str, *,
+		label: str = None,
 		description: str = None,
 		shared: bool = None,
 		resources_to_set: list = None,
@@ -297,6 +313,10 @@ class RoleService(asab.Service):
 		if resources_to_set != set(role_current["resources"]):
 			upsertor.set("resources", list(resources_to_set))
 			log_data["resources"] = ", ".join(resources_to_set)
+
+		if label is not None:
+			upsertor.set("label", label)
+			log_data["label"] = label
 
 		if description is not None:
 			upsertor.set("description", description)
