@@ -256,6 +256,10 @@ class RoleService(asab.Service):
 		# Verify that role exists and validate access
 		role_current = await self.get(role_id)
 
+		if not role_current.get("editable", True):
+			L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role_id})
+			raise exceptions.NotEditableError("Role is not editable.", role_id=role_id)
+
 		# Verify that role tenant exists
 		try:
 			tenant = await self.get_role_tenant(role_id)
