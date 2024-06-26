@@ -21,6 +21,10 @@ class AuthErrorResponseCode:
 	RequestUriNotSupported = "request_uri_not_supported"
 	RegistrationNotSupported = "registration_not_supported"
 
+	# Custom response codes
+	TenantAccessDenied = "tenant_access_denied"
+	NoTenants = "no_tenants"
+
 
 class TokenRequestErrorResponseCode:
 	# OAuth2.0 token request error response codes defined in RFC6749

@@ -1,3 +1,4 @@
+import binascii
 import datetime
 import json
 import base64
@@ -14,7 +15,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from ..generic import add_params_to_url_query
+from ..generic import update_url_query_params
 from ..session.adapter import SessionAdapter
 from .. import exceptions
 from . import pkce
@@ -407,7 +408,7 @@ class OpenIdConnectService(asab.Service):
 		authorize_uri = client_dict.get("authorize_uri")
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
-		return add_params_to_url_query(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
+		return update_url_query_params(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
 
 
 	async def revoke_token(self, token, token_type_hint=None):
@@ -427,7 +428,7 @@ class OpenIdConnectService(asab.Service):
 		scope: typing.Iterable,
 		credentials_id: str,
 		has_access_to_all_tenants: bool = False
-	):
+	) -> typing.Optional[str]:
 		"""
 		Extract tenants from requested scope and return the first accessible one.
 		"""
@@ -435,13 +436,10 @@ class OpenIdConnectService(asab.Service):
 			tenants: set = await self.TenantService.get_tenants_by_scope(
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			L.error("Tenant not found.", struct_data={"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
-			raise exceptions.AccessDeniedError(subject=credentials_id)
-		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": credentials_id})
+			L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"tenant": e.Tenant, "cid": credentials_id})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 
 		if tenants:
@@ -527,7 +525,15 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its temporary authorization code.
 		"""
-		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		try:
+			token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
+		except binascii.Error as e:
+			L.error("Corrupt authorization code format: Base64 decoding failed.", struct_data={"code": code})
+			raise exceptions.SessionNotFoundError("Corrupt authorization code format") from e
+		except UnicodeEncodeError as e:
+			L.error("Corrupt authorization code format: ASCII decoding failed.", struct_data={"code": code})
+			raise exceptions.SessionNotFoundError("Corrupt authorization code format") from e
+
 		token_data = await self.TokenService.get(token_bytes, token_type=AuthorizationCode.TokenType)
 		if "cc" in token_data:
 			self.PKCE.evaluate_code_challenge(
@@ -547,7 +553,17 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its access token.
 		"""
-		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		try:
+			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		except binascii.Error as e:
+			L.error("Corrupt access token format: Base64 decoding failed.", struct_data={
+				"token_value": token_value})
+			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
+		except UnicodeEncodeError as e:
+			L.error("Corrupt access token format: ASCII decoding failed.", struct_data={
+				"token_value": token_value})
+			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
+
 		try:
 			token_data = await self.TokenService.get(token_bytes, token_type=AccessToken.TokenType)
 		except KeyError:
@@ -567,11 +583,21 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its refresh token.
 		"""
-		token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		try:
+			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
+		except binascii.Error as e:
+			L.error("Corrupt refresh token format: Base64 decoding failed.", struct_data={
+				"token_value": token_value})
+			raise exceptions.SessionNotFoundError("Corrupt refresh token format") from e
+		except UnicodeEncodeError as e:
+			L.error("Corrupt refresh token format: ASCII decoding failed.", struct_data={
+				"token_value": token_value})
+			raise exceptions.SessionNotFoundError("Corrupt refresh token format") from e
+
 		try:
 			token_data = await self.TokenService.get(token_bytes, token_type=RefreshToken.TokenType)
 		except KeyError:
-			raise exceptions.SessionNotFoundError("Invalid or expired access token")
+			raise exceptions.SessionNotFoundError("Invalid or expired refresh token")
 		try:
 			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
