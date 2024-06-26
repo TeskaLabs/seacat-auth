@@ -3,6 +3,7 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha12`
 - `v24.20-alpha11`
 - `v24.20-alpha10`
 - `v24.20-alpha9`
@@ -30,6 +31,7 @@
 - Properly handle Argon2 verification error in login call (#378, `v24.20-alpha3`)
 
 ### Features
+- Log login factor verification failure (#402, `v24.20-alpha12`)
 - External login with dynamic redirection (#384, `v24.20-alpha9`)
 - Custom response codes for tenant-related authorization errors (#392, `v24.20-alpha8`)
 - Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
