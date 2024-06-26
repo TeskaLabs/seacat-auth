@@ -3,10 +3,12 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-beta2`
 - `v24.20-alpha11`
 - `v24.20-alpha10`
 - `v24.20-alpha9`
 - `v24.20-alpha8`
+- `v24.20-beta1`
 - `v24.20-alpha7`
 - `v24.20-alpha6`
 - `v24.20-alpha5`
