@@ -235,5 +235,9 @@ class RoleHandler(object):
 			)
 		except exceptions.RoleNotFoundError as e:
 			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": e.Role})
-			return aiohttp.web.HTTPNotFound()
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR", "tech_err": "Role not found."})
+		except exceptions.NotEditableError:
+			return asab.web.rest.json_response(request, status=405, data={
+				"result": "ERROR", "tech_err": "Role is not editable."})
 		return asab.web.rest.json_response(request, data={"result": result})

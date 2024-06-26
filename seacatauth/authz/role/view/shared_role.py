@@ -71,7 +71,7 @@ class SharedRoleView(RoleView):
 
 
 	def _normalize_role(self, role: dict):
-		role["global_id"] = role["_id"]
+		role["parent_id"] = role["_id"]
 		role["_id"] = self._global_id_to_tenant(role["_id"])
 		role["editable"] = False
 		return role
