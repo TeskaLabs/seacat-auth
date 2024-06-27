@@ -292,6 +292,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if limit >= 0:
 			cursor.limit(limit)
 
+		cursor.sort("username", 1)
+
 		async for d in cursor:
 			yield self._normalize_credentials(d)
 
