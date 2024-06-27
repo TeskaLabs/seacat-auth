@@ -3,6 +3,9 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha12`
+- `v24.20-alpha11`
+- `v24.20-alpha10`
 - `v24.20-alpha9`
 - `v24.20-alpha8`
 - `v24.20-alpha7`
@@ -18,6 +21,8 @@
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
+- Fix AttributeError in credentials update (#399, `v24.20-alpha11`)
+- Catch token decoding errors when finding sessions (#397, `v24.20-alpha10`)
 - Properly encrypt cookie value in session update (#394, `v24.20-alpha8`)
 - Properly parse URL query before adding new parameters (#393, `v24.20-alpha8`)
 - Delete client cookie on introspection failure (#385, `v24.20-alpha6`)
@@ -26,6 +31,7 @@
 - Properly handle Argon2 verification error in login call (#378, `v24.20-alpha3`)
 
 ### Features
+- Log login factor verification failure (#402, `v24.20-alpha12`)
 - External login with dynamic redirection (#384, `v24.20-alpha9`)
 - Custom response codes for tenant-related authorization errors (#392, `v24.20-alpha8`)
 - Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
