@@ -628,6 +628,7 @@ class CredentialsService(asab.Service):
 		"""
 		Check if the target user is a member of currently authorized tenant
 		"""
+		tenant_service = self.App.get_service("seacatauth.TenantService")
 		if not session:
 			return False
 		if session.is_superuser():
@@ -635,7 +636,7 @@ class CredentialsService(asab.Service):
 		for tenant_id in session.Authorization.Authz.keys():
 			if tenant_id == "*":
 				continue
-			if await self.TenantService.has_tenant_assigned(credentials_id, tenant_id):
+			if await tenant_service.has_tenant_assigned(credentials_id, tenant_id):
 				# User is member of currently authorized tenant
 				return True
 		# The request and the target credentials have no tenant in common
