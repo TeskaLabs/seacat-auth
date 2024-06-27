@@ -159,15 +159,22 @@ class TenantHandler(object):
 				exc_info=True,
 				struct_data={"cid": credentials_id, "tenant": tenant_id})
 
-		# Create role
-		role = "{}/admin".format(tenant_id)
+		# Create admin role
+		created_roles = []
+		role = "{}/auth-admin".format(tenant_id)
 		try:
 			# Create admin role in tenant
 			await role_service.create(role)
 			# Assign tenant management resources
-			await role_service.update(role, resources_to_set=[
-				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
-				"seacat:role:access", "seacat:role:edit", "seacat:role:assign"])
+			await role_service.update(
+				role,
+				description="Manage tenant access, create, edit and assign tenant roles.",
+				resources_to_set=[
+					"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
+					"seacat:role:access", "seacat:role:edit", "seacat:role:assign"
+				]
+			)
+			created_roles.append(role)
 		except Exception as e:
 			L.error("Error creating admin role: {}".format(e), exc_info=True, struct_data={"role": role})
 
@@ -175,10 +182,19 @@ class TenantHandler(object):
 		try:
 			await role_service.assign_role(credentials_id, role)
 		except Exception as e:
-			L.error("Error assigning role: {}".format(e), exc_info=True, struct_data={"cid": credentials_id, "role": role})
+			L.error("Error assigning role: {}".format(e), exc_info=True, struct_data={
+				"cid": credentials_id, "role": role})
+
+		try:
+			# Copy global roles into tenant
+			synced_roles = await role_service.sync_global_roles_into_tenant(tenant_id)
+			created_roles.extend(synced_roles)
+		except Exception as e:
+			L.error("Error creating tenant roles from global template: {}".format(e), exc_info=True, struct_data={
+				"tenant": tenant_id})
 
 		return asab.web.rest.json_response(
-			request, data={"id": tenant_id})
+			request, data={"id": tenant_id, "roles": created_roles})
 
 	@asab.web.rest.json_schema_handler(schemas.UPDATE_TENANT)
 	@access_control("seacat:tenant:edit")

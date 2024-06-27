@@ -5,6 +5,7 @@ import asab.storage.exceptions
 import asab
 import asab.exceptions
 
+from ... import exceptions
 from ...events import EventTypes
 from ... import exceptions
 
