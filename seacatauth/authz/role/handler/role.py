@@ -133,8 +133,25 @@ class RoleHandler(object):
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		role_id = await self.RoleService.create(role_id)
-		return asab.web.rest.json_response(request, {"result": "OK", "id": role_id})
+		try:
+			role_id = await self.RoleService.create(role_id)
+		except asab.exceptions.Conflict:
+			return asab.web.rest.json_response(
+				request,
+				status=409,
+				data={
+					"result": "ERROR",
+					"error_dict": {"role_id": role_id},
+					"tech_err": "Role {!r} already exists.".format(role_id),
+				}
+			)
+		except exceptions.ResourceNotFoundError as e:
+			return e.json_response(request)
+
+		return asab.web.rest.json_response(request, {
+			"result": "OK",
+			"id": role_id
+		})
 
 
 	@access_control("seacat:role:edit")
