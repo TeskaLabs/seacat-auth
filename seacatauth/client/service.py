@@ -279,6 +279,8 @@ class ClientService(asab.Service):
 			cursor.limit(limit)
 
 		async for client in cursor:
+			if client.get("managed_by"):
+				client["editable"] = False
 			if rest_normalize:
 				yield self._rest_normalize(client)
 			else:
@@ -310,6 +312,9 @@ class ClientService(asab.Service):
 			client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
 
 			self._store_in_cache(client_id, client)
+
+		if client.get("managed_by"):
+			client["editable"] = False
 
 		if rest_normalize:
 			return self._rest_normalize(client)
@@ -405,6 +410,9 @@ class ClientService(asab.Service):
 		"""
 		# TODO: Use M2M credentials provider.
 		client = await self.get(client_id)
+		if client.get("editable") is False:
+			raise exceptions.AccessDeniedError("Client not editable.")
+
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		client_secret_hash = generic.argon2_hash(client_secret)
@@ -421,6 +429,9 @@ class ClientService(asab.Service):
 
 	async def update(self, client_id: str, **kwargs):
 		client = await self.get(client_id)
+		if client.get("editable") is False:
+			raise exceptions.AccessDeniedError("Client not editable.")
+
 		client_update = {}
 		for k, v in kwargs.items():
 			if k not in CLIENT_METADATA_SCHEMA:
@@ -464,6 +475,10 @@ class ClientService(asab.Service):
 
 
 	async def delete(self, client_id: str):
+		client = await self.get(client_id)
+		if client.get("editable") is False:
+			raise exceptions.AccessDeniedError("Client not editable.")
+
 		await self.StorageService.delete(self.ClientCollection, client_id)
 		self._delete_from_cache(client_id)
 		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
@@ -724,9 +739,6 @@ class ClientService(asab.Service):
 			if "client_secret_expires_at" in rest_data:
 				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
 		rest_data["cookie_name"] = cookie_service.get_cookie_name(rest_data["_id"])
-
-		if rest_data.get("managed_by"):
-			rest_data["editable"] = False
 		return rest_data
 
 
