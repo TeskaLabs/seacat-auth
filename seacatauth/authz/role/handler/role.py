@@ -4,9 +4,11 @@ import aiohttp.web
 import asab
 import asab.web.rest
 import asab.storage.exceptions
+import asab.exceptions
 
 from .... import exceptions
 from ....decorators import access_control
+from .... import generic
 
 #
 
@@ -90,24 +92,17 @@ class RoleHandler(object):
 				enum:
 				- true
 		"""
-		tenant_id = request.match_info["tenant"]
-		if tenant_id == "*":
-			asab.web.rest.json_response(request, {"result": "ACCESS-DENIED"}, status=403)
-		return await self._list(request, tenant_id=tenant_id)
+		return await self._list(request, tenant_id=request.match_info["tenant"])
 
 	async def _list(self, request, *, tenant_id):
-		page = int(request.query.get("p", 1)) - 1
-		limit = request.query.get("i")
-		if limit is not None:
-			limit = int(limit)
-		filter_string = request.query.get("f")
-		resource = request.query.get("resource")
-		exclude_global = request.query.get("exclude_global", "false") == "true"
-
+		search = generic.SearchParams(request.query)
 		result = await self.RoleService.list(
-			tenant_id, page, limit, filter_string,
-			resource=resource,
-			exclude_global=exclude_global)
+			tenant_id=tenant_id,
+			page=search.Page,
+			limit=search.ItemsPerPage,
+			name_filter=search.SimpleFilter,
+			resource_filter=search.get("resource"),
+		)
 		return asab.web.rest.json_response(request, result)
 
 
@@ -126,15 +121,49 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"additionalProperties": False,
+		"properties": {
+			"label": {"type": "string"},
+			"description": {"type": "string"},
+			"shared": {"type": "boolean"},
+			"resources": {
+				"type": "array",
+				"items": {"type": "string"},
+			},
+		}
+	})
 	@access_control("seacat:role:edit")
-	async def create(self, request, *, tenant):
+	async def create(self, request, *, tenant, json_data):
 		"""
 		Create a new role
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		role_id = await self.RoleService.create(role_id)
-		return asab.web.rest.json_response(request, {"result": "OK", "id": role_id})
+		try:
+			role_id = await self.RoleService.create(
+				role_id,
+				label=json_data.get("label"),
+				description=json_data.get("description"),
+				resources=json_data.get("resources"),
+			)
+		except exceptions.ResourceNotFoundError as e:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR",
+				"tech_err": "Resource not found.",
+				"err_dict": {"resource_id": e.ResourceId},
+			})
+		except asab.exceptions.Conflict:
+			return asab.web.rest.json_response(request, status=409, data={
+				"result": "ERROR",
+				"tech_err": "Role already exists.",
+				"err_dict": {"role_id": role_id},
+			})
+		return asab.web.rest.json_response(request, {
+			"result": "OK",
+			"id": role_id
+		})
 
 
 	@access_control("seacat:role:edit")
@@ -157,8 +186,9 @@ class RoleHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
-			"description": {
-				"type": "string"},
+			"label": {"type": "string"},
+			"description": {"type": "string"},
+			"shared": {"type": "boolean"},
 			"add": {
 				"type": "array",
 				"items": {"type": "string"},
@@ -197,6 +227,7 @@ class RoleHandler(object):
 		try:
 			result = await self.RoleService.update(
 				role_id,
+				label=json_data.get("label"),
 				description=json_data.get("description"),
 				resources_to_set=resources_to_set,
 				resources_to_add=resources_to_add,

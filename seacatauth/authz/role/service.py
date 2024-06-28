@@ -5,14 +5,15 @@ from typing import Optional
 
 import asab.storage.exceptions
 import asab.exceptions
-from ... import exceptions
 
+from ...generic import SessionContext
+from ... import exceptions
 from ...events import EventTypes
+from .view import GlobalRoleView, SharedRoleView, TenantRoleView
 
 #
 
 L = logging.getLogger(__name__)
-
 
 #
 
@@ -22,7 +23,9 @@ class RoleService(asab.Service):
 	Role object schema:
 	{
 		"_id": str,
-		"resources": [str, str, ...]
+		"description": str,
+		"resources": [str, str, ...],
+		"managed_by": str,
 	}
 	"""
 
@@ -43,86 +46,180 @@ class RoleService(asab.Service):
 		self.RoleIdRegex = re.compile(r"^([^/]+)/({role})$".format(
 			role=self.RoleNamePattern
 		))
+		self.RoleNameRegex = re.compile(self.RoleNamePattern)
+
+
+	def _prepare_views(self, tenant_id: str | None):
+		assert tenant_id != "*"
+		views = []
+		if tenant_id:
+			views.append(SharedRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(TenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
+		return views
+
+
+	def _role_tenant_id(self, role_id: str):
+		tenant_id = role_id.split("/")[0]
+		if tenant_id == "*":
+			return None
+		else:
+			return tenant_id
 
 
 	async def list(
-		self, tenant: Optional[str] = None, page: int = 0, limit: int = None, filter: str = None, *,
-		resource: str = None,
-		active_only: bool = False,
-		exclude_global: bool = False,
+		self,
+		tenant_id: Optional[str] = None,
+		page: int = 0,
+		limit: int = None,
+		name_filter: str = None,
+		resource_filter: str = None,
 	):
-		collection = self.StorageService.Database[self.RoleCollection]
-		query_filter = {}
-		if tenant is not None:
-			if exclude_global:
-				query_filter["tenant"] = {"$in": [tenant]}
-			else:
-				query_filter["tenant"] = {"$in": [tenant, None]}
-		if filter:
-			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
-			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
-		if resource is not None:
-			query_filter["resources"] = resource
-		if active_only is True:
-			query_filter["deleted"] = {"$in": [False, None]}
+		if tenant_id in {"*", None}:
+			tenant_id = None
+		else:
+			self.validate_tenant_access(tenant_id)
 
-		cursor = collection.find(query_filter)
-
-		cursor.sort("_c", -1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
-
+		views = self._prepare_views(tenant_id)
+		counts = [
+			await view.count(name_filter, resource_filter)
+			for view in views
+		]
 		roles = []
-		count = await collection.count_documents(query_filter)
-		async for role_dict in cursor:
-			roles.append(role_dict)
+		offset = (page or 0) * (limit or 0)
+		for count, view in zip(counts, views):
+			if offset > count:
+				offset -= count
+				continue
+
+			async for role in view.iterate(
+				offset=offset,
+				limit=limit - len(roles),
+				sort=("_id", 1),
+				name_filter=name_filter,
+				resource_filter=resource_filter,
+			):
+				roles.append(role)
+
+			if len(roles) >= limit:
+				break
+
+			offset = 0
 
 		return {
-			"result": "OK",
-			"count": count,
+			"count": sum(counts),
 			"data": roles,
 		}
 
 
-	async def iterate(
-		self, tenant: str | None, page: int = 0, limit: int = None, filter: str = None, *, resource: str = None,
-	):
-		assert tenant != "*"  # Use tenant=None
-		query_filter = {"tenant": tenant}
-		if filter:
-			# List roles that match "QUERY...", "*/QUERY..." or "TENANT/QUERY..."
-			query_filter["_id"] = {"$regex": "^(.+/)?{}".format(re.escape(filter))}
-		if resource is not None:
-			query_filter["resources"] = resource
-
-		collection = self.StorageService.Database[self.RoleCollection]
-		cursor = collection.find(query_filter)
-
-		cursor.sort("_c", -1)
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
-
-		async for role in cursor:
-			yield role
+	async def _get(self, role_id: str):
+		tenant_id = self._role_tenant_id(role_id)
+		try:
+			if not tenant_id:
+				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
+			try:
+				return await TenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+			except KeyError:
+				return await SharedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+		except KeyError:
+			raise exceptions.RoleNotFoundError(role_id)
 
 
 	async def get(self, role_id: str):
-		try:
-			result = await self.StorageService.get(self.RoleCollection, role_id)
-		except KeyError:
-			raise exceptions.RoleNotFoundError(role_id)
-		return result
+		tenant_id = self._role_tenant_id(role_id)
+		if tenant_id:
+			self.validate_tenant_access(tenant_id)
+		return await self._get(role_id)
 
 
 	async def get_role_resources(self, role_id: str):
-		role_obj = await self.get(role_id)
+		role_obj = await self._get(role_id)
 		return role_obj["resources"]
 
 
-	async def create(self, role_id: str):
-		match = self.RoleIdRegex.match(role_id)
+	async def create(
+		self,
+		role_id: str,
+		label: str = None,
+		description: str = None,
+		resources: typing.Optional[typing.Iterable] = None,
+		shared: bool = False,
+		_managed_by: typing.Optional[str] = None,
+	):
+		tenant_id, role_name = self.parse_role_id(role_id)
+		self.validate_role_name(role_name)
+		if tenant_id:
+			# Does tenant exist?
+			await self.TenantService.get_tenant(tenant_id)
+			# Does the user have access to the tenant?
+			self.validate_tenant_access(tenant_id)
+		else:
+			# Only superusers can create global roles
+			self.validate_superuser_access()
+
+		# Check existence before creating to prevent shadowing shared roles with tenant roles
+		try:
+			await self._get(role_id)
+			raise asab.exceptions.Conflict(key="_id", value=role_id)
+		except exceptions.RoleNotFoundError:
+			pass
+
+		upsertor = self.StorageService.upsertor(
+			self.RoleCollection,
+			role_id
+		)
+		if tenant_id:
+			upsertor.set("tenant", tenant_id)
+		if resources:
+			# TODO: Check global resources, check resource access
+			for resource_id in resources:
+				try:
+					await self.ResourceService.get(resource_id)
+				except exceptions.ResourceNotFoundError as e:
+					L.log(asab.LOG_NOTICE, "Resource not found.", struct_data={"resource_id": resource_id})
+					raise e
+			upsertor.set("resources", resources)
+		else:
+			upsertor.set("resources", [])
+		if label:
+			upsertor.set("label", label)
+		if description:
+			upsertor.set("description", description)
+		if shared:
+			upsertor.set("shared", True)
+		if _managed_by:
+			upsertor.set("managed_by", _managed_by)
+
+		role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
+		L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
+
+		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
+		return role_id
+
+
+	def validate_tenant_access(self, tenant_id: str):
+		session = SessionContext.get()
+		if not (session and session.has_tenant_access(tenant_id)):
+			raise exceptions.TenantAccessDeniedError(
+				tenant_id, subject=session.Credentials.Id if session else None)
+
+
+	def validate_superuser_access(self):
+		session = SessionContext.get()
+		if not (session and session.is_superuser()):
+			raise exceptions.AccessDeniedError(
+				subject=session.Credentials.Id if session else None, resource="authz:superuser")
+
+
+	def parse_role_id(self, role_id: str) -> (typing.Optional[str], str):
+		tenant_id, role_name = role_id.split("/", 1)
+		if tenant_id == "*":
+			tenant_id = None
+		return tenant_id, role_name
+
+
+	def validate_role_name(self, role_name: str):
+		match = self.RoleNameRegex.match(role_name)
 		if match is None:
 			raise asab.exceptions.ValidationError(
 				"Role ID must match the format {tenant_name}/{role_name}, "
@@ -130,27 +227,6 @@ class RoleService(asab.Service):
 				"and {role_name} consists only of characters 'a-z0-9_-', "
 				"starts with a letter or underscore, and is between 1 and 32 characters long."
 			)
-		try:
-			tenant = await self.get_role_tenant(role_id)
-		except KeyError:
-			tenant, _ = role_id.split("/", 1)
-			raise KeyError("Tenant {!r} not found.".format(tenant))
-
-		upsertor = self.StorageService.upsertor(
-			self.RoleCollection,
-			role_id
-		)
-		upsertor.set("resources", [])
-		if tenant != "*":
-			upsertor.set("tenant", tenant)
-		try:
-			role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
-			L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
-		except asab.storage.exceptions.DuplicateError:
-			raise asab.exceptions.Conflict(key="role", value=role_id)
-
-		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
-		return role_id
 
 
 	async def delete(self, role_id: str):
@@ -169,12 +245,15 @@ class RoleService(asab.Service):
 
 	async def update(
 		self, role_id: str, *,
+		label: str = None,
 		description: str = None,
+		shared: bool = None,
 		resources_to_set: list = None,
 		resources_to_add: list = None,
-		resources_to_remove: list = None
+		resources_to_remove: list = None,
+		_managed_by: typing.Optional[str] = None,
 	):
-		# Verify that role exists
+		# Verify that role exists and validate access
 		role_current = await self.get(role_id)
 
 		# Verify that role tenant exists
@@ -235,9 +314,21 @@ class RoleService(asab.Service):
 			upsertor.set("resources", list(resources_to_set))
 			log_data["resources"] = ", ".join(resources_to_set)
 
+		if label is not None:
+			upsertor.set("label", label)
+			log_data["label"] = label
+
 		if description is not None:
 			upsertor.set("description", description)
 			log_data["description"] = description
+
+		if shared is not None:
+			upsertor.set("shared", bool(shared))
+		if _managed_by is not None:
+			if not _managed_by:
+				upsertor.unset("managed_by")
+			else:
+				upsertor.set("managed_by", _managed_by)
 
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
 		L.log(asab.LOG_NOTICE, "Role updated", struct_data=log_data)
