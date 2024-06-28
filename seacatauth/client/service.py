@@ -264,7 +264,7 @@ class ClientService(asab.Service):
 		]}
 
 
-	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None):
+	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None, rest_normalize: bool = False):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -279,9 +279,10 @@ class ClientService(asab.Service):
 			cursor.limit(limit)
 
 		async for client in cursor:
-			if "__client_secret" in client:
-				client.pop("__client_secret")
-			yield client
+			if rest_normalize:
+				yield self._rest_normalize(client)
+			else:
+				yield client
 
 
 	async def count(self, query_filter: dict = None):
@@ -293,7 +294,7 @@ class ClientService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def get(self, client_id: str):
+	async def get(self, client_id: str, rest_normalize: bool = False):
 		"""
 		Get client metadata
 
@@ -302,17 +303,18 @@ class ClientService(asab.Service):
 		"""
 		# Try to get client from cache
 		client = self._get_from_cache(client_id)
-		if client:
-			return client
-
 		# Get from the database
-		cookie_svc = self.App.get_service("seacatauth.CookieService")
-		client = await self.StorageService.get(self.ClientCollection, client_id)
-		client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
+		if not client:
+			cookie_svc = self.App.get_service("seacatauth.CookieService")
+			client = await self.StorageService.get(self.ClientCollection, client_id)
+			client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
 
-		self._store_in_cache(client_id, client)
+			self._store_in_cache(client_id, client)
 
-		return client
+		if rest_normalize:
+			return self._rest_normalize(client)
+		else:
+			return client
 
 
 	async def register(
@@ -705,6 +707,27 @@ class ClientService(asab.Service):
 			if now < exp:
 				valid[k] = v, exp
 		self.Cache = valid
+
+
+	def _rest_normalize(self, client: dict):
+		cookie_service = self.App.get_service("seacatauth.CookieService")
+
+		rest_data = {
+			k: v
+			for k, v in client.items()
+			if not k.startswith("__")
+		}
+		rest_data["client_id"] = rest_data["_id"]
+		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
+		if "__client_secret" in client:
+			rest_data["client_secret"] = True
+			if "client_secret_expires_at" in rest_data:
+				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
+		rest_data["cookie_name"] = cookie_service.get_cookie_name(rest_data["_id"])
+
+		if rest_data.get("managed_by"):
+			rest_data["editable"] = False
+		return rest_data
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
