@@ -76,7 +76,7 @@ class RoleService(asab.Service):
 		roles = []
 		count = await collection.count_documents(query_filter)
 		async for role_dict in cursor:
-			roles.append(role_dict)
+			roles.append(self._normalize_role(role_dict))
 
 		return {
 			"result": "OK",
@@ -105,7 +105,7 @@ class RoleService(asab.Service):
 			cursor.limit(limit)
 
 		async for role in cursor:
-			yield role
+			yield self._normalize_role(role)
 
 
 	async def get(self, role_id: str):
@@ -113,7 +113,13 @@ class RoleService(asab.Service):
 			result = await self.StorageService.get(self.RoleCollection, role_id)
 		except KeyError:
 			raise exceptions.RoleNotFoundError(role_id)
-		return result
+		return self._normalize_role(result)
+
+
+	def _normalize_role(self, role: dict):
+		if role.get("managed_by"):
+			role["editable"] = False
+		return role
 
 
 	async def get_role_resources(self, role_id: str):
@@ -157,6 +163,11 @@ class RoleService(asab.Service):
 		"""
 		Delete a role. Also remove all role assignments.
 		"""
+		# Check that the role exists and is editable
+		role = await self.get(role_id)
+		if role.get("editable") is False:
+			raise exceptions.AccessDeniedError("Role is not editable.")
+
 		# Unassign the role from all credentials
 		await self.delete_role_assignments(role_id)
 
