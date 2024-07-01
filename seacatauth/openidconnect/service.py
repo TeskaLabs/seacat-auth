@@ -542,8 +542,7 @@ class OpenIdConnectService(asab.Service):
 				code_verifier=code_verifier)
 		if token_data.get("sa"):
 			# Session is algorithmic (self-encoded token)
-			algo_token = self.StorageService.aes_decrypt(token_data["sid"])
-			return await self.SessionService.Algorithmic.deserialize(algo_token.decode("ascii"))
+			return await self.SessionService.Algorithmic.deserialize(token_data["sid"])
 		else:
 			# Session is in the DB
 			return await self.SessionService.get(token_data["sid"])
