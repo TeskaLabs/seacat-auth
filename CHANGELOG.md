@@ -21,6 +21,7 @@
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
+- Fix token request for self-encoded (algorithmic) sessions (#404, `v24.20-alpha12`)
 - Fix AttributeError in credentials update (#399, `v24.20-alpha11`)
 - Catch token decoding errors when finding sessions (#397, `v24.20-alpha10`)
 - Properly encrypt cookie value in session update (#394, `v24.20-alpha8`)
