@@ -1,16 +1,13 @@
 import logging
-import datetime
-
 import aiohttp.web
+import jwcrypto.jws
+import jwcrypto.jwt
+import json
 
 import asab
 import asab.web.rest
 import asab.web.rest.json
 import asab.exceptions
-
-import jwcrypto.jws
-import jwcrypto.jwt
-import json
 
 from .. import pkce
 from ..utils import TokenRequestErrorResponseCode
