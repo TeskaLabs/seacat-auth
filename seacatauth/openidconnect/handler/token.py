@@ -172,22 +172,20 @@ class TokenHandler(object):
 			"grant_type": "authorization_code",
 			"from_ip": from_ip})
 
+		# Client can limit the session scope to a subset of the scope granted at authorization time
+		scope = form_data.get("scope")
+
 		# Generate new auth tokens
 		if session.is_algorithmic():
-			new_access_token = await self.SessionService.Algorithmic.serialize(session)
-			access_token_expires_in = (
-				session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+			new_access_token = self.SessionService.Algorithmic.serialize(session)
+			access_token_expires_in = self.SessionService.AnonymousExpiration
 			new_refresh_token, refresh_token_expires_in = None, None
 		else:
 			new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
 			new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
-
-		# Client can limit the session scope to a subset of the scope granted at authorization time
-		scope = form_data.get("scope")
-
-		# Refresh the session data
-		session = await self.OpenIdConnectService.refresh_session(
-			session, requested_scope=scope, expires_in=refresh_token_expires_in)
+			# Refresh the session data
+			session = await self.OpenIdConnectService.refresh_session(
+				session, requested_scope=scope, expires_in=refresh_token_expires_in)
 
 		# Response
 		response_payload = {
