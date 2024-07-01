@@ -340,9 +340,13 @@ class TenantService(asab.Service):
 		return tenants
 
 
-	async def has_tenant_assigned(self, credatials_id: str, tenant: str):
+	async def has_tenant_assigned(self, credatials_id: str, tenant: str) -> bool:
 		try:
-			await self.TenantsProvider.get_assignment(credatials_id, tenant)
+			await self.get_assigned_tenant(credatials_id, tenant)
 		except KeyError:
 			return False
 		return True
+
+
+	async def get_assigned_tenant(self, credatials_id: str, tenant: str) -> dict:
+		return await self.TenantsProvider.get_assignment(credatials_id, tenant)
