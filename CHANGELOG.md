@@ -3,6 +3,7 @@
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha13`
 - `v24.20-alpha12`
 - `v24.20-alpha11`
 - `v24.20-alpha10`
@@ -17,10 +18,13 @@
 - `v24.20-alpha1`
 
 ### Breaking changes
+- Removed total item count from credential list response (#391, `v24.20-alpha12`, Compatible with Seacat Admin WebUI v24.19-alpha28 and later)
 - External login endpoints changed (#384, `v24.20-alpha9`)
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
+- Fix token request for self-encoded (algorithmic) sessions (#404, `v24.20-alpha13`)
+- Fix credential search performance (#391, `v24.20-alpha12`)
 - Fix AttributeError in credentials update (#399, `v24.20-alpha11`)
 - Catch token decoding errors when finding sessions (#397, `v24.20-alpha10`)
 - Properly encrypt cookie value in session update (#394, `v24.20-alpha8`)

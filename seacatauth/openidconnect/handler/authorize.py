@@ -354,7 +354,7 @@ class AuthorizeHandler(object):
 		authenticated = root_session is not None and not root_session.is_anonymous()
 		allow_anonymous = "anonymous" in requested_scope
 		if allow_anonymous:
-			if client_dict.get("authorize_anonymous_users", False):
+			if not client_dict.get("authorize_anonymous_users", False):
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidScope, client_id,
 					redirect_uri=redirect_uri,
