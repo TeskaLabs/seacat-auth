@@ -119,7 +119,7 @@ class RoleService(asab.Service):
 		try:
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
-			elif role_id.startswith("*"):
+			elif role_id.endswith("*"):
 				return await GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 			else:
 				return await CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
@@ -342,8 +342,6 @@ class RoleService(asab.Service):
 			upsertor.set("description", description)
 			log_data["description"] = description
 
-		if shared is not None:
-			upsertor.set("shared", bool(shared))
 		if _managed_by is not None:
 			if not _managed_by:
 				upsertor.unset("managed_by")
