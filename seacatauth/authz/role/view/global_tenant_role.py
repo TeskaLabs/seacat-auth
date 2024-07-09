@@ -58,9 +58,9 @@ class GloballyDefinedTenantRoleView(RoleView):
 
 
 	def _role_tenant_matches(self, role_id: str):
-		# Remove leading "*"
-		assert role_id[0] == "*"
-		role_id = role_id[1:]
+		# Remove trailing "*"
+		assert role_id[-1] == "*"
+		role_id = role_id[:-1]
 		tenant_id, role_name = role_id.split("/")
 		return tenant_id == self.TenantId
 
@@ -68,19 +68,19 @@ class GloballyDefinedTenantRoleView(RoleView):
 	def _global_role_id_to_tenant(self, role_id: str):
 		tenant_id, role_name = role_id.split("/")
 		assert tenant_id == "*"
-		return "*{}/{}".format(self.TenantId, role_name)
+		return "{}/{}*".format(self.TenantId, role_name)
 
 
 	def _tenant_role_id_to_global(self, role_id: str):
-		# Remove leading "*"
-		assert role_id[0] == "*"
-		role_id = role_id[1:]
+		# Remove trailing "*"
+		assert role_id[-1] == "*"
+		role_id = role_id[:-1]
 		_, role_name = role_id.split("/")
 		return "*/{}".format(role_name)
 
 
 	def _normalize_role(self, role: dict):
-		role["parent_id"] = role["_id"]
+		role["global_role_id"] = role["_id"]
 		role["_id"] = self._global_role_id_to_tenant(role["_id"])
 		role["editable"] = False
 		return role
