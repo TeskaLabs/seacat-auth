@@ -575,3 +575,8 @@ class RoleService(asab.Service):
 			await self.TenantService.get_tenant(tenant)
 
 		return tenant
+
+
+	async def get_assigned_role(self, credentials_id: str, role_id: str):
+		assignment_id = "{} {}".format(credentials_id, role_id)
+		return await self.StorageService.get(self.CredentialsRolesCollection, assignment_id)
