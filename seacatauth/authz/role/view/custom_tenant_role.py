@@ -55,4 +55,3 @@ class CustomTenantRoleView(RoleView):
 
 	def _role_tenant_matches(self, role_id: str):
 		return role_id.split("/")[0] == self.TenantId
-
