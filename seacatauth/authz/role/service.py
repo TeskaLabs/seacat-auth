@@ -9,7 +9,7 @@ import asab.exceptions
 from ...generic import SessionContext
 from ... import exceptions
 from ...events import EventTypes
-from .view import GlobalRoleView, SharedRoleView, TenantRoleView
+from .view import GlobalRoleView, GloballyDefinedTenantRoleView, CustomTenantRoleView
 
 #
 
@@ -53,8 +53,8 @@ class RoleService(asab.Service):
 		assert tenant_id != "*"
 		views = []
 		if tenant_id:
-			views.append(SharedRoleView(self.StorageService, self.RoleCollection, tenant_id))
-			views.append(TenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
 		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
 		return views
 
@@ -118,9 +118,9 @@ class RoleService(asab.Service):
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
 			try:
-				return await TenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+				return await CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 			except KeyError:
-				return await SharedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+				return await GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 		except KeyError:
 			raise exceptions.RoleNotFoundError(role_id)
 
@@ -143,7 +143,7 @@ class RoleService(asab.Service):
 		label: str = None,
 		description: str = None,
 		resources: typing.Optional[typing.Iterable] = None,
-		shared: bool = False,
+		assign_in_tenant: bool = False,
 		_managed_by: typing.Optional[str] = None,
 	):
 		tenant_id, role_name = self.parse_role_id(role_id)
@@ -185,8 +185,8 @@ class RoleService(asab.Service):
 			upsertor.set("label", label)
 		if description:
 			upsertor.set("description", description)
-		if shared:
-			upsertor.set("shared", True)
+		if assign_in_tenant:
+			upsertor.set("assign_in_tenant", True)
 		if _managed_by:
 			upsertor.set("managed_by", _managed_by)
 
@@ -247,7 +247,6 @@ class RoleService(asab.Service):
 		self, role_id: str, *,
 		label: str = None,
 		description: str = None,
-		shared: bool = None,
 		resources_to_set: list = None,
 		resources_to_add: list = None,
 		resources_to_remove: list = None,

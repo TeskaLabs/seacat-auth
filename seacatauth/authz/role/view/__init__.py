@@ -1,9 +1,9 @@
 from .global_role import GlobalRoleView
-from .shared_role import SharedRoleView
-from .tenant_role import TenantRoleView
+from .global_tenant_role import GloballyDefinedTenantRoleView
+from .custom_tenant_role import CustomTenantRoleView
 
 __all__ = [
 	"GlobalRoleView",
-	"SharedRoleView",
-	"TenantRoleView",
+	"GloballyDefinedTenantRoleView",
+	"CustomTenantRoleView",
 ]
