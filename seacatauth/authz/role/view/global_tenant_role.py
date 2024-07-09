@@ -54,29 +54,33 @@ class GloballyDefinedTenantRoleView(RoleView):
 	async def get(self, role_id: str) -> dict:
 		assert self._role_tenant_matches(role_id)
 		return self._normalize_role(
-			await self.StorageService.get(self.CollectionName, self._tenant_id_to_global(role_id)))
+			await self.StorageService.get(self.CollectionName, self._tenant_role_id_to_global(role_id)))
 
 
 	def _role_tenant_matches(self, role_id: str):
-		return role_id.split("/")[0] == self.TenantId
-
-
-	def _global_id_to_tenant(self, role_id: str):
-		tenant_part, role_part = role_id.split("/")
-		assert tenant_part == "*"
-		return "*{}/{}".format(self.TenantId, role_part)
-
-
-	def _tenant_id_to_global(self, role_id: str):
 		# Remove leading "*"
 		assert role_id[0] == "*"
 		role_id = role_id[1:]
-		_, role_part = role_id.split("/")
-		return "*/{}".format(role_part)
+		tenant_id, role_name = role_id.split("/")
+		return tenant_id == self.TenantId
+
+
+	def _global_role_id_to_tenant(self, role_id: str):
+		tenant_id, role_name = role_id.split("/")
+		assert tenant_id == "*"
+		return "*{}/{}".format(self.TenantId, role_name)
+
+
+	def _tenant_role_id_to_global(self, role_id: str):
+		# Remove leading "*"
+		assert role_id[0] == "*"
+		role_id = role_id[1:]
+		_, role_name = role_id.split("/")
+		return "*/{}".format(role_name)
 
 
 	def _normalize_role(self, role: dict):
 		role["parent_id"] = role["_id"]
-		role["_id"] = self._global_id_to_tenant(role["_id"])
+		role["_id"] = self._global_role_id_to_tenant(role["_id"])
 		role["editable"] = False
 		return role

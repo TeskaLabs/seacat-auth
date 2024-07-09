@@ -63,6 +63,8 @@ class RoleService(asab.Service):
 		tenant_id = role_id.split("/")[0]
 		if tenant_id == "*":
 			return None
+		elif tenant_id.startswith("*"):
+			return tenant_id[1:]
 		else:
 			return tenant_id
 
@@ -117,10 +119,10 @@ class RoleService(asab.Service):
 		try:
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
-			try:
-				return await CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
-			except KeyError:
+			elif role_id.startswith("*"):
 				return await GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+			else:
+				return await CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 		except KeyError:
 			raise exceptions.RoleNotFoundError(role_id)
 
@@ -233,6 +235,17 @@ class RoleService(asab.Service):
 		"""
 		Delete a role. Also remove all role assignments.
 		"""
+		# Verify that role exists and validate access
+		try:
+			role_current = await self.get(role_id)
+		except exceptions.RoleNotFoundError as e:
+			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
+			raise e
+
+		if not role_current.get("editable", True):
+			L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role_id})
+			raise exceptions.NotEditableError("Role is not editable.", role_id=role_id)
+
 		# Unassign the role from all credentials
 		await self.delete_role_assignments(role_id)
 
@@ -253,7 +266,11 @@ class RoleService(asab.Service):
 		_managed_by: typing.Optional[str] = None,
 	):
 		# Verify that role exists and validate access
-		role_current = await self.get(role_id)
+		try:
+			role_current = await self.get(role_id)
+		except exceptions.RoleNotFoundError as e:
+			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
+			raise e
 
 		if not role_current.get("editable", True):
 			L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role_id})
