@@ -171,9 +171,12 @@ class RoleHandler(object):
 
 		try:
 			result = await self.RoleService.delete(role_id)
-		except KeyError:
-			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": role_id})
-			return aiohttp.web.HTTPNotFound()
+		except exceptions.RoleNotFoundError:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR", "tech_err": "Role not found."})
+		except exceptions.NotEditableError:
+			return asab.web.rest.json_response(request, status=405, data={
+				"result": "ERROR", "tech_err": "Role is not editable."})
 		return asab.web.rest.json_response(request, result)
 
 
