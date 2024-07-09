@@ -4,7 +4,7 @@ import typing
 from .abc import RoleView
 
 
-class TenantRoleView(RoleView):
+class CustomTenantRoleView(RoleView):
 	def __init__(self, storage_service, collection_name, tenant_id):
 		super().__init__(storage_service, collection_name)
 		self.TenantId = tenant_id

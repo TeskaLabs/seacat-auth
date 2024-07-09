@@ -127,7 +127,7 @@ class RoleHandler(object):
 		"properties": {
 			"label": {"type": "string"},
 			"description": {"type": "string"},
-			"shared": {"type": "boolean"},
+			"assign_in_tenant": {"type": "boolean"},
 			"resources": {
 				"type": "array",
 				"items": {"type": "string"},
@@ -142,12 +142,7 @@ class RoleHandler(object):
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
 		try:
-			role_id = await self.RoleService.create(
-				role_id,
-				label=json_data.get("label"),
-				description=json_data.get("description"),
-				resources=json_data.get("resources"),
-			)
+			role_id = await self.RoleService.create(role_id, **json_data)
 		except exceptions.ResourceNotFoundError as e:
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR",
@@ -188,7 +183,6 @@ class RoleHandler(object):
 		"properties": {
 			"label": {"type": "string"},
 			"description": {"type": "string"},
-			"shared": {"type": "boolean"},
 			"add": {
 				"type": "array",
 				"items": {"type": "string"},
@@ -233,8 +227,7 @@ class RoleHandler(object):
 				resources_to_add=resources_to_add,
 				resources_to_remove=resources_to_remove,
 			)
-		except exceptions.RoleNotFoundError as e:
-			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": e.Role})
+		except exceptions.RoleNotFoundError:
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR", "tech_err": "Role not found."})
 		except exceptions.NotEditableError:

@@ -4,10 +4,9 @@ import typing
 from .abc import RoleView
 
 
-class SharedRoleView(RoleView):
+class GloballyDefinedTenantRoleView(RoleView):
 	"""
-	Manage shared tenant roles that are projected from global roles.
-	Not editable.
+	View for globally defined tenant roles.
 	"""
 	def __init__(self, storage_service, collection_name, tenant_id):
 		super().__init__(storage_service, collection_name)
@@ -20,7 +19,7 @@ class SharedRoleView(RoleView):
 		resource_filter: typing.Optional[str] = None,
 		**kwargs
 	):
-		query = {"tenant": None, "shared": True}
+		query = {"tenant": None, "assign_in_tenant": True}
 		if name_filter:
 			query["_id"] = {"$regex": re.escape(name_filter)}
 		if resource_filter:
@@ -63,11 +62,17 @@ class SharedRoleView(RoleView):
 
 
 	def _global_id_to_tenant(self, role_id: str):
-		return "{}/{}".format(self.TenantId, role_id.split("/")[1])
+		tenant_part, role_part = role_id.split("/")
+		assert tenant_part == "*"
+		return "*{}/{}".format(self.TenantId, role_part)
 
 
 	def _tenant_id_to_global(self, role_id: str):
-		return "*/{}".format(role_id.split("/")[1])
+		# Remove leading "*"
+		assert role_id[0] == "*"
+		role_id = role_id[1:]
+		_, role_part = role_id.split("/")
+		return "*/{}".format(role_part)
 
 
 	def _normalize_role(self, role: dict):
