@@ -247,7 +247,7 @@ class RoleService(asab.Service):
 			raise exceptions.NotEditableError("Role is not editable.", role_id=role_id)
 
 		# Unassign the role from all credentials
-		await self.delete_role_assignments(role_id)
+		await self.delete_role_assignments(role_current)
 
 		# Delete the role
 		await self.StorageService.delete(self.RoleCollection, role_id)
@@ -529,16 +529,25 @@ class RoleService(asab.Service):
 		})
 
 
-	async def delete_role_assignments(self, role_id):
+	async def delete_role_assignments(self, role: dict):
 		"""
 		Delete all role assignments of a specified role
 		"""
+		role_id = role["_id"]
+		tenant_id, role_name = role_id.split("/")
 		collection = await self.StorageService.collection(self.CredentialsRolesCollection)
 
-		result = await collection.delete_many({'r': role_id})
-		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
+		result = await collection.delete_many({"r": role_id})
+		deleted_count = result.deleted_count
+
+		# For globally defined tenant roles delete also their assignments within tenants
+		if tenant_id == "*" and role.get("assign_in_tenant") is True:
+			result = await collection.delete_many({"r": re.compile(r"^.+/{}\*$".format(re.escape(role_name)))})
+			deleted_count += result.deleted_count
+
+		L.log(asab.LOG_NOTICE, "Role unassigned.", struct_data={
 			"role_id": role_id,
-			"deleted_count": result.deleted_count
+			"deleted_count": deleted_count,
 		})
 
 
