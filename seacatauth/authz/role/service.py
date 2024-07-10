@@ -53,8 +53,8 @@ class RoleService(asab.Service):
 		assert tenant_id != "*"
 		views = []
 		if tenant_id:
-			views.append(GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
 			views.append(CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
 		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
 		return views
 
