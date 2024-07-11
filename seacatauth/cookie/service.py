@@ -8,7 +8,6 @@ import typing
 import asab
 import asab.storage
 import asab.exceptions
-import jwcrypto.jws
 
 from .. import exceptions
 from ..session.adapter import SessionAdapter, CookieData
