@@ -552,6 +552,10 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Retrieve session by its access token.
 		"""
+		if "." in token_value:
+			# If there is ".", the value is not pure base64. It must be a JWT of an algorithmic session.
+			return await self.SessionService.Algorithmic.deserialize(token_value)
+
 		try:
 			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		except binascii.Error as e:
