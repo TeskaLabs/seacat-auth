@@ -7,8 +7,6 @@ import jwcrypto.jwk
 import uuid
 import json
 import datetime
-
-import asab.exceptions
 import asab.web.rest
 import asab.metrics
 
