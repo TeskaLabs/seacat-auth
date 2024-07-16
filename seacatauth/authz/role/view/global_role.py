@@ -54,3 +54,9 @@ class GlobalRoleView(RoleView):
 
 	def _role_tenant_matches(self, role_id: str):
 		return role_id.split("/")[0] == "*"
+
+
+	def _normalize_role(self, role: dict):
+		role = super()._normalize_role(role)
+		role["type"] = "global"
+		return role

@@ -9,7 +9,7 @@ import asab.exceptions
 from ...generic import SessionContext
 from ... import exceptions
 from ...events import EventTypes
-from .view import GlobalRoleView, GloballyDefinedTenantRoleView, CustomTenantRoleView
+from .view import GlobalRoleView, GlobalPropagatedRoleView, CustomTenantRoleView
 
 #
 
@@ -54,7 +54,7 @@ class RoleService(asab.Service):
 		views = []
 		if tenant_id:
 			views.append(CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
-			views.append(GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(GlobalPropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id))
 		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
 		return views
 
@@ -114,11 +114,12 @@ class RoleService(asab.Service):
 
 	async def _get(self, role_id: str):
 		tenant_id = self._role_tenant_id(role_id)
+		_, role_name = role_id.split("/")
 		try:
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
-			elif role_id.endswith("*"):
-				return await GloballyDefinedTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+			elif role_name.startswith("~"):
+				return await GlobalPropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 			else:
 				return await CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 		except KeyError:
@@ -143,7 +144,7 @@ class RoleService(asab.Service):
 		label: str = None,
 		description: str = None,
 		resources: typing.Optional[typing.Iterable] = None,
-		assign_in_tenant: bool = False,
+		propagate: bool = False,
 		_managed_by: typing.Optional[str] = None,
 	):
 		tenant_id, role_name = self.parse_role_id(role_id)
@@ -171,7 +172,7 @@ class RoleService(asab.Service):
 		if tenant_id:
 			upsertor.set("tenant", tenant_id)
 		if resources:
-			await self._validate_role_resources(role_id, assign_in_tenant, resources)
+			await self._validate_role_resources(role_id, propagate, resources)
 			upsertor.set("resources", resources)
 		else:
 			upsertor.set("resources", [])
@@ -179,8 +180,8 @@ class RoleService(asab.Service):
 			upsertor.set("label", label)
 		if description:
 			upsertor.set("description", description)
-		if assign_in_tenant:
-			upsertor.set("assign_in_tenant", True)
+		if propagate:
+			upsertor.set("propagate", True)
 		if _managed_by:
 			upsertor.set("managed_by", _managed_by)
 
@@ -283,7 +284,7 @@ class RoleService(asab.Service):
 			resources_to_add or [],
 			resources_to_remove or []
 		)
-		await self._validate_role_resources(role_id, role_current.get("assign_in_tenant"), resources_to_assign)
+		await self._validate_role_resources(role_id, role_current.get("propagate"), resources_to_assign)
 
 		if resources_to_set is None:
 			resources_to_set = set(role_current["resources"])
@@ -343,7 +344,7 @@ class RoleService(asab.Service):
 		return "OK"
 
 
-	async def _validate_role_resources(self, role_id: str, assign_in_tenant: bool, resources: typing.Iterable):
+	async def _validate_role_resources(self, role_id: str, propagate: bool, resources: typing.Iterable):
 		"""
 		Check if resources exist and can be assigned to role
 		"""
@@ -352,7 +353,7 @@ class RoleService(asab.Service):
 			# Verify that resource exists
 			await self.ResourceService.get(resource_id)
 
-			if (tenant_id is not None or assign_in_tenant is True) and self.ResourceService.is_global_only_resource(resource_id):
+			if (tenant_id is not None or propagate is True) and self.ResourceService.is_global_only_resource(resource_id):
 				# Global-only resources cannot be assigned to tenant roles or globally defined tenant roles
 				message = "Cannot assign global-only resources to a tenant (or globally-defined tenant) role."
 				L.error(message, struct_data={"resource_id": resource_id, "role_id": role_id})
@@ -545,7 +546,7 @@ class RoleService(asab.Service):
 		deleted_count = result.deleted_count
 
 		# For globally defined tenant roles delete also their assignments within tenants
-		if tenant_id == "*" and role.get("assign_in_tenant") is True:
+		if tenant_id == "*" and role.get("propagate") is True:
 			result = await collection.delete_many({"r": re.compile(r"^.+/{}\*$".format(re.escape(role_name)))})
 			deleted_count += result.deleted_count
 

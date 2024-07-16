@@ -55,3 +55,9 @@ class CustomTenantRoleView(RoleView):
 
 	def _role_tenant_matches(self, role_id: str):
 		return role_id.split("/")[0] == self.TenantId
+
+
+	def _normalize_role(self, role: dict):
+		role = super()._normalize_role(role)
+		role["type"] = "tenant"
+		return role
