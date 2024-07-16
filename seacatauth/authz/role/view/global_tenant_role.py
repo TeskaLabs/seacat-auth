@@ -83,4 +83,5 @@ class GloballyDefinedTenantRoleView(RoleView):
 		role["global_role_id"] = role["_id"]
 		role["_id"] = self._global_role_id_to_tenant(role["_id"])
 		role["editable"] = False
+		role["tenant"] = self.TenantId
 		return role
