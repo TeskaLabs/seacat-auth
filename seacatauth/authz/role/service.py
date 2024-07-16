@@ -63,8 +63,6 @@ class RoleService(asab.Service):
 		tenant_id = role_id.split("/")[0]
 		if tenant_id == "*":
 			return None
-		elif tenant_id.startswith("*"):
-			return tenant_id[1:]
 		else:
 			return tenant_id
 
@@ -173,13 +171,7 @@ class RoleService(asab.Service):
 		if tenant_id:
 			upsertor.set("tenant", tenant_id)
 		if resources:
-			# TODO: Check global resources, check resource access
-			for resource_id in resources:
-				try:
-					await self.ResourceService.get(resource_id)
-				except exceptions.ResourceNotFoundError as e:
-					L.log(asab.LOG_NOTICE, "Resource not found.", struct_data={"resource_id": resource_id})
-					raise e
+			await self._validate_role_resources(role_id, assign_in_tenant, resources)
 			upsertor.set("resources", resources)
 		else:
 			upsertor.set("resources", [])
@@ -196,6 +188,7 @@ class RoleService(asab.Service):
 		L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
 
 		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
+
 		return role_id
 
 
@@ -277,10 +270,12 @@ class RoleService(asab.Service):
 			raise exceptions.NotEditableError("Role is not editable.", role_id=role_id)
 
 		# Verify that role tenant exists
-		try:
-			tenant = await self.get_role_tenant(role_id)
-		except KeyError as e:
-			raise KeyError("Tenant of role {!r} not found. Please delete this role.".format(role_id)) from e
+		tenant_id = self._role_tenant_id(role_id)
+		if tenant_id:
+			try:
+				await self.TenantService.get_tenant(tenant_id)
+			except KeyError as e:
+				raise KeyError("Tenant of role {!r} not found. Please delete this role.".format(role_id)) from e
 
 		# Validate resources
 		resources_to_assign = set().union(
@@ -288,14 +283,7 @@ class RoleService(asab.Service):
 			resources_to_add or [],
 			resources_to_remove or []
 		)
-		if tenant != "*":
-			# TENANT role
-			# Global-only resources cannot be assigned to a tenant role
-			for resource in resources_to_assign:
-				if self.ResourceService.is_global_only_resource(resource):
-					message = "Cannot assign global-only resources to tenant roles."
-					L.error(message, struct_data={"resource": resource, "role": role_id})
-					raise asab.exceptions.ValidationError(message)
+		await self._validate_role_resources(role_id, role_current.get("assign_in_tenant"), resources_to_assign)
 
 		if resources_to_set is None:
 			resources_to_set = set(role_current["resources"])
@@ -353,6 +341,22 @@ class RoleService(asab.Service):
 		self.App.PubSub.publish("Role.updated!", role_id=role_id, asynchronously=True)
 
 		return "OK"
+
+
+	async def _validate_role_resources(self, role_id: str, assign_in_tenant: bool, resources: typing.Iterable):
+		"""
+		Check if resources exist and can be assigned to role
+		"""
+		tenant_id = self._role_tenant_id(role_id)
+		for resource_id in resources:
+			# Verify that resource exists
+			await self.ResourceService.get(resource_id)
+
+			if (tenant_id is not None or assign_in_tenant is True) and self.ResourceService.is_global_only_resource(resource_id):
+				# Global-only resources cannot be assigned to tenant roles or globally defined tenant roles
+				message = "Cannot assign global-only resources to a tenant (or globally-defined tenant) role."
+				L.error(message, struct_data={"resource_id": resource_id, "role_id": role_id})
+				raise asab.exceptions.ValidationError(message)
 
 
 	async def get_roles_by_credentials(self, credentials_id: str, tenants: list = None):
@@ -549,32 +553,6 @@ class RoleService(asab.Service):
 			"role_id": role_id,
 			"deleted_count": deleted_count,
 		})
-
-
-	async def get_role_tenant(self, role_id):
-		"""
-		Get the tenant from role ID.
-		Verify that the tenant exists, propagate KeyError if it does not.
-
-		:param role_id: Role ID
-		:return: Tenant ID
-		"""
-		match = self.RoleIdRegex.match(role_id)
-		if match is not None:
-			tenant = match.group(1)
-		else:
-			L.warning(
-				"Role ID contains unallowed characters. "
-				"Consider deleting this role and creating a new one.",
-				struct_data={"role_id": role_id}
-			)
-			tenant, _ = role_id.split("/", 1)
-
-		# Verify that tenant exists if the role is not global
-		if tenant != "*":
-			await self.TenantService.get_tenant(tenant)
-
-		return tenant
 
 
 	async def get_assigned_role(self, credentials_id: str, role_id: str):
