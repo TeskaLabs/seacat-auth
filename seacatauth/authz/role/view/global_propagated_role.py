@@ -77,6 +77,7 @@ class GlobalPropagatedRoleView(RoleView):
 
 	def _normalize_role(self, role: dict):
 		role = super()._normalize_role(role)
+		del role["propagate"]
 		role["type"] = "propagated"
 		role["global_role_id"] = role["_id"]
 		role["_id"] = self._global_role_id_to_tenant(role["_id"])
