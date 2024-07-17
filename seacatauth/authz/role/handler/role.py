@@ -127,7 +127,7 @@ class RoleHandler(object):
 		"properties": {
 			"label": {"type": "string"},
 			"description": {"type": "string"},
-			"propagate": {"type": "boolean"},
+			"propagated": {"type": "boolean"},
 			"resources": {
 				"type": "array",
 				"items": {"type": "string"},

@@ -19,7 +19,7 @@ class GlobalPropagatedRoleView(RoleView):
 		resource_filter: typing.Optional[str] = None,
 		**kwargs
 	):
-		query = {"tenant": None, "propagate": True}
+		query = {"tenant": None, "propagated": True}
 		if name_filter:
 			query["_id"] = {"$regex": re.escape(name_filter)}
 		if resource_filter:
@@ -77,8 +77,7 @@ class GlobalPropagatedRoleView(RoleView):
 
 	def _normalize_role(self, role: dict):
 		role = super()._normalize_role(role)
-		del role["propagate"]
-		role["type"] = "propagated"
+		role["type"] = "tenant"
 		role["global_role_id"] = role["_id"]
 		role["_id"] = self._global_role_id_to_tenant(role["_id"])
 		role["editable"] = False
