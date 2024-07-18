@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v24.29
+
+### Pre-releases
+
+### Features
+- Print ASAB version during Docker build (#406, `v24.29-alpha1`)
+
+---
+
+
 ## v24.20
 
 ### Pre-releases
