@@ -1,7 +1,7 @@
 FROM alpine:3.18 AS stage1
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 RUN set -ex \
   && apk update \
@@ -48,6 +48,8 @@ RUN apk add --no-cache  \
     git+https://github.com/TeskaLabs/asab.git
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
+
+RUN cat /usr/lib/python3.11/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
