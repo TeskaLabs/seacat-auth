@@ -49,6 +49,8 @@ RUN apk add --no-cache  \
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
+RUN cat /usr/lib/python3.11/site-packages/asab/__version__.py
+
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
 
