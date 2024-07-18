@@ -1,7 +1,7 @@
 FROM alpine:3.18 AS stage1
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 RUN set -ex \
   && apk update \
