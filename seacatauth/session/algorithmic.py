@@ -7,12 +7,11 @@ import jwcrypto.jwk
 import uuid
 import json
 import datetime
-
-import asab.exceptions
 import asab.web.rest
 import asab.metrics
 
 from .adapter import SessionAdapter
+from .. import exceptions
 from ..authz import build_credentials_authz
 
 L = logging.getLogger(__name__)
@@ -114,12 +113,14 @@ class AlgorithmicSessionProvider:
 		"""
 		try:
 			token = jwcrypto.jwt.JWT(jwt=token_value, key=self.PrivateKey)
-		except ValueError:
-			# This is not a JWToken
-			return None
-		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTExpired) as e:
-			# JWToken invalid
-			raise asab.exceptions.NotAuthenticatedError() from e
+		except (ValueError, jwcrypto.jws.InvalidJWSObject) as e:
+			L.error("Corrupt algorithmic session token.")
+			raise exceptions.SessionNotFoundError("Corrupt algorithmic session token.") from e
+		except jwcrypto.jws.InvalidJWSSignature as e:
+			L.error("Invalid algorithmic session token signature.")
+			raise exceptions.SessionNotFoundError("Invalid algorithmic session token signature.") from e
+		except jwcrypto.jwt.JWTExpired as e:
+			raise exceptions.SessionNotFoundError("Expired algorithmic session token.") from e
 
 		data_dict = json.loads(token.claims)
 		client_dict = await self.ClientService.get(data_dict["azp"])
@@ -130,7 +131,10 @@ class AlgorithmicSessionProvider:
 				client_dict=client_dict,
 				scope=data_dict["scope"])
 		except Exception as e:
-			raise asab.exceptions.NotAuthenticatedError() from e
+			L.error(
+				"Failed to build session from algorithmic session token claims.", struct_data=data_dict)
+			raise exceptions.SessionNotFoundError(
+				"Failed to build session from algorithmic session token claims.") from e
 
 		return session
 

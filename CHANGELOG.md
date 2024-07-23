@@ -1,8 +1,19 @@
 # CHANGELOG
 
+## v24.29
+
+### Pre-releases
+
+### Features
+- Print ASAB version during Docker build (#406, `v24.29-alpha1`)
+
+---
+
+
 ## v24.20
 
 ### Pre-releases
+- `v24.20-alpha14`
 - `v24.20-alpha13`
 - `v24.20-alpha12`
 - `v24.20-alpha11`
@@ -23,6 +34,7 @@
 - Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
 
 ### Fix
+- Fix nginx oauth introspection for self-encoded (algorithmic) sessions (#405, `v24.20-alpha14`)
 - Fix token request for self-encoded (algorithmic) sessions (#404, `v24.20-alpha13`)
 - Fix credential search performance (#391, `v24.20-alpha12`)
 - Fix AttributeError in credentials update (#399, `v24.20-alpha11`)
