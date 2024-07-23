@@ -611,9 +611,9 @@ class RoleService(asab.Service):
 		result = await collection.delete_many({"r": role_id})
 		deleted_count = result.deleted_count
 
-		# For globally defined tenant roles delete also their assignments within tenants
+		# For propagated global roles delete also their assignments within tenants
 		if tenant_id == "*" and role.get("propagated") is True:
-			result = await collection.delete_many({"r": re.compile(r"^.+/{}\*$".format(re.escape(role_name)))})
+			result = await collection.delete_many({"r": re.compile(r"^.+/~{}$".format(re.escape(role_name)))})
 			deleted_count += result.deleted_count
 
 		L.log(asab.LOG_NOTICE, "Role unassigned.", struct_data={
