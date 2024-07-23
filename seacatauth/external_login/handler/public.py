@@ -68,6 +68,9 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
+		client_id = self.ExternalLoginService.get_client_id(redirect_uri)
+		if not await self.ExternalLoginService.validate_client_id_and_redirect_uri(redirect_uri, client_id):
+			return aiohttp.web.HTTPBadRequest()
 		authorization_url = await self.ExternalLoginService.initialize_pairing_external_account(
 			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(authorization_url)
@@ -91,6 +94,9 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
+		client_id = self.ExternalLoginService.get_client_id(redirect_uri)
+		if not await self.ExternalLoginService.validate_client_id_and_redirect_uri(redirect_uri, client_id):
+			return aiohttp.web.HTTPBadRequest()
 		authorization_url = await self.ExternalLoginService.initialize_login_with_external_account(
 			provider_type, redirect_uri)
 		return aiohttp.web.HTTPFound(authorization_url)
@@ -112,6 +118,9 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
+		client_id = self.ExternalLoginService.get_client_id(redirect_uri)
+		if not await self.ExternalLoginService.validate_client_id_and_redirect_uri(redirect_uri, client_id):
+			return aiohttp.web.HTTPBadRequest()
 		try:
 			authorization_url = await self.ExternalLoginService.initialize_signup_with_external_account(
 				provider_type, redirect_uri)
