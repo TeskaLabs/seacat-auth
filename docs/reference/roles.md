@@ -26,7 +26,7 @@ To edit the privileges of a global role, it is necessary to have superuser privi
 
 When creating a global role, there is an option to mark it as "Propagated to tenants".
 Propagated global roles behave as common global roles, plus they create their virtual copy (or a "link", to be more precise) in every tenant.
-This allows administrators to define a role globally, while being able to assign it to users independently in any tenant.
+This allows for defining a role globally, while also being able to assign it to users independently in every tenant.
 The ID of such virtual propagated role starts with the name of their tenant followed by slash, **a tilde** and the global role name (`$TENANT_ID/~$ROLE_NAME`),
 for example if the global role is called  `*/reader`, its virtual copy in tenant `acmecorp` will have the ID `acmecorp/~reader`.
 
