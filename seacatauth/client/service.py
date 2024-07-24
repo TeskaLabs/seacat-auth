@@ -9,6 +9,7 @@ import urllib.parse
 
 import asab.storage.exceptions
 import asab.exceptions
+import pymongo
 from asab.utils import convert_to_seconds
 
 from .. import exceptions
@@ -256,6 +257,18 @@ class ClientService(asab.Service):
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
 
+		# Create index for case-insensitive alphabetical sorting
+		coll = await self.StorageService.collection(self.ClientCollection)
+		await coll.create_index(
+			[
+				("client_name", pymongo.ASCENDING),
+			],
+			collation={
+				"locale": "en",
+				"strength": 1,
+			}
+		)
+
 
 	def build_filter(self, match_string):
 		return {"$or": [
@@ -264,7 +277,7 @@ class ClientService(asab.Service):
 		]}
 
 
-	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None):
+	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None, sort_by: str = "_id"):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -273,7 +286,11 @@ class ClientService(asab.Service):
 			query_filter = self.build_filter(query_filter)
 		cursor = collection.find(query_filter)
 
-		cursor.sort("_c", -1)
+		if sort_by == "client_name":
+			cursor.collation({"locale": "en"})
+			cursor.sort("client_name", 1)
+		else:
+			cursor.sort(sort_by, 1)
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
