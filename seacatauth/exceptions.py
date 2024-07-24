@@ -1,6 +1,7 @@
 import typing
 
 import asab.exceptions
+import asab.web.rest
 
 
 class SeacatAuthError(Exception):
@@ -105,6 +106,13 @@ class NotEditableError(SeacatAuthError):
 			"result": "ERROR",
 			"tech_err": "Item is not editable."
 		}
+
+	def json_response(self, request):
+		return asab.web.rest.json_response(
+			request,
+			status=405,
+			data=self.rest_payload(),
+		)
 
 
 class LoginPrologueDeniedError(SeacatAuthError):
