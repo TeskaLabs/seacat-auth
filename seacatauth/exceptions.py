@@ -100,6 +100,12 @@ class NotEditableError(SeacatAuthError):
 		self.Kwargs = kwargs
 		super().__init__(message, *args)
 
+	def rest_payload(self):
+		return {
+			"result": "ERROR",
+			"tech_err": "Item is not editable."
+		}
+
 
 class LoginPrologueDeniedError(SeacatAuthError):
 	"""
