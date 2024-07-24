@@ -174,18 +174,14 @@ class ClientHandler(object):
 
 
 	def _rest_normalize(self, client: dict):
-		cookie_service = self.ClientService.App.get_service("seacatauth.CookieService")
-
 		rest_data = {
 			k: v
 			for k, v in client.items()
 			if not k.startswith("__")
 		}
-		rest_data["client_id"] = rest_data["_id"]
 		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
 		if "__client_secret" in client:
 			rest_data["client_secret"] = True
 			if "client_secret_expires_at" in rest_data:
 				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
-		rest_data["cookie_name"] = cookie_service.get_cookie_name(rest_data["_id"])
 		return rest_data

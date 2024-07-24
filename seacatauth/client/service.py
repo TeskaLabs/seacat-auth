@@ -309,7 +309,7 @@ class ClientService(asab.Service):
 		async for client in cursor:
 			if "__client_secret" in client:
 				client.pop("__client_secret")
-			yield client
+			yield self._normalize_client(client)
 
 
 	async def count(self, query_filter: dict = None):
@@ -334,9 +334,8 @@ class ClientService(asab.Service):
 			return client
 
 		# Get from the database
-		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client = await self.StorageService.get(self.ClientCollection, client_id)
-		client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
+		client = self._normalize_client(client)
 
 		self._store_in_cache(client_id, client)
 
@@ -733,6 +732,15 @@ class ClientService(asab.Service):
 			if now < exp:
 				valid[k] = v, exp
 		self.Cache = valid
+
+
+	def _normalize_client(self, client: dict):
+		client["client_id"] = client["_id"]
+		if client.get("managed_by"):
+			client["editable"] = False
+		cookie_svc = self.App.get_service("seacatauth.CookieService")
+		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
+		return client
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
