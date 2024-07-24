@@ -140,11 +140,7 @@ class ClientHandler(object):
 		try:
 			await self.ClientService.update(client_id, **json_data)
 		except exceptions.NotEditableError as e:
-			return asab.web.rest.json_response(
-				request,
-				status=405,
-				data=e.rest_payload(),
-			)
+			return e.json_response(request)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
@@ -160,11 +156,7 @@ class ClientHandler(object):
 		try:
 			client_secret, client_secret_expires_at = await self.ClientService.reset_secret(client_id)
 		except exceptions.NotEditableError as e:
-			return asab.web.rest.json_response(
-				request,
-				status=405,
-				data=e.rest_payload(),
-			)
+			return e.json_response(request)
 		response_data = {"client_secret": client_secret}
 		if client_secret_expires_at:
 			response_data["client_secret_expires_at"] = client_secret_expires_at
@@ -183,11 +175,7 @@ class ClientHandler(object):
 		try:
 			await self.ClientService.delete(client_id)
 		except exceptions.NotEditableError as e:
-			return asab.web.rest.json_response(
-				request,
-				status=405,
-				data=e.rest_payload(),
-			)
+			return e.json_response(request)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
