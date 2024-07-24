@@ -277,7 +277,13 @@ class ClientService(asab.Service):
 		]}
 
 
-	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None, sort_by: str = "_id"):
+	async def iterate(
+		self,
+		page: int = 0,
+		limit: int = None,
+		query_filter: str = None,
+		sort_by: typing.Optional[typing.List[tuple]] = None
+	):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -286,11 +292,16 @@ class ClientService(asab.Service):
 			query_filter = self.build_filter(query_filter)
 		cursor = collection.find(query_filter)
 
-		if sort_by == "client_name":
-			cursor.collation({"locale": "en"})
-			cursor.sort("client_name", 1)
-		else:
-			cursor.sort(sort_by, 1)
+		if sort_by:
+			if len(sort_by) > 1:
+				L.warning("Multiple sorting parameters are not supported. Only the first one is taken into account.")
+			sort_by = sort_by[0]
+
+			if sort_by[0] == "client_name":
+				# Case-insensitive sorting
+				cursor.collation({"locale": "en"})
+			cursor.sort(*sort_by)
+
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
