@@ -33,7 +33,7 @@ class SearchParams:
 		self.ItemsPerPage: int | None = items_per_page_default
 		self.SimpleFilter: str | None = simple_filter_default
 		self.AdvancedFilter: dict = {}
-		self.SortBy: list = []
+		self.SortBy: typing.List[typing.Tuple[str, int]] = []
 
 		# Load actual parameter values from the query dict
 		for k, v in query.items():
