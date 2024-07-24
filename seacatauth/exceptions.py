@@ -92,6 +92,15 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
 
 
+class NotEditableError(SeacatAuthError):
+	"""
+	Target item is not editable
+	"""
+	def __init__(self, message="Item is not editable", *args, **kwargs):
+		self.Kwargs = kwargs
+		super().__init__(message, *args)
+
+
 class LoginPrologueDeniedError(SeacatAuthError):
 	"""
 	Seacat login prologue was denied
