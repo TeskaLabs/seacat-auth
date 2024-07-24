@@ -66,7 +66,7 @@ class ClientHandler(object):
 		query_filter = request.query.get("f")
 
 		data = []
-		async for client in self.ClientService.iterate(page, limit, query_filter):
+		async for client in self.ClientService.iterate(page, limit, query_filter, sort_by="client_name"):
 			data.append(self._rest_normalize(client))
 
 		count = await self.ClientService.count(query_filter)
