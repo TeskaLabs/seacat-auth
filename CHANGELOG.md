@@ -3,6 +3,12 @@
 ## v24.29
 
 ### Pre-releases
+- v24.29-alpha2
+- v24.29-alpha2
+- v24.29-alpha1
+
+### Fix
+- Handle session decryption error (#410, `v24.29-alpha2`)
 
 ### Features
 - Sort clients alphabetically by client name (#408, `v24.29-alpha2`)
