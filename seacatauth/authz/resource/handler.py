@@ -6,6 +6,7 @@ import asab
 import asab.web.rest
 import asab.exceptions
 
+from ... import exceptions
 from ...decorators import access_control
 
 #
@@ -160,10 +161,16 @@ class ResourceHandler(object):
 		"""
 		resource_id = request.match_info["resource_id"]
 		if "description" in json_data:
-			await self.ResourceService.update(resource_id, json_data["description"])
+			try:
+				await self.ResourceService.update(resource_id, json_data["description"])
+			except exceptions.NotEditableError as e:
+				return e.json_response(request)
 		if "name" in json_data and json_data["name"] != resource_id:
 			# TODO: Renaming should be on a separate endpoint
-			await self.ResourceService.rename(resource_id, json_data["name"])
+			try:
+				await self.ResourceService.rename(resource_id, json_data["name"])
+			except exceptions.NotEditableError as e:
+				return e.json_response(request)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
@@ -194,5 +201,8 @@ class ResourceHandler(object):
 			L.log(asab.LOG_NOTICE, "Cannot hard-delete resources without superuser rights", struct_data={
 				"cid": credentials_id, "resource": resource_id})
 			return aiohttp.web.HTTPForbidden()
-		await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
+		try:
+			await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(request, {"result": "OK"})
