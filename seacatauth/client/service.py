@@ -430,6 +430,7 @@ class ClientService(asab.Service):
 		"""
 		# TODO: Use M2M credentials provider.
 		client = await self.get(client_id)
+		self.assert_client_is_editable(client)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		client_secret_hash = generic.argon2_hash(client_secret)
@@ -446,6 +447,7 @@ class ClientService(asab.Service):
 
 	async def update(self, client_id: str, **kwargs):
 		client = await self.get(client_id)
+		self.assert_client_is_editable(client)
 		client_update = {}
 		for k, v in kwargs.items():
 			if k not in CLIENT_METADATA_SCHEMA:
@@ -489,6 +491,8 @@ class ClientService(asab.Service):
 
 
 	async def delete(self, client_id: str):
+		client = await self.get(client_id)
+		self.assert_client_is_editable(client)
 		await self.StorageService.delete(self.ClientCollection, client_id)
 		self._delete_from_cache(client_id)
 		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
@@ -587,6 +591,13 @@ class ClientService(asab.Service):
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
 		return client_id
+
+
+	def assert_client_is_editable(self, client: dict):
+		if not client.get("editable", True):
+			raise exceptions.NotEditableError("Client is not editable.")
+		return True
+
 
 	def _get_credentials_from_authorization_header(
 		self, request
