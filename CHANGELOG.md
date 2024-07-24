@@ -5,6 +5,7 @@
 ### Pre-releases
 
 ### Features
+- Sort clients alphabetically by client name (#408, `v24.29-alpha2`)
 - Print ASAB version during Docker build (#406, `v24.29-alpha1`)
 
 ---
