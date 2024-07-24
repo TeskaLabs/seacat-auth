@@ -25,7 +25,8 @@ class SearchParams:
 		self, query: typing.Mapping, *,
 		page_default=0,
 		items_per_page_default=10,
-		simple_filter_default=None
+		simple_filter_default=None,
+		sort_by_default=None,
 	):
 		# Set defaults
 		self.Page: int | None = page_default
@@ -64,9 +65,12 @@ class SearchParams:
 				self.AdvancedFilter[k[1:]] = v
 
 			elif k.startswith("s") and v in {"a", "d"}:
-				self.SortBy.append((k[1:], v))
+				self.SortBy.append((k[1:], 1 if v == "a" else -1))
 
 			# Ignore any other parameter
+
+		if not self.SortBy:
+			self.SortBy = sort_by_default or []
 
 	def asdict(self):
 		d = {}
