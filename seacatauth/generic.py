@@ -26,7 +26,8 @@ class SearchParams:
 		self, query: typing.Mapping, *,
 		page_default=0,
 		items_per_page_default=10,
-		simple_filter_default=None
+		simple_filter_default=None,
+		sort_by_default=None,
 	):
 		# Set defaults
 		self.Query: typing.Mapping = query
@@ -34,7 +35,7 @@ class SearchParams:
 		self.ItemsPerPage: int | None = items_per_page_default
 		self.SimpleFilter: str | None = simple_filter_default
 		self.AdvancedFilter: dict = {}
-		self.SortBy: list = []
+		self.SortBy: typing.List[typing.Tuple[str, int]] = []
 
 		# Load actual parameter values from the query dict
 		for k, v in self.Query.items():
@@ -66,9 +67,12 @@ class SearchParams:
 				self.AdvancedFilter[k[1:]] = v
 
 			elif k.startswith("s") and v in {"a", "d"}:
-				self.SortBy.append((k[1:], v))
+				self.SortBy.append((k[1:], 1 if v == "a" else -1))
 
 			# Ignore any other parameter
+
+		if not self.SortBy:
+			self.SortBy = sort_by_default or []
 
 	def asdict(self):
 		d = {}
