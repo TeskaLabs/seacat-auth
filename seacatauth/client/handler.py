@@ -4,7 +4,8 @@ import asab
 import asab.web.rest
 import asab.exceptions
 
-from seacatauth.decorators import access_control
+from ..decorators import access_control
+from .. import generic
 from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
 
 #
@@ -57,19 +58,15 @@ class ClientHandler(object):
 			schema:
 				type: string
 		"""
-		page = int(request.query.get("p", 1)) - 1
-		limit = request.query.get("i", None)
-		if limit is not None:
-			limit = int(limit)
-
-		# Filter by ID.startswith()
-		query_filter = request.query.get("f")
+		search = generic.SearchParams(request.query, sort_by_default=[("client_name", 1)])
 
 		data = []
-		async for client in self.ClientService.iterate(page, limit, query_filter):
+		async for client in self.ClientService.iterate(
+			search.Page, search.ItemsPerPage, search.SimpleFilter, sort_by=search.SortBy
+		):
 			data.append(self._rest_normalize(client))
 
-		count = await self.ClientService.count(query_filter)
+		count = await self.ClientService.count(search.SimpleFilter)
 
 		return asab.web.rest.json_response(request, {
 			"data": data,
