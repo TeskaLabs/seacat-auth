@@ -166,14 +166,14 @@ class RoleService(asab.Service):
 
 			async for role in view.iterate(
 				offset=offset,
-				limit=limit - len(roles),
+				limit=(limit - len(roles)) if limit else None,
 				sort=("_id", 1),
 				name_filter=name_filter,
 				resource_filter=resource_filter,
 			):
 				roles.append(role)
 
-			if len(roles) >= limit:
+			if limit and len(roles) >= limit:
 				break
 
 			offset = 0
@@ -361,7 +361,6 @@ class RoleService(asab.Service):
 		resources_to_assign = set().union(
 			resources_to_set or [],
 			resources_to_add or [],
-			resources_to_remove or []
 		)
 		await self._validate_role_resources(role_id, role_current.get("propagated"), resources_to_assign)
 
