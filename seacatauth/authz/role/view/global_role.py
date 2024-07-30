@@ -5,6 +5,10 @@ from .abc import RoleView
 
 
 class GlobalRoleView(RoleView):
+	"""
+	View over global roles. Includes global roles with propagation.
+	"""
+
 	def __init__(self, storage_service, collection_name):
 		super().__init__(storage_service, collection_name)
 
