@@ -121,13 +121,15 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "System role updated.", struct_data={"role_id": role_id})
 
 
-	def _prepare_views(self, tenant_id: str | None):
+	def _prepare_views(self, tenant_id: str | None, exclude_global: bool = False, exclude_propagated: bool = False):
 		assert tenant_id != "*"
 		views = []
 		if tenant_id:
 			views.append(CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
-			views.append(PropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id))
-		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
+			if not exclude_propagated:
+				views.append(PropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id))
+		if not exclude_global:
+			views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
 		return views
 
 
@@ -146,13 +148,15 @@ class RoleService(asab.Service):
 		limit: int = None,
 		name_filter: str = None,
 		resource_filter: str = None,
+		exclude_global: bool = False,
+		exclude_propagated: bool = False,
 	):
 		if tenant_id in {"*", None}:
 			tenant_id = None
 		else:
 			self.validate_tenant_access(tenant_id)
 
-		views = self._prepare_views(tenant_id)
+		views = self._prepare_views(tenant_id, exclude_global, exclude_propagated)
 		counts = [
 			await view.count(name_filter, resource_filter)
 			for view in views
