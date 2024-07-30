@@ -9,7 +9,7 @@ import asab.exceptions
 from ...generic import SessionContext
 from ... import exceptions
 from ...events import EventTypes
-from .view import GlobalRoleView, GlobalPropagatedRoleView, CustomTenantRoleView
+from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 
 #
 
@@ -126,7 +126,7 @@ class RoleService(asab.Service):
 		views = []
 		if tenant_id:
 			views.append(CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id))
-			views.append(GlobalPropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id))
+			views.append(PropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id))
 		views.append(GlobalRoleView(self.StorageService, self.RoleCollection))
 		return views
 
@@ -191,7 +191,7 @@ class RoleService(asab.Service):
 			if not tenant_id:
 				return await GlobalRoleView(self.StorageService, self.RoleCollection).get(role_id)
 			elif role_name.startswith("~"):
-				return await GlobalPropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
+				return await PropagatedRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 			else:
 				return await CustomTenantRoleView(self.StorageService, self.RoleCollection, tenant_id).get(role_id)
 		except KeyError:

@@ -4,10 +4,11 @@ import typing
 from .abc import RoleView
 
 
-class GlobalPropagatedRoleView(RoleView):
+class PropagatedRoleView(RoleView):
 	"""
-	View for global roles that are propagated into tenants as tenant roles.
+	View over tenant roles projected from global roles that have propagation enabled.
 	"""
+
 	def __init__(self, storage_service, collection_name, tenant_id):
 		super().__init__(storage_service, collection_name)
 		self.TenantId = tenant_id

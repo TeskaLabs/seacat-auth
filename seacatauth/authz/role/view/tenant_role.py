@@ -5,6 +5,10 @@ from .abc import RoleView
 
 
 class CustomTenantRoleView(RoleView):
+	"""
+	View over proper (non-propagated) tenant roles.
+	"""
+
 	def __init__(self, storage_service, collection_name, tenant_id):
 		super().__init__(storage_service, collection_name)
 		self.TenantId = tenant_id
