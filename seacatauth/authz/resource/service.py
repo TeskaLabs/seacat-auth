@@ -241,7 +241,7 @@ class ResourceService(asab.Service):
 
 		# Remove the resource from all roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
-		roles = await role_svc.list(resource=resource_id)
+		roles = await role_svc.list(resource_filter=resource_id)
 		if roles["count"] > 0:
 			for role in roles["data"]:
 				await role_svc.update(role["_id"], resources_to_remove=[resource_id])
@@ -296,7 +296,7 @@ class ResourceService(asab.Service):
 			raise asab.exceptions.ValidationError("Built-in resource cannot be renamed")
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
-		roles = await role_svc.list(resource=resource_id)
+		roles = await role_svc.list(resource_filter=resource_id)
 
 		# Delete existing resource
 		await self.StorageService.delete(self.ResourceCollection, resource_id)

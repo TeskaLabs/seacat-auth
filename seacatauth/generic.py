@@ -1,3 +1,4 @@
+import contextvars
 import random
 import logging
 import re
@@ -5,14 +6,14 @@ import typing
 import urllib.parse
 import aiohttp.web
 import asab
+import asab.utils
 import bcrypt
 import argon2
-
-from .session import SessionAdapter
 
 #
 
 L = logging.getLogger(__name__)
+SessionContext = contextvars.ContextVar("request_session", default=None)
 
 #
 
@@ -29,6 +30,7 @@ class SearchParams:
 		sort_by_default=None,
 	):
 		# Set defaults
+		self.Query: typing.Mapping = query
 		self.Page: int | None = page_default
 		self.ItemsPerPage: int | None = items_per_page_default
 		self.SimpleFilter: str | None = simple_filter_default
@@ -36,7 +38,7 @@ class SearchParams:
 		self.SortBy: typing.List[typing.Tuple[str, int]] = []
 
 		# Load actual parameter values from the query dict
-		for k, v in query.items():
+		for k, v in self.Query.items():
 			if k == "p":
 				try:
 					v = int(v)
@@ -91,6 +93,29 @@ class SearchParams:
 			"{}={}".format(k, repr(v))
 			for k, v in self.asdict().items()
 		))
+
+	def get(self, key: str, default=None):
+		return self.Query.get(key, default)
+
+	def getint(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return int(self.Query[key])
+
+	def getfloat(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return float(self.Query[key])
+
+	def getboolean(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return asab.utils.string_to_boolean(self.Query[key])
+
+	def getseconds(self, key: str, default=None):
+		if key not in self.Query:
+			return default
+		return asab.utils.convert_to_seconds(self.Query[key])
 
 
 def get_bearer_token_value(request):
@@ -165,7 +190,7 @@ async def add_to_header(headers, attributes_to_add, session, requested_tenant=No
 
 async def nginx_introspection(
 	request: aiohttp.web.Request,
-	session: SessionAdapter,
+	session,
 	app: asab.Application
 ):
 	"""
