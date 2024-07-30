@@ -1,13 +1,36 @@
 import typing
 
 import asab.exceptions
+import asab.web.rest
 
 
 class SeacatAuthError(Exception):
 	"""
 	Generic Seacat Auth error
 	"""
-	pass
+	I18nKeyPrefix = "SeacatAuthError|"
+	I18nMessage = "Generic error."
+	ErrorDict = {}
+	HttpResponseCode = 500
+
+	def __init__(self, message=None, *args, **kwargs):
+		self.TechMessage = message
+		super().__init__(message, *args)
+
+	def json_response(self, request, status=None):
+		return asab.web.rest.json_response(
+			request,
+			status=status or self.HttpResponseCode,
+			data=self.rest_payload()
+		)
+
+	def rest_payload(self):
+		return {
+			"result": "ERROR",
+			"error": self.I18nKeyPrefix + self.I18nMessage,
+			"error_dict": self.ErrorDict,
+			"tech_err": self.TechMessage,
+		}
 
 
 class TenantNotSpecifiedError(SeacatAuthError):
@@ -78,9 +101,14 @@ class ResourceNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Resource not found
 	"""
+	I18nMessage = "Resource '{{resource_id}}' not found."
+	TechMessage = "Resource not found."
+	HttpResponseCode = 404
+
 	def __init__(self, resource_id, *args):
 		self.ResourceId = resource_id
-		super().__init__("Resource {!r} not found".format(self.ResourceId), *args)
+		super().__init__(self.TechMessage, *args)
+		self.ErrorDict = {"resource_id": self.ResourceId}
 
 
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
