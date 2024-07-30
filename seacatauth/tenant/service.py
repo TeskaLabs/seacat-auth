@@ -116,7 +116,7 @@ class TenantService(asab.Service):
 
 		# Unassign and delete tenant roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
-		tenant_roles = (await role_svc.list(tenant=tenant_id, exclude_global=True))["data"]
+		tenant_roles = (await role_svc.list(tenant_id=tenant_id, exclude_global=True))["data"]
 		for role in tenant_roles:
 			role_id = role["_id"]
 			try:
