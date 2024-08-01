@@ -100,21 +100,20 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
-	async def is_editable_resource(self, resource: dict | str):
-		if isinstance(resource, str):
-			resource_id = resource
-			if resource_id in self._BuiltinResources:
-				return False
-			resource = await self.get(resource_id)
-		else:
-			resource_id = resource["_id"]
-			if resource_id in self._BuiltinResources:
-				return False
+	def is_resource_editable(self, resource: dict):
+		resource_id = resource["_id"]
+		if resource_id in self._BuiltinResources:
+			return False
 
 		if resource.get("managed_by"):
 			return False
 		else:
 			return True
+
+
+	def assert_resource_is_editable(self, resource: dict):
+		if not self.is_resource_editable(resource):
+			raise exceptions.NotEditableError("Resource is not editable.")
 
 
 	def is_global_only_resource(self, resource_id):
@@ -158,11 +157,7 @@ class ResourceService(asab.Service):
 		resources = []
 		count = await collection.count_documents(query_filter)
 		async for resource_dict in cursor:
-			if not await self.is_editable_resource(resource_dict):
-				resource_dict["editable"] = False
-			if self.is_global_only_resource(resource_dict["_id"]):
-				resource_dict["global_only"] = True
-			resources.append(resource_dict)
+			resources.append(self.normalize_resource(resource_dict))
 
 		return {
 			"data": resources,
@@ -172,14 +167,10 @@ class ResourceService(asab.Service):
 
 	async def get(self, resource_id: str):
 		try:
-			data = await self.StorageService.get(self.ResourceCollection, resource_id)
+			resource = await self.StorageService.get(self.ResourceCollection, resource_id)
 		except KeyError:
 			raise exceptions.ResourceNotFoundError(resource_id)
-		if not await self.is_editable_resource(data):
-			data["editable"] = False
-		if self.is_global_only_resource(data["_id"]):
-			data["global_only"] = True
-		return data
+		return self.normalize_resource(resource)
 
 
 	async def create(self, resource_id: str, description: str = None, is_managed_by_seacat_auth=False):
@@ -210,8 +201,7 @@ class ResourceService(asab.Service):
 
 	async def update(self, resource_id: str, description: str):
 		resource = await self.get(resource_id)
-		if not await self.is_editable_resource(resource):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
+		self.assert_resource_is_editable(resource)
 		await self._update(resource, description)
 
 
@@ -236,8 +226,7 @@ class ResourceService(asab.Service):
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
 		resource = await self.get(resource_id)
-		if not await self.is_editable_resource(resource):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
+		self.assert_resource_is_editable(resource)
 
 		# Remove the resource from all roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
@@ -292,8 +281,7 @@ class ResourceService(asab.Service):
 		"""
 		# Get existing resource details and roles
 		resource = await self.get(resource_id)
-		if not await self.is_editable_resource(resource):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be renamed")
+		self.assert_resource_is_editable(resource)
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
 		roles = await role_svc.list(resource_filter=resource_id)
@@ -315,3 +303,11 @@ class ResourceService(asab.Service):
 			"new_resource": resource_id,
 			"n_roles": roles["count"],
 		})
+
+
+	def normalize_resource(self, resource: dict):
+		if not self.is_resource_editable(resource):
+			resource["editable"] = False
+		if self.is_global_only_resource(resource["_id"]):
+			resource["global_only"] = True
+		return resource
