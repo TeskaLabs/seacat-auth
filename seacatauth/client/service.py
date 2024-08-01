@@ -594,7 +594,7 @@ class ClientService(asab.Service):
 
 
 	def assert_client_is_editable(self, client: dict):
-		if not client.get("editable", True):
+		if client.get("read_only"):
 			raise exceptions.NotEditableError("Client is not editable.")
 		return True
 
@@ -748,7 +748,7 @@ class ClientService(asab.Service):
 	def _normalize_client(self, client: dict):
 		client["client_id"] = client["_id"]
 		if client.get("managed_by"):
-			client["editable"] = False
+			client["read_only"] = True
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
 		return client
