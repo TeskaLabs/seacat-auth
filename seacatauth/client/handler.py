@@ -5,7 +5,7 @@ import asab.web.rest
 import asab.exceptions
 
 from ..decorators import access_control
-from .. import generic
+from .. import generic, exceptions
 from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
 
 #
@@ -137,7 +137,10 @@ class ClientHandler(object):
 		client_id = request.match_info["client_id"]
 		if "preferred_client_id" in json_data:
 			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
-		await self.ClientService.update(client_id, **json_data)
+		try:
+			await self.ClientService.update(client_id, **json_data)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
@@ -150,7 +153,10 @@ class ClientHandler(object):
 		Reset client secret
 		"""
 		client_id = request.match_info["client_id"]
-		client_secret, client_secret_expires_at = await self.ClientService.reset_secret(client_id)
+		try:
+			client_secret, client_secret_expires_at = await self.ClientService.reset_secret(client_id)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		response_data = {"client_secret": client_secret}
 		if client_secret_expires_at:
 			response_data["client_secret_expires_at"] = client_secret_expires_at
@@ -166,7 +172,10 @@ class ClientHandler(object):
 		Delete a client
 		"""
 		client_id = request.match_info["client_id"]
-		await self.ClientService.delete(client_id)
+		try:
+			await self.ClientService.delete(client_id)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
@@ -174,18 +183,14 @@ class ClientHandler(object):
 
 
 	def _rest_normalize(self, client: dict):
-		cookie_service = self.ClientService.App.get_service("seacatauth.CookieService")
-
 		rest_data = {
 			k: v
 			for k, v in client.items()
 			if not k.startswith("__")
 		}
-		rest_data["client_id"] = rest_data["_id"]
 		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
 		if "__client_secret" in client:
 			rest_data["client_secret"] = True
 			if "client_secret_expires_at" in rest_data:
 				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
-		rest_data["cookie_name"] = cookie_service.get_cookie_name(rest_data["_id"])
 		return rest_data

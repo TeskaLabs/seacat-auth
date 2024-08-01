@@ -1,6 +1,7 @@
 import typing
 
 import asab.exceptions
+import asab.web.rest
 
 
 class SeacatAuthError(Exception):
@@ -74,15 +75,6 @@ class RoleNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Role {!r} not found".format(self.Role), *args)
 
 
-class NotEditableError(SeacatAuthError):
-	"""
-	Target item is not editable
-	"""
-	def __init__(self, message="Item is not editable", *args, **kwargs):
-		self.Kwargs = kwargs
-		super().__init__(message, *args)
-
-
 class ResourceNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Resource not found
@@ -99,6 +91,28 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
+
+
+class NotEditableError(SeacatAuthError):
+	"""
+	Target item is not editable
+	"""
+	def __init__(self, message="Item is not editable", *args, **kwargs):
+		self.Kwargs = kwargs
+		super().__init__(message, *args)
+
+	def rest_payload(self):
+		return {
+			"result": "ERROR",
+			"tech_err": "Item is not editable."
+		}
+
+	def json_response(self, request):
+		return asab.web.rest.json_response(
+			request,
+			status=405,
+			data=self.rest_payload(),
+		)
 
 
 class LoginPrologueDeniedError(SeacatAuthError):
