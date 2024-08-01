@@ -3,8 +3,15 @@
 ## v24.29
 
 ### Pre-releases
+- v24.29-alpha3
+- v24.29-alpha2
+- v24.29-alpha1
+
+### Fix
+- Handle session decryption error (#410, `v24.29-alpha2`)
 
 ### Features
+- Global roles propagated to tenants (#395, `v24.29-alpha3`)
 - Sort clients alphabetically by client name (#408, `v24.29-alpha2`)
 - Print ASAB version during Docker build (#406, `v24.29-alpha1`)
 
