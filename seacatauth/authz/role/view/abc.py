@@ -49,5 +49,5 @@ class RoleView(abc.ABC):
 
 	def _normalize_role(self, role: dict):
 		if role.get("managed_by"):
-			role["editable"] = False
+			role["read_only"] = True
 		return role
