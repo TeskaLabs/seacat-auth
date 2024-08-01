@@ -174,9 +174,8 @@ class RoleHandler(object):
 		except exceptions.RoleNotFoundError:
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR", "tech_err": "Role not found."})
-		except exceptions.NotEditableError:
-			return asab.web.rest.json_response(request, status=405, data={
-				"result": "ERROR", "tech_err": "Role is not editable."})
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(request, result)
 
 
@@ -233,7 +232,6 @@ class RoleHandler(object):
 		except exceptions.RoleNotFoundError:
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR", "tech_err": "Role not found."})
-		except exceptions.NotEditableError:
-			return asab.web.rest.json_response(request, status=405, data={
-				"result": "ERROR", "tech_err": "Role is not editable."})
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(request, data={"result": result})
