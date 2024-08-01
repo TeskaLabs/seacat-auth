@@ -312,7 +312,7 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
 			raise e
 
-		self.assert_role_is_editable(role_current)
+		assert_role_is_editable(role_current)
 
 		# Unassign the role from all credentials
 		await self.delete_role_assignments(role_current)
@@ -342,7 +342,7 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
 			raise e
 
-		self.assert_role_is_editable(role_current)
+		assert_role_is_editable(role_current)
 
 		# Verify that role tenant exists
 		tenant_id = self._role_tenant_id(role_id)
@@ -626,7 +626,8 @@ class RoleService(asab.Service):
 		return await self.StorageService.get(self.CredentialsRolesCollection, assignment_id)
 
 
-	def assert_role_is_editable(self, role: dict):
-		if role.get("read_only"):
-			L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role["_id"]})
-			raise exceptions.NotEditableError("Role is not editable.")
+def assert_role_is_editable(role: dict):
+	if role.get("read_only"):
+		L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role["_id"]})
+		raise exceptions.NotEditableError("Role is not editable.")
+	return True
