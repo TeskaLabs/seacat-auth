@@ -272,10 +272,16 @@ class SessionService(asab.Service):
 		if key in SessionAdapter.EncryptedIdentifierFields:
 			value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
 
-		session_dict = await self.StorageService.get_by(
-			self.SessionCollection, key, value, decrypt=SessionAdapter.EncryptedAttributes)
+		try:
+			session_dict = await self.StorageService.get_by(
+				self.SessionCollection, key, value, decrypt=SessionAdapter.EncryptedAttributes)
+		except ValueError as e:
+			# Likely a problem with obsolete decryption
+			L.warning("ValueError when retrieving session: {}".format(e), struct_data={"key": key})
+			raise exceptions.SessionNotFoundError("Session not found.", query={key: value})
+
 		if session_dict is None:
-			raise exceptions.SessionNotFoundError("Session not found in database.", query={key: value})
+			raise exceptions.SessionNotFoundError("Session not found.", query={key: value})
 
 		# Do not return expired sessions
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
@@ -299,7 +305,11 @@ class SessionService(asab.Service):
 			session_dict = await self.StorageService.get(
 				self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
 		except KeyError:
-			raise exceptions.SessionNotFoundError("Session not found", session_id=session_id)
+			raise exceptions.SessionNotFoundError("Session not found.", session_id=session_id)
+		except ValueError as e:
+			# Likely a problem with obsolete decryption
+			L.warning("ValueError when retrieving session: {}".format(e), struct_data={"sid": session_id})
+			raise exceptions.SessionNotFoundError("Session not found.", session_id=session_id)
 
 		# Do not return expired sessions
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
