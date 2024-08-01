@@ -100,19 +100,8 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
-	def is_resource_editable(self, resource: dict):
-		resource_id = resource["_id"]
-		if resource_id in self._BuiltinResources:
-			return False
-
-		if resource.get("managed_by"):
-			return False
-		else:
-			return True
-
-
 	def assert_resource_is_editable(self, resource: dict):
-		if not self.is_resource_editable(resource):
+		if resource.get("read_only"):
 			raise exceptions.NotEditableError("Resource is not editable.")
 
 
@@ -306,8 +295,8 @@ class ResourceService(asab.Service):
 
 
 	def normalize_resource(self, resource: dict):
-		if not self.is_resource_editable(resource):
-			resource["editable"] = False
+		if resource["_id"] in self._BuiltinResources or resource.get("managed_by"):
+			resource["read_only"] = True
 		if self.is_global_only_resource(resource["_id"]):
 			resource["global_only"] = True
 		return resource
