@@ -75,15 +75,6 @@ class RoleNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Role {!r} not found".format(self.Role), *args)
 
 
-class NotEditableError(SeacatAuthError):
-	"""
-	Target item is not editable
-	"""
-	def __init__(self, message="Item is not editable", *args, **kwargs):
-		self.Kwargs = kwargs
-		super().__init__(message, *args)
-
-
 class ResourceNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Resource not found
