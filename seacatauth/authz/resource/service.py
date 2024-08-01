@@ -100,11 +100,6 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
-	def assert_resource_is_editable(self, resource: dict):
-		if resource.get("read_only"):
-			raise exceptions.NotEditableError("Resource is not editable.")
-
-
 	def is_global_only_resource(self, resource_id):
 		return resource_id in self.GlobalOnlyResources
 
@@ -190,7 +185,7 @@ class ResourceService(asab.Service):
 
 	async def update(self, resource_id: str, description: str):
 		resource = await self.get(resource_id)
-		self.assert_resource_is_editable(resource)
+		assert_resource_is_editable(resource)
 		await self._update(resource, description)
 
 
@@ -215,7 +210,7 @@ class ResourceService(asab.Service):
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
 		resource = await self.get(resource_id)
-		self.assert_resource_is_editable(resource)
+		assert_resource_is_editable(resource)
 
 		# Remove the resource from all roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
@@ -270,7 +265,7 @@ class ResourceService(asab.Service):
 		"""
 		# Get existing resource details and roles
 		resource = await self.get(resource_id)
-		self.assert_resource_is_editable(resource)
+		assert_resource_is_editable(resource)
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
 		roles = await role_svc.list(resource_filter=resource_id)
@@ -300,3 +295,10 @@ class ResourceService(asab.Service):
 		if self.is_global_only_resource(resource["_id"]):
 			resource["global_only"] = True
 		return resource
+
+
+def assert_resource_is_editable(resource: dict):
+	if resource.get("read_only"):
+		L.log(asab.LOG_NOTICE, "Resource is not editable.", struct_data={"resource_id": resource["_id"]})
+		raise exceptions.NotEditableError("Resource is not editable.")
+	return True
