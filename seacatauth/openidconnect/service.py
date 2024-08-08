@@ -579,6 +579,9 @@ class OpenIdConnectService(asab.Service):
 			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
 
+		# Effective session expiration must match Access Token expiration
+		session.Session.Expiration = token_data["exp"]
+
 		return session
 
 

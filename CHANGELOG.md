@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v24.32
+
+### Pre-releases
+- v24.32-alpha1
+
+### Fix
+- Session expiration in userinfo must match access token expiration (#412, `v24.32-alpha1`)
+
+---
+
+
 ## v24.29
 
 ### Pre-releases
