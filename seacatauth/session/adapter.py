@@ -21,7 +21,8 @@ class SessionData:
 	Version: int
 	ParentSessionId: typing.Optional[str]
 	Type: typing.Optional[str]
-	Expiration: datetime.datetime
+	Expiration: datetime.datetime  # Expired session can be extended and re-activated
+	DeleteAfter: datetime.datetime  # When the expired session is deleted
 	MaxExpiration: datetime.datetime
 	ExpirationExtension: int
 	TrackId: typing.Optional[bytes]
@@ -103,6 +104,7 @@ class SessionAdapter:
 			TrackId = "s_tid"
 			ParentSessionId = "s_pid"
 			Expiration = "s_exp"
+			DeleteAfter = "s_del"
 			MaxExpiration = "s_expm"
 			ExpirationExtension = "s_expe"
 
@@ -216,6 +218,7 @@ class SessionAdapter:
 			self.FN.Session.Type: self.Session.Type,
 			self.FN.Session.ParentSessionId: self.Session.ParentSessionId,
 			self.FN.Session.Expiration: self.Session.Expiration,
+			self.FN.Session.DeleteAfter: self.Session.DeleteAfter,
 			self.FN.Session.MaxExpiration: self.Session.MaxExpiration,
 			self.FN.Session.ExpirationExtension: self.Session.ExpirationExtension,
 			self.FN.Session.TrackId: self.Session.TrackId,
@@ -360,6 +363,7 @@ class SessionAdapter:
 			Type=session_dict.pop(cls.FN.Session.Type, None),
 			ParentSessionId=session_dict.pop(cls.FN.Session.ParentSessionId, None),
 			Expiration=session_dict.pop(cls.FN.Session.Expiration, None),
+			DeleteAfter=session_dict.pop(cls.FN.Session.DeleteAfter, None),
 			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
 			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),
 			TrackId=session_dict.pop(cls.FN.Session.TrackId, None),
