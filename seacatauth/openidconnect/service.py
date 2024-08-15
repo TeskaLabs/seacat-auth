@@ -107,8 +107,8 @@ class OpenIdConnectService(asab.Service):
 		self,
 		session: SessionAdapter,
 		requested_scope: typing.Optional[typing.Iterable] = None,
-		access_token_valid_until: typing.Optional[datetime.datetime] = None,
-		refresh_token_valid_until: typing.Optional[datetime.datetime] = None,
+		valid_until: typing.Optional[datetime.datetime] = None,
+		delete_after: typing.Optional[datetime.datetime] = None,
 	):
 		"""
 		Update/rebuild the session according to its authorization parameters
@@ -158,10 +158,10 @@ class OpenIdConnectService(asab.Service):
 			redirect_uri=session.OAuth2.RedirectUri,
 		)
 
-		if access_token_valid_until:
-			session_builders.append(((SessionAdapter.FN.Session.Expiration, access_token_valid_until),))
-		if refresh_token_valid_until:
-			session_builders.append(((SessionAdapter.FN.Session.DeleteAfter, refresh_token_valid_until),))
+		if valid_until:
+			session_builders.append(((SessionAdapter.FN.Session.Expiration, valid_until),))
+		if delete_after:
+			session_builders.append(((SessionAdapter.FN.Session.DeleteAfter, delete_after),))
 
 		session = await self.SessionService.update_session(session.SessionId, session_builders)
 

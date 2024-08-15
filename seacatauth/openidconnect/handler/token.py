@@ -185,8 +185,8 @@ class TokenHandler(object):
 			session = await self.OpenIdConnectService.refresh_session(
 				session,
 				requested_scope=scope,
-				access_token_valid_until=access_token_valid_until,
-				refresh_token_valid_until=refresh_token_valid_until,
+				valid_until=access_token_valid_until,
+				delete_after=refresh_token_valid_until,
 			)
 
 		# Response
@@ -262,8 +262,8 @@ class TokenHandler(object):
 		session = await self.OpenIdConnectService.refresh_session(
 			session,
 			requested_scope=scope,
-			access_token_valid_until=access_token_valid_until,
-			refresh_token_valid_until=refresh_token_valid_until,
+			valid_until=access_token_valid_until,
+			delete_after=refresh_token_valid_until,
 		)
 
 		# Response
