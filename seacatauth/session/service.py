@@ -135,11 +135,11 @@ class SessionService(asab.Service):
 		try:
 			await collection.create_index(
 				[
-					(SessionAdapter.FN.Session.Expiration, pymongo.DESCENDING)
+					(SessionAdapter.FN.Session.DeleteAfter, pymongo.DESCENDING)
 				]
 			)
 		except Exception as e:
-			L.error("Failed to create index (expiration descending): {}".format(e))
+			L.error("Failed to create index (DeleteAfter descending): {}".format(e))
 
 		# Parent session
 		# For searching session groups
@@ -168,7 +168,10 @@ class SessionService(asab.Service):
 		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
-			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+			query_filter={"$or": [
+				{SessionAdapter.FN.Session.DeleteAfter: None},
+				{SessionAdapter.FN.Session.DeleteAfter: {"$lt": datetime.datetime.now(datetime.timezone.utc)}},
+			]}
 		):
 			expired.append(session["_id"])
 

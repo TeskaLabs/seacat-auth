@@ -107,14 +107,11 @@ class OpenIdConnectService(asab.Service):
 		self,
 		session: SessionAdapter,
 		requested_scope: typing.Optional[typing.Iterable] = None,
-		expires_in: float | None = None,
+		access_token_valid_until: typing.Optional[datetime.datetime] = None,
+		refresh_token_valid_until: typing.Optional[datetime.datetime] = None,
 	):
 		"""
 		Update/rebuild the session according to its authorization parameters
-
-		@param session:
-		@param track_id:
-		@return:
 		"""
 		# Get parent session
 		root_session = await self.SessionService.get(session.Session.ParentSessionId)
@@ -161,9 +158,10 @@ class OpenIdConnectService(asab.Service):
 			redirect_uri=session.OAuth2.RedirectUri,
 		)
 
-		if expires_in:
-			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)
-			session_builders.append(((SessionAdapter.FN.Session.Expiration, expiration),))
+		if access_token_valid_until:
+			session_builders.append(((SessionAdapter.FN.Session.Expiration, access_token_valid_until),))
+		if refresh_token_valid_until:
+			session_builders.append(((SessionAdapter.FN.Session.DeleteAfter, refresh_token_valid_until),))
 
 		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
@@ -462,7 +460,7 @@ class OpenIdConnectService(asab.Service):
 		@return: Base64-encoded token value
 		"""
 		if session.is_algorithmic():
-			raw_value = await self.TokenService.create(
+			raw_value, _ = await self.TokenService.create(
 				token_length=AuthorizationCode.ByteLength,
 				token_type=AuthorizationCode.TokenType,
 				session_id=self.SessionService.Algorithmic.serialize(session),
@@ -472,7 +470,7 @@ class OpenIdConnectService(asab.Service):
 				ccm=code_challenge_method,
 			)
 		else:
-			raw_value = await self.TokenService.create(
+			raw_value, _ = await self.TokenService.create(
 				token_length=AuthorizationCode.ByteLength,
 				token_type=AuthorizationCode.TokenType,
 				session_id=session.SessionId,
@@ -492,15 +490,14 @@ class OpenIdConnectService(asab.Service):
 		@return: Base64-encoded token and its expiration
 		"""
 		client = await self.ClientService.get(session.OAuth2.ClientId)
-		expires_in = client.get("session_expiration") or AccessToken.Expiration
-		raw_value = await self.TokenService.create(
+		raw_value, valid_until = await self.TokenService.create(
 			token_length=AccessToken.ByteLength,
 			token_type=AccessToken.TokenType,
 			session_id=session.SessionId,
-			expiration=expires_in,
+			expiration=client.get("session_expiration") or AccessToken.Expiration,
 			is_session_algorithmic=session.is_algorithmic(),
 		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), valid_until
 
 
 	async def create_refresh_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
@@ -511,14 +508,13 @@ class OpenIdConnectService(asab.Service):
 		@return: Base64-encoded token value
 		"""
 		assert not session.is_algorithmic()
-		expires_in = RefreshToken.Expiration
-		raw_value = await self.TokenService.create(
+		raw_value, valid_until = await self.TokenService.create(
 			token_length=RefreshToken.ByteLength,
 			token_type=RefreshToken.TokenType,
 			session_id=session.SessionId,
 			expiration=RefreshToken.Expiration,
 		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), valid_until
 
 
 	async def get_session_by_authorization_code(self, code, code_verifier: str | None = None):
@@ -578,9 +574,6 @@ class OpenIdConnectService(asab.Service):
 				"sid": token_data["sid"]})
 			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
-
-		# Effective session expiration must match Access Token expiration
-		session.Session.Expiration = token_data["exp"]
 
 		return session
 
