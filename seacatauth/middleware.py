@@ -1,10 +1,10 @@
 import aiohttp.web
 import asab
 import logging
-from .generic import SessionContext
 
+from . import generic
 from . import exceptions
-from .generic import get_bearer_token_value
+from .contextvars import AccessIps
 
 #
 
@@ -21,7 +21,13 @@ def app_middleware_factory(app):
 		Add the application object to the request.
 		"""
 		request.App = app
-		return await handler(request)
+
+		# Set request sender IP addresses for logging purposes
+		access_ips_ctx = AccessIps.set(generic.get_request_access_ips(request))
+		try:
+			return await handler(request)
+		finally:
+			AccessIps.reset(access_ips_ctx)
 
 	return app_middleware
 
@@ -56,7 +62,7 @@ def private_auth_middleware_factory(app):
 			# Well-known endpoints use no authentication
 			return await handler(request)
 
-		token_value = get_bearer_token_value(request)
+		token_value = generic.get_bearer_token_value(request)
 		if token_value is not None:
 			try:
 				request.Session = await oidc_service.get_session_by_id_token(token_value)
@@ -81,7 +87,7 @@ def private_auth_middleware_factory(app):
 		request.can_access_all_tenants = rbac_svc.can_access_all_tenants(request.Session.Authorization.Authz) \
 			if request.Session is not None else False
 
-		SessionContext.set(request.Session)
+		generic.SessionContext.set(request.Session)
 
 		if require_authentication is False:
 			return await handler(request)
@@ -120,7 +126,7 @@ def public_auth_middleware_factory(app):
 		request.Session = None
 
 		# If Bearer token exists, authorize using Bearer token and ignore cookie
-		token_value = get_bearer_token_value(request)
+		token_value = generic.get_bearer_token_value(request)
 		if token_value is not None:
 			try:
 				request.Session = await oidc_service.get_session_by_id_token(token_value)
@@ -152,7 +158,7 @@ def public_auth_middleware_factory(app):
 				L.log(asab.LOG_NOTICE, "Cannot locate session by root cookie: Session missing or expired")
 				request.Session = None
 
-		SessionContext.set(request.Session)
+		generic.SessionContext.set(request.Session)
 		return await handler(request)
 
 	return public_auth_middleware
