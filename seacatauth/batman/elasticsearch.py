@@ -66,6 +66,10 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.RoleService = self.App.get_service("seacatauth.RoleService")
 		self.ResourceService = self.App.get_service("seacatauth.ResourceService")
 
+		if not self.Config.get("url"):
+			L.warning("No ElasticSearch URL provided. Batman module will not be active.")
+			return
+
 		self.Kibana = KibanaUtils(self.App, config_section_name, config)
 
 		elasticsearch_url = self.Config.get("url")
