@@ -3,6 +3,7 @@
 ## v24.29
 
 ### Pre-releases
+- v24.29-alpha6
 - v24.29-alpha5
 - v24.29-alpha4
 - v24.29-alpha3
@@ -14,6 +15,7 @@
 - Handle session decryption error (#410, `v24.29-alpha2`)
 
 ### Features
+- Run Batman with warning when there is no ElasticSearch URL (#413, `v24.29-alpha6`)
 - Disable editing of managed resources and clients (#409, `v24.29-alpha4`)
 - Global roles propagated to tenants (#395, `v24.29-alpha3`)
 - Sort clients alphabetically by client name (#408, `v24.29-alpha2`)
