@@ -579,6 +579,11 @@ class OpenIdConnectService(asab.Service):
 			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
 
+		# Session expiry date must be the same as the expiration of its ACCESS token,
+		# and it should be deleted after its REFRESH token expires.
+		# TODO: This is a hotfix. Replace with a systemic solution.
+		session.Session.Expiration = token_data["exp"]
+
 		return session
 
 
