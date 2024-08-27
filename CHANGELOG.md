@@ -3,6 +3,8 @@
 ## v24.29
 
 ### Pre-releases
+- v24.29-beta2
+- v24.29-beta
 - v24.29-alpha5
 - v24.29-alpha4
 - v24.29-alpha3
@@ -10,6 +12,7 @@
 - v24.29-alpha1
 
 ### Fix
+- Upgrade ASAB to fix storage padding error (`v24.29-beta2`)
 - Non-editable items are marked with read_only flag (#411, `v24.29-alpha5`)
 - Handle session decryption error (#410, `v24.29-alpha2`)
 
