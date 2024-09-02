@@ -184,7 +184,7 @@ class TenantService(asab.Service):
 		tenants_to_assign = new_tenants.difference(existing_tenants)
 		tenants_to_unassign = existing_tenants.difference(new_tenants)
 
-		for tenant in tenants_to_assign.union(tenants_to_unassign):
+		for tenant in tenants_to_assign:
 			# Check if tenant exists
 			try:
 				await self.TenantsProvider.get(tenant)
@@ -197,7 +197,21 @@ class TenantService(asab.Service):
 				}
 			# Check permission
 			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["seacat:tenant:assign"]):
-				message = "Not authorized for tenant un/assignment"
+				message = "Not authorized for tenant assignment."
+				L.error(message, struct_data={
+					"agent_cid": session.Credentials.Id,
+					"tenant": tenant
+				})
+				return {
+					"result": "NOT-AUTHORIZED",
+					"message": message,
+					"error_data": {"tenant": tenant},
+				}
+
+		for tenant in tenants_to_unassign:
+			# Check permission
+			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["seacat:tenant:assign"]):
+				message = "Not authorized for tenant unassignment."
 				L.error(message, struct_data={
 					"agent_cid": session.Credentials.Id,
 					"tenant": tenant

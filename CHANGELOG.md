@@ -12,6 +12,7 @@
 - v24.29-alpha1
 
 ### Fix
+- Do not check tenant existence when unassigning tenant (#415, `v24.29-alpha8`)
 - Hotfix: Session expiration in userinfo must match access token expiration (#414, `v24.29-alpha7`)
 - Non-editable items are marked with read_only flag (#411, `v24.29-alpha5`)
 - Handle session decryption error (#410, `v24.29-alpha2`)
