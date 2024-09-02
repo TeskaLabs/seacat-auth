@@ -138,11 +138,21 @@ class RoleHandler(object):
 	async def create(self, request, *, tenant, json_data):
 		"""
 		Create a new role
+
+		---
+		parameters:
+		-	name: copy
+			in: query
+			description:
+				Copy resources and description from a specified existing role.
+				Resources non-applicable for the new role will be excluded.
+			schema:
+				type: string
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
 		try:
-			role_id = await self.RoleService.create(role_id, **json_data)
+			role_id = await self.RoleService.create(role_id, from_role=request.query.get("copy"), **json_data)
 		except exceptions.ResourceNotFoundError as e:
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR",
