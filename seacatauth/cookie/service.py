@@ -5,13 +5,17 @@ import re
 import logging
 import typing
 
+import aiohttp
 import asab
+import asab.web
 import asab.storage
 import asab.exceptions
 
-from .. import exceptions
+from ..contextvars import AccessIps
+from .. import exceptions, generic
 from ..session.adapter import SessionAdapter, CookieData
 from ..session.builders import cookie_session_builder
+from ..authz import build_credentials_authz
 from .. import AuditLogger
 
 #
@@ -19,6 +23,12 @@ from .. import AuditLogger
 L = logging.getLogger(__name__)
 
 #
+
+
+class CookieToken:
+	TokenType = "ct"
+	ByteLength = asab.Config.getint("cookie", "token_length")
+	Expiration = asab.Config.getseconds("cookie", "expiration")
 
 
 class CookieService(asab.Service):
@@ -33,6 +43,7 @@ class CookieService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.TokenService = app.get_service("seacatauth.SessionTokenService")
 		self.AuthenticationService = None
 		self.OpenIdConnectService = None
 
@@ -128,10 +139,6 @@ class CookieService(asab.Service):
 		return session
 
 
-	async def get_session_by_authorization_code(self, code):
-		return await self.OpenIdConnectService.get_session_by_authorization_code(code)
-
-
 	async def create_cookie_client_session(
 		self, root_session, client_id, scope,
 		nonce=None,
@@ -158,7 +165,6 @@ class CookieService(asab.Service):
 			nonce=nonce,
 			redirect_uri=redirect_uri,
 		)
-		session_builders.append(cookie_session_builder())
 
 		session = await self.SessionService.create_session(
 			session_type="cookie",
@@ -239,3 +245,264 @@ class CookieService(asab.Service):
 		"""
 		cookie_name = self.get_cookie_name(client_id)
 		response.del_cookie(cookie_name)
+
+
+	async def process_cookie_request(
+		self,
+		request,
+		client_id: str,
+		grant_type: str,
+		code: str,
+		redirect_uri: typing.Optional[str]
+	) -> typing.Tuple[
+		typing.Mapping[str, typing.Any],
+		str,
+		typing.Mapping[str, typing.Any],
+	]:
+		client_svc = self.App.get_service("seacatauth.ClientService")
+
+		session = await self.CookieService.get_session_by_authorization_code(
+			request,
+			client_id=client_id,
+			grant_type=grant_type,
+			code=code,
+		)
+
+		if session.is_algorithmic():
+			cookie_value = self.SessionService.Algorithmic.serialize(session)
+			cookie_valid_until = self.SessionService.AnonymousExpiration
+		else:
+			cookie_value, cookie_valid_until = await self._create_cookie_token(session)
+			await self.refresh_session(
+				session,
+				valid_until=cookie_valid_until,
+				delete_after=cookie_valid_until,
+			)
+
+		client = await client_svc.get(client_id)
+
+		if client.get("cookie_domain") not in (None, ""):
+			domain = client["cookie_domain"]
+		else:
+			domain = self.RootCookieDomain
+
+		cookie = {
+			"value": cookie_value,
+			"max_age": None,
+			"domain": domain
+		}
+
+		# Determine the destination URI
+		if not redirect_uri:
+			# Fallback to client URI or Auth UI
+			redirect_uri = client.get("client_uri") or self.AuthWebUiBaseUrl.rstrip("/")
+		# TODO: Optionally validate the URI against client["redirect_uris"]
+		#   and check if it is the same as in the authorization request
+
+		# Trigger webhook and set custom client response headers
+		try:
+			data = await self._fetch_webhook_data(client, session)
+			headers = data.get("response_headers", {})
+		except exceptions.ClientResponseError as e:
+			AuditLogger.error("Cookie request denied: Webhook error", struct_data={
+				"cid": session.Credentials.Id,
+				"sid": session.Id,
+				"client_id": session.OAuth2.ClientId,
+				"from_ip": AccessIps.get(),
+				"redirect_uri": redirect_uri
+			})
+			raise InvalidRequest() from e
+
+		AuditLogger.log(asab.LOG_NOTICE, "Cookie request granted", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"from_ip": AccessIps.get(),
+			"redirect_uri": redirect_uri
+		})
+
+		return cookie, redirect_uri, headers
+
+
+	async def get_session_by_authorization_code(self, client_id: str, grant_type: str, code: str):
+		if grant_type != "authorization_code":
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: Unsupported grant type.",
+				struct_data={
+					"client_id": client_id,
+					"access_ips": AccessIps.get(),
+					"grant_type": grant_type,
+				}
+			)
+			raise UnsupportedGrantType(grant_type)
+
+		try:
+			session = await self.OpenIdConnectService.get_session_by_authorization_code(code)
+		except exceptions.SessionNotFoundError:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: Invalid or expired authorization code",
+				struct_data={
+					"client_id": client_id,
+					"access_ips": AccessIps.get(),
+				}
+			)
+			raise InvalidGrant()
+
+		if client_id != session.OAuth2.ClientId:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Cookie request denied: Invalid client.",
+				struct_data={
+					"client_id": client_id,
+					"access_ips": AccessIps.get(),
+				}
+			)
+			raise InvalidClient(client_id)
+
+		return session
+
+
+	async def create_cookie(self, request, session: SessionAdapter) -> typing.Tuple[str, float]:
+		# Establish and propagate track ID
+		try:
+			session = await self._set_track_id(request, session)
+		except ValueError as e:
+			AuditLogger.error(
+				"Token request denied: Failed to produce session track ID",
+				struct_data={
+					"from_ip": AccessIps.get(),
+					"cid": session.Credentials.Id,
+					"client_id": session.OAuth2.ClientId,
+				}
+			)
+			raise e
+
+
+	async def _set_track_id(self, request, session: SessionAdapter) -> typing.Tuple[str, float]:
+		# Set track ID if not set yet
+		if session.TrackId is None:
+			session = await self.SessionService.inherit_track_id_from_root(session)
+		if session.TrackId is None:
+			# Obtain the old session by request cookie or access token
+			try:
+				old_session = await self.get_session_by_request_cookie(
+					request, session.OAuth2.ClientId)
+			except exceptions.SessionNotFoundError:
+				old_session = None
+			except exceptions.NoCookieError:
+				old_session = None
+
+			token_value = generic.get_bearer_token_value(request)
+			if old_session is None and token_value is not None:
+				try:
+					old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
+					old_session = None
+			try:
+				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
+			except ValueError as e:
+				L.error("Failed to produce session track ID")
+				raise e
+		return session
+
+
+	async def _create_cookie_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
+		"""
+		Create cookie token
+
+		@param session: Target session
+		@return: Base64-encoded token and its expiration
+		"""
+		client_svc = self.App.get_service("seacatauth.ClientService")
+		client = await client_svc.get(session.OAuth2.ClientId)
+		expires_in = client.get("session_expiration") or CookieToken.Expiration
+		raw_value, valid_until = await self.TokenService.create(
+			token_length=CookieToken.ByteLength,
+			token_type=CookieToken.TokenType,
+			session_id=session.SessionId,
+			expiration=expires_in,
+			is_session_algorithmic=session.is_algorithmic(),
+		)
+		return base64.urlsafe_b64encode(raw_value).decode("ascii"), valid_until
+
+
+	async def refresh_session(
+		self,
+		session: SessionAdapter,
+		valid_until: typing.Optional[datetime.datetime] = None,
+		delete_after: typing.Optional[datetime.datetime] = None,
+	):
+		"""
+		Update/rebuild the session according to its authorization parameters
+		"""
+		# Get parent session
+		root_session = await self.SessionService.get(session.Session.ParentSessionId)
+
+		# Exclude critical resource grants from impersonated sessions
+		if root_session.Authentication.ImpersonatorSessionId is not None:
+			exclude_resources = {"authz:superuser", "authz:impersonate"}
+		else:
+			exclude_resources = set()
+
+		# Authorize tenant
+		authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, root_session.Credentials.Id,
+			tenants=None,
+			exclude_resources=exclude_resources
+		)
+		authorized_tenant = await self.get_accessible_tenant_from_scope(
+			session.OAuth2.Scope, root_session.Credentials.Id,
+			has_access_to_all_tenants=self.RBACService.can_access_all_tenants(authz)
+		)
+
+		session_builders = await self.SessionService.build_client_session(
+			root_session,
+			client_id=session.OAuth2.ClientId,
+			scope=session.OAuth2.Scope,
+			tenants=[authorized_tenant] if authorized_tenant else None,
+			nonce=session.OAuth2.Nonce,
+			redirect_uri=session.OAuth2.RedirectUri,
+		)
+
+		if valid_until:
+			session_builders.append(((SessionAdapter.FN.Session.Expiration, valid_until),))
+
+		if delete_after:
+			session_builders.append(((SessionAdapter.FN.Session.DeleteAfter, delete_after),))
+
+		session = await self.SessionService.update_session(session.SessionId, session_builders)
+
+		return session
+
+
+	async def _fetch_webhook_data(self, client, session):
+		"""
+		Make a webhook request and return the response body.
+		The response should match the following schema:
+		```json
+		{
+			"type": "object",
+			"properties": {
+				"response_headers": {
+					"type": "object",
+					"description": "HTTP headers and their values that will be added to the response."
+				}
+			}
+		}
+		```
+		"""
+		cookie_webhook_uri = client.get("cookie_webhook_uri")
+		if cookie_webhook_uri is None:
+			return None
+		async with aiohttp.ClientSession() as http_session:
+			# TODO: Better serialization
+			userinfo = await self.OpenIdConnectService.build_userinfo(session)
+			data = asab.web.rest.json.JSONDumper(pretty=False)(userinfo)
+			async with http_session.put(cookie_webhook_uri, data=data, headers={
+				"Content-Type": "application/json"}) as resp:
+				if resp.status != 200:
+					text = await resp.text()
+					raise exceptions.ClientResponseError(resp.status, text)
+				return await resp.json()

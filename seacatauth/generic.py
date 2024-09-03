@@ -13,7 +13,7 @@ import argon2
 #
 
 L = logging.getLogger(__name__)
-SessionContext = contextvars.ContextVar("request_session", default=None)
+SessionContext = contextvars.ContextVar("request_session", default=None)  # TODO: Move to contextvars
 
 #
 

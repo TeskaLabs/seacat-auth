@@ -62,14 +62,14 @@ class SessionTokenService(asab.Service):
 		expiration: typing.Optional[float] = None,
 		is_session_algorithmic: bool = False,
 		**kwargs
-	) -> bytes:
+	) -> typing.Tuple[bytes, datetime.datetime]:
 		"""
 		Create and store a new auth token
 
 		@param token_length: Number of token bytes
 		@param token_type: Token type string
 		@param session_id: Session identifier
-		@param expiration: Expiration in seconds
+		@param expiration: Token lifetime
 		@param is_session_algorithmic: Whether the session is algorithmic
 		@return: Raw token value
 		"""
@@ -89,9 +89,9 @@ class SessionTokenService(asab.Service):
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_CREATED)
-		L.info("Session token created.", struct_data={"sid": session_id, "type": token_type})
+		L.info("Session token created.", struct_data={"sid": session_id, "type": token_type, "exp": expires_at})
 
-		return token
+		return token, expires_at
 
 
 	async def get(
