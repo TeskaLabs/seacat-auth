@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v24.36
+
+### Pre-releases
+- v24.36-alpha1
+
+### Features
+- Duplicating roles (#416, `v24.36-alpha1`)
+
+---
+
+
 ## v24.29
 
 ### Pre-releases
