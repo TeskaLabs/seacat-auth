@@ -221,6 +221,7 @@ class RoleService(asab.Service):
 		description: str = None,
 		resources: typing.Optional[typing.Iterable] = None,
 		propagated: bool = False,
+		from_role: typing.Optional[str] = None,
 		_managed_by_seacat_auth: bool = False,
 	):
 		tenant_id, role_name = self.parse_role_id(role_id)
@@ -240,6 +241,21 @@ class RoleService(asab.Service):
 			raise asab.exceptions.Conflict(key="_id", value=role_id)
 		except exceptions.RoleNotFoundError:
 			pass
+
+		if from_role:
+			# Use specified role as a template
+			source_role = await self.get(from_role)
+			if not description:
+				description = source_role.get("description")
+			if not resources:
+				if tenant_id is not None or propagated is True:
+					# Tenant and propagated roles cannot access global-only resources
+					resources = [
+						resource_id for resource_id in source_role.get("resources")
+						if not self.ResourceService.is_global_only_resource(resource_id)
+					]
+				else:
+					resources = source_role.get("resources")
 
 		upsertor = self.StorageService.upsertor(
 			self.RoleCollection,
