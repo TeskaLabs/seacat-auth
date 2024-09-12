@@ -20,10 +20,10 @@ jobs:
         python-version: ["3.11", "3.10"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -45,10 +45,10 @@ jobs:
         python-version: ["3.11", "3.10"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -72,10 +72,10 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     
     - name: Docker Metadata action
-      uses: docker/metadata-action@v3
+      uses: docker/metadata-action@v5
       id: meta
       with:
           images:  teskalabs/seacat-auth
@@ -85,13 +85,13 @@ jobs:
             type=semver,pattern={{raw}}
     
     - name: Login to DockerHub
-      uses: docker/login-action@v1
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_USER }} 
         password: ${{ secrets.DOCKER_PASSWORD }}  
       
     - name: Build and push
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v6
       with:
         context: .
         push: true
@@ -99,13 +99,13 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
 
     - name: Create Docker Starter
-      uses: papeloto/action-zip@v1
+      uses: vimtor/action-zip@v1.2
       with:
         files: example/docker
         dest: seacat-auth-docker-starter.zip
 
     - name: Upload Docker Starter
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: seacat-auth-docker-starter
         path: ${{ github.workspace }}/seacat-auth-docker-starter.zip
