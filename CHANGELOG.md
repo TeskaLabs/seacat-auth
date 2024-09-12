@@ -1,8 +1,128 @@
 # CHANGELOG
 
+## v24.29
+
+### Pre-releases
+- v24.29-beta2
+- v24.29-beta
+- v24.29-alpha5
+- v24.29-alpha4
+- v24.29-alpha3
+- v24.29-alpha2
+- v24.29-alpha1
+
+### Fix
+- Upgrade ASAB to fix storage padding error (`v24.29-beta2`)
+- Non-editable items are marked with read_only flag (#411, `v24.29-alpha5`)
+- Handle session decryption error (#410, `v24.29-alpha2`)
+
+### Features
+- Disable editing of managed resources and clients (#409, `v24.29-alpha4`)
+- Global roles propagated to tenants (#395, `v24.29-alpha3`)
+- Sort clients alphabetically by client name (#408, `v24.29-alpha2`)
+- Print ASAB version during Docker build (#406, `v24.29-alpha1`)
+
+---
+
+
+## v24.20
+
+### Pre-releases
+- `v24.20-alpha14`
+- `v24.20-alpha13`
+- `v24.20-alpha12`
+- `v24.20-alpha11`
+- `v24.20-alpha10`
+- `v24.20-alpha9`
+- `v24.20-alpha8`
+- `v24.20-alpha7`
+- `v24.20-alpha6`
+- `v24.20-alpha5`
+- `v24.20-alpha4`
+- `v24.20-alpha3`
+- `v24.20-alpha2`
+- `v24.20-alpha1`
+
+### Breaking changes
+- Removed total item count from credential list response (#391, `v24.20-alpha12`, Compatible with Seacat Admin WebUI v24.19-alpha28 and later)
+- External login endpoints changed (#384, `v24.20-alpha9`)
+- Default password criteria are more restrictive (#372, `v24.20-alpha1`, Compatible with Seacat Auth Webui v24.19-alpha and later, Seacat Account Webui v24.08-beta and later)
+
+### Fix
+- Fix nginx oauth introspection for self-encoded (algorithmic) sessions (#405, `v24.20-alpha14`)
+- Fix token request for self-encoded (algorithmic) sessions (#404, `v24.20-alpha13`)
+- Fix credential search performance (#391, `v24.20-alpha12`)
+- Fix AttributeError in credentials update (#399, `v24.20-alpha11`)
+- Catch token decoding errors when finding sessions (#397, `v24.20-alpha10`)
+- Properly encrypt cookie value in session update (#394, `v24.20-alpha8`)
+- Properly parse URL query before adding new parameters (#393, `v24.20-alpha8`)
+- Delete client cookie on introspection failure (#385, `v24.20-alpha6`)
+- Extend session expiration at cookie entrypoint (#383, `v24.20-alpha5`)
+- Do not log failed LDAP login as error (#381, `v24.20-alpha4`)
+- Properly handle Argon2 verification error in login call (#378, `v24.20-alpha3`)
+
+### Features
+- Log login factor verification failure (#402, `v24.20-alpha12`)
+- External login with dynamic redirection (#384, `v24.20-alpha9`)
+- Custom response codes for tenant-related authorization errors (#392, `v24.20-alpha8`)
+- Implement OAuth refresh tokens (#358, `v24.20-alpha2`)
+- Configurable password criteria (#372, `v24.20-alpha1`)
+
+### Refactoring
+- Expected client ID is optional for authentication (#390, `v24.20-alpha8`)
+- Move SSO session creation into session service (#387, `v24.20-alpha8`)
+- Refactor duplicate code in session build (#386, `v24.20-alpha7`)
+
+---
+
+
+## v24.17
+
+### Pre-releases
+- `v24.17-alpha9`
+- `v24.17-alpha8`
+- `v24.17-alpha7`
+- `v24.17-alpha6`
+- `v24.17-alpha5`
+- `v24.17-alpha4`
+- `v24.17-alpha3`
+- `v24.17-alpha2`
+- `v24.17-beta1`
+- `v24.17-alpha1`
+
+### Fix
+- Fix AttributeError in failed login (#376, `v24.17-alpha9`)
+- Deny password change when old password verification fails (#374, `v24.17-alpha7`)
+- Authorize into last active tenant (#373, `v24.17-alpha6`)
+- Default provisioning tenant name mst pass validation (#368, `v24.17-alpha4`)
+- Fix the initialization and updating of built-in resources (#363, `v24.06-alpha15`)
+- Fix searching credentials with multiple filters (#362, `v24.06-alpha14`)
+
+### Features
+- Hash passwords using argon2 instead of bcrypt (#375, `v24.17-alpha8`)
+- Improve resource sorting and filtering (#370, `v24.17-alpha3`)
+- User invitations are enabled by default (#367, `v24.17-alpha2`)
+- When invitation cannot be created because the user already exists, the invitation is re-sent (#364, `v24.17-alpha1`)
+- When no communication channel is configured, invitation and password reset URLs are returned in admin responses (#364, `v24.17-alpha1`)
+- Listing assigned tenants and roles no longer requires resource authorization (#348, `v24.06-alpha13`)
+- List credentials from authorized tenant only (#348, `v24.06-alpha13`)
+
+### Refactoring
+- Consistent use of item-specific not-found exceptions (#371, `v24.17-alpha5`)
+- Deprecate passlib (#368, `v24.17-alpha4`)
+- Utility functions for password verification (#368, `v24.17-alpha4`)
+
+---
+
+
 ## v24.06
 
 ### Pre-releases
+- `v24.06-alpha15`
+- `v24.06-alpha14`
+- `v24.06-alpha13`
+- `v24.06-alpha12`
+- `v24.06-alpha11`
 - `v24.06-alpha10`
 - `v24.06-beta3`
 - `v24.06-alpha9`
@@ -18,6 +138,7 @@
 - `v24.06-alpha1`
 
 ### Breaking changes
+- Credentials list returns only the members of the currently authorized tenant (#348, `v24.06-alpha13`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)
 
 ### Fix
@@ -29,6 +150,9 @@
 - Fix the initialization of NoTenantsError (#346, `v24.06-alpha2`)
 
 ### Features
+- Client cache (#361, `v24.06-alpha13`)
+- Update OpenAPI specs (#360, `v24.06-alpha12`)
+- Client secret management (#359, `v24.06-alpha11`)
 - External login provider label contains just the display name (#352, `v24.06-alpha10`)
 - ElasticSearch index and Kibana space authorization (#353, `v24.06-alpha7.2`)
 - Disable special characters in tenant ID (#349, `v24.06-alpha6`)

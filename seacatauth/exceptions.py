@@ -1,5 +1,8 @@
 import typing
 
+import asab.exceptions
+import asab.web.rest
+
 
 class SeacatAuthError(Exception):
 	"""
@@ -72,6 +75,15 @@ class RoleNotFoundError(SeacatAuthError, KeyError):
 		super().__init__("Role {!r} not found".format(self.Role), *args)
 
 
+class ResourceNotFoundError(SeacatAuthError, KeyError):
+	"""
+	Resource not found
+	"""
+	def __init__(self, resource_id, *args):
+		self.ResourceId = resource_id
+		super().__init__("Resource {!r} not found".format(self.ResourceId), *args)
+
+
 class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Credentials not found
@@ -79,6 +91,28 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
+
+
+class NotEditableError(SeacatAuthError):
+	"""
+	Target item is not editable
+	"""
+	def __init__(self, message="Item is not editable", *args, **kwargs):
+		self.Kwargs = kwargs
+		super().__init__(message, *args)
+
+	def rest_payload(self):
+		return {
+			"result": "ERROR",
+			"tech_err": "Item is not editable."
+		}
+
+	def json_response(self, request):
+		return asab.web.rest.json_response(
+			request,
+			status=405,
+			data=self.rest_payload(),
+		)
 
 
 class LoginPrologueDeniedError(SeacatAuthError):
@@ -96,6 +130,14 @@ class CredentialsSuspendedError(SeacatAuthError):
 	def __init__(self, credentials_id, *args):
 		self.CredentialsId = credentials_id
 		super().__init__("Credentials {!r} suspended".format(self.CredentialsId), *args)
+
+
+class WeakPasswordError(SeacatAuthError, asab.exceptions.ValidationError):
+	"""
+	Password does not comply with configured policies
+	"""
+	def __init__(self, message, *args):
+		super().__init__(message, *args)
 
 
 class UnauthorizedTenantAccessError(AccessDeniedError):
@@ -161,18 +203,27 @@ class SessionNotFoundError(SeacatAuthError, KeyError):
 		super().__init__(message, *args)
 
 
-class CommunicationError(SeacatAuthError):
+class MessageDeliveryError(SeacatAuthError):
 	"""
-	Failed to send notification or message
+	Failed to send message
 	"""
-	def __init__(self, message, credentials_id=None, *args):
-		self.CredentialsId = credentials_id
+	def __init__(self, message, channel, template_id=None, *args):
+		self.TemplateId = template_id
+		self.Channel = channel
 		super().__init__(message, *args)
+
+
+class CommunicationNotConfiguredError(SeacatAuthError):
+	"""
+	No communication channels are configured
+	"""
+	def __init__(self, *args):
+		super().__init__("No communication channels are configured.", *args)
 
 
 class NoCookieError(SeacatAuthError):
 	"""
-	Request has no (roo or client) cookie
+	Request has no (root or client) cookie
 	"""
 	def __init__(self, client_id=None, *args):
 		self.ClientId = client_id
@@ -180,4 +231,70 @@ class NoCookieError(SeacatAuthError):
 			message = "Request contains no cookie of client {!r}".format(self.ClientId)
 		else:
 			message = "Request contains no root session cookie"
+		super().__init__(message, *args)
+
+
+class URLValidationError(SeacatAuthError):
+	"""
+	Failed to verify requested URL
+	"""
+	def __init__(self, url: str, client_id: str | None = None):
+		self.ClientId = client_id
+		self.URL = url
+		super().__init__("Cannot verify requested URL.")
+
+
+class ClientError(SeacatAuthError):
+	def __init__(self, *args, client_id, **kwargs):
+		self.ClientID = client_id
+		self.Key = None
+		self.Value = None
+		if len(kwargs) > 0:
+			self.Key, self.Value = kwargs.popitem()
+			message = "Invalid {key} '{value}' for client '{client_id}'".format(
+				client_id=client_id, key=self.Key, value=self.Value)
+			super().__init__(message, *args)
+		else:
+			super().__init__(*args)
+
+
+class ClientAuthenticationError(ClientError):
+	"""
+	Failed to authenticate client
+	"""
+	def __init__(self, message, *args, client_id: str | None = None):
+		super().__init__(message, *args, client_id=client_id)
+
+
+class InvalidRedirectURI(ClientError):
+	def __init__(self, *args, client_id, redirect_uri):
+		self.RedirectURI = redirect_uri
+		super().__init__(*args, client_id=client_id, redirect_uri=redirect_uri)
+
+
+class InvalidClientSecret(ClientError):
+	def __init__(self, client_id, *args):
+		message = "Invalid client secret for client '{client_id}'".format(client_id=client_id)
+		super().__init__(message, *args, client_id=client_id)
+
+
+class ClientNotFoundError(ClientError, KeyError):
+	def __init__(self, client_id, *args):
+		message = "Client '{client_id}' not found".format(client_id=client_id)
+		super().__init__(message, *args, client_id=client_id)
+
+
+class RegistrationNotOpenError(SeacatAuthError):
+	pass
+
+
+class CredentialsRegistrationError(SeacatAuthError):
+	def __init__(
+		self,
+		message: str,
+		*args,
+		credentials: dict = None,
+		**kwargs
+	):
+		self.Credentials: typing.Optional[str] = credentials
 		super().__init__(message, *args)

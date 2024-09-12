@@ -4,9 +4,11 @@ import aiohttp.web
 import asab
 import asab.web.rest
 import asab.storage.exceptions
+import asab.exceptions
 
 from .... import exceptions
 from ....decorators import access_control
+from .... import generic
 
 #
 
@@ -20,7 +22,7 @@ class RoleHandler(object):
 	Manage roles
 
 	---
-	tags: ["Manage roles"]
+	tags: ["Roles"]
 	"""
 	def __init__(self, app, role_svc):
 		self.App = app
@@ -58,10 +60,10 @@ class RoleHandler(object):
 			schema:
 				type: string
 		"""
-		return await self._list(request, tenant=None)
+		return await self._list(request, tenant_id=None)
 
-	@access_control("seacat:role:access")
-	async def list(self, request, *, tenant):
+
+	async def list(self, request):
 		"""
 		List tenant roles
 
@@ -90,31 +92,27 @@ class RoleHandler(object):
 				enum:
 				- true
 		"""
-		return await self._list(request, tenant=tenant)
+		return await self._list(request, tenant_id=request.match_info["tenant"])
 
-	async def _list(self, request, *, tenant):
-		page = int(request.query.get("p", 1)) - 1
-		limit = request.query.get("i")
-		if limit is not None:
-			limit = int(limit)
-		filter_string = request.query.get("f")
-		resource = request.query.get("resource")
-		exclude_global = request.query.get("exclude_global", "false") == "true"
-
+	async def _list(self, request, *, tenant_id):
+		search = generic.SearchParams(request.query)
 		result = await self.RoleService.list(
-			tenant, page, limit, filter_string,
-			resource=resource,
-			exclude_global=exclude_global)
+			tenant_id=tenant_id,
+			page=search.Page,
+			limit=search.ItemsPerPage,
+			name_filter=search.SimpleFilter,
+			resource_filter=search.get("resource"),
+		)
 		return asab.web.rest.json_response(request, result)
 
 
-	@access_control("seacat:role:access")
-	async def get(self, request, *, tenant):
+	async def get(self, request):
 		"""
 		Get role detail
 		"""
+		tenant_id = request.match_info["tenant"]
 		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant, role_name)
+		role_id = "{}/{}".format(tenant_id, role_name)
 		try:
 			result = await self.RoleService.get(role_id)
 		except KeyError:
@@ -123,15 +121,44 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
+	@asab.web.rest.json_schema_handler({
+		"type": "object",
+		"additionalProperties": False,
+		"properties": {
+			"label": {"type": "string"},
+			"description": {"type": "string"},
+			"propagated": {"type": "boolean"},
+			"resources": {
+				"type": "array",
+				"items": {"type": "string"},
+			},
+		}
+	})
 	@access_control("seacat:role:edit")
-	async def create(self, request, *, tenant):
+	async def create(self, request, *, tenant, json_data):
 		"""
 		Create a new role
 		"""
 		role_name = request.match_info["role_name"]
 		role_id = "{}/{}".format(tenant, role_name)
-		role_id = await self.RoleService.create(role_id)
-		return asab.web.rest.json_response(request, {"result": "OK", "id": role_id})
+		try:
+			role_id = await self.RoleService.create(role_id, **json_data)
+		except exceptions.ResourceNotFoundError as e:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR",
+				"tech_err": "Resource not found.",
+				"err_dict": {"resource_id": e.ResourceId},
+			})
+		except asab.exceptions.Conflict:
+			return asab.web.rest.json_response(request, status=409, data={
+				"result": "ERROR",
+				"tech_err": "Role already exists.",
+				"err_dict": {"role_id": role_id},
+			})
+		return asab.web.rest.json_response(request, {
+			"result": "OK",
+			"id": role_id
+		})
 
 
 	@access_control("seacat:role:edit")
@@ -144,9 +171,11 @@ class RoleHandler(object):
 
 		try:
 			result = await self.RoleService.delete(role_id)
-		except KeyError:
-			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": role_id})
-			return aiohttp.web.HTTPNotFound()
+		except exceptions.RoleNotFoundError:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR", "tech_err": "Role not found."})
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(request, result)
 
 
@@ -154,8 +183,8 @@ class RoleHandler(object):
 		"type": "object",
 		"additionalProperties": False,
 		"properties": {
-			"description": {
-				"type": "string"},
+			"label": {"type": "string"},
+			"description": {"type": "string"},
 			"add": {
 				"type": "array",
 				"items": {"type": "string"},
@@ -194,12 +223,15 @@ class RoleHandler(object):
 		try:
 			result = await self.RoleService.update(
 				role_id,
+				label=json_data.get("label"),
 				description=json_data.get("description"),
 				resources_to_set=resources_to_set,
 				resources_to_add=resources_to_add,
 				resources_to_remove=resources_to_remove,
 			)
-		except exceptions.RoleNotFoundError as e:
-			L.log(asab.LOG_NOTICE, "Role not found", struct_data={"role_id": e.Role})
-			return aiohttp.web.HTTPNotFound()
+		except exceptions.RoleNotFoundError:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR", "tech_err": "Role not found."})
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(request, data={"result": result})

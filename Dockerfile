@@ -1,7 +1,7 @@
 FROM alpine:3.18 AS stage1
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 RUN set -ex \
   && apk update \
@@ -35,8 +35,8 @@ RUN apk add --no-cache  \
     cryptography \
     jwcrypto>=0.9.1 \
     fastjsonschema \
-    passlib \
     bcrypt \
+    argon2_cffi \
     python-ldap \
     aiomysql \
     jinja2 \
@@ -45,9 +45,11 @@ RUN apk add --no-cache  \
     pyyaml \
     pymongo \
     sentry-sdk \
-    git+https://github.com/TeskaLabs/asab.git
+    git+https://github.com/TeskaLabs/asab.git@f41b76f7496e56b789b8db94497ad1dfa0d980ff
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
+
+RUN cat /usr/lib/python3.11/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth

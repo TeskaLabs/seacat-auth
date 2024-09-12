@@ -1,8 +1,10 @@
 import hashlib
 import logging
 import datetime
+import re
 
 import asab
+import asab.exceptions
 
 from ... import exceptions
 from ...generic import generate_ergonomic_token
@@ -25,6 +27,13 @@ class ChangePasswordService(asab.Service):
 
 	def __init__(self, app, cred_service, service_name="seacatauth.ChangePasswordService"):
 		super().__init__(app, service_name)
+
+		self.PasswordMaxLength = asab.Config.getint("seacatauth:password", "max_length")
+		self.PasswordMinLength = asab.Config.getint("seacatauth:password", "min_length")
+		self.PasswordMinLowerCount = asab.Config.getint("seacatauth:password", "min_lowercase_count")
+		self.PasswordMinUpperCount = asab.Config.getint("seacatauth:password", "min_uppercase_count")
+		self.PasswordMinDigitCount = asab.Config.getint("seacatauth:password", "min_digit_count")
+		self.PasswordMinSpecialCount = asab.Config.getint("seacatauth:password", "min_special_count")
 
 		self.CredentialsService = cred_service
 		self.CommunicationService = app.get_service("seacatauth.CommunicationService")
@@ -61,7 +70,7 @@ class ChangePasswordService(asab.Service):
 			})
 
 
-	async def create_password_reset_token(self, credentials_id: str, expiration: int | None = None):
+	async def _create_password_reset_token(self, credentials_id: str, expiration: int | None = None):
 		"""
 		Create a password reset object
 		"""
@@ -91,36 +100,91 @@ class ChangePasswordService(asab.Service):
 		return token
 
 
-	async def init_password_change(self, credentials_id: str, is_new_user: bool = False, expiration: float = None):
+	async def create_password_reset_token(self, credentials: dict, expiration: float = None):
 		"""
 		Create a password reset link and send it to the user via email or other way
 		"""
-		# Verify that credentials exists
-		creds = await self.CredentialsService.get(credentials_id)
-		if creds is None:
-			raise exceptions.CredentialsNotFoundError(credentials_id)
-
 		# Deny password reset to suspended credentials
-		if creds.get("suspended") is True:
-			raise exceptions.CredentialsSuspendedError(credentials_id)
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
 
-		pwdreset_token = await self.create_password_reset_token(credentials_id=credentials_id, expiration=expiration)
+		return await self._create_password_reset_token(credentials_id=credentials["_id"], expiration=expiration)
+
+
+	async def password_policy(self) -> dict:
+		"""
+		Password validation requirements
+		"""
+		return {
+			"min_length": self.PasswordMinLength,
+			"min_lowercase_count": self.PasswordMinLowerCount,
+			"min_uppercase_count": self.PasswordMinUpperCount,
+			"min_digit_count": self.PasswordMinDigitCount,
+			"min_special_count": self.PasswordMinSpecialCount,
+		}
+
+
+	async def init_password_reset_by_admin(
+		self,
+		credentials: dict,
+		is_new_user: bool = False,
+		expiration: float = None,
+	):
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Deny password reset to suspended credentials
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
+
+		password_reset_token = await self.create_password_reset_token(credentials, expiration=expiration)
+		reset_url = self.format_password_reset_url(password_reset_token)
+
+		if not self.CommunicationService.is_enabled():
+			return reset_url
 
 		# Send the message
-		email = creds.get("email")
-		username = creds.get("username")
-		phone = creds.get("phone")
-		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, pwdreset_token)
-		successful = await self.CommunicationService.password_reset(
-			email=email, username=username, phone=phone, reset_url=reset_url, welcome=is_new_user
-		)
+		try:
+			await self.CommunicationService.password_reset(
+				credentials=credentials,
+				reset_url=reset_url,
+				welcome=is_new_user
+			)
+			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
+		except Exception as e:
+			raise e
 
-		if successful:
-			L.log(asab.LOG_NOTICE, "Password reset initiated", struct_data={"cid": credentials_id})
-		else:
-			await self.delete_password_reset_token(pwdreset_token)
-			raise exceptions.CommunicationError(
-				"Failed to send password reset link", credentials_id=credentials_id)
+		return None
+
+
+	async def init_lost_password_reset(self, credentials: dict):
+		"""
+		Create a password reset link and send it to the user via email or other way
+		"""
+		# Deny password reset to suspended credentials
+		if credentials.get("suspended") is True:
+			raise exceptions.CredentialsSuspendedError(credentials["_id"])
+
+		password_reset_token = await self.create_password_reset_token(credentials)
+		reset_url = self.format_password_reset_url(password_reset_token)
+
+		# Send the message
+		try:
+			await self.CommunicationService.password_reset(
+				credentials=credentials,
+				reset_url=reset_url,
+			)
+			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
+		except Exception as e:
+			L.log(asab.LOG_NOTICE, "Failed to send password reset message: {}".format(e), struct_data={
+				"cid": credentials["_id"]})
+			await self.delete_password_reset_token(password_reset_token)
+			raise e
+
+
+	def format_password_reset_url(self, password_reset_token):
+		reset_url = "{}{}?pwd_token={}".format(self.AuthWebUIBaseUrl, self.ResetPwdPath, password_reset_token)
+		return reset_url
 
 
 	async def change_password(self, credentials_id: str, new_password: str):
@@ -131,6 +195,8 @@ class ChangePasswordService(asab.Service):
 		# Verify that the credentials are not suspended
 		if credentials.get("suspended") is True:
 			raise exceptions.CredentialsSuspendedError(credentials_id)
+
+		self.verify_password_strength(new_password)
 
 		# Remove "password" from enforced factors
 		enforce_factors = set(credentials.get("enforce_factors", []))
@@ -146,3 +212,29 @@ class ChangePasswordService(asab.Service):
 
 	async def _token_id_from_token_string(self, password_reset_token):
 		return hashlib.sha256(password_reset_token.encode("ascii")).digest()
+
+
+	def verify_password_strength(self, password: str):
+		if len(password) > self.PasswordMaxLength:
+			raise asab.exceptions.ValidationError(
+				"Password cannot be longer than {} characters.".format(self.PasswordMaxLength))
+
+		if len(password) < self.PasswordMinLength:
+			raise exceptions.WeakPasswordError(
+				"Password must be {} or more characters long.".format(self.PasswordMinLength))
+
+		if len(re.findall(r"[a-z]", password)) < self.PasswordMinLowerCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} lowercase letters.".format(self.PasswordMinLowerCount))
+
+		if len(re.findall(r"[A-Z]", password)) < self.PasswordMinUpperCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} uppercase letters.".format(self.PasswordMinUpperCount))
+
+		if len(re.findall(r"[0-9]", password)) < self.PasswordMinDigitCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} digits.".format(self.PasswordMinDigitCount))
+
+		if len(re.findall(r"[^a-zA-Z0-9]", password)) < self.PasswordMinSpecialCount:
+			raise exceptions.WeakPasswordError(
+				"Password must contain at least {} special characters.".format(self.PasswordMinSpecialCount))

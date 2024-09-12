@@ -1,19 +1,16 @@
 import logging
-import datetime
-
 import aiohttp.web
+import jwcrypto.jws
+import jwcrypto.jwt
+import json
 
 import asab
 import asab.web.rest
 import asab.web.rest.json
 import asab.exceptions
 
-import jwcrypto.jws
-import jwcrypto.jwt
-import json
-
+from .. import pkce
 from ..utils import TokenRequestErrorResponseCode
-from ..pkce import CodeChallengeFailedError
 from ... import exceptions, AuditLogger
 from ... import generic
 
@@ -37,6 +34,9 @@ class TokenHandler(object):
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.CookieService = app.get_service("seacatauth.CookieService")
+
+		self.ValidateRedirectUri = asab.Config.getboolean(
+			"openidconnect:token_request", "validate_redirect_uri", fallback=False)
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post(self.OpenIdConnectService.TokenPath, self.token_request)
@@ -88,145 +88,253 @@ class TokenHandler(object):
 						required:
 							- grant_type
 		"""
-		data = await request.post()
-
-		# 3.1.3.2.  Token Request Validation
-		grant_type = data.get("grant_type")
-
-		if grant_type == "authorization_code":
-			return await self._token_request_authorization_code(request, data)
-
-		# TODO: elif grant_type == "refresh_token"
-
-		AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type", struct_data={
-			"from_ip": generic.get_request_access_ips(request), "grant_type": grant_type})
-		return aiohttp.web.HTTPBadRequest()
-
-
-	async def _token_request_authorization_code(self, request, qs_data):
-		"""
-		https://openid.net/specs/openid-connect-core-1_0.html
-
-		3.1.3.1.  Token Request
-
-		Request contains query string such as:
-		grant_type=authorization_code&code=foo-bar-code&redirect_uri=....
-
-		"""
+		form_data = await request.post()
 		from_ip = generic.get_request_access_ips(request)
 
-		# TODO: If client_id and redirect_uri is present in the query, verify that their values are the same
-		#  as those used in the authorization request
-		# TODO: Authenticate confidential clients with client_secret
+		# 3.1.3.2.  Token Request Validation
+		grant_type = form_data.get("grant_type")
+		if grant_type == "authorization_code":
+			return await self._authorization_code_grant(request, from_ip)
+		elif grant_type == "refresh_token":
+			return await self._refresh_token_grant(request, from_ip)
+		else:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": grant_type,
+				"client_id": form_data.get("client_id"),
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.UnsupportedGrantType)
 
-		# Ensure the Authorization Code was issued to the authenticated Client
-		authorization_code = qs_data.get("code", "")
-		if len(authorization_code) == 0:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: No authorization code in request", struct_data={
-				"from_ip": from_ip})
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
-		# Locate the session by authorization code
+	async def _authorization_code_grant(self, request, from_ip):
+		form_data = await request.post()
+
+		# Get session by code
 		try:
-			new_session = await self.OpenIdConnectService.pop_session_by_authorization_code(
-				authorization_code, qs_data.get("code_verifier"))
-		except KeyError:
+			session = await self._get_session_by_authorization_code(request)
+
+		except (exceptions.SessionNotFoundError, KeyError):
 			AuditLogger.log(
 				asab.LOG_NOTICE,
-				"Token request denied: Invalid or expired authorization code",
-				struct_data={"from_ip": from_ip, "code": authorization_code}
+				"Token request denied: Invalid or expired authorization code.",
+				struct_data={
+					"from_ip": from_ip,
+					"grant_type": "authorization_code",
+					"client_id": form_data.get("client_id"),
+					"redirect_uri": form_data.get("redirect_uri"),
+				}
 			)
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
-		except CodeChallengeFailedError:
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
+
+		except pkce.CodeChallengeFailedError:
 			AuditLogger.log(
 				asab.LOG_NOTICE,
-				"Token request denied: Code challenge failed",
-				struct_data={"from_ip": from_ip}
+				"Token request denied: Code challenge failed.",
+				struct_data={
+					"from_ip": from_ip,
+					"grant_type": "authorization_code",
+					"client_id": form_data.get("client_id"),
+					"redirect_uri": form_data.get("redirect_uri"),
+				}
 			)
-			return asab.web.rest.json_response(
-				request, {"error": TokenRequestErrorResponseCode.InvalidGrant}, status=400)
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
 
-		# TODO: If an authorization code is used more than
-		#   once, the authorization server MUST deny the request and SHOULD
-		#   revoke (when possible) all tokens previously issued based on
-		#   that authorization code. (https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2)
+		except exceptions.ClientAuthenticationError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client ({}).".format(e), struct_data={
+				"from_ip": from_ip,
+				"grant_type": "authorization_code",
+				"client_id": e.ClientID,
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
 
-		# TODO: Check if the redirect URL is the same as the one in the authorization request:
-		#   if authorization_request.get("redirect_uri") != qs_data.get('redirect_uri'):
-		# 	  return await self.token_error_response(request, "The redirect URL is not associated with the client.")
+		except exceptions.URLValidationError:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Redirect URI mismatch.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": "authorization_code",
+				"client_id": form_data.get("client_id"),
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
 
-		# Set track ID if not set yet
-		if new_session.TrackId is None:
-			new_session = await self.SessionService.inherit_track_id_from_root(new_session)
-		if new_session.TrackId is None:
-			# Obtain the old session by request access token or cookie
-			token_value = generic.get_bearer_token_value(request)
-			if token_value is not None:
-				old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-				if old_session is None:
-					AuditLogger.log(
-						asab.LOG_NOTICE,
-						"Token request denied: Track ID transfer failed because of invalid Authorization header",
-						struct_data={
-							"from_ip": from_ip,
-							"cid": new_session.Credentials.Id,
-							"client_id": new_session.OAuth2.ClientId,
-						}
-					)
-					return aiohttp.web.HTTPBadRequest()
-			else:
-				# Use cookie only if there is no access token
-				try:
-					old_session = await self.CookieService.get_session_by_request_cookie(request, new_session.OAuth2.ClientId)
-				except exceptions.SessionNotFoundError:
-					old_session = None
-				except exceptions.NoCookieError:
-					old_session = None
+		# Establish and propagate track ID
+		session = await self.set_track_id(request, session, from_ip)
 
-			try:
-				new_session = await self.SessionService.inherit_or_generate_new_track_id(new_session, old_session)
-			except ValueError as e:
-				# Return 400 to prevent disclosure while keeping the stacktrace
-				AuditLogger.log(
-					asab.LOG_NOTICE,
-					"Token request denied: Failed to produce session track ID",
-					struct_data={
-						"from_ip": from_ip,
-						"cid": new_session.Credentials.Id,
-						"client_id": new_session.OAuth2.ClientId,
-					}
-				)
-				raise aiohttp.web.HTTPBadRequest() from e
+		# Everything is okay: Request granted
+		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"grant_type": "authorization_code",
+			"from_ip": from_ip})
+
+		# Client can limit the session scope to a subset of the scope granted at authorization time
+		scope = form_data.get("scope")
+
+		# Generate new auth tokens
+		if session.is_algorithmic():
+			new_access_token = self.SessionService.Algorithmic.serialize(session)
+			access_token_expires_in = self.SessionService.AnonymousExpiration
+			new_refresh_token, refresh_token_expires_in = None, None
+		else:
+			new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
+			new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
+			# Refresh the session data
+			session = await self.OpenIdConnectService.refresh_session(
+				session, requested_scope=scope, expires_in=refresh_token_expires_in)
+
+		# Response
+		response_payload = {
+			"token_type": "Bearer",
+			"scope": " ".join(session.OAuth2.Scope),
+			"access_token": new_access_token,
+			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
+			"expires_in": int(access_token_expires_in),
+		}
+
+		if new_refresh_token:
+			response_payload["refresh_token"] = new_refresh_token
 
 		headers = {
 			"Cache-Control": "no-store",
 			"Pragma": "no-cache",
 		}
 
-		id_token = await self.OpenIdConnectService.build_id_token(new_session)
+		return asab.web.rest.json_response(request, response_payload, headers=headers)
 
-		# 3.1.3.3.  Successful Token Response
-		data = {
+
+	async def _refresh_token_grant(self, request, from_ip):
+		form_data = await request.post()
+
+		# Get session by refresh token
+		try:
+			session = await self._get_session_by_refresh_token(request)
+
+		except (exceptions.SessionNotFoundError, KeyError):
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Token request denied: Invalid or expired refresh token.",
+				struct_data={
+					"from_ip": from_ip,
+					"grant_type": "refresh_token",
+					"client_id": form_data.get("client_id"),
+				}
+			)
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
+
+		except exceptions.ClientAuthenticationError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": "refresh_token",
+				"client_id": e.ClientID,
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
+
+		# Refresh is not supported for algorithmic sessions (yet)
+		assert not session.is_algorithmic()
+
+		# Delete the used refresh token and the current access token
+		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
+
+		# Everything is okay: Request granted
+		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"grant_type": "refresh_token",
+			"from_ip": from_ip
+		})
+
+		# Generate new auth tokens
+		new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
+		new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
+
+		# Client can limit the session scope to a subset of the scope granted at authorization time
+		scope = form_data.get("scope")
+
+		# Refresh the session data
+		session = await self.OpenIdConnectService.refresh_session(
+			session, requested_scope=scope, expires_in=refresh_token_expires_in)
+
+		# Response
+		response_payload = {
 			"token_type": "Bearer",
-			"scope": " ".join(new_session.OAuth2.Scope),
-			"access_token": new_session.OAuth2.AccessToken,
-			"id_token": id_token,
-			# TODO: Include refresh_token
+			"scope": " ".join(session.OAuth2.Scope),
+			"access_token": new_access_token,
+			"refresh_token": new_refresh_token,
+			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
+			"expires_in": int(access_token_expires_in),
 		}
 
-		if new_session.Session.Expiration:
-			data["expires_in"] = int(
-				(new_session.Session.Expiration - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+		headers = {
+			"Cache-Control": "no-store",
+			"Pragma": "no-cache",
+		}
 
-		AuditLogger.log(asab.LOG_NOTICE, "Token request granted", struct_data={
-			"cid": new_session.Credentials.Id,
-			"sid": new_session.Id,
-			"client_id": new_session.OAuth2.ClientId,
-			"from_ip": from_ip})
+		return asab.web.rest.json_response(request, response_payload, headers=headers)
 
-		return asab.web.rest.json_response(request, data, headers=headers)
+
+	async def _get_session_by_authorization_code(self, request):
+		form_data = await request.post()
+
+		authorization_code = form_data.get("code")
+		if not authorization_code:
+			raise asab.exceptions.ValidationError("No authorization code in request.")
+
+		# Locate the session by authorization code
+		session = await self.OpenIdConnectService.get_session_by_authorization_code(
+			authorization_code, form_data.get("code_verifier"))
+
+		# TODO: If possible, verify that the Authorization Code has not been previously used.
+
+		# Verify client credentials if required
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=session.OAuth2.ClientId)
+
+		# Ensure the Authorization Code was issued to the authenticated Client
+		if client_id != session.OAuth2.ClientId:
+			raise exceptions.ClientAuthenticationError(
+				"Client ID in token request does not match the one used in authorization request.")
+
+		if self.ValidateRedirectUri:
+			# Ensure that the redirect_uri parameter value is identical to the redirect_uri parameter value
+			# that was included in the initial Authorization Request.
+			# TODO: If the redirect_uri parameter value is not present when there is only one registered
+			#  redirect_uri value, the Authorization Server MAY return an error (since the Client should have
+			#  included the parameter) or MAY proceed without an error
+			redirect_uri = form_data.get("redirect_uri")
+			if redirect_uri != session.OAuth2.RedirectUri:
+				raise exceptions.ClientAuthenticationError(
+					"Redirect URI in token request does not match the one used in authorization request.")
+
+		# Request valid, code is consumed
+		await self.OpenIdConnectService.delete_authorization_code(authorization_code)
+
+		return session
+
+
+	async def _get_session_by_refresh_token(self, request):
+		form_data = await request.post()
+		refresh_token = form_data.get("refresh_token")
+		if not refresh_token:
+			raise asab.exceptions.ValidationError("No refresh token in request.")
+
+		# Locate the session
+		session = await self.OpenIdConnectService.get_session_by_refresh_token(refresh_token)
+
+		# TODO: If possible, verify that the Refresh Token has not been previously used.
+
+		# Verify client credentials if required
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=session.OAuth2.ClientId)
+
+		# Ensure the Authorization Code was issued to the authenticated Client
+		if client_id != session.OAuth2.ClientId:
+			raise exceptions.ClientAuthenticationError(
+				"Client ID in token request does not match the one used in authorization request.")
+
+		return session
 
 
 	@asab.web.rest.json_schema_handler({
@@ -239,9 +347,9 @@ class TokenHandler(object):
 	})
 	async def token_revoke(self, request, *, json_data):
 		"""
-		https://tools.ietf.org/html/rfc7009
+		OAuth 2.0 Token revocation
 
-		2.1.  Revocation Request
+		https://tools.ietf.org/html/rfc7009
 		"""
 		# TODO: Confidential clients must authenticate (query params or Authorization header)
 		# TODO: Public clients are not allowed to revoke other clients' tokens
@@ -253,25 +361,25 @@ class TokenHandler(object):
 		return aiohttp.web.HTTPOk()
 
 
-	async def token_error_response(self, request, error_description):
+	def token_error_response(self, request, error, error_description=None):
 		"""
 		3.1.3.4.  Token Error Response
 		"""
 
-		response = {
-			"error": "invalid_request",
-			"error_description": error_description
-		}
-
+		response = {"error": error}
+		if error_description:
+			response["error_description"] = error_description
 		return asab.web.rest.json_response(request, response, headers={
-			'Cache-Control': 'no-store',
-			'Pragma': 'no-cache',
+			"Cache-Control": "no-store",
+			"Pragma": "no-cache",
 		}, status=400)
 
 
 	async def validate_id_token(self, request):
 		"""
-		Read the JWT token either from the request body or from the Authorization header.
+		Check the validity of a JWToken
+
+		Read the JWToken either from the request body or from the Authorization header.
 		Validate the token: send back the contents if successful; otherwise respond with error.
 		"""
 		body = await request.read()
@@ -298,3 +406,52 @@ class TokenHandler(object):
 			return asab.web.rest.json_response(request, {"error": "Cannot parse token claims"}, status=400)
 
 		return asab.web.rest.json_response(request, token_payload)
+
+
+	async def set_track_id(self, request, session, from_ip):
+		# Set track ID if not set yet
+		if session.TrackId is None:
+			session = await self.SessionService.inherit_track_id_from_root(session)
+		if session.TrackId is None:
+			# Obtain the old session by request access token or cookie
+			token_value = generic.get_bearer_token_value(request)
+			if token_value is not None:
+				try:
+					old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
+					AuditLogger.log(
+						asab.LOG_NOTICE,
+						"Token request denied: Track ID transfer failed because of invalid Authorization header",
+						struct_data={
+							"from_ip": from_ip,
+							"cid": session.Credentials.Id,
+							"client_id": session.OAuth2.ClientId,
+						}
+					)
+					return aiohttp.web.HTTPBadRequest()
+			else:
+				# Use cookie only if there is no access token
+				try:
+					old_session = await self.CookieService.get_session_by_request_cookie(
+						request, session.OAuth2.ClientId)
+				except exceptions.SessionNotFoundError:
+					old_session = None
+				except exceptions.NoCookieError:
+					old_session = None
+
+			try:
+				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
+			except ValueError as e:
+				# Return 400 to prevent disclosure while keeping the stacktrace
+				AuditLogger.log(
+					asab.LOG_NOTICE,
+					"Token request denied: Failed to produce session track ID",
+					struct_data={
+						"from_ip": from_ip,
+						"cid": session.Credentials.Id,
+						"client_id": session.OAuth2.ClientId,
+					}
+				)
+				raise aiohttp.web.HTTPBadRequest() from e
+
+		return session

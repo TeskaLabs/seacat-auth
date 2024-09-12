@@ -5,9 +5,8 @@ import asab.storage.exceptions
 
 import pymongo
 
-from passlib.hash import bcrypt
 from .mongodb import MongoDBCredentialsProvider
-
+from ... import generic
 from ...events import EventTypes
 
 #
@@ -54,6 +53,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(app, provider_id, config_section_name)
+		self.RegistrationEnabled = False
 		self.RegistrationFeatures = None
 
 	async def initialize(self):
@@ -79,7 +79,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		u = self.MongoDBStorageService.upsertor(self.CredentialsCollection, obj_id)
 
 		u.set("username", credentials["username"])
-		u.set("__password", bcrypt.hash(credentials["password"].encode("utf-8")))
+		u.set("__password", generic.argon2_hash(credentials["password"]))
 
 		credentials_id = await u.execute(event_type=EventTypes.M2M_CREDENTIALS_CREATED)
 

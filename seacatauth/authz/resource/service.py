@@ -6,6 +6,7 @@ import asab
 import asab.exceptions
 
 from ...events import EventTypes
+from ... import exceptions
 
 #
 
@@ -83,7 +84,7 @@ class ResourceService(asab.Service):
 		},
 	}
 	GlobalOnlyResources = frozenset({
-		"authz:superuser", "authz:impersonate", "authz:tenant:access", "seacat:credentials:access", "seacat:credentials:edit",
+		"authz:superuser", "authz:impersonate", "authz:tenant:access",
 		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
 		"seacat:client:access", "seacat:client:edit", "seacat:tenant:create"})
 
@@ -97,23 +98,6 @@ class ResourceService(asab.Service):
 	async def initialize(self, app):
 		await super().initialize(app)
 		await self._ensure_builtin_resources()
-
-
-	async def is_editable_resource(self, resource: dict | str):
-		if isinstance(resource, str):
-			resource_id = resource
-			if resource_id in self._BuiltinResources:
-				return False
-			resource = await self.get(resource_id)
-		else:
-			resource_id = resource["_id"]
-			if resource_id in self._BuiltinResources:
-				return False
-
-		if resource.get("managed_by"):
-			return False
-		else:
-			return True
 
 
 	def is_global_only_resource(self, resource_id):
@@ -135,9 +119,11 @@ class ResourceService(asab.Service):
 				await self.create(resource_id, description, is_managed_by_seacat_auth=True)
 				continue
 
-			# Update resource description
-			if description is not None and db_resource.get("description") != description:
-				await self._update(resource_id, description)
+			if (
+				(db_resource.get("managed_by") != "seacat-auth")
+				or (description is not None and db_resource.get("description") != description)
+			):
+				await self._update(db_resource, description, is_managed_by_seacat_auth=True)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -147,7 +133,7 @@ class ResourceService(asab.Service):
 			query_filter = {}
 		cursor = collection.find(query_filter)
 
-		cursor.sort("_c", -1)
+		cursor.sort("_id", 1)
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
@@ -155,11 +141,7 @@ class ResourceService(asab.Service):
 		resources = []
 		count = await collection.count_documents(query_filter)
 		async for resource_dict in cursor:
-			if not await self.is_editable_resource(resource_dict):
-				resource_dict["editable"] = False
-			if self.is_global_only_resource(resource_dict["_id"]):
-				resource_dict["global_only"] = True
-			resources.append(resource_dict)
+			resources.append(self.normalize_resource(resource_dict))
 
 		return {
 			"data": resources,
@@ -168,12 +150,11 @@ class ResourceService(asab.Service):
 
 
 	async def get(self, resource_id: str):
-		data = await self.StorageService.get(self.ResourceCollection, resource_id)
-		if not await self.is_editable_resource(data):
-			data["editable"] = False
-		if self.is_global_only_resource(data["_id"]):
-			data["global_only"] = True
-		return data
+		try:
+			resource = await self.StorageService.get(self.ResourceCollection, resource_id)
+		except KeyError:
+			raise exceptions.ResourceNotFoundError(resource_id)
+		return self.normalize_resource(resource)
 
 
 	async def create(self, resource_id: str, description: str = None, is_managed_by_seacat_auth=False):
@@ -204,11 +185,14 @@ class ResourceService(asab.Service):
 
 	async def update(self, resource_id: str, description: str):
 		resource = await self.get(resource_id)
-		if not await self.is_editable_resource(resource):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
+		assert_resource_is_editable(resource)
+		await self._update(resource, description)
+
+
+	async def _update(self, resource: dict, description: str, is_managed_by_seacat_auth=False):
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
-			obj_id=resource_id,
+			obj_id=resource["_id"],
 			version=resource["_v"])
 
 		assert description is not None
@@ -217,18 +201,20 @@ class ResourceService(asab.Service):
 		else:
 			upsertor.set("description", description)
 
+		if is_managed_by_seacat_auth:
+			upsertor.set("managed_by", "seacat-auth")
+
 		await upsertor.execute(event_type=EventTypes.RESOURCE_UPDATED)
-		L.log(asab.LOG_NOTICE, "Resource updated", struct_data={"resource": resource_id})
+		L.log(asab.LOG_NOTICE, "Resource updated", struct_data={"resource": resource["_id"]})
 
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
 		resource = await self.get(resource_id)
-		if not await self.is_editable_resource(resource):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be modified")
+		assert_resource_is_editable(resource)
 
 		# Remove the resource from all roles
 		role_svc = self.App.get_service("seacatauth.RoleService")
-		roles = await role_svc.list(resource=resource_id)
+		roles = await role_svc.list(resource_filter=resource_id)
 		if roles["count"] > 0:
 			for role in roles["data"]:
 				await role_svc.update(role["_id"], resources_to_remove=[resource_id])
@@ -279,11 +265,10 @@ class ResourceService(asab.Service):
 		"""
 		# Get existing resource details and roles
 		resource = await self.get(resource_id)
-		if not await self.is_editable_resource(resource):
-			raise asab.exceptions.ValidationError("Built-in resource cannot be renamed")
+		assert_resource_is_editable(resource)
 
 		role_svc = self.App.get_service("seacatauth.RoleService")
-		roles = await role_svc.list(resource=resource_id)
+		roles = await role_svc.list(resource_filter=resource_id)
 
 		# Delete existing resource
 		await self.StorageService.delete(self.ResourceCollection, resource_id)
@@ -302,3 +287,18 @@ class ResourceService(asab.Service):
 			"new_resource": resource_id,
 			"n_roles": roles["count"],
 		})
+
+
+	def normalize_resource(self, resource: dict):
+		if resource["_id"] in self._BuiltinResources or resource.get("managed_by"):
+			resource["read_only"] = True
+		if self.is_global_only_resource(resource["_id"]):
+			resource["global_only"] = True
+		return resource
+
+
+def assert_resource_is_editable(resource: dict):
+	if resource.get("read_only"):
+		L.log(asab.LOG_NOTICE, "Resource is not editable.", struct_data={"resource_id": resource["_id"]})
+		raise exceptions.NotEditableError("Resource is not editable.")
+	return True

@@ -4,8 +4,9 @@ import asab
 import asab.web.rest
 import asab.exceptions
 
-from seacatauth.decorators import access_control
-from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES
+from ..decorators import access_control
+from .. import generic, exceptions
+from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
 
 #
 
@@ -19,8 +20,7 @@ class ClientHandler(object):
 	Client management
 
 	---
-	tags:
-	- Client management
+	tags: ["Clients (Applications)"]
 	"""
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
@@ -52,25 +52,21 @@ class ClientHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: p
+		-	name: f
 			in: query
 			description: Filter
 			schema:
 				type: string
 		"""
-		page = int(request.query.get("p", 1)) - 1
-		limit = request.query.get("i", None)
-		if limit is not None:
-			limit = int(limit)
-
-		# Filter by ID.startswith()
-		query_filter = request.query.get("f")
+		search = generic.SearchParams(request.query, sort_by_default=[("client_name", 1)])
 
 		data = []
-		async for client in self.ClientService.iterate(page, limit, query_filter):
+		async for client in self.ClientService.iterate(
+			search.Page, search.ItemsPerPage, search.SimpleFilter, sort_by=search.SortBy
+		):
 			data.append(self._rest_normalize(client))
 
-		count = await self.ClientService.count(query_filter)
+		count = await self.ClientService.count(search.SimpleFilter)
 
 		return asab.web.rest.json_response(request, {
 			"data": data,
@@ -84,12 +80,8 @@ class ClientHandler(object):
 		Get client by client_id
 		"""
 		client_id = request.match_info["client_id"]
-		result = self._rest_normalize(
-			await self.ClientService.get(client_id),
-			include_client_secret=True)
-		return asab.web.rest.json_response(
-			request, result
-		)
+		result = self._rest_normalize(await self.ClientService.get(client_id))
+		return asab.web.rest.json_response(request, result)
 
 
 	@access_control("seacat:client:access")
@@ -120,11 +112,18 @@ class ClientHandler(object):
 			if not self.ClientService._AllowCustomClientID:
 				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
-		result = await self.ClientService.register(**json_data)
-		data = self._rest_normalize(
-			await self.ClientService.get(result["client_id"]),
-			include_client_secret=True)
-		return asab.web.rest.json_response(request, data=data)
+		client_id = await self.ClientService.register(**json_data)
+		client = await self.ClientService.get(client_id)
+		response_data = self._rest_normalize(client)
+
+		if is_client_confidential(client):
+			# Set a secret for confidential client
+			client_secret, client_secret_expires_at = await self.ClientService.reset_secret(client_id)
+			response_data["client_secret"] = client_secret
+			if client_secret_expires_at:
+				response_data["client_secret_expires_at"] = client_secret_expires_at
+
+		return asab.web.rest.json_response(request, data=response_data)
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CLIENT_SCHEMA)
@@ -138,7 +137,10 @@ class ClientHandler(object):
 		client_id = request.match_info["client_id"]
 		if "preferred_client_id" in json_data:
 			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
-		await self.ClientService.update(client_id, **json_data)
+		try:
+			await self.ClientService.update(client_id, **json_data)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
@@ -151,10 +153,16 @@ class ClientHandler(object):
 		Reset client secret
 		"""
 		client_id = request.match_info["client_id"]
-		response = await self.ClientService.reset_secret(client_id)
+		try:
+			client_secret, client_secret_expires_at = await self.ClientService.reset_secret(client_id)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
+		response_data = {"client_secret": client_secret}
+		if client_secret_expires_at:
+			response_data["client_secret_expires_at"] = client_secret_expires_at
 		return asab.web.rest.json_response(
 			request,
-			data=response,
+			data=response_data,
 		)
 
 
@@ -164,26 +172,25 @@ class ClientHandler(object):
 		Delete a client
 		"""
 		client_id = request.match_info["client_id"]
-		await self.ClientService.delete(client_id)
+		try:
+			await self.ClientService.delete(client_id)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
 		)
 
 
-	def _rest_normalize(self, client: dict, include_client_secret: bool = False):
-		cookie_service = self.ClientService.App.get_service("seacatauth.CookieService")
-
+	def _rest_normalize(self, client: dict):
 		rest_data = {
 			k: v
 			for k, v in client.items()
 			if not k.startswith("__")
 		}
-		rest_data["client_id"] = rest_data["_id"]
 		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
-		if include_client_secret and "__client_secret" in client:
-			rest_data["client_secret"] = client["__client_secret"]
+		if "__client_secret" in client:
+			rest_data["client_secret"] = True
 			if "client_secret_expires_at" in rest_data:
 				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
-		rest_data["cookie_name"] = cookie_service.get_cookie_name(rest_data["_id"])
 		return rest_data

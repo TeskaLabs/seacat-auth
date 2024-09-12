@@ -1,15 +1,19 @@
+import base64
+import binascii
 import datetime
 import logging
 import re
 import secrets
+import typing
 import urllib.parse
 
 import asab.storage.exceptions
 import asab.exceptions
-
-from seacatauth.client import exceptions
+import pymongo
 from asab.utils import convert_to_seconds
 
+from .. import exceptions
+from .. import generic
 from ..events import EventTypes
 
 #
@@ -36,8 +40,8 @@ APPLICATION_TYPES = [
 ]
 TOKEN_ENDPOINT_AUTH_METHODS = [
 	"none",
-	# "client_secret_basic",
-	# "client_secret_post",
+	"client_secret_basic",
+	"client_secret_post",
 	# "client_secret_jwt",
 	# "private_key_jwt"
 ]
@@ -75,7 +79,8 @@ CLIENT_METADATA_SCHEMA = {
 			"Public URI of the client's cookie entrypoint."},
 	"redirect_uris": {
 		"type": "array",
-		"description": "Array of Redirection URI values used by the Client."},
+		"description": "Array of Redirection URI values used by the Client.",
+		"items": {"type": "string"}},
 	#  "contacts": {},
 	# "custom_data": {  # NON-CANONICAL
 	# 	"type": "object", "description": "(Non-canonical) Additional client data."},
@@ -221,6 +226,15 @@ class ClientService(asab.Service):
 		if self.ClientSecretExpiration <= 0:
 			self.ClientSecretExpiration = None
 
+		self.Cache: typing.Optional[typing.Dict[str, typing.Tuple[dict, datetime.datetime]]] = None
+		self.CacheExpiration = asab.Config.getseconds("seacatauth:client", "cache_expiration")
+		if self.CacheExpiration <= 0:
+			# Disable cache
+			self.Cache = None
+		else:
+			self.Cache = {}
+			self.CacheExpiration = datetime.timedelta(seconds=self.CacheExpiration)
+
 		# DEV OPTIONS
 		# _allow_custom_client_ids
 		#   https://www.oauth.com/oauth2-servers/client-registration/client-id-secret/
@@ -237,9 +251,23 @@ class ClientService(asab.Service):
 		if not self._AllowCustomClientID:
 			CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
 
+		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
+
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
+
+		# Create index for case-insensitive alphabetical sorting
+		coll = await self.StorageService.collection(self.ClientCollection)
+		await coll.create_index(
+			[
+				("client_name", pymongo.ASCENDING),
+			],
+			collation={
+				"locale": "en",
+				"strength": 1,
+			}
+		)
 
 
 	def build_filter(self, match_string):
@@ -249,7 +277,13 @@ class ClientService(asab.Service):
 		]}
 
 
-	async def iterate(self, page: int = 0, limit: int = None, query_filter: str = None):
+	async def iterate(
+		self,
+		page: int = 0,
+		limit: int = None,
+		query_filter: str = None,
+		sort_by: typing.Optional[typing.List[tuple]] = None
+	):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -258,7 +292,16 @@ class ClientService(asab.Service):
 			query_filter = self.build_filter(query_filter)
 		cursor = collection.find(query_filter)
 
-		cursor.sort("_c", -1)
+		if sort_by:
+			if len(sort_by) > 1:
+				L.warning("Multiple sorting parameters are not supported. Only the first one is taken into account.")
+			sort_by = sort_by[0]
+
+			if sort_by[0] == "client_name":
+				# Case-insensitive sorting
+				cursor.collation({"locale": "en"})
+			cursor.sort(*sort_by)
+
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
@@ -266,7 +309,7 @@ class ClientService(asab.Service):
 		async for client in cursor:
 			if "__client_secret" in client:
 				client.pop("__client_secret")
-			yield client
+			yield self._normalize_client(client)
 
 
 	async def count(self, query_filter: dict = None):
@@ -279,11 +322,23 @@ class ClientService(asab.Service):
 
 
 	async def get(self, client_id: str):
-		cookie_svc = self.App.get_service("seacatauth.CookieService")
-		client = await self.StorageService.get(self.ClientCollection, client_id, decrypt=["__client_secret"])
-		if "__client_secret" in client:
-			client["__client_secret"] = client["__client_secret"].decode("ascii")
-		client["cookie_name"] = cookie_svc.get_cookie_name(client_id)
+		"""
+		Get client metadata
+
+		@param client_id:
+		@return:
+		"""
+		# Try to get client from cache
+		client = self._get_from_cache(client_id)
+		if client:
+			return client
+
+		# Get from the database
+		client = await self.StorageService.get(self.ClientCollection, client_id)
+		client = self._normalize_client(client)
+
+		self._store_in_cache(client_id, client)
+
 		return client
 
 
@@ -303,61 +358,27 @@ class ClientService(asab.Service):
 		:type _custom_client_id: str
 		:return: Dict containing the issued client_id and client_secret.
 		"""
-		response_types = kwargs.get("response_types", frozenset(["code"]))
+		response_types = kwargs.get("response_types", {"code"})
 		for v in response_types:
 			assert v in RESPONSE_TYPES
 
-		grant_types = kwargs.get("grant_types", frozenset(["authorization_code"]))
+		grant_types = kwargs.get("grant_types", {"authorization_code"})
 		for v in grant_types:
 			assert v in GRANT_TYPES
 
 		application_type = kwargs.get("application_type", "web")
 		assert application_type in APPLICATION_TYPES
 
-		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
-		# TODO: The default should be "client_secret_basic". Change this once implemented.
-		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
-
 		if _custom_client_id is not None:
 			client_id = _custom_client_id
-			L.warning("Creating a client with custom ID", struct_data={"client_id": client_id})
+			L.warning("Creating a client with custom ID.", struct_data={"client_id": client_id})
 		else:
 			client_id = secrets.token_urlsafe(self.ClientIdLength)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
 
-		if token_endpoint_auth_method == "none":
-			# The client is PUBLIC
-			# Clients incapable of maintaining the confidentiality of their
-			# credentials (e.g., clients executing on the device used by the
-			# resource owner, such as an installed native application or a web
-			# browser-based application), and incapable of secure client
-			# authentication via any other means.
-			# The authorization server MAY establish a client authentication method
-			# with public clients. However, the authorization server MUST NOT rely
-			# on public client authentication for the purpose of identifying the
-			# client.
-			client_secret = None
-			client_secret_expires_at = None
-		elif token_endpoint_auth_method == "client_secret_basic":
-			raise NotImplementedError("Token endpoint auth method 'client_secret_basic' is not supported.")
-			# TODO: Finish implementing authorization with client secret
-			# The client is CONFIDENTIAL
-			# Clients capable of maintaining the confidentiality of their
-			# credentials (e.g., client implemented on a secure server with
-			# restricted access to the client credentials), or capable of secure
-			# client authentication using other means.
-			# Confidential clients are typically issued (or establish) a set of
-			# client credentials used for authenticating with the authorization
-			# server (e.g., password, public/private key pair).
-			client_secret, client_secret_expires_at = self._generate_client_secret()
-			upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
-			if client_secret_expires_at is not None:
-				upsertor.set("client_secret_expires_at", client_secret_expires_at)
-		else:
-			# The client is CONFIDENTIAL
-			# Valid method type, not implemented yet
-			raise NotImplementedError("token_endpoint_auth_method = {!r}".format(token_endpoint_auth_method))
-
+		# TODO: The default should be "client_secret_basic".
+		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
+		assert token_endpoint_auth_method in TOKEN_ENDPOINT_AUTH_METHODS
 		upsertor.set("token_endpoint_auth_method", token_endpoint_auth_method)
 
 		self._check_redirect_uris(redirect_uris, application_type, grant_types)
@@ -385,10 +406,11 @@ class ClientService(asab.Service):
 			upsertor.set("session_expiration", session_expiration)
 
 		# Optional client metadata
-		for k in frozenset([
+		for k in {
 			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
 			"authorize_anonymous_users", "authorize_uri", "cookie_webhook_uri", "cookie_entry_uri",
-			"anonymous_cid"]):
+			"anonymous_cid"
+		}:
 			v = kwargs.get(k)
 			if v is not None and not (isinstance(v, str) and len(v) == 0):
 				upsertor.set(k, v)
@@ -398,44 +420,34 @@ class ClientService(asab.Service):
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="client_id", value=client_id)
 
-		L.log(asab.LOG_NOTICE, "Client created", struct_data={"client_id": client_id})
-
-		response = {
-			"client_id": client_id,
-			"client_id_issued_at": int(datetime.datetime.now(datetime.timezone.utc).timestamp())}
-
-		if client_secret is not None:
-			response["client_secret"] = client_secret
-			if client_secret_expires_at is not None:
-				response["client_secret_expires_at"] = client_secret_expires_at
-
-		return response
+		L.log(asab.LOG_NOTICE, "Client created.", struct_data={"client_id": client_id})
+		return client_id
 
 
 	async def reset_secret(self, client_id: str):
+		"""
+		Set or reset client secret
+		"""
+		# TODO: Use M2M credentials provider.
 		client = await self.get(client_id)
-		if client["token_endpoint_auth_method"] == "none":
-			# The authorization server MAY establish a client authentication method with public clients.
-			# However, the authorization server MUST NOT rely on public client authentication for the purpose
-			# of identifying the client. [rfc6749#section-3.1.2]
-			raise asab.exceptions.ValidationError("Cannot set secret for public client")
+		assert_client_is_editable(client)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
-		upsertor.set("__client_secret", client_secret.encode("ascii"), encrypt=True)
+		client_secret_hash = generic.argon2_hash(client_secret)
+		upsertor.set("__client_secret", client_secret_hash)
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
+
 		await upsertor.execute(event_type=EventTypes.CLIENT_SECRET_RESET)
-		L.log(asab.LOG_NOTICE, "Client secret updated", struct_data={"client_id": client_id})
+		self._delete_from_cache(client_id)
+		L.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
 
-		response = {"client_secret": client_secret}
-		if client_secret_expires_at is not None:
-			response["client_secret_expires_at"] = client_secret_expires_at
-
-		return response
+		return client_secret, client_secret_expires_at
 
 
 	async def update(self, client_id: str, **kwargs):
 		client = await self.get(client_id)
+		assert_client_is_editable(client)
 		client_update = {}
 		for k, v in kwargs.items():
 			if k not in CLIENT_METADATA_SCHEMA:
@@ -471,14 +483,19 @@ class ClientService(asab.Service):
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
-		L.log(asab.LOG_NOTICE, "Client updated", struct_data={
+		self._delete_from_cache(client_id)
+		L.log(asab.LOG_NOTICE, "Client updated.", struct_data={
 			"client_id": client_id,
-			"fields": " ".join(client_update.keys())})
+			"fields": " ".join(client_update.keys())
+		})
 
 
 	async def delete(self, client_id: str):
+		client = await self.get(client_id)
+		assert_client_is_editable(client)
 		await self.StorageService.delete(self.ClientCollection, client_id)
-		L.log(asab.LOG_NOTICE, "Client deleted", struct_data={"client_id": client_id})
+		self._delete_from_cache(client_id)
+		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
 
 
 	async def validate_client_authorize_options(
@@ -504,22 +521,108 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client(self, client: dict, client_secret: str = None):
+	async def authenticate_client_request(
+		self,
+		request,
+		expected_client_id: typing.Optional[str] = None
+	) -> typing.Optional[str]:
 		"""
-		Verify client credentials (client_id and client_secret).
+		Verify client ID and secret.
 		"""
-		# TODO: Use a client credential provider.
-		if client_secret is None:
-			# The client MAY omit the parameter if the client secret is an empty string.
-			# [rfc6749#section-2.3.1]
-			client_secret = ""
-		if "client_secret_expires_at" in client \
-			and client["client_secret_expires_at"] != 0 \
-			and client["client_secret_expires_at"] < datetime.datetime.now(datetime.timezone.utc):
-			L.warning("Client secret expired.", struct_data={"client_id": client["_id"]})
-		if client_secret != client.get("__client_secret", ""):
-			L.warning("Incorrect client secret.", struct_data={"client_id": client["_id"]})
-		return True
+		if expected_client_id:
+			# Client ID is known - Use the pre-configured authentication method
+			client_dict = await self.get(expected_client_id)
+			expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+			if expected_auth_method == "none":
+				return expected_client_id
+			if expected_auth_method == "client_secret_basic":
+				client_id, client_secret = self._get_credentials_from_authorization_header(request)
+			elif expected_auth_method == "client_secret_post":
+				client_id, client_secret = await self._get_credentials_from_post_data(request)
+			else:
+				raise NotImplementedError("Unsupported client authentication method: {}".format(expected_auth_method))
+
+			if not client_id:
+				raise exceptions.ClientAuthenticationError(
+					"Failed to get client credentials from request.",
+					client_id=expected_client_id,
+				)
+			elif client_id != expected_client_id:
+				raise exceptions.ClientAuthenticationError(
+					"Client IDs do not match (expected {!r}).".format(expected_client_id),
+					client_id=client_id,
+				)
+
+		else:
+			# Client ID is not known in advance - Try to extract it from the request
+			client_id, client_secret = self._get_credentials_from_authorization_header(request)
+			if client_id and client_secret:
+				auth_method = "client_secret_basic"
+			else:
+				client_id, client_secret = await self._get_credentials_from_post_data(request)
+				if client_id and client_secret:
+					auth_method = "client_secret_post"
+				else:
+					# Public client - Authentication not required
+					# auth_method = "none"
+					return None
+
+			assert client_id
+			client_dict = await self.get(client_id)
+			expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+			if auth_method != expected_auth_method:
+				raise exceptions.ClientAuthenticationError(
+					"Unexpected authentication method (expected {!r}, {!r}).".format(
+						expected_auth_method, auth_method),
+					client_id=client_id,
+				)
+			elif auth_method == "none":
+				# Public client - no secret verification required
+				return client_id
+
+		# Check secret expiration
+		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
+		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
+			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=expected_client_id)
+
+		# Verify client secret
+		client_secret_hash = client_dict.get("__client_secret", None)
+		if not generic.argon2_verify(client_secret_hash, client_secret):
+			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
+
+		return client_id
+
+
+	def _get_credentials_from_authorization_header(
+		self, request
+	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+		auth_header = request.headers.get("Authorization")
+		if not auth_header:
+			return None, None
+		try:
+			token_type, auth_token = auth_header.split(" ")
+		except ValueError:
+			return None, None
+		if token_type != "Basic":
+			return None, None
+		try:
+			auth_token_decoded = base64.urlsafe_b64decode(auth_token.encode("ascii")).decode("ascii")
+		except (binascii.Error, UnicodeDecodeError):
+			return None, None
+		try:
+			client_id, client_secret = auth_token_decoded.split(":")
+		except ValueError:
+			return None, None
+		return client_id, client_secret
+
+
+	async def _get_credentials_from_post_data(
+		self, request
+	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+		post_data = await request.post()
+		if not ("client_id" in post_data and "client_secret" in post_data):
+			return None, None
+		return post_data["client_id"], post_data["client_secret"]
 
 
 	def _check_grant_types(self, grant_types, response_types):
@@ -597,6 +700,54 @@ class ClientService(asab.Service):
 		return client_secret, client_secret_expires_at
 
 
+	def _get_from_cache(self, client_id: str):
+		if self.Cache is None:
+			return None
+		if client_id not in self.Cache:
+			return None
+		client, expires_at = self.Cache[client_id]
+		if datetime.datetime.now(datetime.UTC) > expires_at:
+			del self.Cache[client_id]
+			return None
+		return client
+
+
+	def _store_in_cache(self, client_id, client):
+		if self.Cache is None:
+			return
+		self.Cache[client_id] = (
+			client,
+			datetime.datetime.now(datetime.UTC) + self.CacheExpiration
+		)
+
+
+	def _delete_from_cache(self, client_id: str):
+		if self.Cache is None:
+			return
+		if client_id in self.Cache:
+			del self.Cache[client_id]
+
+
+	def _clear_expired_cache(self, event_name):
+		if not self.Cache:
+			return
+		valid = {}
+		now = datetime.datetime.now(datetime.UTC)
+		for k, (v, exp) in self.Cache.items():
+			if now < exp:
+				valid[k] = v, exp
+		self.Cache = valid
+
+
+	def _normalize_client(self, client: dict):
+		client["client_id"] = client["_id"]
+		if client.get("managed_by"):
+			client["read_only"] = True
+		cookie_svc = self.App.get_service("seacatauth.CookieService")
+		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
+		return client
+
+
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
 	if validation_method is None:
 		validation_method = "full_match"
@@ -622,3 +773,20 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 		raise ValueError("Unsupported redirect_uri_validation_method: {!r}".format(validation_method))
 
 	return False
+
+
+def is_client_confidential(client: dict):
+	token_endpoint_auth_method = client.get("token_endpoint_auth_method", "none")
+	if token_endpoint_auth_method == "none":
+		return False
+	elif token_endpoint_auth_method in {"client_secret_basic", "client_secret_post"}:
+		return True
+	else:
+		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
+
+
+def assert_client_is_editable(client: dict):
+	if client.get("read_only"):
+		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
+		raise exceptions.NotEditableError("Client is not editable.")
+	return True

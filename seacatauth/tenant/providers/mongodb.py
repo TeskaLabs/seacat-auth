@@ -131,21 +131,17 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 	async def delete(self, tenant_id: str) -> Optional[bool]:
 		"""
-		Delete tenant. Also delete all its roles and assignments.
+		Delete tenant
 		"""
 		await self.MongoDBStorageService.delete(self.TenantsCollection, tenant_id)
 		L.log(asab.LOG_NOTICE, "Tenant deleted.", struct_data={"tenant": tenant_id})
 
 
 	async def get(self, tenant_id) -> Optional[dict]:
-		# Fetch the tenant from a Mongo
-		tenant = await self.MongoDBStorageService.get(
-			self.TenantsCollection,
-			# bson.ObjectId(tenant_id)
-			tenant_id
-		)
-
-		return tenant
+		"""
+		Get tenant
+		"""
+		return await self.MongoDBStorageService.get(self.TenantsCollection, tenant_id)
 
 
 	# async def register(self, register_info, credentials_id):
@@ -208,8 +204,15 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		})
 
 
-	async def list_tenant_assignments(self, tenant, page: int = 0, limit: int = None):
-		query_filter = {'t': tenant}
+	async def list_tenant_assignments(self, tenant: str | list, page: int = 0, limit: int = None):
+		"""
+		List credential IDs assigned to the tenant or tenants
+		"""
+		if isinstance(tenant, str):
+			query_filter = {"t": tenant}
+		else:
+			query_filter = {"t": {"$in": tenant}}
+
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
 		cursor = collection.find(query_filter)
 
@@ -238,7 +241,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		})
 
 
-	async def get_assignment(self, credatials_id: str, tenant: str):
+	async def get_assignment(self, credatials_id: str, tenant: str) -> dict:
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
 		query = {"c": credatials_id, "t": tenant}
 		result = await collection.find_one(query)

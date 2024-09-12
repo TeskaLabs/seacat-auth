@@ -3,7 +3,7 @@ import logging
 import secrets
 import aiohttp
 import asab
-import passlib.hash
+import hashlib
 
 from . import CommunicationProviderABC
 
@@ -81,17 +81,16 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 
 			time = datetime.datetime.now(datetime.timezone.utc).strftime(self.TimestampFormat)
 			salt = secrets.token_urlsafe(16)
-			auth = passlib.hash.hex_md5.hash(self.Password + time + salt)
 			url_params["time"] = time
 			url_params["salt"] = salt
-			url_params["auth"] = auth
+			url_params["auth"] = hashlib.md5((self.Password + time + salt).encode("utf-8")).hexdigest()
 
 			if self.MockMode:
 				L.log(
 					asab.LOG_NOTICE, "SMSBrana.cz provider is in mock mode. Message will not be sent.",
 					struct_data=url_params
 				)
-				return True
+				return
 
 			async with aiohttp.ClientSession() as session:
 				async with session.get(self.URL, params=url_params) as resp:
@@ -105,4 +104,3 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				raise RuntimeError("SMS delivery failed.")
 			else:
 				L.log(asab.LOG_NOTICE, "SMS sent")
-		return True

@@ -3,11 +3,11 @@ from typing import Optional
 
 import asab
 import aiomysql
-import passlib.hash
 import pymysql
 import re
 
 from .abc import CredentialsProviderABC, EditableCredentialsProviderABC
+from ... import generic
 
 #
 
@@ -218,7 +218,7 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 		if dbcred[self.PasswordField].startswith("$2b$") \
 			or dbcred[self.PasswordField].startswith("$2a$") \
 			or dbcred[self.PasswordField].startswith("$2y$"):
-			if passlib.hash.bcrypt.verify(credentials["password"], dbcred[self.PasswordField]):
+			if generic.bcrypt_verify(dbcred[self.PasswordField], credentials["password"]):
 				return True
 			else:
 				return False
@@ -284,7 +284,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 
 		value = update.pop("password", None)
 		if value is not None:
-			new_credentials["__password"] = passlib.hash.bcrypt.hash(value.encode("utf-8"))
+			new_credentials["__password"] = generic.argon2_hash(value)
 
 		value = update.pop("enforce_factors", None)
 		if value is not None:

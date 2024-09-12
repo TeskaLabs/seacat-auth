@@ -21,7 +21,7 @@ class ChangePasswordHandler(object):
 	Manage password
 
 	---
-	tags: ["Manage password"]
+	tags: ["Passwords"]
 	"""
 
 	def __init__(self, app, change_password_svc):
@@ -30,12 +30,15 @@ class ChangePasswordHandler(object):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_put("/password", self.admin_request_password_change)
+		web_app.router.add_put("/password", self.admin_request_password_reset)
+		web_app.router.add_get("/account/password/policy", self.password_policy)
 		web_app.router.add_put("/account/password-change", self.change_password)
+		web_app.router.add_get("/public/password/policy", self.password_policy)
 		web_app.router.add_put("/public/password-reset", self.reset_password)
 		web_app.router.add_put("/public/lost-password", self.lost_password)
 
 		web_app_public = app.PublicWebContainer.WebApp
+		web_app_public.router.add_get("/public/password/policy", self.password_policy)
 		web_app_public.router.add_put("/public/password-reset", self.reset_password)
 		web_app_public.router.add_put("/public/lost-password", self.lost_password)
 
@@ -44,6 +47,14 @@ class ChangePasswordHandler(object):
 		web_app.router.add_put("/public/password-change", self.change_password)
 		web_app_public.router.add_put("/public/password-change", self.change_password)
 		# <<<
+
+
+	async def password_policy(self, request):
+		"""
+		Get minimum password requirements
+		"""
+		response_data = await self.ChangePasswordService.password_policy()
+		return asab.web.rest.json_response(request, response_data)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -75,10 +86,35 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id, "from_ip": from_ip})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=401, data={
+				"result": "UNAUTHORIZED",
+				"tech_message": "Authentication failed.",
+			})
+
+		# Verify that the new password is different from the old one
+		# TODO: Users should not reuse their last 10 passwords at least
+		if new_password == old_password:
+			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: Reusing old passwords is not allowed.", struct_data={
+				"cid": credentials_id, "from_ip": from_ip})
+			await self.LastActivityService.update_last_activity(
+				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "FAILED",
+				"tech_message": "Reusing old passwords is not allowed.",
+			})
 
 		# Change the password
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
+		except exceptions.WeakPasswordError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: New password too weak.", struct_data={
+				"cid": credentials_id, "from_ip": from_ip})
+			await self.LastActivityService.update_last_activity(
+				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "FAILED",
+				"tech_message": str(e),
+			})
 		except Exception as e:
 			L.exception("Password change failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
@@ -146,6 +182,15 @@ class ChangePasswordHandler(object):
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
+		except exceptions.WeakPasswordError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Password reset denied: New password too weak.", struct_data={
+				"cid": credentials_id, "from_ip": from_ip})
+			await self.LastActivityService.update_last_activity(
+				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "FAILED",
+				"tech_message": str(e),
+			})
 		except Exception as e:
 			L.exception("Password reset failed: {}".format(e))
 			AuditLogger.log(asab.LOG_NOTICE, "Password reset failed: {}".format(e.__class__.__name__), struct_data={
@@ -177,14 +222,21 @@ class ChangePasswordHandler(object):
 		}
 	})
 	@access_control("seacat:credentials:edit")
-	async def admin_request_password_change(self, request, *, json_data):
+	async def admin_request_password_reset(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
 		"""
 		credentials_id = json_data.get("credentials_id")
 		try:
-			await self.ChangePasswordService.init_password_change(
-				credentials_id,
+			credentials = await self.CredentialsService.get(credentials_id)
+		except exceptions.CredentialsNotFoundError:
+			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found.", struct_data={
+				"cid": credentials_id})
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+
+		try:
+			reset_url = await self.ChangePasswordService.init_password_reset_by_admin(
+				credentials,
 				expiration=json_data.get("expiration")
 			)
 		except exceptions.CredentialsNotFoundError:
@@ -195,12 +247,18 @@ class ChangePasswordHandler(object):
 			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
-		except exceptions.CommunicationError:
-			# TODO: If no communication provider is configured, return the link in the response
-			L.error("Failed to send password change link", struct_data={"cid": credentials_id})
+		except exceptions.MessageDeliveryError as e:
+			L.error("Failed to send password change link: {}".format(e), struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
-		return asab.web.rest.json_response(request, {"result": "OK"})
+		response_data = {"result": "OK"}
+		if reset_url:
+			# Password reset URL was not sent because CommunicationService is disabled
+			# Add the URL to admin response
+			response_data["reset_url"] = reset_url
+
+		return asab.web.rest.json_response(request, response_data)
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -227,18 +285,24 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, {"result": "OK"})
 
 		try:
-			await self.ChangePasswordService.init_password_change(credentials_id)
-			AuditLogger.log(asab.LOG_NOTICE, "Lost password reset initiated", struct_data={
-				"cid": credentials_id, "from": access_ips})
+			credentials = await self.CredentialsService.get(credentials_id)
 		except exceptions.CredentialsNotFoundError:
 			L.error("Lost password reset denied: Credentials not found", struct_data={
 				"cid": credentials_id, "from": access_ips})
+			# Avoid information disclosure
+			return asab.web.rest.json_response(request, {"result": "OK"})
+
+		try:
+			await self.ChangePasswordService.init_lost_password_reset(credentials)
 		except exceptions.CredentialsSuspendedError:
 			L.error("Lost password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id, "from": access_ips})
-		except exceptions.CommunicationError:
-			L.error("Lost password reset failed: Failed to send password change link", struct_data={
-				"cid": credentials_id, "from": access_ips})
-		finally:
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})
+		except exceptions.MessageDeliveryError as e:
+			L.error("Lost password reset failed: Failed to send password change link ({})".format(e), struct_data={
+				"cid": credentials_id, "from": access_ips})
+			# Avoid information disclosure
+			return asab.web.rest.json_response(request, {"result": "OK"})
+
+		return asab.web.rest.json_response(request, {"result": "OK"})

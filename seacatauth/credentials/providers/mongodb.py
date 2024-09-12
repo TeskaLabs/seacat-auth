@@ -3,8 +3,6 @@ import logging
 import re
 from typing import Optional
 
-from passlib.hash import bcrypt
-
 import asab
 import asab.storage.mongodb
 import asab.storage.exceptions
@@ -17,7 +15,7 @@ import pymongo
 import pymongo.errors
 
 from .abc import EditableCredentialsProviderABC
-
+from ... import generic
 from ...events import EventTypes
 
 #
@@ -33,7 +31,6 @@ class MongoDBCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		# TODO: Check bcrypt.get_backend() - see https://passlib.readthedocs.io/en/stable/lib/passlib.hash.bcrypt.html#index-0
 		return MongoDBCredentialsProvider(self.App, provider_id, config_section_name)
 
 
@@ -61,8 +58,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 	ConfigDefaults = {
 		"credentials_collection": "c",
-		"tenants": "no",
-		"registration": "no",
+		"tenants": "yes",
+		"registration": "yes",
 	}
 
 
@@ -176,7 +173,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		# Update password
 		v = update.pop("password", None)
 		if v is not None:
-			u.set("__password", bcrypt.hash(v.encode('utf-8')))
+			u.set("__password", generic.argon2_hash(v))
 
 		# Update basic credentials
 		for key, value in update.items():
@@ -295,6 +292,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if limit >= 0:
 			cursor.limit(limit)
 
+		cursor.sort("username", 1)
+
 		async for d in cursor:
 			yield self._normalize_credentials(d)
 
@@ -383,40 +382,32 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			)
 		except KeyError:
 			# Should not occur if login prologue happened correctly
-			L.error("Authentication failed: Credentials not found", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: Credentials not found.", struct_data={"cid": credentials_id})
 			return False
 
 		if dbcred.get("suspended") is True:
 			# if the user is in suspended state then login no allowed
-			L.info("Authentication failed: Credentials suspended", struct_data={"cid": credentials_id})
+			L.info("Authentication failed: Credentials suspended.", struct_data={"cid": credentials_id})
 			return False
 
-		if "__password" in dbcred:
-			if authn_password(dbcred, credentials):
-				return True
-			else:
-				L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
-		else:
+		password = credentials.get("password")
+		if not password:
+			L.error("Authentication failed: Login data contain no password.", struct_data={"cid": credentials_id})
+			return False
+
+		password_hash = dbcred.get("__password")
+		if not password_hash:
 			# Should not occur if login prologue happened correctly
-			L.error("Authentication failed: Login data contain no password", struct_data={"cid": credentials_id})
+			L.error("Authentication failed: User has no password set.", struct_data={"cid": credentials_id})
+			return False
+
+		if self._verify_password(password_hash, password):
+			return True
+		else:
+			L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
 
 		return False
 
 
 	def _create_credential_id(self, username) -> bson.ObjectId:
 		return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
-
-
-def authn_password(dbcred, credentials):
-	# This is here for a cryptoagility, if we migrate to a newer password hashing function,
-	# this if block will be extended
-	if dbcred['__password'].startswith('$2b$') \
-		or dbcred['__password'].startswith('$2a$') \
-		or dbcred['__password'].startswith('$2y$'):
-		if bcrypt.verify(credentials['password'], dbcred['__password']):
-			return True
-		else:
-			return False
-	else:
-		L.error("Unknown password hash function '{}'".format(dbcred['__password'][:4]))
-		return False

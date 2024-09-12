@@ -10,7 +10,7 @@ import typing
 
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
-from .. import AuditLogger
+from .. import AuditLogger, generic, exceptions
 from ..session import SessionAdapter
 
 #
@@ -179,26 +179,89 @@ class CredentialsService(asab.Service):
 				break
 		return credentials
 
-	async def iterate(self):
-		'''
-		This iterates over all providers and combines their results
-		'''
-		pending = [provider.iterate() for provider in self.CredentialProviders.values()]
+
+	async def iterate(self, filter: typing.Optional[str] = None):
+		"""
+		Iterate over all providers and combine their results.
+		Fully asynchronous, but does not preserve the order of documents.
+		"""
+		pending = [provider.iterate(filtr=filter) for provider in self.CredentialProviders.values()]
 		pending_tasks = {
 			asyncio.ensure_future(g.__anext__()): g for g in pending
 		}
 		while len(pending_tasks) > 0:
-			done, _ = await asyncio.wait(pending_tasks.keys(), return_when="FIRST_COMPLETED")
-			for d in done:
-				dg = pending_tasks.pop(d)
+			tasks_done, _ = await asyncio.wait(pending_tasks.keys(), return_when="FIRST_COMPLETED")
+			for task in tasks_done:
+				provider_generator = pending_tasks.pop(task)
 
 				try:
-					r = await d
+					credentials_data = await task
 				except StopAsyncIteration:
 					continue
 
-				pending_tasks[asyncio.ensure_future(dg.__anext__())] = dg
-				yield r
+				pending_tasks[asyncio.ensure_future(provider_generator.__anext__())] = provider_generator
+				yield credentials_data
+
+
+	async def iterate_stable(self, offset: int = 0, filter: typing.Optional[str] = None):
+		"""
+		Iterate over all providers and combine their results.
+		Preserves the order of results.
+		"""
+		for provider in self.CredentialProviders.values():
+			async for credobj in provider.iterate(offset=offset, filtr=filter):
+				if offset > 0:
+					offset -= 1
+					continue
+				yield credobj
+
+
+	async def _tenant_filter(self, credentials_id: str, tenant_ids: typing.Iterable):
+		if tenant_ids is None:
+			return True
+		tenant_svc = self.App.get_service("seacatauth.TenantService")
+		for tenant_id in tenant_ids:
+			try:
+				await tenant_svc.get_assigned_tenant(credentials_id, tenant_id)
+				return True
+			except KeyError:
+				return False
+
+	async def _role_filter(self, credentials_id: str, role_ids: typing.Iterable):
+		if role_ids is None:
+			return True
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		for role_id in role_ids:
+			try:
+				await role_svc.get_assigned_role(credentials_id, role_id)
+				return True
+			except KeyError:
+				return False
+
+
+	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, try_global_search: bool = False):
+		"""
+		List credentials that are members of currently authorized tenants.
+		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
+		"""
+		searched_tenants = _authorize_searched_tenants(session, search_params, try_global_search)
+		searched_roles = _authorize_searched_roles(session, search_params)
+
+		credentials = []
+		offset = search_params.Page * search_params.ItemsPerPage
+		async for credentials_data in self.iterate_stable(filter=search_params.SimpleFilter):
+			if not await self._role_filter(credentials_data["_id"], searched_roles):
+				continue
+			if not await self._tenant_filter(credentials_data["_id"], searched_tenants):
+				continue
+			if offset > 0:
+				offset -= 1
+				continue
+			credentials.append(credentials_data)
+			if len(credentials) >= search_params.ItemsPerPage:
+				break
+
+		return {"data": credentials}
 
 
 	def get_provider(self, credentials_id):
@@ -226,8 +289,11 @@ class CredentialsService(asab.Service):
 		'''
 		Find detail of credentials for a credentials_id.
 		'''
-		provider = self.get_provider(credentials_id)
-		return await provider.get(credentials_id, include=include)
+		try:
+			provider = self.get_provider(credentials_id)
+			return await provider.get(credentials_id, include=include)
+		except KeyError:
+			raise exceptions.CredentialsNotFoundError(credentials_id=credentials_id)
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
@@ -341,6 +407,7 @@ class CredentialsService(asab.Service):
 			"credentials_id": credentials_id,
 		}
 
+
 	# TODO: Implement editing for M2M credentials
 	async def update_credentials(self, credentials_id: str, update_dict: dict, session: SessionAdapter = None):
 		"""
@@ -354,6 +421,10 @@ class CredentialsService(asab.Service):
 		"""
 		# Record the requester's ID for logging purposes
 		agent_cid = session.Credentials.Id if session is not None else None
+
+		# Credentials outside the current tenant are invisible (except if superuser)
+		if not await self.can_access_credentials(session, credentials_id):
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		# Disallow sensitive field updates
 		for key in update_dict:
@@ -551,3 +622,86 @@ class CredentialsService(asab.Service):
 			]
 
 		return info
+
+
+	async def can_access_credentials(self, session, credentials_id: str) -> bool:
+		"""
+		Check if the target user is a member of currently authorized tenant
+		"""
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		if not session:
+			return False
+		if session.is_superuser():
+			return True
+		for tenant_id in session.Authorization.Authz.keys():
+			if tenant_id == "*":
+				continue
+			if await tenant_service.has_tenant_assigned(credentials_id, tenant_id):
+				# User is member of currently authorized tenant
+				return True
+		# The request and the target credentials have no tenant in common
+		return False
+
+
+def _authorize_searched_tenants(
+	session: SessionAdapter,
+	search_params: generic.SearchParams,
+	try_global_search: bool = False
+) -> typing.Optional[typing.Iterable[str]]:
+	"""
+	Authorize and return a list of tenants to filter by.
+	"""
+	if not session.is_superuser():
+		# Return only tenant members
+		try_global_search = False
+
+	authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
+
+	# Authorize searched tenants
+	if "tenant" in search_params.AdvancedFilter:
+		# Search only requested tenant
+		tenant_id = search_params.AdvancedFilter["tenant"]
+		# Check tenant access
+		if not (tenant_id in authorized_tenants or session.is_superuser()):
+			raise exceptions.AccessDeniedError(
+				"Not authorized to access tenant members",
+				subject=session.Credentials.Id,
+				resource={"tenant_id": tenant_id}
+			)
+		searched_tenants = [tenant_id]
+	elif try_global_search:
+		# Search all credentials, ignore tenants
+		searched_tenants = None
+	else:
+		# Search currently authorized tenants
+		searched_tenants = authorized_tenants
+
+	return searched_tenants
+
+
+def _authorize_searched_roles(
+	session: SessionAdapter,
+	search_params: generic.SearchParams
+) -> typing.Optional[typing.Iterable[str]]:
+	"""
+	Authorize and return a list of roles to filter by.
+	"""
+	authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
+	role_id = search_params.AdvancedFilter.get("role")
+	if not role_id:
+		return None
+
+	role_id = search_params.AdvancedFilter["role"]
+	tenant_id = role_id.split("/")[0]
+
+	# Check tenant access
+	#  - global role is always accessible
+	#  - role in my authorized tenants is accessible
+	#  - superuser can access anything
+	if not (tenant_id == "*" or tenant_id in authorized_tenants or session.is_superuser()):
+		raise exceptions.AccessDeniedError(
+			"Not authorized to access role.",
+			subject=session.Credentials.Id,
+			resource={"role_id": role_id}
+		)
+	return [role_id]

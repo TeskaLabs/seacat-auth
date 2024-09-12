@@ -4,8 +4,10 @@ import re
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.exceptions
 
-from seacatauth.decorators import access_control
+from ... import exceptions
+from ...decorators import access_control
 
 #
 
@@ -19,7 +21,7 @@ class ResourceHandler(object):
 	Resource management
 
 	---
-	tags: ["Resource management"]
+	tags: ["Resources"]
 	"""
 
 	def __init__(self, app, rbac_svc):
@@ -34,7 +36,6 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 
-	@access_control("seacat:resource:access")
 	async def list(self, request):
 		"""
 		List resources
@@ -75,8 +76,9 @@ class ResourceHandler(object):
 
 		# Filter by ID.startswith()
 		query_filter = {}
-		if "f" in request.query:
-			query_filter["_id"] = {"$regex": "^{}".format(re.escape(request.query["f"]))}
+		name_filter = request.query.get("f")
+		if name_filter:
+			query_filter["_id"] = {"$regex": re.escape(name_filter)}
 
 		# Get the types of resources to exclude from the results
 		# By default, exclude only deleted resources
@@ -104,7 +106,6 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, resources)
 
 
-	@access_control("seacat:resource:access")
 	async def get(self, request):
 		"""
 		Get resource detail
@@ -160,10 +161,16 @@ class ResourceHandler(object):
 		"""
 		resource_id = request.match_info["resource_id"]
 		if "description" in json_data:
-			await self.ResourceService.update(resource_id, json_data["description"])
+			try:
+				await self.ResourceService.update(resource_id, json_data["description"])
+			except exceptions.NotEditableError as e:
+				return e.json_response(request)
 		if "name" in json_data and json_data["name"] != resource_id:
 			# TODO: Renaming should be on a separate endpoint
-			await self.ResourceService.rename(resource_id, json_data["name"])
+			try:
+				await self.ResourceService.rename(resource_id, json_data["name"])
+			except exceptions.NotEditableError as e:
+				return e.json_response(request)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
@@ -194,5 +201,8 @@ class ResourceHandler(object):
 			L.log(asab.LOG_NOTICE, "Cannot hard-delete resources without superuser rights", struct_data={
 				"cid": credentials_id, "resource": resource_id})
 			return aiohttp.web.HTTPForbidden()
-		await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
+		try:
+			await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
 		return asab.web.rest.json_response(request, {"result": "OK"})

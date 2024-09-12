@@ -150,10 +150,7 @@ async def _authorize_tenant(request):
 	else:
 		# Check if tenant exists
 		tenant_service = request.App.get_service("seacatauth.TenantService")
-		try:
-			await tenant_service.get_tenant(requested_tenant)
-		except KeyError as e:
-			raise exceptions.TenantNotFoundError(requested_tenant) from e
+		await tenant_service.get_tenant(requested_tenant)
 
 		if requested_tenant in request.Session.Authorization.Authz:
 			# Tenant accessible

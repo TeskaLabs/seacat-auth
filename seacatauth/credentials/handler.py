@@ -4,8 +4,9 @@ import asab
 import asab.web.rest
 import asab.web.webcrypto
 import asab.exceptions
+import asab.utils
 
-from .. import exceptions
+from .. import exceptions, generic
 from ..decorators import access_control
 from .schemas import (
 	CREATE_CREDENTIALS,
@@ -25,7 +26,7 @@ class CredentialsHandler(object):
 	Credential management
 
 	---
-	tags: ["Credential management"]
+	tags: ["Users and credentials"]
 	"""
 
 	def __init__(self, app, credentials_svc):
@@ -69,7 +70,6 @@ class CredentialsHandler(object):
 		# <<<
 
 
-	@access_control("seacat:credentials:access")
 	async def list_providers(self, request):
 		"""
 		Get credential providers and their metadata
@@ -80,7 +80,6 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, providers)
 
 
-	@access_control("seacat:credentials:access")
 	async def get_provider_info(self, request):
 		"""
 		Get the metadata of the requested credential provider.
@@ -108,7 +107,6 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control("seacat:credentials:access")
 	async def get_last_login_data(self, request):
 		"""
 		Get the credentials' last successful/failed login data.
@@ -129,7 +127,6 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control("seacat:credentials:access")
 	async def locate_credentials(self, request):
 		"""
 		Return the IDs of credentials that match the specified ident.
@@ -157,168 +154,66 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"credentials_ids": credentials_ids})
 
 
-	@access_control("seacat:credentials:access")
+	@access_control()
 	async def list_credentials(self, request):
 		"""
-		List credentials
+		List credentials that are members of currently authorized tenant
 
 		---
 		parameters:
 		-	name: p
 			in: query
 			description: Page number
-			schema:
-				type: integer
+			schema: {"type": "integer"}
 		-	name: i
 			in: query
 			description: Items per page
-			schema:
-				type: integer
+			schema: {"type": "integer"}
 		-	name: f
 			in: query
-			description: Filter string
-			schema:
-				type: string
-		-	name: m
+			description: Filter by username or email
+			schema: {"type": "string"}
+		-	name: atenant
+			in: query
+			required: false
+			description: Filter by tenant
+			schema: {"type": "string"}
+		-	name: arole
+			in: query
+			required: false
+			description: Filter by role
+			schema: {"type": "string"}
+		-	name: global
 			in: query
 			required: false
 			description:
-				Filter mode.
-
-				- In the `default` mode, the request filters for credentials whose attributes contain
-				the *filter string*. The actual attributes searched depend on the capabilities of the respective
-				credential provider.
-
-				- In the `tenant` mode, the request filters for credentials assigned to the tenant that exactly
-				matches the *filter string*.
-
-				- In the `role` mode, the request filters for credentials with the role that exactly
-				matches the *filter string*.
-			schema:
-				type: string
-				enum: ["tenant", "role", "default"]
-				default: default
+			schema: {"type": "boolean"}
 		"""
-		page = int(request.query.get('p', 1)) - 1
-		limit = int(request.query.get('i', 10))
+		search = generic.SearchParams(request.query)
 
-		# Filter mode switches between `default` (username) string filter, `role` match and `tenant` match
+		# BACK-COMPAT: Convert the old "mode" search to advanced filters
 		mode = request.query.get("m", "default")
-		filtr = request.query.get("f", "")
-		if len(filtr) == 0:
-			filtr = None
+		if mode == "role":
+			search.AdvancedFilter["role"] = request.query.get("f")
+			search.SimpleFilter = None
+		elif mode == "tenant":
+			search.AdvancedFilter["tenant"] = request.query.get("f")
+			search.SimpleFilter = None
+		elif mode == "default":
+			search.SimpleFilter = request.query.get("f")
 
-		# Filtering based on IDs obtained form another collection
-		if mode in frozenset(["role", "tenant"]):
-			if filtr is None:
-				raise asab.exceptions.ValidationError(
-					"Filter mode {!r} requires that a filter string is specified".format(mode))
+		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
-			# These filters require access dedicated resource
-			rbac_svc = self.CredentialsService.App.get_service("seacatauth.RBACService")
-
-			if mode == "role":
-				# Check if the user has admin access to the role's tenant
-				tenant = filtr.split("/")[0]
-				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["seacat:role:access"]
-				):
-					return asab.web.rest.json_response(request, {
-						"result": "NOT-AUTHORIZED"
-					})
-				role_svc = self.CredentialsService.App.get_service("seacatauth.RoleService")
-				assignments = await role_svc.list_role_assignments(role_id=filtr, page=page, limit=limit)
-
-			elif mode == "tenant":
-				# Check if the user has admin access to the requested tenant
-				tenant = filtr
-				if not rbac_svc.has_resource_access(
-					request.Session.Authorization.Authz, tenant, ["seacat:tenant:access"]
-				):
-					return asab.web.rest.json_response(request, {
-						"result": "NOT-AUTHORIZED"
-					})
-				tenant_svc = self.CredentialsService.App.get_service("seacatauth.TenantService")
-				provider = tenant_svc.get_provider()
-				assignments = await provider.list_tenant_assignments(tenant, page, limit)
-
-			else:
-				raise ValueError("Unknown mode: {}".format(mode))
-
-			if assignments["count"] == 0:
-				return asab.web.rest.json_response(request, {
-					"result": "OK",
-					"count": 0,
-					"data": []
-				})
-
-			credentials = []
-			total_count = assignments["count"]
-
-			# Sort the ids by their respective provider
-			for assignment in assignments["data"]:
-				cid = assignment["c"]
-				_, provider_id, _ = cid.split(":", 2)
-				provider = self.CredentialsService.CredentialProviders[provider_id]
-				try:
-					credentials.append(await provider.get(cid))
-				except KeyError:
-					L.warning("Found an assignment of nonexisting credentials", struct_data={
-						"cid": cid,
-						"assigned_to": filtr,
-					})
-
-		# Substring based filtering
-		elif mode in frozenset(["", "default"]):
-			stack = []
-			total_count = 0  # If -1, then total count cannot be determined
-			for provider in self.CredentialsService.CredentialProviders.values():
-				try:
-					count = await provider.count(filtr=filtr)
-				except Exception as e:
-					L.exception("Exception when getting count from a credentials provider: {}".format(e))
-					continue
-
-				stack.append((count, provider))
-				if count >= 0 and total_count >= 0:
-					total_count += count
-				else:
-					total_count = -1
-
-			# Scroll to first relevant provider
-			offset = page * limit
-			credentials = []
-
-			for count, provider in stack:
-				if count >= 0:
-					if offset > count:
-						# The offset is beyond the count of the provider, so let's skip to the next one
-						offset -= count
-						continue
-
-					async for credobj in provider.iterate(offset=offset, limit=limit, filtr=filtr):
-						credentials.append(credobj)
-						limit -= 1
-
-					if limit <= 0:
-						#  We are done here ...
-						break
-
-					# Continue to the beginning of the next provider (zero offset)
-					offset = 0
-
-				else:
-					# TODO: Uncountable branch
-					L.error("Not implemented: Uncountable branch.", struct_data={"provider_id": provider.ProviderID})
-					continue
-
-		else:
-			raise asab.exceptions.ValidationError("Unsupported filter mode {!r}".format(mode))
-
+		try:
+			result = await self.CredentialsService.list(request.Session, search, try_global_search)
+		except exceptions.AccessDeniedError as e:
+			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
+			return asab.web.rest.json_response(request, status=403, data={
+				"result": "ACCESS-DENIED",
+			})
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
-			"data": credentials,
-			"count": total_count,
+			**result
 		})
 
 
@@ -328,7 +223,6 @@ class CredentialsHandler(object):
 			"type": "string"
 		}
 	})
-	@access_control("seacat:credentials:access")
 	async def get_idents_from_ids(self, request, *, json_data):
 		"""
 		Get human-intelligible identifiers for a list of credential IDs
@@ -356,7 +250,6 @@ class CredentialsHandler(object):
 			"data": result_data
 		})
 
-	@access_control("seacat:credentials:access")
 	async def get_credentials(self, request):
 		"""
 		Get requested credentials' detail
@@ -372,10 +265,29 @@ class CredentialsHandler(object):
 				default: no
 		"""
 		credentials_id = request.match_info["credentials_id"]
+
+		# Check authorization:
+		#   the requester must be authorized in at least one of the tenants that the requested is a member of
+		if not request.Session.is_superuser():
+			for tenant in request.Session.Authorization.Authz:
+				if tenant == "*":
+					continue
+				if await self.TenantService.has_tenant_assigned(credentials_id, tenant):
+					# Found a common tenant
+					break
+				else:
+					continue
+			else:
+				# No tenant in common
+				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+
 		_, provider_id, _ = credentials_id.split(':', 2)
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
-		credentials = await provider.get(request.match_info["credentials_id"])
+		try:
+			credentials = await provider.get(request.match_info["credentials_id"])
+		except KeyError:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
 			credentials["_ll"] = await self.LastActivityService.get_last_logins(credentials_id)
@@ -402,21 +314,39 @@ class CredentialsHandler(object):
 
 		credentials_id = result["credentials_id"]
 
-		if password_link:
-			# TODO: Separate password creation from password reset
-			crd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
-			try:
-				await crd_svc.init_password_change(credentials_id, is_new_user=True)
-			except exceptions.CommunicationError:
-				L.error("Password reset failed: Failed to send password change link", struct_data={
-					"cid": credentials_id})
-
-		return asab.web.rest.json_response(request, {
+		response_data = {
 			"status": "OK",
 			"_id": credentials_id,
 			"_type": provider.Type,
 			"_provider_id": provider.ProviderID
-		})
+		}
+
+		if password_link:
+			change_pwd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
+			credentials = await self.CredentialsService.get(credentials_id)
+			try:
+				reset_url = await change_pwd_svc.init_password_reset_by_admin(
+					credentials,
+					expiration=json_data.get("expiration")
+				)
+			except exceptions.CredentialsNotFoundError:
+				L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found", struct_data={
+					"cid": credentials_id})
+				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+			except exceptions.CredentialsSuspendedError:
+				L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
+					"cid": credentials_id})
+				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+			except exceptions.MessageDeliveryError as e:
+				L.error("Failed to send password change link: {}".format(e), struct_data={"cid": credentials_id})
+				return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
+
+			if reset_url:
+				# Password reset URL was not sent because CommunicationService is disabled
+				# Add the URL to admin response
+				response_data["reset_url"] = reset_url
+
+		return asab.web.rest.json_response(request, response_data)
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CREDENTIALS)
@@ -465,7 +395,8 @@ class CredentialsHandler(object):
 		"properties": {
 			"factors": {
 				"type": "array",
-				"description": "Factors to enforce/reset"
+				"description": "Factors to enforce/reset",
+				"items": {"type": "string"}
 			}
 		}
 	})

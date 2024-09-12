@@ -43,12 +43,22 @@ asab.Config.add_defaults({
 
 	"openidconnect": {
 		"bearer_realm": "asab",
-		"auth_code_timeout": "60 s",
+		"authorization_code_length": "36",
+		"authorization_code_expiration": "3 m",
+		"access_token_length": "36",
+		"access_token_expiration": "4 h",
+		"refresh_token_length": "36",
+		"refresh_token_expiration": "3 d",
 	},
 
 	"seacatauth:client": {
-		# How long until the secret expires
+		# How long until the secret expires.
+		# Set to "0" to disable the expiration.
 		"client_secret_expiration": "0",
+
+		# Validity period of local client metadata cache.
+		# Set to "0" to disable cache.
+		"cache_expiration": "30 s",
 	},
 
 	"seacatauth:cookie": {
@@ -181,6 +191,14 @@ asab.Config.add_defaults({
 	},
 
 	"seacatauth:password": {
+		# Password requirements
+		"max_length": 64,
+		"min_length": 10,
+		"min_lowercase_count": 1,
+		"min_uppercase_count": 1,
+		"min_digit_count": 1,
+		"min_special_count": 1,
+
 		# Timeout for password reset requests
 		"password_reset_expiration": "3 d",
 	},
@@ -189,6 +207,24 @@ asab.Config.add_defaults({
 		# Key used for generating Basic auth passwords
 		"password_key": "",
 	},
+
+	"seacatauth:external_login": {
+		# URI for delegated sign-up of unknown accounts from external identity providers.
+		# Must accept POST requests with JSON body.
+		"registration_webhook_uri": "",
+
+		# Where to redirect the user when there is no redirect URI in the request
+		"default_redirect_uri": "",
+
+		# Maximum lifespan of external login process
+		"state_expiration": "10m",
+
+		# Length of OAuth state string
+		"state_length": 16,
+
+		# Length of OAuth nonce string
+		"nonce_length": 16,
+	}
 })
 
 AuditLogger = logging.getLogger("AUDIT")
