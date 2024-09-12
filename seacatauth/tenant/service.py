@@ -29,7 +29,7 @@ class TenantService(asab.Service):
 	def create_provider(self, provider_id, config_section_name):
 		assert (self.TenantsProvider is None)  # We support only one tenant provider for now
 		_, creds, provider_type, provider_name = config_section_name.rsplit(":", 3)
-		if provider_type == 'mongodb':
+		if provider_type == "mongodb":
 			from .providers.mongodb import MongoDBTenantProvider
 			provider = MongoDBTenantProvider(self.App, provider_id, config_section_name)
 
@@ -156,7 +156,7 @@ class TenantService(asab.Service):
 		# TODO: This has to be cached agressivelly
 		result = []
 		async for obj in self.TenantsProvider.iterate_assigned(credentials_id):
-			result.append(obj['t'])
+			result.append(obj["t"])
 		return result
 
 

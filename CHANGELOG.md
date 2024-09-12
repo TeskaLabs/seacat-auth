@@ -3,10 +3,19 @@
 ## v24.36
 
 ### Pre-releases
+- v24.36-alpha2
 - v24.36-alpha1
+- v24.29-alpha7
+- v24.29-alpha6
+
+### Fix
+- Sort assigned tenants and roles alphabetically (#417, `v24.36-alpha2`)
+- Do not check tenant existence when unassigning tenant (#415, `v24.29-alpha8`)
+- Hotfix: Session expiration in userinfo must match access token expiration (#414, `v24.29-alpha7`)
 
 ### Features
 - Duplicating roles (#416, `v24.36-alpha1`)
+- Run Batman with warning when there is no ElasticSearch URL (#413, `v24.29-alpha6`)
 
 ---
 
@@ -14,8 +23,8 @@
 ## v24.29
 
 ### Pre-releases
-- v24.29-alpha7
-- v24.29-alpha6
+- v24.29-beta2
+- v24.29-beta
 - v24.29-alpha5
 - v24.29-alpha4
 - v24.29-alpha3
@@ -23,13 +32,10 @@
 - v24.29-alpha1
 
 ### Fix
-- Do not check tenant existence when unassigning tenant (#415, `v24.29-alpha8`)
-- Hotfix: Session expiration in userinfo must match access token expiration (#414, `v24.29-alpha7`)
 - Non-editable items are marked with read_only flag (#411, `v24.29-alpha5`)
 - Handle session decryption error (#410, `v24.29-alpha2`)
 
 ### Features
-- Run Batman with warning when there is no ElasticSearch URL (#413, `v24.29-alpha6`)
 - Disable editing of managed resources and clients (#409, `v24.29-alpha4`)
 - Global roles propagated to tenants (#395, `v24.29-alpha3`)
 - Sort clients alphabetically by client name (#408, `v24.29-alpha2`)

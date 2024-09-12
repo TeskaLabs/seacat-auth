@@ -441,18 +441,31 @@ class RoleService(asab.Service):
 				raise asab.exceptions.ValidationError(message)
 
 
-	async def get_roles_by_credentials(self, credentials_id: str, tenants: list = None):
+	async def get_roles_by_credentials(
+		self,
+		credentials_id: str,
+		tenants: list = None,
+		limit: typing.Optional[int] = None,
+		page: int = 0
+	):
 		"""
 		Returns a list of roles assigned to the given `credentials_id`.
 		Includes roles that match the given `tenant` plus global roles.
 		"""
+		collection = await self.StorageService.collection(self.CredentialsRolesCollection)
+		query_filter = {
+			"c": credentials_id,
+			"t": {"$in": [None, *(tenants or [])]}
+		}
+		cursor = collection.find(query_filter)
+		cursor.sort("r", 1)
+		if limit is not None:
+			cursor.skip(limit * page)
+			cursor.limit(limit)
+
 		result = []
-		coll = await self.StorageService.collection(self.CredentialsRolesCollection)
-		async for obj in coll.find({
-			'c': credentials_id,
-			't': {"$in": [None, *(tenants or [])]}
-		}):
-			result.append(obj["r"])
+		async for assignment in cursor:
+			result.append(assignment["r"])
 		return result
 
 
