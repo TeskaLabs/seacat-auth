@@ -254,14 +254,16 @@ class TenantHandler(object):
 		"""
 		Get list of tenants memberships of the requested credentials
 		"""
-		tenants = set(await self.TenantService.get_tenants(request.match_info["credentials_id"]))
+		tenants = await self.TenantService.get_tenants(request.match_info["credentials_id"])
 		if not request.can_access_all_tenants:
-			my_tenants = await self.TenantService.get_tenants(request.Session.Credentials.Id)
-			tenants.intersection_update(my_tenants)
+			my_tenants = set(await self.TenantService.get_tenants(request.Session.Credentials.Id))
+			# Preserve ordering
+			tenants = [
+				tenant for tenant in tenants
+				if tenant in my_tenants
+			]
 
-		return asab.web.rest.json_response(
-			request, list(tenants)
-		)
+		return asab.web.rest.json_response(request, tenants)
 
 
 	@asab.web.rest.json_schema_handler(schemas.GET_TENANTS_BATCH)
