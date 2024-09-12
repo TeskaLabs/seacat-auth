@@ -167,11 +167,9 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 
 	async def iterate_assigned(self, credatials_id: str, page: int = 10, limit: int = None):
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
-
-		filter = {'c': credatials_id}
+		filter = {"c": credatials_id}
 		cursor = collection.find(filter)
-
-		cursor.sort('_id', 1)
+		cursor.sort("t", 1)
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
