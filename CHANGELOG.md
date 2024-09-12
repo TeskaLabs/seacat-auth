@@ -3,7 +3,11 @@
 ## v24.36
 
 ### Pre-releases
+- v24.36-alpha2
 - v24.36-alpha1
+
+### Fix
+- Sort assigned tenants and roles alphabetically (#417, `v24.36-alpha2`)
 
 ### Features
 - Duplicating roles (#416, `v24.36-alpha1`)
