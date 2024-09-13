@@ -288,11 +288,12 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			yield i
 
 	def _build_search_filter(self, filtr=None):
-		if filtr is None:
+		if not filtr:
 			filterstr = self.Config["filter"]
 		else:
 			# The query filter is the intersection of the filter from config
 			# and the filter defined by the search request
+			# The username must START WITH the given filter string
 			filter_template = "(&{}({}=*%s*))".format(self.Config["filter"], self.Config["attrusername"])
 			assertion_values = ["{}".format(filtr.lower())]
 			filterstr = ldap.filter.filter_format(
