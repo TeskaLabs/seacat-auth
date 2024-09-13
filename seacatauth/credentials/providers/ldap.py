@@ -176,20 +176,17 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 		# TODO: Validate credetials_id with regex
 
-		# Ensure that the base lies within configured base
-		base = base64.urlsafe_b64decode(credentials_id[len(prefix):]).decode("utf-8")
-		if not base.endswith(self.Config["base"]):
-			raise KeyError("Credentials {!r} do not end with {!r}".format(credentials_id, self.Config["base"]))
-
+		cn = base64.urlsafe_b64decode(credentials_id[len(prefix):]).decode("utf-8")
 		with self._ldap_client() as lc:
 			try:
 				sr = lc.search_s(
-					base,
+					cn,
 					ldap.SCOPE_BASE,
 					filterstr=self.Config["filter"],
 					attrlist=self.AttrList,
 				)
-			except ldap.NO_SUCH_OBJECT:
+			except ldap.NO_SUCH_OBJECT as e:
+				L.error(e)
 				sr = []
 
 		if len(sr) == 0:
