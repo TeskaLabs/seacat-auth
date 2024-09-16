@@ -336,7 +336,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 				ret["_m"] = _parse_timestamp(v)
 
 		if len(decoded_record) > 0:
-			ret["_ldap"] = decoded_record
+			ret["data"] = {k: v for k, v in decoded_record.items() if k in self.AttrList}
 
 		return ret
 
