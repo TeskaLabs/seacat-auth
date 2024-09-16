@@ -3,6 +3,7 @@
 ## v24.36
 
 ### Pre-releases
+- v24.36-alpha5
 - v24.36-alpha4
 - v24.36-alpha3
 - ~~v24.36-alpha2~~
@@ -18,8 +19,12 @@
 - Hotfix: Session expiration in userinfo must match access token expiration (#414, `v24.29-alpha7`)
 
 ### Features
+- Improve the default configuration of LDAP credentials provider (#422, `v24.36-alpha5`)
 - Duplicating roles (#416, `v24.36-alpha1`)
 - Run Batman with warning when there is no ElasticSearch URL (#413, `v24.29-alpha6`)
+
+### Refactoring
+- Refactor LDAP credentials provider (#422, `v24.36-alpha5`)
 
 ---
 
