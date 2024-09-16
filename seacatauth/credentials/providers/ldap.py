@@ -54,8 +54,8 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		"username": "cn=admin,dc=example,dc=org",
 		"password": "admin",
 		"base": "dc=example,dc=org",
-		"filter": "(&(objectClass=inetOrgPerson)(cn=*))",  # should filter valid users only
-		"attributes": "mail mobile",
+		"filter": "(&(objectClass=inetOrgPerson)(cn=*))",
+		"attributes": "mail mobile userAccountControl displayName",
 
 		# Path to CA file in PEM format
 		"tls_cafile": "",
@@ -72,7 +72,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		"tls_protocol_max": "",
 		"tls_cipher_suite": "",
 
-		"attrusername": "cn",  # LDAP attribute that should be used as a username, e.g. `uid` or `sAMAccountName`
+		"attrusername": "sAMAccountName",  # LDAP attribute that should be used as a username, e.g. `uid` or `sAMAccountName`
 	}
 
 
