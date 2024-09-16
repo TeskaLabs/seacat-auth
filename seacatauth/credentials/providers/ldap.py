@@ -176,20 +176,17 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 		# TODO: Validate credetials_id with regex
 
-		# Ensure that the base lies within configured base
-		base = base64.urlsafe_b64decode(credentials_id[len(prefix):]).decode("utf-8")
-		if not base.endswith(self.Config["base"]):
-			raise KeyError("Credentials {!r} do not end with {!r}".format(credentials_id, self.Config["base"]))
-
+		cn = base64.urlsafe_b64decode(credentials_id[len(prefix):]).decode("utf-8")
 		with self._ldap_client() as lc:
 			try:
 				sr = lc.search_s(
-					base,
+					cn,
 					ldap.SCOPE_BASE,
 					filterstr=self.Config["filter"],
 					attrlist=self.AttrList,
 				)
-			except ldap.NO_SUCH_OBJECT:
+			except ldap.NO_SUCH_OBJECT as e:
+				L.error(e)
 				sr = []
 
 		if len(sr) == 0:
@@ -288,11 +285,12 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			yield i
 
 	def _build_search_filter(self, filtr=None):
-		if filtr is None:
+		if not filtr:
 			filterstr = self.Config["filter"]
 		else:
 			# The query filter is the intersection of the filter from config
 			# and the filter defined by the search request
+			# The username must START WITH the given filter string
 			filter_template = "(&{}({}=*%s*))".format(self.Config["filter"], self.Config["attrusername"])
 			assertion_values = ["{}".format(filtr.lower())]
 			filterstr = ldap.filter.filter_format(
