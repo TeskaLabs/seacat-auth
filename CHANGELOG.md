@@ -9,6 +9,7 @@
 - v24.29-alpha6
 
 ### Fix
+- Fix handling of empty filter in LDAP credentials provider (#421, `v24.36-alpha3`)
 - Sort assigned tenants and roles alphabetically (#417, `v24.36-alpha2`)
 - Do not check tenant existence when unassigning tenant (#415, `v24.29-alpha8`)
 - Hotfix: Session expiration in userinfo must match access token expiration (#414, `v24.29-alpha7`)
