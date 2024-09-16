@@ -84,6 +84,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 		self.LdapUri = self.Config["uri"]
 		self.Base = self.Config["base"]
+		self.Filter = self.Config["filter"]
 		self.AttrList = _prepare_attributes(self.Config)
 
 		# Fields to filter by when locating a user
@@ -144,7 +145,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 				results = lc.search_s(
 					cn,
 					ldap.SCOPE_BASE,
-					filterstr=self.Config["filter"],
+					filterstr=self.Filter,
 					attrlist=self.AttrList,
 				)
 			except ldap.NO_SUCH_OBJECT as e:
@@ -160,7 +161,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 	def _search_worker(self, filterstr):
 		# TODO: sorting
-		result = []
+		results = []
 
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
@@ -174,16 +175,16 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			for res_type, res_data, res_msgid, res_controls in result_iter:
 				for dn, entry in res_data:
 					if dn is not None:
-						result.append(self._normalize_credentials(dn, entry))
+						results.append(self._normalize_credentials(dn, entry))
 
-		return result
+		return results
 
 
 	def _count_worker(self, filterstr):
 		count = 0
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
-				self.Config["base"],
+				self.Base,
 				ldap.SCOPE_SUBTREE,
 				filterstr=filterstr,
 				attrsonly=1,  # If attrsonly is non-zero
@@ -193,9 +194,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 			for res_type, res_data, res_msgid, res_controls in result_iter:
 				for dn, entry in res_data:
-					if dn is None:
-						continue
-					else:
+					if dn is not None:
 						count += 1
 
 		return count
@@ -205,7 +204,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		# TODO: Implement configurable ident_fields support
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
-				self.Config["base"],
+				self.Base,
 				ldap.SCOPE_SUBTREE,
 				filterstr=ldap.filter.filter_format(
 					# Build the filter template
@@ -249,45 +248,45 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return True
 
 
-	def _normalize_credentials(self, dn: str, search_result: typing.Mapping):
+	def _normalize_credentials(self, dn: str, search_record: typing.Mapping):
 		ret = {
 			"_id": self._format_credentials_id(dn),
 			"_type": self.Type,
 			"_provider_id": self.ProviderID,
 		}
 
-		decoded_result = {"dn": dn}
-		for k, v in search_result.items():
+		decoded_record = {"dn": dn}
+		for k, v in search_record.items():
 			if k =="userPassword":
 				continue
 			if isinstance(v, list):
 				if len(v) == 0:
 					continue
 				elif len(v) == 1:
-					decoded_result[k] = v[0].decode("utf-8")
+					decoded_record[k] = v[0].decode("utf-8")
 				else:
-					decoded_result[k] = [i.decode("utf-8") for i in v]
+					decoded_record[k] = [i.decode("utf-8") for i in v]
 
-		v = decoded_result.pop(self.Config["attrusername"], None)
+		v = decoded_record.pop(self.Config["attrusername"], None)
 		if v is not None:
 			ret["username"] = v
 		else:
 			# This is fallback, since we need a username on various places
 			ret["username"] = dn
 
-		v = decoded_result.pop("cn", None)
+		v = decoded_record.pop("cn", None)
 		if v is not None:
 			ret["full_name"] = v
 
-		v = decoded_result.pop("mail", None)
+		v = decoded_record.pop("mail", None)
 		if v is not None:
 			ret["email"] = v
 
-		v = decoded_result.pop("mobile", None)
+		v = decoded_record.pop("mobile", None)
 		if v is not None:
 			ret["phone"] = v
 
-		v = decoded_result.pop("userAccountControl", None)
+		v = decoded_record.pop("userAccountControl", None)
 		if v is not None:
 			# userAccountControl is an array of binary flags returned as a decimal integer
 			# byte #1 is ACCOUNTDISABLE which corresponds to "suspended" status
@@ -297,24 +296,24 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			except ValueError:
 				pass
 
-		v = decoded_result.pop("createTimestamp", None)
+		v = decoded_record.pop("createTimestamp", None)
 		if v is not None:
 			ret["_c"] = _parse_timestamp(v)
 		else:
-			v = decoded_result.pop("createTimeStamp", None)
+			v = decoded_record.pop("createTimeStamp", None)
 			if v is not None:
 				ret["_c"] = _parse_timestamp(v)
 
-		v = decoded_result.pop("modifyTimestamp", None)
+		v = decoded_record.pop("modifyTimestamp", None)
 		if v is not None:
 			ret["_m"] = _parse_timestamp(v)
 		else:
-			v = decoded_result.pop("modifyTimeStamp", None)
+			v = decoded_record.pop("modifyTimeStamp", None)
 			if v is not None:
 				ret["_m"] = _parse_timestamp(v)
 
-		if len(decoded_result) > 0:
-			ret["_ldap"] = decoded_result
+		if len(decoded_record) > 0:
+			ret["_ldap"] = decoded_record
 
 		return ret
 
@@ -389,12 +388,12 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 	def _build_search_filter(self, filtr: typing.Optional[str] = None):
 		if not filtr:
-			filterstr = self.Config["filter"]
+			filterstr = self.Filter
 		else:
 			# The query filter is the intersection of the filter from config
 			# and the filter defined by the search request
 			# The username must START WITH the given filter string
-			filter_template = "(&{}({}=*%s*))".format(self.Config["filter"], self.Config["attrusername"])
+			filter_template = "(&{}({}=*%s*))".format(self.Filter, self.Config["attrusername"])
 			assertion_values = ["{}".format(filtr.lower())]
 			filterstr = ldap.filter.filter_format(
 				filter_template=filter_template,
