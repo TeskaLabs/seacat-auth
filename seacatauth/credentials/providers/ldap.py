@@ -164,7 +164,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			ldap_client.unbind_s()
 
 
-	def _get_worker(self, cn: str) -> Optional[dict]:
+	def _get_worker(self, cn: str) -> Optional[typing.Dict]:
 		with self._ldap_client() as ldap_client:
 			try:
 				results = ldap_client.search_s(
@@ -184,10 +184,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return self._normalize_credentials(dn, entry)
 
 
-	def _search_worker(self, filterstr: str):
-		# TODO: sorting
+	def _search_worker(self, filterstr: str) -> typing.List[typing.Dict]:
+		# TODO: Implement sorting (Note that not all LDAP servers support server-side sorting)
 		results = []
-
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
 				self.Base,
@@ -205,7 +204,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return results
 
 
-	def _count_worker(self, filterstr: str):
+	def _count_worker(self, filterstr: str) -> int:
 		count = 0
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
@@ -225,7 +224,11 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return count
 
 
-	def _locate_worker(self, ident: str, ident_fields: typing.Optional[typing.Mapping[str, str]] = None):
+	def _locate_worker(
+		self,
+		ident: str,
+		ident_fields: typing.Optional[typing.Mapping[str, str]] = None
+	) -> typing.Optional[str]:
 		# TODO: Implement configurable ident_fields support
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
@@ -268,7 +271,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return True
 
 
-	def _normalize_credentials(self, dn: str, search_record: typing.Mapping):
+	def _normalize_credentials(self, dn: str, search_record: typing.Mapping) -> typing.Dict:
 		ret = {
 			"_id": self._format_credentials_id(dn),
 			"_type": self.Type,
@@ -338,11 +341,11 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return ret
 
 
-	def _format_credentials_id(self, dn):
+	def _format_credentials_id(self, dn: str) -> str:
 		return self.Prefix + base64.urlsafe_b64encode(dn.encode("utf-8")).decode("ascii")
 
 
-	def _build_search_filter(self, filtr: typing.Optional[str] = None):
+	def _build_search_filter(self, filtr: typing.Optional[str] = None) -> str:
 		if not filtr:
 			filterstr = self.Filter
 		else:
@@ -371,7 +374,7 @@ def _parse_timestamp(ts: str) -> datetime.datetime:
 	return datetime.datetime.strptime(ts, r"%Y%m%d%H%M%S.%fZ")
 
 
-def _prepare_attributes(config: typing.Mapping):
+def _prepare_attributes(config: typing.Mapping) -> list:
 	attr = set(config["attributes"].split(" "))
 	attr.add("createTimestamp")
 	attr.add("modifyTimestamp")
