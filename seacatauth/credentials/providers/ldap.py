@@ -119,7 +119,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
 		filterstr = self._build_search_filter(filtr)
 		results = await self.ProactorService.execute(self._search_worker, filterstr)
-		for i in results[offset : (None if limit == -1 else limit + offset)]:
+		for i in results[offset:(None if limit == -1 else limit + offset)]:
 			yield i
 
 
@@ -280,7 +280,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 		decoded_record = {"dn": dn}
 		for k, v in search_record.items():
-			if k =="userPassword":
+			if k == "userPassword":
 				continue
 			if isinstance(v, list):
 				if len(v) == 0:
