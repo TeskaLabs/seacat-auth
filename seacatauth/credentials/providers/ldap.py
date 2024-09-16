@@ -13,6 +13,7 @@ import ldap.filter
 
 import asab
 import asab.proactor
+import asab.config
 
 from .abc import CredentialsProviderABC
 
@@ -94,13 +95,17 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			self.IdentFields.append(self.Config["attrusername"])
 
 
-	async def get(self, credentials_id, include=None) -> Optional[dict]:
+	async def get(self, credentials_id: str, include: typing.Optional[typing.Iterable[str]] = None) -> Optional[dict]:
 		if not credentials_id.startswith(self.Prefix):
 			raise KeyError("Credentials {!r} not found".format(credentials_id))
-		return await self.ProactorService.execute(self._get_worker, credentials_id, include)
+		cn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
+		try:
+			return await self.ProactorService.execute(self._get_worker, cn)
+		except KeyError as e:
+			raise KeyError("Credentials not found: {!r}".format(credentials_id)) from e
 
 
-	async def search(self, filter: dict = None, **kwargs) -> list:
+	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = 0, **kwargs) -> list:
 		# TODO: Implement pagination
 		filterstr = self._build_search_filter(filter)
 		return await self.ProactorService.execute(self._search_worker, filterstr)
@@ -123,10 +128,12 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		return await self.ProactorService.execute(self._authenticate_worker, credentials_id, credentials)
+		dn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
+		password = credentials.get("password")
+		return await self.ProactorService.execute(self._authenticate_worker, dn, password)
 
 
-	async def get_login_descriptors(self, credentials_id):
+	async def get_login_descriptors(self, credentials_id: str) -> typing.List[typing.Dict]:
 		# Only login with password is supported
 		return [{
 			"id": "default",
@@ -138,28 +145,46 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		}]
 
 
-	def _get_worker(self, credentials_id, include=None) -> Optional[dict]:
-		cn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
-		with self._ldap_client() as lc:
+	@contextlib.contextmanager
+	def _ldap_client(self):
+		ldap_client = _LDAPObject(self.LdapUri)
+		ldap_client.protocol_version = ldap.VERSION3
+		ldap_client.set_option(ldap.OPT_REFERRALS, 0)
+
+		network_timeout = self.Config.getint("network_timeout")
+		ldap_client.set_option(ldap.OPT_NETWORK_TIMEOUT, network_timeout)
+
+		if self.LdapUri.startswith("ldaps"):
+			_enable_tls(ldap_client, self.Config)
+
+		ldap_client.simple_bind_s(self.Config["username"], self.Config["password"])
+		try:
+			yield ldap_client
+		finally:
+			ldap_client.unbind_s()
+
+
+	def _get_worker(self, cn: str) -> Optional[dict]:
+		with self._ldap_client() as ldap_client:
 			try:
-				results = lc.search_s(
+				results = ldap_client.search_s(
 					cn,
 					ldap.SCOPE_BASE,
 					filterstr=self.Filter,
 					attrlist=self.AttrList,
 				)
 			except ldap.NO_SUCH_OBJECT as e:
-				raise KeyError("Credentials {!r} not found".format(credentials_id)) from e
+				raise KeyError("CN matched no LDAP objects.") from e
 
 		if len(results) > 1:
-			L.exception("Multiple credentials matched ID.", struct_data={"cid": credentials_id})
-			raise KeyError("Credentials {!r} not found".format(credentials_id))
+			L.error("CN matched multiple LDAP objects.", struct_data={"CN": cn})
+			raise KeyError("CN matched multiple LDAP objects.")
 
 		dn, entry = results[0]
 		return self._normalize_credentials(dn, entry)
 
 
-	def _search_worker(self, filterstr):
+	def _search_worker(self, filterstr: str):
 		# TODO: sorting
 		results = []
 
@@ -180,7 +205,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return results
 
 
-	def _count_worker(self, filterstr):
+	def _count_worker(self, filterstr: str):
 		count = 0
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
@@ -200,7 +225,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return count
 
 
-	def _locate_worker(self, ident: str, ident_fields: typing.Optional[typing.Mapping[str, str]]):
+	def _locate_worker(self, ident: str, ident_fields: typing.Optional[typing.Mapping[str, str]] = None):
 		# TODO: Implement configurable ident_fields support
 		with self._ldap_client() as ldap_client:
 			msgid = ldap_client.search(
@@ -224,23 +249,18 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return None
 
 
-	def _authenticate_worker(self, credentials_id: str, credentials: dict) -> bool:
-		password = credentials.get("password")
-		dn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
-
+	def _authenticate_worker(self, dn: str, password: str) -> bool:
 		ldap_client = _LDAPObject(self.LdapUri)
 		ldap_client.protocol_version = ldap.VERSION3
 		ldap_client.set_option(ldap.OPT_REFERRALS, 0)
 
-		# Enable TLS
 		if self.LdapUri.startswith("ldaps"):
-			self._enable_tls(ldap_client)
+			_enable_tls(ldap_client, self.Config)
 
 		try:
 			ldap_client.simple_bind_s(dn, password)
 		except ldap.INVALID_CREDENTIALS:
-			L.log(asab.LOG_NOTICE, "Authentication failed: Invalid LDAP credentials.", struct_data={
-				"cid": credentials_id, "dn": dn})
+			L.log(asab.LOG_NOTICE, "Authentication failed: Invalid LDAP credentials.", struct_data={"dn": dn})
 			return False
 
 		ldap_client.unbind_s()
@@ -318,70 +338,6 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return ret
 
 
-	@contextlib.contextmanager
-	def _ldap_client(self):
-		ldap_client = _LDAPObject(self.LdapUri)
-		ldap_client.protocol_version = ldap.VERSION3
-		ldap_client.set_option(ldap.OPT_REFERRALS, 0)
-
-		network_timeout = self.Config.getint("network_timeout")
-		ldap_client.set_option(ldap.OPT_NETWORK_TIMEOUT, network_timeout)
-
-		# Enable TLS
-		if self.LdapUri.startswith("ldaps"):
-			self._enable_tls(ldap_client)
-
-		ldap_client.simple_bind_s(self.Config["username"], self.Config["password"])
-
-		try:
-			yield ldap_client
-
-		finally:
-			ldap_client.unbind_s()
-
-
-	def _enable_tls(self, ldap_client):
-		tls_cafile = self.Config["tls_cafile"]
-
-		# Add certificate authority
-		if len(tls_cafile) > 0:
-			ldap_client.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
-
-		# Set cert policy
-		if self.Config["tls_require_cert"] == "never":
-			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-		elif self.Config["tls_require_cert"] == "demand":
-			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
-		elif self.Config["tls_require_cert"] == "allow":
-			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_ALLOW)
-		elif self.Config["tls_require_cert"] == "hard":
-			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_HARD)
-		else:
-			L.error("Invalid 'tls_require_cert' value: {!r}. Defaulting to 'demand'.".format(
-				self.Config["tls_require_cert"]
-			))
-			ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
-
-		# Misc TLS options
-		tls_protocol_min = self.Config["tls_protocol_min"]
-		if tls_protocol_min != "":
-			if tls_protocol_min not in _TLS_VERSION:
-				raise ValueError("'tls_protocol_min' must be one of {} or empty.".format(list(_TLS_VERSION)))
-			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[tls_protocol_min])
-
-		tls_protocol_max = self.Config["tls_protocol_max"]
-		if tls_protocol_max != "":
-			if tls_protocol_max not in _TLS_VERSION:
-				raise ValueError("'tls_protocol_max' must be one of {} or empty.".format(list(_TLS_VERSION)))
-			ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MAX, _TLS_VERSION[tls_protocol_max])
-
-		if self.Config["tls_cipher_suite"] != "":
-			ldap_client.set_option(ldap.OPT_X_TLS_CIPHER_SUITE, self.Config["tls_cipher_suite"])
-
-		# NEWCTX needs to be the last option, because it applies all the prepared options to the new context
-		ldap_client.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
-
-
 	def _format_credentials_id(self, dn):
 		return self.Prefix + base64.urlsafe_b64encode(dn.encode("utf-8")).decode("ascii")
 
@@ -393,7 +349,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			# The query filter is the intersection of the filter from config
 			# and the filter defined by the search request
 			# The username must START WITH the given filter string
-			filter_template = "(&{}({}=*%s*))".format(self.Filter, self.Config["attrusername"])
+			filter_template = "(&{}({}=%s*))".format(self.Filter, self.Config["attrusername"])
 			assertion_values = ["{}".format(filtr.lower())]
 			filterstr = ldap.filter.filter_format(
 				filter_template=filter_template,
@@ -422,3 +378,45 @@ def _prepare_attributes(config: typing.Mapping):
 	attr.add("cn")
 	attr.add(config["attrusername"])
 	return list(attr)
+
+
+def _enable_tls(ldap_client, config: typing.Mapping):
+	tls_cafile = config["tls_cafile"]
+
+	# Add certificate authority
+	if len(tls_cafile) > 0:
+		ldap_client.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
+
+	# Set cert policy
+	if config["tls_require_cert"] == "never":
+		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+	elif config["tls_require_cert"] == "demand":
+		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
+	elif config["tls_require_cert"] == "allow":
+		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_ALLOW)
+	elif config["tls_require_cert"] == "hard":
+		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_HARD)
+	else:
+		L.error("Invalid 'tls_require_cert' value: {!r}. Defaulting to 'demand'.".format(
+			config["tls_require_cert"]
+		))
+		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
+
+	# Misc TLS options
+	tls_protocol_min = config["tls_protocol_min"]
+	if tls_protocol_min != "":
+		if tls_protocol_min not in _TLS_VERSION:
+			raise ValueError("'tls_protocol_min' must be one of {} or empty.".format(list(_TLS_VERSION)))
+		ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MIN, _TLS_VERSION[tls_protocol_min])
+
+	tls_protocol_max = config["tls_protocol_max"]
+	if tls_protocol_max != "":
+		if tls_protocol_max not in _TLS_VERSION:
+			raise ValueError("'tls_protocol_max' must be one of {} or empty.".format(list(_TLS_VERSION)))
+		ldap_client.set_option(ldap.OPT_X_TLS_PROTOCOL_MAX, _TLS_VERSION[tls_protocol_max])
+
+	if config["tls_cipher_suite"] != "":
+		ldap_client.set_option(ldap.OPT_X_TLS_CIPHER_SUITE, config["tls_cipher_suite"])
+
+	# NEWCTX needs to be the last option, because it applies all the prepared options to the new context
+	ldap_client.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
