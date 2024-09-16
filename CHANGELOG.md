@@ -3,13 +3,17 @@
 ## v24.36
 
 ### Pre-releases
-- v24.36-alpha2
+- v24.36-alpha4
+- v24.36-alpha3
+- ~~v24.36-alpha2~~
 - v24.36-alpha1
 - v24.29-alpha7
 - v24.29-alpha6
 
 ### Fix
-- Sort assigned tenants and roles alphabetically (#417, `v24.36-alpha2`)
+- Fix handling of empty filter in LDAP credentials provider (#421, `v24.36-alpha4`)
+- Upgrade CI/CD action versions (#418, `v24.36-alpha3`)
+- Sort assigned tenants and roles alphabetically (#417, `v24.36-alpha3`)
 - Do not check tenant existence when unassigning tenant (#415, `v24.29-alpha8`)
 - Hotfix: Session expiration in userinfo must match access token expiration (#414, `v24.29-alpha7`)
 
