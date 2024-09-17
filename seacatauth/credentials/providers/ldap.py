@@ -54,7 +54,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		"username": "cn=admin,dc=example,dc=org",
 		"password": "admin",
 		"base": "dc=example,dc=org",
-		"filter": "(&(objectClass=inetOrgPerson)(cn=*))",
+		"filter": "|(objectClass=organizationalPerson)(objectClass=inetOrgPerson)",
 		"attributes": "mail mobile userAccountControl displayName",
 
 		# Path to CA file in PEM format
@@ -85,7 +85,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 		self.LdapUri = self.Config["uri"]
 		self.Base = self.Config["base"]
-		self.Filter = self.Config["filter"]
+		self.Filter: str = self.Config["filter"]
+		if not (self.Filter.startswith("(") and self.Filter.endswith(")")):
+			self.Filter = "({})".format(self.Filter)
 		self.AttrList = _prepare_attributes(self.Config)
 
 		# Fields to filter by when locating a user
