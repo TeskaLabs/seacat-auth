@@ -3,6 +3,8 @@
 ## v24.29
 
 ### Pre-releases
+- v24.29.1
+- ~~v24.29~~
 - v24.29-beta2
 - v24.29-beta
 - v24.29-alpha5
