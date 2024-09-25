@@ -14,6 +14,7 @@
 ## v24.36
 
 ### Pre-releases
+- v24.36-beta
 - v24.36-alpha5
 - v24.36-alpha4
 - v24.36-alpha3
