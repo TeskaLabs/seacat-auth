@@ -1,8 +1,20 @@
 # CHANGELOG
 
+## v24.39
+
+### Pre-releases
+- v24.39-alpha1
+
+### Fix
+- Fix credentials custom data editing (#424, `v24.39-alpha1`)
+
+---
+
+
 ## v24.36
 
 ### Pre-releases
+- v24.36-beta
 - v24.36-alpha5
 - v24.36-alpha4
 - v24.36-alpha3
