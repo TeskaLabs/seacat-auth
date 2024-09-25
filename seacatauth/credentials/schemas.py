@@ -26,14 +26,14 @@ _FIELDS = {
 	"data": {
 		"type": "object",
 		"description": "Custom data",
-		# "patternProperties": {
-		# 	"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
-		# 		{"type": "string"},
-		# 		{"type": "number"},
-		# 		{"type": "boolean"},
-		# 		{"type": "null"},
-		# 	]}
-		# },
+		"patternProperties": {
+			"^[a-zA-Z][a-zA-Z0-9_-]{0,126}[a-zA-Z0-9]$": {"anyOf": [
+				{"type": "string"},
+				{"type": "number"},
+				{"type": "boolean"},
+				{"type": "null"},
+			]}
+		},
 		"additionalProperties": False,
 	},
 	"suspended": {
