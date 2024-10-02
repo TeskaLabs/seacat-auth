@@ -3,9 +3,11 @@
 ## v24.39
 
 ### Pre-releases
+- v24.39-alpha2
 - v24.39-alpha1
 
 ### Fix
+- Log the credentials out when they are suspended (#425, `v24.39-alpha2`)
 - Fix credentials custom data editing (#424, `v24.39-alpha1`)
 
 ---
