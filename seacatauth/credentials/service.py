@@ -521,6 +521,11 @@ class CredentialsService(asab.Service):
 		})
 		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials_id)
 
+		# Log the credentials out if they have been suspended
+		if validated_data.get("suspended") is True:
+			session_service = self.App.get_service("seacatauth.SessionService")
+			await session_service.delete_sessions_by_credentials_id(credentials_id)
+
 		return {"status": "OK"}
 
 
