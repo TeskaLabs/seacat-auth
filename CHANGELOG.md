@@ -3,10 +3,12 @@
 ## v24.39
 
 ### Pre-releases
+- v24.39-alpha3
 - v24.39-alpha2
 - v24.39-alpha1
 
 ### Fix
+- Avoid logging stacktrace when LDAP credentials server is down (#426, `v24.39-alpha3`)
 - Log the credentials out when they are suspended (#425, `v24.39-alpha2`)
 - Fix credentials custom data editing (#424, `v24.39-alpha1`)
 

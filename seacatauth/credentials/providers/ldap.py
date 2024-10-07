@@ -105,34 +105,57 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			return await self.ProactorService.execute(self._get_worker, cn)
 		except KeyError as e:
 			raise KeyError("Credentials not found: {!r}".format(credentials_id)) from e
+		except ldap.SERVER_DOWN:
+			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return None
 
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = 0, **kwargs) -> list:
 		# TODO: Implement pagination
 		filterstr = self._build_search_filter(filter)
-		return await self.ProactorService.execute(self._search_worker, filterstr)
+		try:
+			return await self.ProactorService.execute(self._search_worker, filterstr)
+		except ldap.SERVER_DOWN:
+			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return []
 
 
 	async def count(self, filtr=None) -> int:
 		filterstr = self._build_search_filter(filtr)
-		return await self.ProactorService.execute(self._count_worker, filterstr)
+		try:
+			return await self.ProactorService.execute(self._count_worker, filterstr)
+		except ldap.SERVER_DOWN:
+			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return None
 
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
 		filterstr = self._build_search_filter(filtr)
-		results = await self.ProactorService.execute(self._search_worker, filterstr)
+		try:
+			results = await self.ProactorService.execute(self._search_worker, filterstr)
+		except ldap.SERVER_DOWN:
+			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return
 		for i in results[offset:(None if limit == -1 else limit + offset)]:
 			yield i
 
 
 	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> str:
-		return await self.ProactorService.execute(self._locate_worker, ident, ident_fields)
+		try:
+			return await self.ProactorService.execute(self._locate_worker, ident, ident_fields)
+		except ldap.SERVER_DOWN:
+			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return None
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
 		dn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
 		password = credentials.get("password")
-		return await self.ProactorService.execute(self._authenticate_worker, dn, password)
+		try:
+			return await self.ProactorService.execute(self._authenticate_worker, dn, password)
+		except ldap.SERVER_DOWN:
+			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return False
 
 
 	async def get_login_descriptors(self, credentials_id: str) -> typing.List[typing.Dict]:
