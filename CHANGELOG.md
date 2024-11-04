@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v24.45
+
+### Pre-releases
+- v24.45-alpha1
+
+### Fix
+- Log more details when message delivery fails (#427, v24.45-alpha1)
+
+---
+
+
 ## v24.39
 
 ### Pre-releases
