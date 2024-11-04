@@ -183,5 +183,6 @@ class CommunicationService(asab.Service):
 		try:
 			await provider.send_message(**message_dict)
 		except Exception as e:
+			L.error("Failed to deliver message (): {}".format(e.__class__.__name__,e))
 			raise exceptions.MessageDeliveryError(
 				"Failed to deliver message.", template_id=template_id, channel=channel) from e
