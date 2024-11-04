@@ -151,7 +151,7 @@ class ChangePasswordService(asab.Service):
 				welcome=is_new_user
 			)
 			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
-		except Exception as e:
+		except exceptions.MessageDeliveryError as e:
 			raise e
 
 		return None
