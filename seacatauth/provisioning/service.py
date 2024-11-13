@@ -7,6 +7,7 @@ import asab.exceptions
 import asab.storage.exceptions
 
 from ..client.service import CLIENT_TEMPLATES
+from ..generic import SessionContext
 
 #
 
@@ -64,6 +65,7 @@ class ProvisioningService(asab.Service):
 
 		# TODO: ResourceService should be already initialized by the app
 		await self.ResourceService.initialize(app)
+		await self.RoleService.initialize(app)
 		await self.ClientService.initialize(app)
 
 		# Create provisioning credentials provider
@@ -95,17 +97,6 @@ class ProvisioningService(asab.Service):
 		except asab.exceptions.Conflict:
 			L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={
 				"cid": self.SuperuserID, "tenant": self.TenantID})
-
-		# Create superuser role
-		try:
-			await self.RoleService.create(self.SuperroleID)
-		except asab.exceptions.Conflict:
-			L.log(asab.LOG_NOTICE, "Role already exists.", struct_data={"role": self.SuperroleID})
-
-		# Ensure the role has superuser access
-		await self.RoleService.update(
-			role_id=self.SuperroleID,
-			resources_to_set=["authz:superuser"])
 
 		# Assign superuser role to the provisioning user
 		try:
