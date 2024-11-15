@@ -3,9 +3,11 @@
 ## v24.45
 
 ### Pre-releases
+- v24.45-alpha2
 - v24.45-alpha1
 
 ### Fix
+- Fix role error in provisioning startup (#428, v24.45-alpha2)
 - Log more details when message delivery fails (#427, v24.45-alpha1)
 
 ---
