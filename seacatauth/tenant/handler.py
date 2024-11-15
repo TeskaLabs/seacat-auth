@@ -2,6 +2,7 @@ import logging
 
 import asab.web.rest
 import asab.exceptions
+import asab.utils
 
 from ..decorators import access_control
 from . import schemas
@@ -138,6 +139,14 @@ class TenantHandler(object):
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
+
+		---
+		parameters:
+		-	name: assign_me
+			in: query
+			description: Page number
+			schema:
+				type: boolean
 		"""
 		role_service = self.App.get_service("seacatauth.RoleService")
 		tenant_id = json_data["id"]
@@ -150,32 +159,25 @@ class TenantHandler(object):
 			data=json_data.get("data"),
 			creator_id=credentials_id)
 
-		# Assign tenant
-		try:
-			await self.TenantService.assign_tenant(credentials_id, tenant_id)
-		except Exception as e:
-			L.error(
-				"Error assigning tenant: {}".format(e),
-				exc_info=True,
-				struct_data={"cid": credentials_id, "tenant": tenant_id})
+		if asab.utils.string_to_boolean(request.query.get("assign_me", "false")):
+			# Give the user access to the tenant
+			try:
+				await self.TenantService.assign_tenant(credentials_id, tenant_id)
+			except Exception as e:
+				L.error(
+					"Error assigning tenant: {}".format(e),
+					exc_info=True,
+					struct_data={"cid": credentials_id, "tenant": tenant_id})
 
-		# Create role
-		role = "{}/admin".format(tenant_id)
-		try:
-			# Create admin role in tenant
-			await role_service.create(role)
-			# Assign tenant management resources
-			await role_service.update(role, resources_to_set=[
-				"seacat:tenant:access", "seacat:tenant:edit", "seacat:tenant:assign", "seacat:tenant:delete",
-				"seacat:role:access", "seacat:role:edit", "seacat:role:assign"])
-		except Exception as e:
-			L.error("Error creating admin role: {}".format(e), exc_info=True, struct_data={"role": role})
-
-		# Assign the admin role to the user
-		try:
-			await role_service.assign_role(credentials_id, role)
-		except Exception as e:
-			L.error("Error assigning role: {}".format(e), exc_info=True, struct_data={"cid": credentials_id, "role": role})
+			# Assign the admin role to the user
+			role_id = "{}/~auth-admin".format(tenant_id)
+			try:
+				await role_service.assign_role(credentials_id, role_id)
+			except Exception as e:
+				L.error(
+					"Error assigning role: {}".format(e),
+					struct_data={"cid": credentials_id, "role": role_id}
+				)
 
 		return asab.web.rest.json_response(
 			request, data={"id": tenant_id})
