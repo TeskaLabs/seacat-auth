@@ -108,6 +108,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return None
+		except ldap.INVALID_CREDENTIALS:
+			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return None
 
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = 0, **kwargs) -> list:
@@ -118,6 +121,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return []
+		except ldap.INVALID_CREDENTIALS:
+			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return []
 
 
 	async def count(self, filtr=None) -> int:
@@ -127,6 +133,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return None
+		except ldap.INVALID_CREDENTIALS:
+			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return None
 
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
@@ -135,6 +144,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			results = await self.ProactorService.execute(self._search_worker, filterstr)
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return
+		except ldap.INVALID_CREDENTIALS:
+			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return
 		for i in results[offset:(None if limit == -1 else limit + offset)]:
 			yield i
@@ -146,6 +158,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return None
+		except ldap.INVALID_CREDENTIALS:
+			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return None
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
@@ -155,6 +170,9 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			return await self.ProactorService.execute(self._authenticate_worker, dn, password)
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
+			return False
+		except ldap.INVALID_CREDENTIALS:
+			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return False
 
 
