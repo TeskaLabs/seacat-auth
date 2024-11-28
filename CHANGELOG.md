@@ -3,11 +3,13 @@
 ## v24.45
 
 ### Pre-releases
+- v24.45-alpha4
 - v24.45-alpha3
 - v24.45-alpha2
 - v24.45-alpha1
 
 ### Fix
+- Catch and log ldap.INVALID_CREDENTIALS (#431, v24.45-alpha4)
 - Fix role error in provisioning startup (#428, v24.45-alpha2)
 - Log more details when message delivery fails (#427, v24.45-alpha1)
 
