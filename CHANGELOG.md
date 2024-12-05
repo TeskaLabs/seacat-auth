@@ -3,6 +3,7 @@
 ## v24.45
 
 ### Pre-releases
+- v24.45-alpha5
 - v24.45-alpha4
 - v24.45-alpha3
 - v24.45-alpha2
@@ -14,6 +15,7 @@
 - Log more details when message delivery fails (#427, v24.45-alpha1)
 
 ### Features
+- Nicer message when message delivery fails (#432, v24.45-alpha5)
 - Do not automatically assign tenant to its creator (#429, v24.45-alpha3)
 
 ---
