@@ -252,7 +252,7 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, {
 				"result": "ERROR",
 				"tech_err": "Failed to send email with password reset link.",
-				"error": "PasswordResetError|Failed to send email with password reset link.",
+				"error": "SeaCatAuthError|Failed to send email with password reset link.",
 			}, status=500)
 
 		response_data = {"result": "OK"}
