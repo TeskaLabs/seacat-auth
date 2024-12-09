@@ -249,7 +249,11 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		except exceptions.MessageDeliveryError as e:
 			L.error("Failed to send password change link: {}".format(e), struct_data={"cid": credentials_id})
-			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
+			return asab.web.rest.json_response(request, {
+				"result": "ERROR",
+				"tech_err": "Failed to send email with password reset link.",
+				"error": "SeaCatAuthError|Failed to send email with password reset link.",
+			}, status=500)
 
 		response_data = {"result": "OK"}
 		if reset_url:
