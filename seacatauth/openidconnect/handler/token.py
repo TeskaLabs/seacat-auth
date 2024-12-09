@@ -175,7 +175,7 @@ class TokenHandler(object):
 		# Generate new auth tokens
 		if session.is_algorithmic():
 			new_access_token = self.SessionService.Algorithmic.serialize(session)
-			access_token_expires_in = self.SessionService.AnonymousExpiration
+			access_token_expires_in = None
 			new_refresh_token, refresh_token_expires_in = None, None
 		else:
 			new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
@@ -190,8 +190,10 @@ class TokenHandler(object):
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": new_access_token,
 			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
-			"expires_in": int(access_token_expires_in),
 		}
+
+		if access_token_expires_in:
+			response_payload["expires_in"] = int(access_token_expires_in)
 
 		if new_refresh_token:
 			response_payload["refresh_token"] = new_refresh_token
