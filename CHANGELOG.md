@@ -3,6 +3,7 @@
 ## v24.45
 
 ### Pre-releases
+- v24.45-alpha6
 - v24.45-alpha5
 - v24.45-alpha4
 - v24.45-alpha3
@@ -10,6 +11,7 @@
 - v24.45-alpha1
 
 ### Fix
+- Remove expires_in from token response for anonymous sessions (#434, v24.45-alpha6)
 - Catch and log ldap.INVALID_CREDENTIALS (#431, v24.45-alpha4)
 - Fix role error in provisioning startup (#428, v24.45-alpha2)
 - Log more details when message delivery fails (#427, v24.45-alpha1)
