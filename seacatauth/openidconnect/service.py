@@ -351,7 +351,7 @@ class OpenIdConnectService(asab.Service):
 		return userinfo
 
 
-	async def issue_id_token(self, session, expires_in: float | None = None):
+	async def issue_id_token(self, session, expires_at: datetime.datetime | None = None):
 		"""
 		Wrap authentication data and userinfo in a JWT token
 		"""
@@ -366,9 +366,8 @@ class OpenIdConnectService(asab.Service):
 		payload = await self.build_userinfo(session)
 
 		payload["iat"] = int(datetime.datetime.now(datetime.UTC).timestamp())
-		if expires_in:
-			payload["exp"] = int(
-				(datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)).timestamp())
+		if expires_at:
+			payload["exp"] = int(expires_at.timestamp())
 
 		token = jwcrypto.jwt.JWT(
 			header=header,
