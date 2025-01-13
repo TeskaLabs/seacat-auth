@@ -448,6 +448,35 @@ class OpenIdConnectService(asab.Service):
 			return None
 
 
+	async def calculate_token_expiration(
+		self,
+		session,
+	) -> typing.Tuple[datetime.datetime, typing.Optional[datetime.datetime]]:
+		"""
+		Calculate the new expiration time of the client session's tokens
+		"""
+		# Get the parent SSO session's max expiration time
+		sso_session = await self.SessionService.get(session.Session.ParentSessionId)
+
+		# Determine the desired access and refresh token expiration time
+		client_id = session.OAuth2.ClientId
+		client = await self.ClientService.get(client_id)
+		access_token_expiration = client.get("session_expiration") or AccessToken.Expiration
+		access_token_expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+			seconds=access_token_expiration)
+
+		if access_token_expires_at > sso_session.Session.MaxExpiration:
+			# Maximum session lifetime reached, there will be no refresh token
+			access_token_expires_at = sso_session.Session.MaxExpiration
+			return access_token_expires_at, None
+
+		refresh_token_expires_at = min(
+			datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=RefreshToken.Expiration),
+			sso_session.Session.MaxExpiration,
+		)
+		return access_token_expires_at, refresh_token_expires_at
+
+
 	async def create_authorization_code(
 		self, session: SessionAdapter,
 		code_challenge: str | None = None,
