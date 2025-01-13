@@ -259,6 +259,7 @@ class SessionService(asab.Service):
 					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
+		return await self.get(session_id)
 
 
 	async def update_session_expiration(self, session_id: str, expires_at: datetime.datetime):
