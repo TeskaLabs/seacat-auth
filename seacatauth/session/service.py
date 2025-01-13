@@ -247,7 +247,7 @@ class SessionService(asab.Service):
 		upsertor = self.StorageService.upsertor(
 			self.SessionCollection,
 			obj_id=session_id,
-			version=session_dict['_v'],
+			version=session_dict["_v"],
 		)
 
 		for session_builder in session_builders:
@@ -260,7 +260,21 @@ class SessionService(asab.Service):
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
-		L.log(asab.LOG_NOTICE, "Session updated.", struct_data={
+
+	async def update_session_expiration(self, session_id: str, expires_at: datetime.datetime):
+		if isinstance(session_id, str):
+			session_id = bson.ObjectId(session_id)
+		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+
+		upsertor = self.StorageService.upsertor(
+			self.SessionCollection,
+			obj_id=session_id,
+			version=session_dict["_v"],
+		)
+		upsertor.set(SessionAdapter.FN.Session.Expiration, expires_at)
+		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
+
+		L.log(asab.LOG_NOTICE, "Session expiration updated.", struct_data={
 			"sid": session_id,
 			"type": session_dict.get(SessionAdapter.FN.Session.Type),
 		})
