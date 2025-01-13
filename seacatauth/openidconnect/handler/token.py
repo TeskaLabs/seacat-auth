@@ -1,3 +1,4 @@
+import datetime
 import logging
 import aiohttp.web
 import jwcrypto.jws
@@ -167,7 +168,8 @@ class TokenHandler(object):
 			"sid": session.Id,
 			"client_id": session.OAuth2.ClientId,
 			"grant_type": "authorization_code",
-			"from_ip": from_ip})
+			"from_ip": from_ip
+		})
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
@@ -175,28 +177,14 @@ class TokenHandler(object):
 		# Generate new auth tokens
 		if session.is_algorithmic():
 			new_access_token = self.SessionService.Algorithmic.serialize(session)
-			access_token_expires_in = None
-			new_refresh_token, refresh_token_expires_in = None, None
+			response_payload = {
+				"token_type": "Bearer",
+				"scope": " ".join(session.OAuth2.Scope),
+				"access_token": new_access_token,
+				"id_token": await self.OpenIdConnectService.issue_id_token(session, expires_at=None),
+			}
 		else:
-			new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
-			new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
-			# Refresh the session data
-			session = await self.OpenIdConnectService.refresh_session(
-				session, requested_scope=scope, expires_in=refresh_token_expires_in)
-
-		# Response
-		response_payload = {
-			"token_type": "Bearer",
-			"scope": " ".join(session.OAuth2.Scope),
-			"access_token": new_access_token,
-			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
-		}
-
-		if access_token_expires_in:
-			response_payload["expires_in"] = int(access_token_expires_in)
-
-		if new_refresh_token:
-			response_payload["refresh_token"] = new_refresh_token
+			response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
 
 		headers = {
 			"Cache-Control": "no-store",
@@ -245,29 +233,13 @@ class TokenHandler(object):
 			"sid": session.Id,
 			"client_id": session.OAuth2.ClientId,
 			"grant_type": "refresh_token",
-			"from_ip": from_ip
+			"from_ip": from_ip,
 		})
-
-		# Generate new auth tokens
-		new_access_token, access_token_expires_in = await self.OpenIdConnectService.create_access_token(session)
-		new_refresh_token, refresh_token_expires_in = await self.OpenIdConnectService.create_refresh_token(session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
 
-		# Refresh the session data
-		session = await self.OpenIdConnectService.refresh_session(
-			session, requested_scope=scope, expires_in=refresh_token_expires_in)
-
-		# Response
-		response_payload = {
-			"token_type": "Bearer",
-			"scope": " ".join(session.OAuth2.Scope),
-			"access_token": new_access_token,
-			"refresh_token": new_refresh_token,
-			"id_token": await self.OpenIdConnectService.issue_id_token(session, access_token_expires_in),
-			"expires_in": int(access_token_expires_in),
-		}
+		response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
 
 		headers = {
 			"Cache-Control": "no-store",
@@ -275,6 +247,43 @@ class TokenHandler(object):
 		}
 
 		return asab.web.rest.json_response(request, response_payload, headers=headers)
+
+
+	async def _refresh_session_and_issue_tokens(self, session, scope=None):
+		"""
+		Refresh the client session, its parent SSO session and generate new tokens.
+		"""
+		# Calculate the new expiration time of the client session's tokens
+		access_token_expires_at, refresh_token_expires_at = \
+			await self.OpenIdConnectService.calculate_token_expiration(session)
+
+		# Extend the parent SSO session
+		await self.SessionService.update_session_expiration(
+			session.Session.ParentSessionId, expires_at=refresh_token_expires_at)
+
+		# Refresh the client session
+		session = await self.OpenIdConnectService.refresh_session(
+			session, requested_scope=scope, expires_at=refresh_token_expires_at)
+
+		# Generate new tokens
+		new_access_token = await self.OpenIdConnectService.create_access_token(
+			session, expires_at=access_token_expires_at)
+		new_id_token = await self.OpenIdConnectService.issue_id_token(session, access_token_expires_at)
+
+		response_payload = {
+			"token_type": "Bearer",
+			"scope": " ".join(session.OAuth2.Scope),
+			"access_token": new_access_token,
+			"id_token": new_id_token,
+			"expires_in": int((access_token_expires_at - datetime.datetime.now()).timestamp()),
+		}
+
+		if not refresh_token_expires_at:
+			new_refresh_token = await self.OpenIdConnectService.create_refresh_token(
+				session, expires_at=refresh_token_expires_at)
+			response_payload["refresh_token"] = new_refresh_token
+
+		return response_payload
 
 
 	async def _get_session_by_authorization_code(self, request):
