@@ -486,17 +486,21 @@ class OpenIdConnectService(asab.Service):
 		"""
 		Create OAuth2 authorization code
 
-		@param session: Session
-		@param code_challenge: PKCE challenge string
-		@param code_challenge_method: PKCE verification method
-		@return: Base64-encoded token value
+		Args:
+			session: Client session
+			code_challenge: PKCE challenge string
+			code_challenge_method: PKCE verification method
+
+		Returns:
+			Base64-encoded token value
 		"""
+		expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=AuthorizationCode.Expiration)
 		if session.is_algorithmic():
 			raw_value = await self.TokenService.create(
 				token_length=AuthorizationCode.ByteLength,
 				token_type=AuthorizationCode.TokenType,
 				session_id=self.SessionService.Algorithmic.serialize(session),
-				expiration=AuthorizationCode.Expiration,
+				expires_at=expires_at,
 				is_session_algorithmic=True,
 				cc=code_challenge,
 				ccm=code_challenge_method,
@@ -506,7 +510,7 @@ class OpenIdConnectService(asab.Service):
 				token_length=AuthorizationCode.ByteLength,
 				token_type=AuthorizationCode.TokenType,
 				session_id=session.SessionId,
-				expiration=AuthorizationCode.Expiration,
+				expires_at=expires_at,
 				is_session_algorithmic=False,
 				cc=code_challenge,
 				ccm=code_challenge_method,
@@ -514,31 +518,46 @@ class OpenIdConnectService(asab.Service):
 		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_access_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
+	async def create_access_token(
+		self,
+		session: SessionAdapter,
+		expires_at: datetime.datetime,
+	) -> str:
 		"""
 		Create OAuth2 access token
 
-		@param session: Target session
-		@return: Base64-encoded token and its expiration
+		Args:
+			session: Client session
+			expires_at: Token expiration time
+
+		Returns:
+			Base64-encoded token value
 		"""
 		client = await self.ClientService.get(session.OAuth2.ClientId)
-		expires_in = client.get("session_expiration") or AccessToken.Expiration
 		raw_value = await self.TokenService.create(
 			token_length=AccessToken.ByteLength,
 			token_type=AccessToken.TokenType,
 			session_id=session.SessionId,
-			expiration=expires_in,
+			expires_at=expires_at,
 			is_session_algorithmic=session.is_algorithmic(),
 		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
-	async def create_refresh_token(self, session: SessionAdapter) -> typing.Tuple[str, float]:
+	async def create_refresh_token(
+		self,
+		session: SessionAdapter,
+		expires_at: datetime.datetime,
+	) -> str:
 		"""
 		Create OAuth2 refresh token
 
-		@param session: Target session
-		@return: Base64-encoded token value
+		Args:
+			session: Client session
+			expires_at: Token expiration time
+
+		Returns:
+			Base64-encoded token value
 		"""
 		assert not session.is_algorithmic()
 		expires_in = RefreshToken.Expiration
@@ -546,9 +565,9 @@ class OpenIdConnectService(asab.Service):
 			token_length=RefreshToken.ByteLength,
 			token_type=RefreshToken.TokenType,
 			session_id=session.SessionId,
-			expiration=RefreshToken.Expiration,
+			expires_at=expires_at,
 		)
-		return base64.urlsafe_b64encode(raw_value).decode("ascii"), expires_in
+		return base64.urlsafe_b64encode(raw_value).decode("ascii")
 
 
 	async def get_session_by_authorization_code(self, code, code_verifier: str | None = None):
