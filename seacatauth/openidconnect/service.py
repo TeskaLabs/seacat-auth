@@ -533,7 +533,6 @@ class OpenIdConnectService(asab.Service):
 		Returns:
 			Base64-encoded token value
 		"""
-		client = await self.ClientService.get(session.OAuth2.ClientId)
 		raw_value = await self.TokenService.create(
 			token_length=AccessToken.ByteLength,
 			token_type=AccessToken.TokenType,

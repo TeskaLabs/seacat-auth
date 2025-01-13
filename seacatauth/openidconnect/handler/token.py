@@ -275,7 +275,7 @@ class TokenHandler(object):
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": new_access_token,
 			"id_token": new_id_token,
-			"expires_in": int((access_token_expires_at - datetime.datetime.now()).timestamp()),
+			"expires_in": int((access_token_expires_at - datetime.datetime.now(datetime.UTC)).total_seconds()),
 		}
 
 		if not refresh_token_expires_at:
