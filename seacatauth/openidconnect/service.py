@@ -106,15 +106,19 @@ class OpenIdConnectService(asab.Service):
 	async def refresh_session(
 		self,
 		session: SessionAdapter,
+		expires_at: datetime.datetime,
 		requested_scope: typing.Optional[typing.Iterable] = None,
-		expires_in: float | None = None,
-	):
+	) -> SessionAdapter:
 		"""
 		Update/rebuild the session according to its authorization parameters
 
-		@param session:
-		@param track_id:
-		@return:
+		Args:
+			session: Session to refresh
+			expires_at: New expiration time
+			requested_scope: Requested scope
+
+		Returns:
+			Updated session
 		"""
 		# Get parent session
 		root_session = await self.SessionService.get(session.Session.ParentSessionId)
@@ -161,9 +165,7 @@ class OpenIdConnectService(asab.Service):
 			redirect_uri=session.OAuth2.RedirectUri,
 		)
 
-		if expires_in:
-			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expires_in)
-			session_builders.append(((SessionAdapter.FN.Session.Expiration, expiration),))
+		session_builders.append(((SessionAdapter.FN.Session.Expiration, expires_at),))
 
 		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
