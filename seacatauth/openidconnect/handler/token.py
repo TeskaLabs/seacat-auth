@@ -258,8 +258,9 @@ class TokenHandler(object):
 			await self.OpenIdConnectService.calculate_token_expiration(session)
 
 		# Extend the parent SSO session
-		await self.SessionService.update_session_expiration(
-			session.Session.ParentSessionId, expires_at=refresh_token_expires_at)
+		if refresh_token_expires_at:
+			await self.SessionService.update_session_expiration(
+				session.Session.ParentSessionId, expires_at=refresh_token_expires_at)
 
 		# Refresh the client session
 		session = await self.OpenIdConnectService.refresh_session(

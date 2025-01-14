@@ -263,6 +263,7 @@ class SessionService(asab.Service):
 
 
 	async def update_session_expiration(self, session_id: str, expires_at: datetime.datetime):
+		assert expires_at is not None
 		if isinstance(session_id, str):
 			session_id = bson.ObjectId(session_id)
 		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
@@ -299,7 +300,8 @@ class SessionService(asab.Service):
 			raise exceptions.SessionNotFoundError("Session not found.", query={key: value})
 
 		# Do not return expired sessions
-		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+		expires_at = session_dict[SessionAdapter.FN.Session.Expiration]
+		if expires_at < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.SessionNotFoundError("Session expired.", query={key: value})
 
 		try:
