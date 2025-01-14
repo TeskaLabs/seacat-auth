@@ -106,7 +106,7 @@ class OpenIdConnectService(asab.Service):
 	async def refresh_session(
 		self,
 		session: SessionAdapter,
-		expires_at: datetime.datetime,
+		expires_at: typing.Optional[datetime.datetime] = None,
 		requested_scope: typing.Optional[typing.Iterable] = None,
 	) -> SessionAdapter:
 		"""
@@ -165,7 +165,8 @@ class OpenIdConnectService(asab.Service):
 			redirect_uri=session.OAuth2.RedirectUri,
 		)
 
-		session_builders.append(((SessionAdapter.FN.Session.Expiration, expires_at),))
+		if expires_at:
+			session_builders.append(((SessionAdapter.FN.Session.Expiration, expires_at),))
 
 		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
@@ -559,7 +560,6 @@ class OpenIdConnectService(asab.Service):
 			Base64-encoded token value
 		"""
 		assert not session.is_algorithmic()
-		expires_in = RefreshToken.Expiration
 		raw_value = await self.TokenService.create(
 			token_length=RefreshToken.ByteLength,
 			token_type=RefreshToken.TokenType,
