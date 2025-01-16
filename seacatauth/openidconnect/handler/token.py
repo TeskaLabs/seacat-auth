@@ -285,7 +285,7 @@ class TokenHandler(object):
 			"expires_in": int((access_token_expires_at - datetime.datetime.now(datetime.UTC)).total_seconds()),
 		}
 
-		if not refresh_token_expires_at:
+		if refresh_token_expires_at:
 			new_refresh_token = await self.OpenIdConnectService.create_refresh_token(
 				session, expires_at=refresh_token_expires_at)
 			response_payload["refresh_token"] = new_refresh_token
