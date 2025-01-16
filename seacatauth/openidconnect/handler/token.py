@@ -111,6 +111,9 @@ class TokenHandler(object):
 	async def _authorization_code_grant(self, request, from_ip):
 		form_data = await request.post()
 
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=None)
+
 		# Get session by code
 		try:
 			session = await self._get_session_by_authorization_code(request)
@@ -122,7 +125,7 @@ class TokenHandler(object):
 				struct_data={
 					"from_ip": from_ip,
 					"grant_type": "authorization_code",
-					"client_id": form_data.get("client_id"),
+					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
 				}
 			)
@@ -135,7 +138,7 @@ class TokenHandler(object):
 				struct_data={
 					"from_ip": from_ip,
 					"grant_type": "authorization_code",
-					"client_id": form_data.get("client_id"),
+					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
 				}
 			)
@@ -154,7 +157,7 @@ class TokenHandler(object):
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Redirect URI mismatch.", struct_data={
 				"from_ip": from_ip,
 				"grant_type": "authorization_code",
-				"client_id": form_data.get("client_id"),
+				"client_id": client_id,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
@@ -197,6 +200,9 @@ class TokenHandler(object):
 	async def _refresh_token_grant(self, request, from_ip):
 		form_data = await request.post()
 
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=None)
+
 		# Get session by refresh token
 		try:
 			session = await self._get_session_by_refresh_token(request)
@@ -208,7 +214,7 @@ class TokenHandler(object):
 				struct_data={
 					"from_ip": from_ip,
 					"grant_type": "refresh_token",
-					"client_id": form_data.get("client_id"),
+					"client_id": client_id,
 				}
 			)
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
