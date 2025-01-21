@@ -85,6 +85,8 @@ class SessionService(asab.Service):
 		self.MaximumAge = datetime.timedelta(
 			seconds=asab.Config.getseconds("seacatauth:session", "maximum_age")
 		)
+		if self.MaximumAge < self.Expiration:
+			raise ValueError("Session maximum_age must be greater than its default expiration.")
 
 		touch_cooldown = asab.Config.getseconds("seacatauth:session", "touch_cooldown")
 		self.TouchCooldown = datetime.timedelta(seconds=touch_cooldown)
@@ -247,7 +249,7 @@ class SessionService(asab.Service):
 		upsertor = self.StorageService.upsertor(
 			self.SessionCollection,
 			obj_id=session_id,
-			version=session_dict['_v'],
+			version=session_dict["_v"],
 		)
 
 		for session_builder in session_builders:
@@ -259,8 +261,24 @@ class SessionService(asab.Service):
 					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
+		return await self.get(session_id)
 
-		L.log(asab.LOG_NOTICE, "Session updated.", struct_data={
+
+	async def update_session_expiration(self, session_id: str, expires_at: datetime.datetime):
+		assert expires_at is not None
+		if isinstance(session_id, str):
+			session_id = bson.ObjectId(session_id)
+		session_dict = await self.StorageService.get(self.SessionCollection, session_id)
+
+		upsertor = self.StorageService.upsertor(
+			self.SessionCollection,
+			obj_id=session_id,
+			version=session_dict["_v"],
+		)
+		upsertor.set(SessionAdapter.FN.Session.Expiration, expires_at)
+		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
+
+		L.log(asab.LOG_NOTICE, "Session expiration updated.", struct_data={
 			"sid": session_id,
 			"type": session_dict.get(SessionAdapter.FN.Session.Type),
 		})
@@ -284,7 +302,8 @@ class SessionService(asab.Service):
 			raise exceptions.SessionNotFoundError("Session not found.", query={key: value})
 
 		# Do not return expired sessions
-		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+		expires_at = session_dict[SessionAdapter.FN.Session.Expiration]
+		if expires_at < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.SessionNotFoundError("Session expired.", query={key: value})
 
 		try:

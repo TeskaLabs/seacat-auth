@@ -525,60 +525,56 @@ class ClientService(asab.Service):
 		self,
 		request,
 		expected_client_id: typing.Optional[str] = None
-	) -> typing.Optional[str]:
+	) -> str:
 		"""
 		Verify client ID and secret.
-		"""
-		if expected_client_id:
-			# Client ID is known - Use the pre-configured authentication method
-			client_dict = await self.get(expected_client_id)
-			expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
-			if expected_auth_method == "none":
-				return expected_client_id
-			if expected_auth_method == "client_secret_basic":
-				client_id, client_secret = self._get_credentials_from_authorization_header(request)
-			elif expected_auth_method == "client_secret_post":
-				client_id, client_secret = await self._get_credentials_from_post_data(request)
-			else:
-				raise NotImplementedError("Unsupported client authentication method: {}".format(expected_auth_method))
 
+		Args:
+			request: aiohttp.web.Request
+			expected_client_id: Expected client ID
+
+		Returns:
+			Authenticated client ID
+		"""
+		# Extract client ID and secret from request authorization header or post data
+		client_id, client_secret = self._get_credentials_from_authorization_header(request)
+		if client_id and client_secret:
+			auth_method = "client_secret_basic"
+		else:
+			client_id, client_secret = await self._get_credentials_from_post_data(request)
 			if not client_id:
 				raise exceptions.ClientAuthenticationError(
-					"Failed to get client credentials from request.",
-					client_id=expected_client_id,
+					"No client ID found in request.",
+					client_id=None,
 				)
-			elif client_id != expected_client_id:
-				raise exceptions.ClientAuthenticationError(
-					"Client IDs do not match (expected {!r}).".format(expected_client_id),
-					client_id=client_id,
-				)
-
-		else:
-			# Client ID is not known in advance - Try to extract it from the request
-			client_id, client_secret = self._get_credentials_from_authorization_header(request)
-			if client_id and client_secret:
-				auth_method = "client_secret_basic"
+			if client_secret:
+				auth_method = "client_secret_post"
 			else:
-				client_id, client_secret = await self._get_credentials_from_post_data(request)
-				if client_id and client_secret:
-					auth_method = "client_secret_post"
-				else:
-					# Public client - Authentication not required
-					# auth_method = "none"
-					return None
+				# Public client - Secret not used
+				auth_method = "none"
 
-			assert client_id
-			client_dict = await self.get(client_id)
-			expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
-			if auth_method != expected_auth_method:
-				raise exceptions.ClientAuthenticationError(
-					"Unexpected authentication method (expected {!r}, {!r}).".format(
-						expected_auth_method, auth_method),
-					client_id=client_id,
-				)
-			elif auth_method == "none":
-				# Public client - no secret verification required
-				return client_id
+		assert client_id is not None
+
+		if expected_client_id and client_id != expected_client_id:
+			raise exceptions.ClientAuthenticationError(
+				"Client IDs do not match (expected {!r}).".format(expected_client_id),
+				client_id=client_id,
+			)
+
+		client_dict = await self.get(client_id)
+
+		# Check if used authentication method matches the pre-configured one
+		expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+		if auth_method != expected_auth_method:
+			raise exceptions.ClientAuthenticationError(
+				"Unexpected authentication method (expected {!r}, got {!r}).".format(
+					expected_auth_method, auth_method),
+				client_id=client_id,
+			)
+
+		if auth_method == "none":
+			# Public client - no secret verification required
+			return client_id
 
 		# Check secret expiration
 		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
@@ -620,9 +616,7 @@ class ClientService(asab.Service):
 		self, request
 	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
 		post_data = await request.post()
-		if not ("client_id" in post_data and "client_secret" in post_data):
-			return None, None
-		return post_data["client_id"], post_data["client_secret"]
+		return post_data.get("client_id"), post_data.get("client_secret")
 
 
 	def _check_grant_types(self, grant_types, response_types):
