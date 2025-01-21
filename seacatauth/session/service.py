@@ -85,6 +85,8 @@ class SessionService(asab.Service):
 		self.MaximumAge = datetime.timedelta(
 			seconds=asab.Config.getseconds("seacatauth:session", "maximum_age")
 		)
+		if self.MaximumAge < self.Expiration:
+			raise ValueError("Session maximum_age must be greater than its default expiration.")
 
 		touch_cooldown = asab.Config.getseconds("seacatauth:session", "touch_cooldown")
 		self.TouchCooldown = datetime.timedelta(seconds=touch_cooldown)
