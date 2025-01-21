@@ -2,7 +2,11 @@
 
 ## v24.45
 
+### Compatibility
+- ASAB WebUI v24.47 and later
+
 ### Pre-releases
+- v24.45-alpha7
 - v24.45-alpha6
 - v24.45-alpha5
 - v24.45-alpha4
@@ -17,6 +21,7 @@
 - Log more details when message delivery fails (#427, v24.45-alpha1)
 
 ### Features
+- Do not issue refresh token when maximum session age is reached (#435, v24.45-alpha7)
 - Nicer message when message delivery fails (#432, v24.45-alpha5)
 - Do not automatically assign tenant to its creator (#429, v24.45-alpha3)
 

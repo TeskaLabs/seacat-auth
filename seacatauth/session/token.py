@@ -59,19 +59,23 @@ class SessionTokenService(asab.Service):
 
 	async def create(
 		self, token_length: int, token_type: str, session_id: str,
-		expiration: typing.Optional[float] = None,
+		expires_at: typing.Optional[datetime.datetime] = None,
 		is_session_algorithmic: bool = False,
 		**kwargs
 	) -> bytes:
 		"""
 		Create and store a new auth token
 
-		@param token_length: Number of token bytes
-		@param token_type: Token type string
-		@param session_id: Session identifier
-		@param expiration: Expiration in seconds
-		@param is_session_algorithmic: Whether the session is algorithmic
-		@return: Raw token value
+		Args:
+			token_length: Length of the token
+			token_type: Type of the token
+			session_id: ID of the session
+			expires_at: Expiration datetime
+			is_session_algorithmic: Whether the session is algorithmic
+			**kwargs: Additional fields to store with the token
+
+		Returns:
+			Raw token value
 		"""
 		token = _generate_token(token_length)
 		token_hash = _hash_token(token)
@@ -81,8 +85,7 @@ class SessionTokenService(asab.Service):
 		upsertor.set(SessionTokenField.SessionId, session_id)
 		if is_session_algorithmic:
 			upsertor.set(SessionTokenField.IsSessionAlgorithmic, is_session_algorithmic)
-		if expiration:
-			expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
+		if expires_at:
 			upsertor.set(SessionTokenField.ExpiresAt, expires_at)
 		for k, v in kwargs.items():
 			if v is not None:
