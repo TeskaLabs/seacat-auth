@@ -2,6 +2,9 @@
 
 ## v24.45
 
+### Compatibility
+- ASAB WebUI v24.47 and later
+
 ### Pre-releases
 - v24.45-alpha7
 - v24.45-alpha6
