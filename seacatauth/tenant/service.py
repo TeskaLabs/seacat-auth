@@ -24,8 +24,12 @@ class TenantService(asab.Service):
 			"seacatauth:tenant", "additional_allowed_id_characters", fallback="")
 		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
+
+		# Role assigned to any user upon tenant assignment
 		self.TenantCommonRole = asab.Config.get(
 			"seacatauth:tenant", "new_user_role", fallback="{tenant}/~reader")
+
+		# Role assigned to the tenant creator
 		self.TenantAdminRole = asab.Config.get(
 			"seacatauth:tenant", "admin_role", fallback="{tenant}/~auth-admin")
 
