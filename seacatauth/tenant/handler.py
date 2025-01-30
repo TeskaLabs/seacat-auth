@@ -170,7 +170,7 @@ class TenantHandler(object):
 					struct_data={"cid": credentials_id, "tenant": tenant_id})
 
 			# Assign the admin role to the user
-			role_id = "{}/~auth-admin".format(tenant_id)
+			role_id = self.TenantService.TenantAdminRole.format(tenant_id)
 			try:
 				await role_service.assign_role(credentials_id, role_id)
 			except Exception as e:

@@ -24,7 +24,10 @@ class TenantService(asab.Service):
 			"seacatauth:tenant", "additional_allowed_id_characters", fallback="")
 		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
-
+		self.TenantCommonRole = asab.Config.get(
+			"seacatauth:tenant", "new_user_role", fallback="{tenant}/~reader")
+		self.TenantAdminRole = asab.Config.get(
+			"seacatauth:tenant", "admin_role", fallback="{tenant}/~auth-admin")
 
 	def create_provider(self, provider_id, config_section_name):
 		assert (self.TenantsProvider is None)  # We support only one tenant provider for now
