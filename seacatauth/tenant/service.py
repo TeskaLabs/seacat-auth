@@ -397,15 +397,19 @@ class TenantService(asab.Service):
 
 
 async def _check_propagated_role(role_svc, role_id_template: str) -> bool:
+	if not "{tenant}" in role_id_template:
+		L.error("Role name must include '{tenant}'.", struct_data={"role": role_id_template})
+		return False
+
 	role_id = role_id_template.format(tenant="*").replace("~", "")
 	try:
 		role = await role_svc.get(role_id)
 	except exceptions.RoleNotFoundError:
-		L.error("Role not found.", struct_data={"role_id": role_id})
+		L.error("Role not found.", struct_data={"role": role_id})
 		return False
 
 	if not role.get("propagated"):
-		L.error("Role is not propagated.", struct_data={"role_id": role_id})
+		L.error("Role is not propagated.", struct_data={"role": role_id})
 		return False
 
 	return True
