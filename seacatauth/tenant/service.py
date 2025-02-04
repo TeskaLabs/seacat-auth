@@ -397,8 +397,8 @@ class TenantService(asab.Service):
 
 
 async def _check_propagated_role(role_svc, role_id_template: str) -> bool:
-	if "{tenant}" not in role_id_template:
-		L.error("Role name must include '{tenant}'.", struct_data={"role": role_id_template})
+	if not role_id_template.startswith("{tenant}/~"):
+		L.error("Role name must start with '{tenant}/~'.", struct_data={"role": role_id_template})
 		return False
 
 	role_id = role_id_template.format(tenant="*").replace("~", "")
