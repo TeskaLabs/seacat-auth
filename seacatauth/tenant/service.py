@@ -26,8 +26,8 @@ class TenantService(asab.Service):
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 		# Role assigned to any user upon tenant assignment
-		self.TenantCommonRole = asab.Config.get(
-			"seacatauth:tenant", "new_user_role", fallback="{tenant}/~reader")
+		self.TenantBaseRole = asab.Config.get(
+			"seacatauth:tenant", "base_role", fallback=None)
 
 		# Role assigned to the tenant creator
 		self.TenantAdminRole = asab.Config.get(
@@ -259,7 +259,8 @@ class TenantService(asab.Service):
 	async def assign_tenant(
 		self, credentials_id: str, tenant: str,
 		verify_tenant: bool = True,
-		verify_credentials: bool = True
+		verify_credentials: bool = True,
+		assign_base_role: bool = True,
 	):
 		"""
 		Grant tenant access to specified credentials.
@@ -292,6 +293,14 @@ class TenantService(asab.Service):
 			"tenant": tenant,
 		})
 		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
+		
+		if assign_base_role and self.TenantBaseRole is not None:
+			role_svc = self.App.get_service("seacatauth.RoleService")
+			await role_svc.assign_role(
+				credentials_id,
+				self.TenantBaseRole.format(tenant=tenant),
+			)
+
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):
