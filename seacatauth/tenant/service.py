@@ -397,7 +397,7 @@ class TenantService(asab.Service):
 
 
 async def _check_propagated_role(role_svc, role_id_template: str) -> bool:
-	if not "{tenant}" in role_id_template:
+	if "{tenant}" not in role_id_template:
 		L.error("Role name must include '{tenant}'.", struct_data={"role": role_id_template})
 		return False
 
