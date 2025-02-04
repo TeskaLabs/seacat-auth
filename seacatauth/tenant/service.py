@@ -27,11 +27,21 @@ class TenantService(asab.Service):
 
 		# Role assigned to any user upon tenant assignment
 		self.TenantBaseRole = asab.Config.get(
-			"seacatauth:tenant", "base_role", fallback=None)
+			"seacatauth:tenant", "base_role", fallback="") or None
 
 		# Role assigned to the tenant creator
 		self.TenantAdminRole = asab.Config.get(
-			"seacatauth:tenant", "admin_role", fallback="{tenant}/~auth-admin")
+			"seacatauth:tenant", "admin_role", fallback="{tenant}/~auth-admin") or None
+
+
+	async def initialize(self, app):
+		await super().initialize(app)
+		role_svc = self.App.get_service("seacatauth.RoleService")
+		if not await _check_propagated_role(role_svc, self.TenantBaseRole):
+			L.error("Tenant base role not ready.", struct_data={"role": self.TenantBaseRole})
+		if not await _check_propagated_role(role_svc, self.TenantAdminRole):
+			L.error("Tenant admin role not ready.", struct_data={"role": self.TenantAdminRole})
+
 
 	def create_provider(self, provider_id, config_section_name):
 		assert (self.TenantsProvider is None)  # We support only one tenant provider for now
@@ -384,3 +394,18 @@ class TenantService(asab.Service):
 
 	async def get_assigned_tenant(self, credatials_id: str, tenant: str) -> dict:
 		return await self.TenantsProvider.get_assignment(credatials_id, tenant)
+
+
+async def _check_propagated_role(role_svc, role_id_template: str) -> bool:
+	role_id = role_id_template.format(tenant="*").replace("~", "")
+	try:
+		role = await role_svc.get(role_id)
+	except exceptions.RoleNotFoundError:
+		L.error("Role not found.", struct_data={"role_id": role_id})
+		return False
+
+	if not role.get("propagated"):
+		L.error("Role is not propagated.", struct_data={"role_id": role_id})
+		return False
+
+	return True
