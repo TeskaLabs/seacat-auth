@@ -6,6 +6,8 @@
 - ASAB WebUI v24.47 and later
 
 ### Pre-releases
+- v24.45-beta2
+- v24.45-beta
 - v24.45-alpha7
 - v24.45-alpha6
 - v24.45-alpha5
@@ -13,6 +15,9 @@
 - v24.45-alpha3
 - v24.45-alpha2
 - v24.45-alpha1
+
+### Patch
+- Hotfix: Ignore client secret if client is configured as public (#434, v24.45-beta2)
 
 ### Fix
 - Remove expires_in from token response for anonymous sessions (#434, v24.45-alpha6)
