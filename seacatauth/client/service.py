@@ -566,6 +566,15 @@ class ClientService(asab.Service):
 		# Check if used authentication method matches the pre-configured one
 		expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
 		if auth_method != expected_auth_method:
+
+			# TODO: Remove this temporary workaround
+			# >>>
+			if expected_auth_method == "none":
+				# Client is configured as public
+				# -> skip secret verification even if secret is provided in the request
+				return client_id
+			# <<<
+
 			raise exceptions.ClientAuthenticationError(
 				"Unexpected authentication method (expected {!r}, got {!r}).".format(
 					expected_auth_method, auth_method),
