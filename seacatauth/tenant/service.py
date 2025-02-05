@@ -28,7 +28,6 @@ class TenantService(asab.Service):
 
 	async def initialize(self, app):
 		await super().initialize(app)
-		role_svc = self.App.get_service("seacatauth.RoleService")
 
 
 	def create_provider(self, provider_id, config_section_name):
