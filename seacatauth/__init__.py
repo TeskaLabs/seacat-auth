@@ -113,9 +113,6 @@ asab.Config.add_defaults({
 		# Role that is assigned to any user when they create a new tenant.
 		# It must be a global role with propagation enabled.
 		"admin_role": "*/auth-admin",
-
-		# Whether Seacat Auth should automatically create and update the admin role.
-		"manage_admin_role": "yes",
 	},
 
 	"seacatauth:registration": {
