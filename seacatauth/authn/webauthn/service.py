@@ -116,7 +116,7 @@ class WebAuthnService(asab.Service):
 								struct_data={"status": resp.status}
 							)
 							return
-			except (TimeoutError, ConnectionError) as e:
+			except (TimeoutError, ConnectionError, aiohttp.ClientConnectionError) as e:
 				L.info("FIDO Metadata Service is unreachable ({}: {}).".format(e.__class__.__name__, e))
 				return
 
