@@ -4,6 +4,7 @@ import asab.web.rest
 import asab.exceptions
 import asab.utils
 
+from .. import exceptions
 from ..decorators import access_control
 from . import schemas
 
@@ -170,14 +171,10 @@ class TenantHandler(object):
 					struct_data={"cid": credentials_id, "tenant": tenant_id})
 
 			# Assign the admin role to the user
-			role_id = self.TenantService.TenantAdminRole.format(tenant=tenant_id)
 			try:
-				await role_service.assign_role(credentials_id, role_id)
-			except Exception as e:
-				L.error(
-					"Error assigning role: {}".format(e),
-					struct_data={"cid": credentials_id, "role": role_id}
-				)
+				await role_service.assign_tenant_base_role(credentials_id, tenant_id)
+			except exceptions.RoleNotFoundError:
+				L.debug("Tenant admin role not available.")
 
 		return asab.web.rest.json_response(
 			request, data={"id": tenant_id})

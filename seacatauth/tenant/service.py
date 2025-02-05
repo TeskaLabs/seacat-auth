@@ -25,22 +25,10 @@ class TenantService(asab.Service):
 		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
-		# Role assigned to any user upon tenant assignment
-		self.TenantBaseRole = asab.Config.get(
-			"seacatauth:tenant", "base_role", fallback="") or None
-
-		# Role assigned to the tenant creator
-		self.TenantAdminRole = asab.Config.get(
-			"seacatauth:tenant", "admin_role", fallback="{tenant}/~auth-admin") or None
-
 
 	async def initialize(self, app):
 		await super().initialize(app)
 		role_svc = self.App.get_service("seacatauth.RoleService")
-		if not await _check_propagated_role(role_svc, self.TenantBaseRole):
-			L.error("Tenant base role not ready.", struct_data={"role": self.TenantBaseRole})
-		if not await _check_propagated_role(role_svc, self.TenantAdminRole):
-			L.error("Tenant admin role not ready.", struct_data={"role": self.TenantAdminRole})
 
 
 	def create_provider(self, provider_id, config_section_name):
@@ -304,12 +292,12 @@ class TenantService(asab.Service):
 		})
 		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
 
-		if assign_base_role and self.TenantBaseRole is not None:
+		if assign_base_role:
 			role_svc = self.App.get_service("seacatauth.RoleService")
-			await role_svc.assign_role(
-				credentials_id,
-				self.TenantBaseRole.format(tenant=tenant),
-			)
+			try:
+				await role_svc.assign_tenant_base_role(credentials_id, tenant)
+			except exceptions.RoleNotFoundError:
+				L.debug("Tenant base role not available.")
 
 
 
@@ -394,22 +382,3 @@ class TenantService(asab.Service):
 
 	async def get_assigned_tenant(self, credatials_id: str, tenant: str) -> dict:
 		return await self.TenantsProvider.get_assignment(credatials_id, tenant)
-
-
-async def _check_propagated_role(role_svc, role_id_template: str) -> bool:
-	if not role_id_template.startswith("{tenant}/~"):
-		L.error("Role name must start with '{tenant}/~'.", struct_data={"role": role_id_template})
-		return False
-
-	role_id = role_id_template.format(tenant="*").replace("~", "")
-	try:
-		role = await role_svc.get(role_id)
-	except exceptions.RoleNotFoundError:
-		L.error("Role not found.", struct_data={"role": role_id})
-		return False
-
-	if not role.get("propagated"):
-		L.error("Role is not propagated.", struct_data={"role": role_id})
-		return False
-
-	return True
