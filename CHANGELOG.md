@@ -8,6 +8,9 @@
 ### Fix
 - Handle FIDO MDS ClientConnectionError (#438, v25.05-alpha1)
 
+### Features
+- Configurable default tenant roles (#436, v25.05-alpha2)
+
 ---
 
 
