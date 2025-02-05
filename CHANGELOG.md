@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v25.05
+
+### Pre-releases
+- v25.05-alpha1
+
+### Fix
+- Handle FIDO MDS ClientConnectionError (#438, v25.05-alpha1)
+
+---
+
+
 ## v24.45
 
 ### Compatibility
