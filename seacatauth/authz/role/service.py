@@ -82,7 +82,7 @@ class RoleService(asab.Service):
 		# Role assigned to the tenant creator upon new tenant creation
 		# Must be a global role with propagation enabled
 		self.TenantAdminRole = asab.Config.get(
-			"seacatauth:tenant", "admin_role", fallback="*/auth-admin") or None
+			"seacatauth:tenant", "admin_role", fallback="") or None
 
 
 	async def initialize(self, app):
