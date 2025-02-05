@@ -130,12 +130,14 @@ class RoleService(asab.Service):
 		Create them if they don't, update them if outdated.
 		"""
 		await self._ensure_system_role(SuperuserRoleId, SuperuserRoleProperties)
+
 		if self.TenantBaseRole:
 			await self._ensure_propagated_role(self.TenantBaseRole)
-		if self.TenantAdminRole:
-			await self._ensure_propagated_role(self.TenantAdminRole)
+
 		if self.ManageTenantAdminRole:
 			await self._ensure_system_role(self.TenantAdminRole, TenantAdminRoleProperties)
+		if self.TenantAdminRole:
+			await self._ensure_propagated_role(self.TenantAdminRole)
 
 
 	def _prepare_views(self, tenant_id: str | None, exclude_global: bool = False, exclude_propagated: bool = False):
@@ -696,6 +698,7 @@ class RoleService(asab.Service):
 		await self.assign_role(
 			credentials_id,
 			global_role_id_to_propagated(self.TenantBaseRole, tenant_id),
+			verify_role=False,
 		)
 
 
