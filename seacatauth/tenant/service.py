@@ -303,7 +303,7 @@ class TenantService(asab.Service):
 			"tenant": tenant,
 		})
 		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
-		
+
 		if assign_base_role and self.TenantBaseRole is not None:
 			role_svc = self.App.get_service("seacatauth.RoleService")
 			await role_svc.assign_role(
