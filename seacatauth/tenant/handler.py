@@ -172,7 +172,7 @@ class TenantHandler(object):
 
 			# Assign the admin role to the user
 			try:
-				await role_service.assign_tenant_base_role(credentials_id, tenant_id)
+				await role_service.assign_tenant_admin_role(credentials_id, tenant_id)
 			except exceptions.RoleNotFoundError:
 				L.debug("Tenant admin role not available.")
 
