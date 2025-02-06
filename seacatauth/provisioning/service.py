@@ -7,6 +7,8 @@ import asab.exceptions
 import asab.storage.exceptions
 
 from ..client.service import CLIENT_TEMPLATES
+from ..generic import SessionContext
+from ..session.adapter import build_system_session
 
 #
 
@@ -46,6 +48,7 @@ class ProvisioningService(asab.Service):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 		self.ResourceService = app.get_service("seacatauth.ResourceService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
+		self.SessionService = app.get_service("seacatauth.SessionService")
 
 		self.Config = _PROVISIONING_CONFIG_DEFAULTS
 		config_file = asab.Config.get("seacatauth:provisioning", "provisioning_config_file").strip() or None
@@ -67,6 +70,24 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.initialize(app)
 		await self.ClientService.initialize(app)
 
+		session = build_system_session(
+			self.SessionService,
+			session_id="PROVISIONING"
+		)
+		session_ctx = SessionContext.set(session)
+		try:
+			await self._set_up_provisioning(app)
+		finally:
+			SessionContext.reset(session_ctx)
+			del session
+
+
+	async def finalize(self, app):
+		await self._tear_down_provisioning(app)
+		await super().finalize(app)
+
+
+	async def _set_up_provisioning(self, app):
 		# Create provisioning credentials provider
 		self.CredentialsService.create_dict_provider(self.CredentialsProviderID)
 		existing_providers = list(self.CredentialsService.CredentialProviders.keys())
@@ -107,7 +128,7 @@ class ProvisioningService(asab.Service):
 		await self._initialize_admin_ui_client()
 
 
-	async def finalize(self, app):
+	async def _tear_down_provisioning(self, app):
 		# Delete the superuser
 		# This also all its sessions and tenant+role assignments
 		await self.CredentialsService.delete_credentials(self.SuperuserID)

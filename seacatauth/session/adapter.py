@@ -3,7 +3,9 @@ import logging
 import base64
 import datetime
 import typing
+import asab
 
+from .. import AuditLogger
 from ..authz.rbac.service import RBACService
 
 #
@@ -500,3 +502,19 @@ def rest_get(session_dict):
 		data["impersonator_sid"] = impersonator_sid
 
 	return data
+
+
+# TODO: Use ASAB Authorization, this is a temporary solution.
+def build_system_session(session_service, session_id):
+	session = SessionAdapter(session_service, {
+		SessionAdapter.FN.SessionId: session_id,
+		SessionAdapter.FN.Version: 0,
+		SessionAdapter.FN.CreatedAt: datetime.datetime.now(datetime.UTC),
+		SessionAdapter.FN.ModifiedAt: None,
+		SessionAdapter.FN.Session.Type: "SYSTEM",
+		SessionAdapter.FN.Session.Expiration: datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30),
+		SessionAdapter.FN.Authorization.Authz: {"*": ["authz:superuser"]},
+		SessionAdapter.FN.Credentials.Id: "SYSTEM",
+	})
+	AuditLogger.log(asab.LOG_NOTICE, "Created new system session.", struct_data={"session_id": session.SessionId})
+	return session

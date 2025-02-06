@@ -3,10 +3,14 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha2
 - v25.05-alpha1
 
 ### Fix
 - Handle FIDO MDS ClientConnectionError (#438, v25.05-alpha1)
+
+### Features
+- Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
 
 ---
 
