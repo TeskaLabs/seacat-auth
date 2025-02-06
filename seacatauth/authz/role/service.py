@@ -700,7 +700,6 @@ class RoleService(asab.Service):
 		await self.assign_role(
 			credentials_id,
 			global_role_id_to_propagated(self.TenantBaseRole, tenant_id),
-			verify_role=False,
 		)
 
 
