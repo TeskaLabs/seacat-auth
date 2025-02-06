@@ -26,6 +26,10 @@ class TenantService(asab.Service):
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
 
+	async def initialize(self, app):
+		await super().initialize(app)
+
+
 	def create_provider(self, provider_id, config_section_name):
 		assert (self.TenantsProvider is None)  # We support only one tenant provider for now
 		_, creds, provider_type, provider_name = config_section_name.rsplit(":", 3)
@@ -252,7 +256,8 @@ class TenantService(asab.Service):
 	async def assign_tenant(
 		self, credentials_id: str, tenant: str,
 		verify_tenant: bool = True,
-		verify_credentials: bool = True
+		verify_credentials: bool = True,
+		assign_base_role: bool = True,
 	):
 		"""
 		Grant tenant access to specified credentials.
@@ -285,6 +290,14 @@ class TenantService(asab.Service):
 			"tenant": tenant,
 		})
 		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
+
+		if assign_base_role:
+			role_svc = self.App.get_service("seacatauth.RoleService")
+			try:
+				await role_svc.assign_tenant_base_role(credentials_id, tenant)
+			except exceptions.RoleNotFoundError:
+				L.debug("Tenant base role not available.")
+
 
 
 	async def unassign_tenant(self, credentials_id: str, tenant: str):

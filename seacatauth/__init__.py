@@ -105,6 +105,14 @@ asab.Config.add_defaults({
 	"seacatauth:tenant": {
 		# Additional characters to be allowed in tenant IDs besides lowercase letters and numbers
 		"additional_allowed_id_characters": "",
+
+		# Role that is assigned to any user when they gain access to a tenant.
+		# It must be a global role with propagation enabled.
+		"base_role": "",
+
+		# Role that is assigned to any user when they create a new tenant.
+		# It must be a global role with propagation enabled.
+		"admin_role": "*/auth-admin",
 	},
 
 	"seacatauth:registration": {
