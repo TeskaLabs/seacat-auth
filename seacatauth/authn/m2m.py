@@ -23,7 +23,6 @@ class M2MIntrospectHandler(object):
 		self.AuthnService = authn_svc
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_service
-		self.RBACService = rbac_service
 
 		self.BasicRealm = "asab"  # TODO: Configurable
 
