@@ -2,8 +2,9 @@ import logging
 import typing
 
 import asab
+import asab.web.auth.authorization
 
-from ...exceptions import TenantNotSpecifiedError
+from ...const import ResourceId
 
 #
 
@@ -12,6 +13,7 @@ L = logging.getLogger(__name__)
 #
 
 
+# TODO: Deprecated. Replace with ASAB auth functions entirely.
 class RBACService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.RBACService"):
@@ -19,69 +21,12 @@ class RBACService(asab.Service):
 
 	@staticmethod
 	def is_superuser(authz: dict) -> bool:
-		global_resources = set(
-			resource
-			for resource in authz["*"]
-		)
-		return "authz:superuser" in global_resources
+		return asab.web.auth.authorization.is_superuser(authz)
 
 	@staticmethod
 	def can_access_all_tenants(authz: dict) -> bool:
-		global_resources = set(
-			resource
-			for resource in authz["*"]
-		)
-		return "authz:superuser" in global_resources or "authz:tenant:access" in global_resources
+		return asab.web.auth.authorization.has_resource_access(authz, [ResourceId.ACCESS_ALL_TENANTS], tenant=None)
 
 	@staticmethod
 	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list) -> bool:
-		# Superuser passes without further checks
-		if RBACService.is_superuser(authz):
-			return True
-
-		if tenant == "*":
-			# If the tenant is "*", we are performing a soft-check, i.e. checking if the resource is under ANY tenant
-			# Gather resources from all tenants
-			resources = set(
-				resource
-				for resources in authz.values()
-				for resource in resources
-			)
-		elif tenant is None:
-			# If the tenant is None, we check only global roles
-			resources = set(
-				resource
-				for resource in authz["*"]
-			)
-		elif tenant in authz:
-			# We are checking resources under a specific tenant
-			resources = set(
-				resource
-				for resource in authz[tenant]
-			)
-		else:
-			# Inaccessible tenant
-			return False
-
-		# Validate the resources
-		for resource in requested_resources:
-
-			if resource == "tenant:access":
-				if tenant is None:
-					# "tenant:access" must be checked against a specific tenant
-					raise TenantNotSpecifiedError()
-				if tenant == "*":
-					# Soft-check: Pass if at least one tenant is accessible
-					# (Authz must contain "*" plus at least one more tenant)
-					if len(authz) >= 2:
-						continue
-					return False
-				if tenant not in authz:
-					return False
-				continue
-
-			if resource in resources:
-				continue
-			return False
-
-		return True
+		return asab.web.auth.authorization.has_resource_access(authz, requested_resources, tenant)
