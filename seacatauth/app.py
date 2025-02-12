@@ -6,6 +6,8 @@ import urllib.parse
 
 import asab
 import asab.web
+import asab.web.auth
+import asab.web.tenant
 import asab.metrics
 import asab.web.rest
 import asab.storage
@@ -53,6 +55,14 @@ class SeaCatAuthApplication(asab.Application):
 		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 		self.PublicWebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
+
+		self.AsabTenantService = asab.web.tenant.TenantService(self)
+		self.AsabTenantService.install(self.WebContainer)
+		self.AsabTenantService.install(self.PublicWebContainer)
+
+		self.AsabAuthService = asab.web.auth.AuthService(self)
+		self.AsabAuthService.install(self.WebContainer)
+		self.AsabAuthService.install(self.PublicWebContainer)
 
 		# Initialize metrics service
 		self.add_module(asab.metrics.Module)
@@ -184,6 +194,17 @@ class SeaCatAuthApplication(asab.Application):
 		if self.Provisioning:
 			from .provisioning import ProvisioningService
 			self.ProvisioningService = ProvisioningService(self)
+
+
+	async def initialize(self):
+		from .auth_provider import AsabAuthProvider
+		auth_provider = AsabAuthProvider(self)
+		self.AsabAuthService.Providers.append(auth_provider)
+
+		from .tenant_provider import AsabTenantProvider
+		tenant_provider = AsabTenantProvider(self, self.AsabTenantService)
+		self.AsabTenantService.Providers.append(tenant_provider)
+
 
 	def _check_encryption_config(self):
 		if len(asab.Config.get("asab:storage", "aes_key", fallback="")) == 0:
