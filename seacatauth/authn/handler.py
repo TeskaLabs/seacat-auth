@@ -3,16 +3,18 @@ import logging
 
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
+import asab.contextvars
 
 import aiohttp.web
 
 import urllib.parse
 import jwcrypto.jwk
 
-from .. import exceptions, AuditLogger, generic
+from .. import exceptions, AuditLogger, generic, const
 from ..last_activity import EventCode
-from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
 #
@@ -66,14 +68,6 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
 		web_app_public.router.add_put("/public/logout", self.logout)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_put("/impersonate", self.impersonate)
-		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
-		web_app_public.router.add_put("/impersonate", self.impersonate)
-		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
-		# <<<
-
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -91,6 +85,8 @@ class AuthenticationHandler(object):
 			**JWK_PARAMS
 		}
 	})
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def login_prologue(self, request, *, json_data):
 		"""
 		Initiate a new login process
@@ -160,6 +156,8 @@ class AuthenticationHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def login(self, request):
 		"""
 		Submit login
@@ -233,9 +231,11 @@ class AuthenticationHandler(object):
 			)
 
 		# If there already is a root session with the same credentials ID, refresh it instead of creating a new one
-		if request.Session is not None and request.Session.Credentials.Id == login_session.SeacatLogin.CredentialsId:
-			root_session = request.Session
-		else:
+		try:
+			root_session = await self.CookieService.get_session_by_request_cookie(request)
+			if root_session.Credentials.Id != login_session.SeacatLogin.CredentialsId:
+				root_session = None
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
 			root_session = None
 
 		# Do the actual login
@@ -277,6 +277,8 @@ class AuthenticationHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def logout(self, request):
 		"""
 		Log out
@@ -327,6 +329,8 @@ class AuthenticationHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def prepare_smslogin_challenge(self, request):
 		"""
 		Prepare authentication via SMS code
@@ -363,6 +367,8 @@ class AuthenticationHandler(object):
 		return aiohttp.web.Response(body=login_session.encrypt(body))
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def prepare_webauthn_login_challenge(self, request):
 		"""
 		Prepare authentication via FIDO2/WebAuthn
@@ -435,7 +441,8 @@ class AuthenticationHandler(object):
 			"credentials_id": "mongodb:default:abc123def456",
 			"expiration": "5m"}
 	})
-	@access_control("authz:impersonate")
+	@asab.web.auth.require(const.ResourceId.IMPERSONATE)
+	@asab.web.tenant.allow_no_tenant
 	async def impersonate(self, request, *, json_data):
 		"""
 		Impersonate another user
@@ -449,10 +456,11 @@ class AuthenticationHandler(object):
 			from_info.extend(ff.split(", "))
 
 		target_cid = json_data["credentials_id"]
-		if request.Session.Session.ParentSessionId is None:
-			impersonator_root_session = request.Session
+		authz = asab.contextvars.Authz.get()
+		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type == "root":
+			impersonator_root_session = authz.Session
 		else:
-			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
+			impersonator_root_session = await self.SessionService.get(authz.Session.Session.ParentSessionId)
 
 		try:
 			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
@@ -467,7 +475,8 @@ class AuthenticationHandler(object):
 		return response
 
 
-	@access_control("authz:impersonate")
+	@asab.web.auth.require(const.ResourceId.IMPERSONATE)
+	@asab.web.tenant.allow_no_tenant
 	async def impersonate_and_redirect(self, request):
 		"""
 		Impersonate another user
@@ -516,10 +525,11 @@ class AuthenticationHandler(object):
 
 		request_data = await request.post()
 		target_cid = request_data["credentials_id"]
-		if request.Session.Session.Type == "root":
-			impersonator_root_session = request.Session
+		authz = asab.contextvars.Authz.get()
+		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type == "root":
+			impersonator_root_session = authz.Session
 		else:
-			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
+			impersonator_root_session = await self.SessionService.get(authz.Session.Session.ParentSessionId)
 
 		try:
 			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
