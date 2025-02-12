@@ -1,5 +1,5 @@
 import asab.web.rest
-import asab.web.auth
+import asab.contextvars
 import asab.web.tenant
 
 
@@ -29,7 +29,10 @@ class RBACHandler(object):
 		# Obtain the resources and credentials ID
 		requested_resources = request.match_info["resources"].split('+')
 
-		if self.RBACService.has_resource_access(request.Session.Authorization.Authz, tenant, requested_resources):
+		authz = asab.contextvars.Authz.get()
+		tenant = asab.contextvars.Tenant.get()
+
+		if self.RBACService.has_resource_access(authz.Session.Authorization.Authz, tenant, requested_resources):
 			return asab.web.rest.json_response(
 				request,
 				data={"result": "OK"},
