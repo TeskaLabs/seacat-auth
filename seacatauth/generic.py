@@ -1,4 +1,3 @@
-import contextvars
 import random
 import logging
 import re
@@ -7,13 +6,13 @@ import urllib.parse
 import aiohttp.web
 import asab
 import asab.utils
+import asab.exceptions
 import bcrypt
 import argon2
 
 #
 
 L = logging.getLogger(__name__)
-SessionContext = contextvars.ContextVar("request_session", default=None)
 
 #
 
