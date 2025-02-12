@@ -312,29 +312,8 @@ class SeaCatAuthApplication(asab.Application):
 		return private_key
 
 
-	def create_argument_parser(
-		self,
-		prog=None,
-		usage=None,
-		description=None,
-		epilog=None,
-		prefix_chars='-',
-		fromfile_prefix_chars=None,
-		argument_default=None,
-		conflict_handler='error',
-		add_help=True
-	):
-		parser = super().create_argument_parser(
-			prog=prog,
-			usage=usage,
-			description=description,
-			epilog=epilog,
-			prefix_chars=prefix_chars,
-			fromfile_prefix_chars=fromfile_prefix_chars,
-			argument_default=argument_default,
-			conflict_handler=conflict_handler,
-			add_help=add_help
-		)
+	def create_argument_parser(self, *args, **kwargs):
+		parser = super().create_argument_parser(*args, **kwargs)
 		parser.add_argument("--provisioning", help="run SeaCat Auth in provisioning mode", action="store_true")
 		return parser
 
