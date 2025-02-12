@@ -1,5 +1,5 @@
 import logging
-
+import aiohttp.web
 import asab
 import asab.exceptions
 import asab.web.auth
@@ -32,6 +32,12 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 		key_provider = asab.web.auth.providers.key_providers.StaticPublicKeyProvider(app)
 		key_provider.set_public_key(app.PrivateKey.public())
 		self.register_key_provider(key_provider)
+
+
+	async def authorize(self, request: aiohttp.web.Request) -> Authorization:
+		bearer_token = asab.web.auth.utils.get_bearer_token_from_authorization_header(request)
+		authz = await self._build_authorization(bearer_token)
+		return authz
 
 
 	async def _build_authorization(self, id_token: str) -> Authorization:
