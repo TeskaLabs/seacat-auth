@@ -1,16 +1,8 @@
-import logging
 import typing
-
 import asab
 import asab.web.auth.authorization
 
 from ...const import ResourceId
-
-#
-
-L = logging.getLogger(__name__)
-
-#
 
 
 # TODO: Deprecated. Replace with ASAB auth functions entirely.
