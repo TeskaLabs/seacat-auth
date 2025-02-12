@@ -7,6 +7,7 @@ import asab.exceptions
 
 from ...events import EventTypes
 from ... import exceptions
+from ...const import ResourceId
 
 #
 
@@ -15,79 +16,82 @@ L = logging.getLogger(__name__)
 #
 
 
+SEACAT_AUTH_RESOURCES = {
+	ResourceId.SUPERUSER: {
+		"description": "Grants superuser access, including the access to all tenants.",
+	},
+	ResourceId.IMPERSONATE: {
+		"description": "Open a session as a different user.",
+	},
+	ResourceId.ACCESS_ALL_TENANTS: {
+		"description": "Grants access to all tenants.",
+	},
+	ResourceId.CREDENTIALS_ACCESS: {
+		"description": "List credentials and view credentials details.",
+	},
+	ResourceId.CREDENTIALS_EDIT: {
+		"description": "Edit and suspend credentials.",
+	},
+	ResourceId.SESSION_ACCESS: {
+		"description": "List sessions and view session details.",
+	},
+	ResourceId.SESSION_TERMINATE: {
+		"description": "Terminate sessions.",
+	},
+	ResourceId.RESOURCE_ACCESS: {
+		"description": "List resources and view resource details.",
+	},
+	ResourceId.RESOURCE_EDIT: {
+		"description": "Edit and delete resources.",
+	},
+	ResourceId.CLIENT_ACCESS: {
+		"description": "List clients and view client details.",
+	},
+	ResourceId.CLIENT_EDIT: {
+		"description": "Edit and delete clients.",
+	},
+	ResourceId.TENANT_ACCESS: {
+		"description": "List tenants, view tenant detail and see tenant members.",
+	},
+	ResourceId.TENANT_EDIT: {
+		"description": "Edit tenant data.",
+	},
+	ResourceId.TENANT_DELETE: {
+		"description": "Delete tenant.",
+	},
+	ResourceId.TENANT_ASSIGN: {
+		"description": "Assign and unassign tenant members, invite new users to tenant.",
+	},
+	ResourceId.ROLE_ACCESS: {
+		"description": "Search tenant roles, view role detail and list role bearers.",
+	},
+	ResourceId.ROLE_EDIT: {
+		"description":
+			"Create, edit and delete tenant roles. "
+			"This does not enable the bearer to assign Seacat system resources.",
+	},
+	ResourceId.ROLE_ASSIGN: {
+		"description": "Assign and unassign tenant roles.",
+	},
+}
+GLOBAL_ONLY_RESOURCES = frozenset({
+	ResourceId.SUPERUSER,
+	ResourceId.IMPERSONATE,
+	ResourceId.ACCESS_ALL_TENANTS,
+	ResourceId.SESSION_ACCESS,
+	ResourceId.SESSION_TERMINATE,
+	ResourceId.RESOURCE_ACCESS,
+	ResourceId.RESOURCE_EDIT,
+	ResourceId.CLIENT_ACCESS,
+	ResourceId.CLIENT_EDIT,
+})
+
+
 class ResourceService(asab.Service):
 
 	ResourceCollection = "rs"
 	# Resource name format: "{module}:{submodule}:..."
 	ResourceNamePattern = r"[a-z][a-z0-9:._-]{0,128}[a-z0-9]"
-
-	# TODO: gather these system resources automatically
-	_BuiltinResources = {
-		"authz:superuser": {
-			"description": "Grants superuser access, including the access to all tenants.",
-		},
-		"authz:impersonate": {
-			"description": "Open a session as a different user.",
-		},
-		"authz:tenant:access": {
-			"description": "Grants non-superuser access to all tenants.",
-		},
-		"seacat:credentials:access": {
-			"description": "List credentials and view credentials details.",
-		},
-		"seacat:credentials:edit": {
-			"description": "Edit and suspend credentials.",
-		},
-		"seacat:session:access": {
-			"description": "List sessions and view session details.",
-		},
-		"seacat:session:terminate": {
-			"description": "Terminate sessions.",
-		},
-		"seacat:resource:access": {
-			"description": "List resources and view resource details.",
-		},
-		"seacat:resource:edit": {
-			"description": "Edit and delete resources.",
-		},
-		"seacat:client:access": {
-			"description": "List clients and view client details.",
-		},
-		"seacat:client:edit": {
-			"description": "Edit and delete clients.",
-		},
-		"seacat:tenant:access": {
-			"description": "List tenants, view tenant detail and see tenant members.",
-		},
-		# "seacat:tenant:create": {  # Requires superuser for now
-		# 	"description": "Create new tenants.",
-		# },
-		"seacat:tenant:edit": {
-			"description": "Edit tenant data.",
-		},
-		"seacat:tenant:delete": {
-			"description": "Delete tenant.",
-		},
-		"seacat:tenant:assign": {
-			"description": "Assign and unassign tenant members, invite new users to tenant.",
-		},
-		"seacat:role:access": {
-			"description": "Search tenant roles, view role detail and list role bearers.",
-		},
-		"seacat:role:edit": {
-			"description":
-				"Create, edit and delete tenant roles. "
-				"This does not enable the bearer to assign Seacat system resources.",
-		},
-		"seacat:role:assign": {
-			"description": "Assign and unassign tenant roles.",
-		},
-	}
-	GlobalOnlyResources = frozenset({
-		"authz:superuser", "authz:impersonate", "authz:tenant:access",
-		"seacat:session:access", "seacat:session:terminate", "seacat:resource:access", "seacat:resource:edit",
-		"seacat:client:access", "seacat:client:edit", "seacat:tenant:create"})
-
 
 	def __init__(self, app, service_name="seacatauth.ResourceService"):
 		super().__init__(app, service_name)
@@ -100,8 +104,9 @@ class ResourceService(asab.Service):
 		await self._ensure_builtin_resources()
 
 
-	def is_global_only_resource(self, resource_id):
-		return resource_id in self.GlobalOnlyResources
+	@staticmethod
+	def is_global_only_resource(resource_id):
+		return resource_id in GLOBAL_ONLY_RESOURCES
 
 
 	async def _ensure_builtin_resources(self):
@@ -109,7 +114,7 @@ class ResourceService(asab.Service):
 		Check if all builtin resources exist. Create them if they don't.
 		Update their descriptions if they are outdated.
 		"""
-		for resource_id, resource_config in self._BuiltinResources.items():
+		for resource_id, resource_config in SEACAT_AUTH_RESOURCES.items():
 			description = resource_config.get("description")
 
 			L.debug("Checking for built-in resource {!r}".format(resource_id))
@@ -290,7 +295,7 @@ class ResourceService(asab.Service):
 
 
 	def normalize_resource(self, resource: dict):
-		if resource["_id"] in self._BuiltinResources or resource.get("managed_by"):
+		if resource["_id"] in SEACAT_AUTH_RESOURCES or resource.get("managed_by"):
 			resource["read_only"] = True
 		if self.is_global_only_resource(resource["_id"]):
 			resource["global_only"] = True
