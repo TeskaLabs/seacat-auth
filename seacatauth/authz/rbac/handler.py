@@ -32,7 +32,7 @@ class RBACHandler(object):
 		authz = asab.contextvars.Authz.get()
 		tenant = asab.contextvars.Tenant.get()
 
-		if self.RBACService.has_resource_access(authz.Session.Authorization.Authz, tenant, requested_resources):
+		if self.RBACService.has_resource_access(authz._resources(), tenant, requested_resources):
 			return asab.web.rest.json_response(
 				request,
 				data={"result": "OK"},
