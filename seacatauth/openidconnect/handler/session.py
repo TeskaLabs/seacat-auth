@@ -2,6 +2,8 @@ import logging
 import aiohttp
 import aiohttp.web
 import asab
+import asab.web.auth
+import asab.web.tenant
 
 from ... import AuditLogger, exceptions
 from ...generic import get_bearer_token_value
@@ -35,6 +37,8 @@ class SessionHandler(object):
 		web_app_public.router.add_get(self.OpenIdConnectService.EndSessionPath, self.session_logout)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def session_logout(self, request):
 		"""
 		OpenID Connect end session endpoint

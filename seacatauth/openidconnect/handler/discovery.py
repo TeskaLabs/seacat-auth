@@ -1,15 +1,12 @@
 import logging
-
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
 from .. import OpenIdConnectService
 
-#
 
 L = logging.getLogger(__name__)
-
-
-#
 
 
 class DiscoveryHandler(object):
@@ -38,6 +35,8 @@ class DiscoveryHandler(object):
 		web_app_public.router.add_get("/openidconnect/configuration", self.configuration)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def configuration(self, request):
 		"""
 		OpenID Connect Discovery

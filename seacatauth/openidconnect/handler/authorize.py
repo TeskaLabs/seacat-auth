@@ -1,10 +1,13 @@
 import logging
 import urllib
 import urllib.parse
-
 import aiohttp
 import aiohttp.web
 import asab
+import asab.contextvars
+import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
 from ..service import AuthorizationCode
 from ...authz import build_credentials_authz
@@ -14,11 +17,8 @@ from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
 from ...last_activity import EventCode
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class OAuthAuthorizeError(Exception):
@@ -95,6 +95,8 @@ class AuthorizeHandler(object):
 		web_app_public.router.add_post(self.AuthorizePath, self.authorize_post)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def authorize_get(self, request):
 		"""
 		OAuth 2.0 Authorize Endpoint
@@ -210,6 +212,8 @@ class AuthorizeHandler(object):
 				state=e.State)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def authorize_post(self, request):
 		"""
 		OAuth 2.0 Authorize Endpoint
