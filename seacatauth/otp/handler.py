@@ -1,16 +1,14 @@
 import logging
-
 import asab.web
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
-from ..decorators import access_control
+from ..const import ResourceId
 from .. import exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class OTPHandler(object):
@@ -31,18 +29,8 @@ class OTPHandler(object):
 		web_app.router.add_put("/account/set-totp", self.activate_totp)
 		web_app.router.add_put("/account/unset-totp", self.deactivate_totp)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_get("/public/totp", self.prepare_totp_if_not_active)
-		web_app.router.add_put("/public/set-totp", self.activate_totp)
-		web_app.router.add_put("/public/unset-totp", self.deactivate_totp)
 
-		web_app_public.router.add_get("/public/totp", self.prepare_totp_if_not_active)
-		web_app_public.router.add_put("/public/set-totp", self.activate_totp)
-		web_app_public.router.add_put("/public/unset-totp", self.deactivate_totp)
-		# <<<
-
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def prepare_totp_if_not_active(self, request, *, credentials_id):
 		"""
 		Return the status of TOTP setting
@@ -70,7 +58,7 @@ class OTPHandler(object):
 			"otp": {"type": "string"}
 		}
 	})
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def activate_totp(self, request, *, credentials_id, json_data):
 		"""
 		Activate TOTP for the current user
@@ -85,7 +73,7 @@ class OTPHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def deactivate_totp(self, request, *, credentials_id):
 		"""
 		Deactivate TOTP for the current user
