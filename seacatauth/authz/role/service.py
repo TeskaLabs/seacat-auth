@@ -18,14 +18,14 @@ from .view.propagated_role import global_role_id_to_propagated
 L = logging.getLogger(__name__)
 
 
-SuperuserRoleId = "*/superuser"
-SuperuserRoleProperties = {
+SUPERUSER_ROLE_ID = "*/superuser"
+SUPERUSER_ROLE_PROPERTIES = {
 	"label": "Superuser",
 	"description": "Has superuser access. Passes any access control check, including the access to any tenant.",
 	"resources": [ResourceId.SUPERUSER],
 }
 
-TenantAdminRoleProperties = {
+TENANT_ADMIN_ROLE_PROPERTIES = {
 	"label": "Authorization admin",
 	"description":
 		"Manages access control. Creates and modifies tenant roles, invites new tenant members and "
@@ -130,14 +130,14 @@ class RoleService(asab.Service):
 		Check if all Seacat Auth system roles exist. Create them if they don't.
 		Update them if outdated.
 		"""
-		await self._ensure_preset_role(SuperuserRoleId, SuperuserRoleProperties)
+		await self._ensure_preset_role(SUPERUSER_ROLE_ID, SUPERUSER_ROLE_PROPERTIES)
 
 		if self.TenantBaseRole:
 			if not await self._ensure_propagated_role(self.TenantBaseRole):
 				L.warning("Tenant base role is not ready.", struct_data={"role": self.TenantBaseRole})
 
 		if self.TenantAdminRole:
-			await self._ensure_preset_role(self.TenantAdminRole, TenantAdminRoleProperties, update=False)
+			await self._ensure_preset_role(self.TenantAdminRole, TENANT_ADMIN_ROLE_PROPERTIES, update=False)
 			if not await self._ensure_propagated_role(self.TenantAdminRole):
 				L.warning("Tenant admin role is not ready.", struct_data={"role": self.TenantAdminRole})
 
