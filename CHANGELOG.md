@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha4
 - v25.05-alpha3
 - v25.05-alpha2
 - v25.05-alpha1
@@ -13,6 +14,9 @@
 ### Features
 - Configurable default tenant roles (#436, v25.05-alpha3)
 - Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
+
+### Refactoring
+- Remove session adapter's dependency on session service (#441, `v25.05-alpha4`)
 
 ---
 
