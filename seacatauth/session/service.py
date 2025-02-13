@@ -30,15 +30,11 @@ from .builders import (
 	cookie_session_builder
 )
 
-#
 
 L = logging.getLogger(__name__)
 
-#
-
 
 class SessionService(asab.Service):
-
 	SessionCollection = "s"
 
 	def __init__(self, app, service_name="seacatauth.SessionService"):
@@ -170,7 +166,8 @@ class SessionService(asab.Service):
 		# TODO: Improve performance - each self.delete(session_id) call searches for potential subsessions!
 		expired = []
 		async for session in self._iterate_raw(
-			query_filter={SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+			query_filter={
+				SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		):
 			expired.append(session["_id"])
 
@@ -306,8 +303,10 @@ class SessionService(asab.Service):
 		if expires_at < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.SessionNotFoundError("Session expired.", query={key: value})
 
+		session_dict = self._decrypt_encrypted_session_identifiers(session_dict)
+
 		try:
-			session = SessionAdapter(self, session_dict)
+			session = SessionAdapter(session_dict)
 		except Exception as e:
 			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
@@ -334,8 +333,10 @@ class SessionService(asab.Service):
 		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.SessionNotFoundError("Session expired.", session_id=session_id)
 
+		session_dict = self._decrypt_encrypted_session_identifiers(session_dict)
+
 		try:
-			session = SessionAdapter(self, session_dict)
+			session = SessionAdapter(session_dict)
 		except Exception as e:
 			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
@@ -408,7 +409,7 @@ class SessionService(asab.Service):
 		count = await collection.count_documents(query_filter)
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
 			try:
-				session = SessionAdapter(self, session_dict).rest_get()
+				session = SessionAdapter(session_dict).rest_get()
 			except Exception as e:
 				L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
 					"sid": session_dict.get("_id"),
@@ -530,6 +531,7 @@ class SessionService(asab.Service):
 
 		# Delete all the session's tokens
 		await self.TokenService.delete_tokens_by_session_id(session_id)
+
 		# TODO: Publish pubsub message for session deletion
 
 
@@ -804,6 +806,7 @@ class SessionService(asab.Service):
 		encrypted = iv + (encryptor.update(token) + encryptor.finalize())
 		return encrypted
 
+
 	def aes_decrypt(self, encrypted_bytes: bytes):
 		algorithm = cryptography.hazmat.primitives.ciphers.algorithms.AES(self.AESKey)
 		iv, token = encrypted_bytes[:self.AESBlockSize], encrypted_bytes[self.AESBlockSize:]
@@ -812,3 +815,21 @@ class SessionService(asab.Service):
 		decryptor = cipher.decryptor()
 		raw = iv + (decryptor.update(token) + decryptor.finalize())
 		return raw
+
+
+	def _decrypt_encrypted_session_identifiers(self, session_dict: dict) -> dict:
+		for field in SessionAdapter.EncryptedIdentifierFields:
+			# BACK COMPAT: Handle nested dictionaries
+			obj = session_dict
+			keys = field.split(".")
+			for key in keys[:-1]:
+				if key not in obj:
+					break
+				obj = obj[key]
+			else:
+				# BACK COMPAT: Keep values without prefix raw
+				# TODO: Remove support once proper m2m tokens are in place
+				value = obj.get(keys[-1])
+				if value is not None and value.startswith(SessionAdapter.EncryptedPrefix):
+					obj[keys[-1]] = self.aes_decrypt(value[len(SessionAdapter.EncryptedPrefix):])
+		return session_dict
