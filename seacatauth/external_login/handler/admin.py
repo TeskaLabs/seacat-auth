@@ -1,17 +1,15 @@
 import logging
-
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
 from ..service import ExternalLoginService
-from ...decorators import access_control
+from ...const import ResourceId
 from ..exceptions import ExternalAccountNotFoundError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginAdminHandler(object):
@@ -33,7 +31,8 @@ class ExternalLoginAdminHandler(object):
 		web_app.router.add_delete("/admin/ext-login/{provider_type}/{sub}", self.remove_external_account)
 
 
-	@access_control("authz:superuser")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def list_external_accounts(self, request):
 		"""
 		List user's external login accounts
@@ -43,7 +42,8 @@ class ExternalLoginAdminHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control("authz:superuser")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def get_external_account(self, request):
 		"""
 		Get external login account detail
@@ -57,7 +57,8 @@ class ExternalLoginAdminHandler(object):
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 
-	@access_control("authz:superuser")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def remove_external_account(self, request):
 		"""
 		Remove external login account
