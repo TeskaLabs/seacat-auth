@@ -4,7 +4,6 @@ import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 
-from ..const import ResourceId
 from .. import exceptions
 
 
