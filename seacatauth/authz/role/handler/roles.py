@@ -1,17 +1,16 @@
 import logging
-
 import aiohttp.web
 import asab
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
-from ....decorators import access_control
+from ....const import ResourceId
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RolesHandler(object):
@@ -80,7 +79,7 @@ class RolesHandler(object):
 				"type": "array",
 				"items": {"type": "string"}}}
 	})
-	@access_control("seacat:role:assign")
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def set_roles(self, request, *, json_data, tenant, resources):
 		"""
 		Set credentials' roles
@@ -114,7 +113,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("seacat:role:assign")
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def assign_role(self, request, *, tenant):
 		"""
 		Assign role to credentials
@@ -145,7 +144,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("seacat:role:assign")
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def unassign_role(self, request, *, tenant):
 		"""
 		Unassign role from credentials
