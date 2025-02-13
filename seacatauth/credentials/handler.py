@@ -1,24 +1,21 @@
 import logging
-
 import asab
 import asab.web.rest
-import asab.web.webcrypto
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 import asab.utils
 
 from .. import exceptions, generic
-from ..decorators import access_control
+from ..const import ResourceId
 from .schemas import (
 	CREATE_CREDENTIALS,
 	UPDATE_CREDENTIALS,
 	UPDATE_MY_CREDENTIALS,
 )
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CredentialsHandler(object):
@@ -57,19 +54,8 @@ class CredentialsHandler(object):
 		web_app.router.add_put("/account/credentials", self.update_my_credentials)
 		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app.router.add_put("/public/credentials", self.update_my_credentials)
-		web_app.router.add_get("/public/last_login", self.get_my_last_login_data)
 
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put("/public/credentials", self.update_my_credentials)
-		web_app_public.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app_public.router.add_get("/public/last_login", self.get_my_last_login_data)
-		# <<<
-
-
+	@asab.web.tenant.allow_no_tenant
 	async def list_providers(self, request):
 		"""
 		Get credential providers and their metadata
@@ -80,6 +66,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, providers)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get_provider_info(self, request):
 		"""
 		Get the metadata of the requested credential provider.
@@ -93,7 +80,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def get_my_provider_info(self, request, *, credentials_id):
 		"""
 		Get the metadata of the current user's credential provider.
@@ -107,6 +94,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get_last_login_data(self, request):
 		"""
 		Get the credentials' last successful/failed login data.
@@ -116,7 +104,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def get_my_last_login_data(self, request, *, credentials_id):
 		"""
 		Get the current user's last successful/failed login data.
@@ -127,6 +115,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def locate_credentials(self, request):
 		"""
 		Return the IDs of credentials that match the specified ident.
@@ -154,7 +143,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"credentials_ids": credentials_ids})
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def list_credentials(self, request):
 		"""
 		List credentials that are members of currently authorized tenant
@@ -223,6 +212,7 @@ class CredentialsHandler(object):
 			"type": "string"
 		}
 	})
+	@asab.web.tenant.allow_no_tenant
 	async def get_idents_from_ids(self, request, *, json_data):
 		"""
 		Get human-intelligible identifiers for a list of credential IDs
@@ -250,6 +240,8 @@ class CredentialsHandler(object):
 			"data": result_data
 		})
 
+
+	@asab.web.tenant.allow_no_tenant
 	async def get_credentials(self, request):
 		"""
 		Get requested credentials' detail
@@ -296,7 +288,8 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(CREATE_CREDENTIALS)
-	@access_control("seacat:credentials:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
@@ -350,7 +343,8 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CREDENTIALS)
-	@access_control("seacat:credentials:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def update_credentials(self, request, *, json_data):
 		"""
 		Update credentials
@@ -369,7 +363,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_MY_CREDENTIALS)
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def update_my_credentials(self, request, *, json_data, credentials_id):
 		"""
 		Update the current user's own credentials
@@ -400,7 +394,8 @@ class CredentialsHandler(object):
 			}
 		}
 	})
-	@access_control("seacat:credentials:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def enforce_factors(self, request, *, json_data):
 		"""
 		Specify authentication factors to be enforced from the user
@@ -422,7 +417,8 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	@access_control("seacat:credentials:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials
