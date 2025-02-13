@@ -103,6 +103,8 @@ def system_authz(
 	tenant: str | None,
 	expiration: int = 60
 ) -> Authorization:
+	if tenant is None:
+		tenant = "*"
 	authorized_resources = {
 		tenant: set(resources),
 	}
