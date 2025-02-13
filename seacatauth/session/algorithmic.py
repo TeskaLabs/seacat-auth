@@ -80,7 +80,7 @@ class AlgorithmicSessionProvider:
 			SessionAdapter.FN.Authentication.IsAnonymous: True,
 		}
 		await self._add_session_authz(session_dict, client_dict["anonymous_cid"], scope)
-		return SessionAdapter(self, session_dict)
+		return SessionAdapter(session_dict)
 
 
 	async def _add_session_authz(self, session_dict: dict, credentials_id: str, scope: set):

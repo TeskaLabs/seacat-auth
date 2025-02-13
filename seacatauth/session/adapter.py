@@ -8,11 +8,8 @@ import asab
 from .. import AuditLogger
 from ..authz.rbac.service import RBACService
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 @dataclasses.dataclass
@@ -172,9 +169,7 @@ class SessionAdapter:
 
 	EncryptedPrefix = b"$aescbc$"
 
-	def __init__(self, session_svc, session_dict):
-		self._decrypt_encrypted_identifiers(session_dict, session_svc)
-
+	def __init__(self, session_dict):
 		self.Session = self._deserialize_session_data(session_dict)
 		self.Id = self.Session.Id
 		self.SessionId = self.Session.Id
@@ -335,23 +330,6 @@ class SessionAdapter:
 			and RBACService.has_resource_access(self.Authorization.Authz, None, {resource_id})
 		)
 
-	def _decrypt_encrypted_identifiers(self, session_dict, session_svc):
-		# Decrypt sensitive fields
-		for field in self.EncryptedIdentifierFields:
-			# BACK COMPAT: Handle nested dictionaries
-			obj = session_dict
-			keys = field.split(".")
-			for key in keys[:-1]:
-				if key not in obj:
-					break
-				obj = obj[key]
-			else:
-				# BACK COMPAT: Keep values without prefix raw
-				# TODO: Remove support once proper m2m tokens are in place
-				value = obj.get(keys[-1])
-				if value is not None and value.startswith(self.EncryptedPrefix):
-					obj[keys[-1]] = session_svc.aes_decrypt(value[len(self.EncryptedPrefix):])
-
 	@classmethod
 	def _deserialize_session_data(cls, session_dict):
 		return SessionData(
@@ -506,7 +484,7 @@ def rest_get(session_dict):
 
 # TODO: Use ASAB Authorization, this is a temporary solution.
 def build_system_session(session_service, session_id):
-	session = SessionAdapter(session_service, {
+	session = SessionAdapter({
 		SessionAdapter.FN.SessionId: session_id,
 		SessionAdapter.FN.Version: 0,
 		SessionAdapter.FN.CreatedAt: datetime.datetime.now(datetime.UTC),
