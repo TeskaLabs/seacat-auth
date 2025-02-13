@@ -55,7 +55,7 @@ class PropagatedRoleView(RoleView):
 	async def get(self, role_id: str) -> dict:
 		assert self._role_tenant_matches(role_id)
 		return self._normalize_role(
-			await self.StorageService.get(self.CollectionName, self._tenant_role_id_to_global(role_id)))
+			await self.StorageService.get(self.CollectionName, self._propagated_role_id_to_global(role_id)))
 
 
 	def _role_tenant_matches(self, role_id: str):
@@ -64,13 +64,11 @@ class PropagatedRoleView(RoleView):
 		return tenant_id == self.TenantId
 
 
-	def _global_role_id_to_tenant(self, role_id: str):
-		tenant_id, role_name = role_id.split("/")
-		assert tenant_id == "*"
-		return "{}/~{}".format(self.TenantId, role_name)
+	def _global_role_id_to_propagated(self, role_id: str):
+		return global_role_id_to_propagated(role_id, self.TenantId)
 
 
-	def _tenant_role_id_to_global(self, role_id: str):
+	def _propagated_role_id_to_global(self, role_id: str):
 		_, role_name = role_id.split("/")
 		assert role_name[0] == "~"
 		return "*/{}".format(role_name[1:])
@@ -80,7 +78,13 @@ class PropagatedRoleView(RoleView):
 		role = super()._normalize_role(role)
 		role["type"] = "tenant"
 		role["global_role_id"] = role["_id"]
-		role["_id"] = self._global_role_id_to_tenant(role["_id"])
+		role["_id"] = self._global_role_id_to_propagated(role["_id"])
 		role["read_only"] = True
 		role["tenant"] = self.TenantId
 		return role
+
+
+def global_role_id_to_propagated(role_id: str, tenant_id: str):
+	tenant_part, role_name = role_id.split("/")
+	assert tenant_part == "*"
+	return "{}/~{}".format(tenant_id, role_name)

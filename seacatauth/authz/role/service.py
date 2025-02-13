@@ -12,34 +12,35 @@ from ... import exceptions
 from ...const import ResourceId
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
+from .view.propagated_role import global_role_id_to_propagated
 
 
 L = logging.getLogger(__name__)
 
 
-SEACAT_AUTH_ROLES = {
-	"*/superuser": {
-		"label": "Superuser",
-		"description": "Has superuser access. Passes any access control check, including the access to any tenant.",
-		"resources": [ResourceId.SUPERUSER],
-	},
-	"*/auth-admin": {
-		"label": "Authorization admin",
-		"description":
-			"Manages access control. Creates and modifies tenant roles, invites new tenant members and "
-			"assigns roles to them.",
-		"resources": [
-			ResourceId.TENANT_ACCESS,
-			ResourceId.TENANT_EDIT,
-			ResourceId.TENANT_ASSIGN,
-			ResourceId.TENANT_DELETE,
-			ResourceId.ROLE_ACCESS,
-			ResourceId.ROLE_EDIT,
-			ResourceId.TENANT_ACCESS,
-			ResourceId.ROLE_ASSIGN,
-		],
-		"propagated": True,
-	},
+SuperuserRoleId = "*/superuser"
+SuperuserRoleProperties = {
+	"label": "Superuser",
+	"description": "Has superuser access. Passes any access control check, including the access to any tenant.",
+	"resources": [ResourceId.SUPERUSER],
+}
+
+TenantAdminRoleProperties = {
+	"label": "Authorization admin",
+	"description":
+		"Manages access control. Creates and modifies tenant roles, invites new tenant members and "
+		"assigns roles to them.",
+	"resources": [
+		ResourceId.TENANT_ACCESS,
+		ResourceId.TENANT_EDIT,
+		ResourceId.TENANT_ASSIGN,
+		ResourceId.TENANT_DELETE,
+		ResourceId.ROLE_ACCESS,
+		ResourceId.ROLE_EDIT,
+		ResourceId.TENANT_ACCESS,
+		ResourceId.ROLE_ASSIGN,
+	],
+	"propagated": True,
 }
 
 
@@ -73,9 +74,55 @@ class RoleService(asab.Service):
 		))
 		self.RoleNameRegex = re.compile(self.RoleNamePattern)
 
+		# Role assigned to any user upon tenant assignment
+		# Must be a global role with propagation enabled
+		self.TenantBaseRole = asab.Config.get(
+			"seacatauth:tenant", "base_role", fallback="") or None
+
+		# Role assigned to the tenant creator upon new tenant creation
+		# Must be a global role with propagation enabled
+		self.TenantAdminRole = asab.Config.get(
+			"seacatauth:tenant", "admin_role", fallback="") or None
+
 
 	async def initialize(self, app):
 		await self._ensure_system_roles()
+
+
+	async def _ensure_preset_role(self, role_id: str, properties: dict, update: bool = True):
+		L.debug("Checking preset role.", struct_data={"role_id": role_id})
+		try:
+			existing_role = await self.get(role_id)
+		except KeyError:
+			# Create the role
+			upsertor = self.StorageService.upsertor(self.RoleCollection, role_id)
+			for k, v in properties.items():
+				upsertor.set(k, v)
+			await upsertor.execute()
+			L.log(asab.LOG_NOTICE, "Role created.", struct_data={"role_id": role_id})
+			return
+
+		if not update:
+			return
+
+		# Role exists - check its attributes
+		for k, v in properties.items():
+			if existing_role.get(k) != v:
+				break
+		else:
+			# All values are up-to-date
+			return
+
+		# Update the role
+		upsertor = self.StorageService.upsertor(
+			self.RoleCollection,
+			role_id,
+			version=existing_role["_v"]
+		)
+		for k, v in properties.items():
+			upsertor.set(k, v)
+		await upsertor.execute()
+		L.log(asab.LOG_NOTICE, "Role updated.", struct_data={"role_id": role_id})
 
 
 	async def _ensure_system_roles(self):
@@ -83,42 +130,16 @@ class RoleService(asab.Service):
 		Check if all Seacat Auth system roles exist. Create them if they don't.
 		Update them if outdated.
 		"""
-		for role_id, role in SEACAT_AUTH_ROLES.items():
-			L.debug("Checking for system role {!r}".format(role_id))
-			try:
-				existing_role = await self.get(role_id)
-			except KeyError:
-				# Create the role
-				# Do not use the self.create method to bypass the authorization check
-				# TODO: Use SystemSession
-				upsertor = self.StorageService.upsertor(self.RoleCollection, role_id)
-				upsertor.set("managed_by", "seacat-auth")
-				for k, v in role.items():
-					upsertor.set(k, v)
-				await upsertor.execute()
-				L.log(asab.LOG_NOTICE, "System role created.", struct_data={"role_id": role_id})
-				continue
+		await self._ensure_preset_role(SuperuserRoleId, SuperuserRoleProperties)
 
-			# Role exists - check its attributes
-			for k, v in role.items():
-				if existing_role.get(k) != v:
-					break
-			else:
-				# All values are up-to-date
-				continue
+		if self.TenantBaseRole:
+			if not await self._ensure_propagated_role(self.TenantBaseRole):
+				L.warning("Tenant base role is not ready.", struct_data={"role": self.TenantBaseRole})
 
-			# Update the role
-			# Do not use the self.update method to bypass the editability check
-			upsertor = self.StorageService.upsertor(
-				self.RoleCollection,
-				role_id,
-				version=existing_role["_v"]
-			)
-			upsertor.set("managed_by", "seacat-auth")
-			for k, v in role.items():
-				upsertor.set(k, v)
-			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "System role updated.", struct_data={"role_id": role_id})
+		if self.TenantAdminRole:
+			await self._ensure_preset_role(self.TenantAdminRole, TenantAdminRoleProperties, update=False)
+			if not await self._ensure_propagated_role(self.TenantAdminRole):
+				L.warning("Tenant admin role is not ready.", struct_data={"role": self.TenantAdminRole})
 
 
 	def _prepare_views(self, tenant_id: str | None, exclude_global: bool = False, exclude_propagated: bool = False):
@@ -644,6 +665,42 @@ class RoleService(asab.Service):
 	async def get_assigned_role(self, credentials_id: str, role_id: str):
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		return await self.StorageService.get(self.CredentialsRolesCollection, assignment_id)
+
+
+	async def _ensure_propagated_role(self, role_id: str) -> bool:
+		if not role_id.startswith("*/"):
+			L.error("Role name must start with '*/'.", struct_data={"role": role_id})
+			return False
+
+		try:
+			role = await self.get(role_id)
+		except exceptions.RoleNotFoundError:
+			L.warning("Role not found.", struct_data={"role": role_id})
+			return False
+
+		if not role.get("propagated"):
+			L.warning("Role is not propagated.", struct_data={"role": role_id})
+			return False
+
+		return True
+
+
+	async def assign_tenant_base_role(self, credentials_id: str, tenant_id: str):
+		if not self.TenantBaseRole:
+			raise exceptions.RoleNotFoundError(self.TenantBaseRole)
+		await self.assign_role(
+			credentials_id,
+			global_role_id_to_propagated(self.TenantBaseRole, tenant_id),
+		)
+
+
+	async def assign_tenant_admin_role(self, credentials_id: str, tenant_id: str):
+		if not self.TenantAdminRole:
+			raise exceptions.RoleNotFoundError(self.TenantBaseRole)
+		await self.assign_role(
+			credentials_id,
+			global_role_id_to_propagated(self.TenantAdminRole, tenant_id),
+		)
 
 
 def assert_role_is_editable(role: dict):
