@@ -1,11 +1,12 @@
 import logging
-
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 import asab.utils
 
 from .. import exceptions
-from ..decorators import access_control
+from ..const import ResourceId
 from . import schemas
 
 ###
@@ -62,7 +63,6 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control()
 	async def search(self, request):
 		"""
 		Search tenants.
@@ -125,7 +125,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control("seacat:tenant:access")
+	@asab.web.auth.require(ResourceId.TENANT_ACCESS)
 	async def get(self, request):
 		"""
 		Get tenant detail
@@ -136,7 +136,8 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.CREATE_TENANT)
-	@access_control("authz:superuser")  # TODO: "seacat:tenant:create"
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
@@ -180,7 +181,7 @@ class TenantHandler(object):
 			request, data={"id": tenant_id})
 
 	@asab.web.rest.json_schema_handler(schemas.UPDATE_TENANT)
-	@access_control("seacat:tenant:edit")
+	@asab.web.auth.require(ResourceId.TENANT_EDIT)
 	async def update_tenant(self, request, *, json_data, tenant):
 		"""
 		Update tenant description and/or its structured data
@@ -189,7 +190,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control("seacat:tenant:delete")
+	@asab.web.auth.require(ResourceId.TENANT_DELETE)
 	async def delete(self, request, *, tenant):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
@@ -199,7 +200,7 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.SET_TENANTS)
-	@access_control("seacat:tenant:assign")
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def set_tenants(self, request, *, json_data):
 		"""
 		Specify a set of accessible tenants for requested credentials ID
@@ -223,7 +224,7 @@ class TenantHandler(object):
 		)
 
 
-	@access_control("seacat:tenant:assign")
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def assign_tenant(self, request, *, tenant):
 		"""
 		Grant specified tenant access to requested credentials
@@ -235,7 +236,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("seacat:tenant:assign")
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def unassign_tenant(self, request, *, tenant):
 		"""
 		Revoke specified tenant access to requested credentials
@@ -249,6 +250,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
+	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
 	async def get_tenants_by_credentials(self, request):
 		"""
 		Get list of tenants memberships of the requested credentials
@@ -266,6 +268,7 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.GET_TENANTS_BATCH)
+	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
 	async def get_tenants_batch(self, request, *, json_data):
 		"""
 		Get list of tenant memberships for each listed credential ID
@@ -285,19 +288,18 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def propose_tenant_name(self, request):
 		"""
 		Propose name for a new tenant.
 		"""
 		proposed_tenant = self.NameProposerService.propose_name()
-		# TODO: Check is the proposed tenant name is not already taken
 		return asab.web.rest.json_response(request, {"tenant_id": proposed_tenant})
 
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_ASSIGN_TENANTS)
-	@access_control("authz:superuser")
-	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
 		Grant tenant access and/or assign roles to a list of credentials
@@ -372,8 +374,8 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_UNASSIGN_TENANTS)
-	@access_control("authz:superuser")
-	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SUPERUSER)
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
 		Revoke tenant access and/or unassign roles from a list of credentials
