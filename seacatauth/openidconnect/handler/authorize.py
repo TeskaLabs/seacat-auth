@@ -345,7 +345,10 @@ class AuthorizeHandler(object):
 				struct_data={"reason": "code_challenge_error"})
 
 		# Only root sessions can be used to authorize client sessions
-		root_session = request.Session
+		try:
+			root_session = await self.CookieService.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			root_session = None
 		if root_session is not None:
 			if root_session.Session.Type != "root":
 				L.error("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
