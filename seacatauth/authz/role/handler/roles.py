@@ -54,22 +54,17 @@ class RolesHandler(object):
 		"description": "Credential IDs",
 		"items": {"type": "string"}
 	})
+	@asab.web.tenant.allow_no_tenant
 	async def get_roles_batch(self, request, *, json_data):
 		"""
 		Get the assigned roles for several credentials
 		"""
-		tenant_id = request.match_info["tenant"]
-		if tenant_id == "*" or request.can_access_all_tenants \
-			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
-			response = {
-				cid: await self.RoleService.get_roles_by_credentials(cid, [tenant_id])
-				for cid in json_data
-			}
-			return asab.web.rest.json_response(request, response)
-
-		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={
-			"cid": request.Session.Credentials.Id, "t": tenant_id})
-		return aiohttp.web.HTTPForbidden()
+		tenant = asab.contextvars.Tenant.get()
+		response = {
+			cid: await self.RoleService.get_roles_by_credentials(cid, [tenant])
+			for cid in json_data
+		}
+		return asab.web.rest.json_response(request, response)
 
 
 	@asab.web.rest.json_schema_handler({
