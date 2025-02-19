@@ -13,8 +13,6 @@ import asab.web.rest
 import asab.storage
 import asab.proactor
 
-from . import middleware
-
 #
 
 L = logging.getLogger(__name__)
@@ -49,12 +47,10 @@ class SeaCatAuthApplication(asab.Application):
 		# Create admin container
 		self.WebContainer = asab.web.WebContainer(self.WebService, "web")
 		self.WebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
-		self.WebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
 		# Create public container
 		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
-		self.PublicWebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
 		self.AsabTenantService = asab.web.tenant.TenantService(self)
 		self.AsabTenantService.install(self.WebContainer)
@@ -170,10 +166,6 @@ class SeaCatAuthApplication(asab.Application):
 		from .openidconnect import OpenIdConnectModule
 		self.add_module(OpenIdConnectModule)
 
-		# Depends on: OpenIDService
-		self.WebContainer.WebApp.middlewares.append(middleware.private_auth_middleware_factory(self))
-		self.PublicWebContainer.WebApp.middlewares.append(middleware.public_auth_middleware_factory(self))
-
 		from .otp import OTPHandler, OTPService
 		self.OTPService = OTPService(self)
 		self.OTPHandler = OTPHandler(self, self.OTPService)
@@ -199,11 +191,11 @@ class SeaCatAuthApplication(asab.Application):
 	async def initialize(self):
 		from .auth_provider import AsabAuthProvider
 		auth_provider = AsabAuthProvider(self)
-		self.AsabAuthService.Providers.append(auth_provider)
+		self.AsabAuthService.Providers.insert(0, auth_provider)  # High priority
 
 		from .tenant_provider import AsabTenantProvider
 		tenant_provider = AsabTenantProvider(self, self.AsabTenantService)
-		self.AsabTenantService.Providers.append(tenant_provider)
+		self.AsabTenantService.Providers.insert(0, tenant_provider)  # High priority
 
 
 	def _check_encryption_config(self):
