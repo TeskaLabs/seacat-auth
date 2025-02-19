@@ -1,20 +1,19 @@
 import logging
-
 import aiohttp.web
 import asab
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.storage.exceptions
 import asab.exceptions
 
 from .... import exceptions
-from ....decorators import access_control
 from .... import generic
+from ....const import ResourceId
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RoleHandler(object):
@@ -37,7 +36,8 @@ class RoleHandler(object):
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
 
 
-	@access_control("authz:superuser")
+	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.tenant.allow_no_tenant
 	async def list_all(self, request):
 		"""
 		List roles from all tenants
@@ -134,7 +134,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control("seacat:role:edit")
+	@asab.web.auth.require(ResourceId.ROLE_EDIT)
 	async def create(self, request, *, tenant, json_data):
 		"""
 		Create a new role
@@ -171,7 +171,7 @@ class RoleHandler(object):
 		})
 
 
-	@access_control("seacat:role:edit")
+	@asab.web.auth.require(ResourceId.ROLE_EDIT)
 	async def delete(self, request, *, tenant):
 		"""
 		Delete role
@@ -209,7 +209,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control("seacat:role:edit")
+	@asab.web.auth.require(ResourceId.ROLE_EDIT)
 	async def update(self, request, *, json_data, tenant):
 		"""
 		Edit role description and resources

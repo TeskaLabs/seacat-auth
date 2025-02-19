@@ -1,19 +1,18 @@
 import logging
 import re
-
-import aiohttp.web
 import asab
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
+from .service import GLOBAL_ONLY_RESOURCES
 from ... import exceptions
-from ...decorators import access_control
+from ...const import ResourceId
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ResourceHandler(object):
@@ -36,6 +35,7 @@ class ResourceHandler(object):
 		web_app.router.add_delete("/resource/{resource_id}", self.delete)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def list(self, request):
 		"""
 		List resources
@@ -100,12 +100,13 @@ class ResourceHandler(object):
 		if "globalonly" in exclude:
 			if "_id" not in query_filter:
 				query_filter["_id"] = {}
-			query_filter["_id"]["$nin"] = list(self.ResourceService.GlobalOnlyResources)
+			query_filter["_id"]["$nin"] = list(GLOBAL_ONLY_RESOURCES)
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get(self, request):
 		"""
 		Get resource detail
@@ -123,10 +124,11 @@ class ResourceHandler(object):
 		"properties": {
 			"description": {"type": "string"}}
 	})
-	@access_control("seacat:resource:edit")
+	@asab.web.auth.require(ResourceId.RESOURCE_EDIT)
+	@asab.web.tenant.allow_no_tenant
 	async def create_or_undelete(self, request, *, json_data):
 		"""
-		Create a new resource or undelete a resource that has been soft-deleted
+		Create a new resource or undelete a soft-deleted resource
 		"""
 		resource_id = request.match_info["resource_id"]
 
@@ -154,7 +156,8 @@ class ResourceHandler(object):
 			"description": {"type": "string"},
 		}
 	})
-	@access_control("seacat:resource:edit")
+	@asab.web.auth.require(ResourceId.RESOURCE_EDIT)
+	@asab.web.tenant.allow_no_tenant
 	async def update(self, request, *, json_data):
 		"""
 		Update resource description or rename resource
@@ -175,8 +178,9 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("seacat:resource:edit")
-	async def delete(self, request, *, credentials_id):
+	@asab.web.auth.require(ResourceId.RESOURCE_EDIT)
+	@asab.web.tenant.allow_no_tenant
+	async def delete(self, request):
 		"""
 		Delete resource
 
@@ -189,18 +193,19 @@ class ResourceHandler(object):
 			description:
 				By default, the resource is only soft-deleted, i.e. marked as deleted and retained in te database.
 				Enabling this switch causes the resource to be completely removed from the database.
-				Hard-deleting requires `authz:superuser`.
+				Hard-deleting requires superuser privileges.
 			required: false
 			schema:
 				type: boolean
 				enum: ["true"]
 		"""
+		authz = asab.contextvars.Authz.get()
 		resource_id = request.match_info["resource_id"]
+
 		hard_delete = request.query.get("hard_delete") == "true"
-		if hard_delete and not request.is_superuser:
-			L.log(asab.LOG_NOTICE, "Cannot hard-delete resources without superuser rights", struct_data={
-				"cid": credentials_id, "resource": resource_id})
-			return aiohttp.web.HTTPForbidden()
+		if hard_delete:
+			authz.require_superuser_access()
+
 		try:
 			await self.ResourceService.delete(resource_id, hard_delete=hard_delete)
 		except exceptions.NotEditableError as e:

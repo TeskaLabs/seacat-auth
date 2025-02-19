@@ -1,18 +1,16 @@
 import logging
-
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
-from ..decorators import access_control
 from .. import generic, exceptions
+from ..const import ResourceId
 from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ClientHandler(object):
@@ -35,7 +33,8 @@ class ClientHandler(object):
 		web_app.router.add_delete("/client/{client_id}", self.delete)
 
 
-	@access_control("seacat:client:access")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_ACCESS)
 	async def list(self, request):
 		"""
 		List registered clients
@@ -74,7 +73,8 @@ class ClientHandler(object):
 		})
 
 
-	@access_control("seacat:client:access")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_ACCESS)
 	async def get(self, request):
 		"""
 		Get client by client_id
@@ -84,7 +84,8 @@ class ClientHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@access_control("seacat:client:access")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_ACCESS)
 	async def features(self, request):
 		"""
 		Get schema of supported client metadata
@@ -101,7 +102,8 @@ class ClientHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(REGISTER_CLIENT_SCHEMA)
-	@access_control("seacat:client:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
 	async def register(self, request, *, json_data):
 		"""
 		Register a new client
@@ -127,7 +129,8 @@ class ClientHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CLIENT_SCHEMA)
-	@access_control("seacat:client:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
 	async def update(self, request, *, json_data):
 		"""
 		Edit an existing client
@@ -147,7 +150,8 @@ class ClientHandler(object):
 		)
 
 
-	@access_control("seacat:client:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
 	async def reset_secret(self, request):
 		"""
 		Reset client secret
@@ -166,7 +170,8 @@ class ClientHandler(object):
 		)
 
 
-	@access_control("seacat:client:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
 	async def delete(self, request):
 		"""
 		Delete a client
