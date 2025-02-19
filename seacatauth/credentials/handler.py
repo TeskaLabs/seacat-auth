@@ -193,13 +193,21 @@ class CredentialsHandler(object):
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
+		if "tenant" in search.AdvancedFilter:
+			tenant_ctx = asab.contextvars.Tenant.set(search.AdvancedFilter["tenant"])
+		else:
+			tenant_ctx = asab.contextvars.Tenant.set(None)
+
 		try:
-			result = await self.CredentialsService.list(request.Session, search, try_global_search)
+			result = await self.CredentialsService.list(search, try_global_search)
 		except exceptions.AccessDeniedError as e:
 			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
 			return asab.web.rest.json_response(request, status=403, data={
 				"result": "ACCESS-DENIED",
 			})
+		finally:
+			asab.contextvars.Tenant.reset(tenant_ctx)
+
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
 			**result
