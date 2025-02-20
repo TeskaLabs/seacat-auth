@@ -25,7 +25,7 @@ class SMTPEmailProvider(CommunicationProviderABC):
 		"starttls": "yes",
 	}
 
-	def __init__(self, config_section_name, config=None):
+	def __init__(self, app, config_section_name, config=None):
 		super().__init__(config_section_name, config=config)
 
 		if "smtp" in asab.Config:

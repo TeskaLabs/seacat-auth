@@ -52,13 +52,13 @@ class CommunicationService(asab.Service):
 
 			if channel == "email" and provider_name == "iris":
 				from .providers import IrisEmailProvider
-				self.CommunicationProviders[channel] = IrisEmailProvider(config_section_name)
+				self.CommunicationProviders[channel] = IrisEmailProvider(self.App, config_section_name)
 			elif channel == "email" and provider_name == "smtp":
 				from .providers import SMTPEmailProvider
-				self.CommunicationProviders[channel] = SMTPEmailProvider(config_section_name)
+				self.CommunicationProviders[channel] = SMTPEmailProvider(self.App, config_section_name)
 			elif channel == "sms" and provider_name == "smsbranacz":
 				from .providers import SMSBranaCZProvider
-				self.CommunicationProviders[channel] = SMSBranaCZProvider(config_section_name)
+				self.CommunicationProviders[channel] = SMSBranaCZProvider(self.App, config_section_name)
 			else:
 				L.error("Unsupported communication provider: '{}'".format(config_section_name))
 
