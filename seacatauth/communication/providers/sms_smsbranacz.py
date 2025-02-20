@@ -4,14 +4,12 @@ import secrets
 import aiohttp
 import asab
 import hashlib
+import re
 
-from . import CommunicationProviderABC
+from .abc import CommunicationProviderABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class SMSBranaCZProvider(CommunicationProviderABC):
@@ -30,20 +28,20 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 	"""
 
 	Channel = "sms"
+	TemplateExtension = "txt"
 
 	ConfigDefaults = {
 		"login": "",
 		"password": "",
 		"url": "https://api.smsbrana.cz/smsconnect/http.php",
 		# smsbrana provides a backup server: https://api-backup.smsbrana.cz/smsconnect/http.php
-		"timestamp_format": "%Y%m%dT%H%M%S",  # Use STARTTLS protocol
 	}
 
-	def __init__(self, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, config_section_name, config=None):
+		super().__init__(config_section_name, config=config)
 		self.Login = self.Config.get("login")
 		self.Password = self.Config.get("password")
-		self.TimestampFormat = self.Config.get("timestamp_format")
+		self.TimestampFormat = "%Y%m%dT%H%M%S"
 		self.URL = self.Config.get("url")
 
 		if "mock" in self.Config:
@@ -54,20 +52,21 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				"SMSbrana.cz provider is running in mock mode. "
 				"Messages will not be sent, but instead will be printed to log.")
 
-	def _init_template_provider(self):
-		pass
 
-	async def send_message(self, *, phone, message_body):
-		if phone is None or phone == "":
-			L.error("Empty or no phone number specified.")
-			raise RuntimeError("Empty or no phone number specified.")
+	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
+		template = self._get_template(locale, template_id)
+		message_body = _split_long_message(template.render(kwargs))
+		message = {
+			"message_body": message_body,
+			"phone": _get_phone(credentials)
+		}
+		return message
 
-		if isinstance(message_body, str):
-			message_list = [message_body]
-		else:
-			message_list = message_body
 
-		# TODO: proper multi-sms handling
+	async def send_message(self, credentials: dict, message: dict, **kwargs):
+		phone = _get_phone(credentials)
+
+		message_list = message["message_body"]
 		for text in message_list:
 			url_params = {
 				"action": "send_sms",
@@ -104,3 +103,21 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				raise RuntimeError("SMS delivery failed.")
 			else:
 				L.log(asab.LOG_NOTICE, "SMS sent")
+
+
+SPLITTER = re.compile(r"\n(?:\s*\n)+")
+
+
+def _split_long_message(message_body: str) -> list:
+	"""
+	Split long SMS into several messages.
+	"""
+	messages = SPLITTER.split(message_body)
+	return messages
+
+
+def _get_phone(credentials: dict) -> str:
+	phone = credentials.get("phone")
+	if not phone:
+		raise KeyError("Credentials do not contain 'phone'.")
+	return phone

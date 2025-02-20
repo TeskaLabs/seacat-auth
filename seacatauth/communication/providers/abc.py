@@ -1,24 +1,17 @@
 import abc
 import logging
-
 import jinja2
-
 import asab
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
-
-class MessageBuilderABC(asab.Configurable, abc.ABC):
-	"""
-	Constructs a message object (dictionary)
-	"""
+class CommunicationProviderABC(asab.Configurable, abc.ABC):
 
 	Channel = None
 	TemplateFilenameFormat = "{locale}-{template_name}.{extension}"
+	TemplateExtension = "txt"
 
 	def __init__(self, config_section_name, config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
@@ -34,12 +27,19 @@ class MessageBuilderABC(asab.Configurable, abc.ABC):
 			loader=jinja2.FileSystemLoader(self.TemplatePath)
 		)
 
-	def build_message(self, template_name, locale, *args, **kwargs):
-		template = self._get_template(locale, template_name)
-		L.debug("Rendering {} template {} ({})".format(self.Channel, template_name, locale))
-		message_body = template.render(kwargs)
-		message = {"message_body": message_body}
-		return message
+
+	async def send_message(self, credentials: dict, message: dict, **kwargs):
+		raise NotImplementedError()
+
+
+	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
+		raise NotImplementedError()
+
+
+	async def build_and_send_message(self, credentials: dict, template_id, locale, **kwargs):
+		message = await self.build(template_id, locale, **kwargs)
+		await self.send(credentials, message, **kwargs)
+
 
 	def _get_template(self, locale, template_name):
 		template_file_name = self.TemplateFilenameFormat.format(
