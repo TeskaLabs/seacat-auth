@@ -13,8 +13,9 @@ class CommunicationProviderABC(asab.Configurable, abc.ABC):
 	TemplateFilenameFormat = "{locale}-{template_name}.{extension}"
 	TemplateExtension = "txt"
 
-	def __init__(self, config_section_name, config=None):
+	def __init__(self, app, config_section_name, config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
+		self.App = app
 		self.TemplatePath = self.Config.get("template_path")
 		if self.TemplatePath is None:
 			base_template_path = asab.Config.get("seacatauth:communication", "template_path")
@@ -36,7 +37,7 @@ class CommunicationProviderABC(asab.Configurable, abc.ABC):
 		raise NotImplementedError()
 
 
-	async def build_and_send_message(self, credentials: dict, template_id, locale, **kwargs):
+	async def build_and_send_message(self, credentials: dict, template_id: str, locale: str, **kwargs):
 		message = await self.build(template_id, locale, **kwargs)
 		await self.send(credentials, message, **kwargs)
 

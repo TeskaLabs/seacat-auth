@@ -37,7 +37,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 		# smsbrana provides a backup server: https://api-backup.smsbrana.cz/smsconnect/http.php
 	}
 
-	def __init__(self, config_section_name, config=None):
+	def __init__(self, app, config_section_name, config=None):
 		super().__init__(config_section_name, config=config)
 		self.Login = self.Config.get("login")
 		self.Password = self.Config.get("password")
