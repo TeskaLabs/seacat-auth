@@ -1,27 +1,21 @@
 import abc
 import logging
-
 import jinja2
-
 import asab
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
-
-class MessageBuilderABC(asab.Configurable, abc.ABC):
-	"""
-	Constructs a message object (dictionary)
-	"""
+class CommunicationProviderABC(asab.Configurable, abc.ABC):
 
 	Channel = None
 	TemplateFilenameFormat = "{locale}-{template_name}.{extension}"
+	TemplateExtension = "txt"
 
-	def __init__(self, config_section_name, config=None):
+	def __init__(self, app, config_section_name, config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
+		self.App = app
 		self.TemplatePath = self.Config.get("template_path")
 		if self.TemplatePath is None:
 			base_template_path = asab.Config.get("seacatauth:communication", "template_path")
@@ -29,17 +23,27 @@ class MessageBuilderABC(asab.Configurable, abc.ABC):
 				base_template_path=base_template_path,
 				channel=self.Channel
 			)
-		self.TemplateExtension = self.Config.get("template_extension")
 		self.JinjaEnv = jinja2.Environment(
 			loader=jinja2.FileSystemLoader(self.TemplatePath)
 		)
 
-	def build_message(self, template_name, locale, *args, **kwargs):
-		template = self._get_template(locale, template_name)
-		L.debug("Rendering {} template {} ({})".format(self.Channel, template_name, locale))
-		message_body = template.render(kwargs)
-		message = {"message_body": message_body}
-		return message
+
+	def can_send_to_target(self, credentials: dict) -> bool:
+		raise NotImplementedError()
+
+
+	async def send_message(self, credentials: dict, message: dict, **kwargs):
+		raise NotImplementedError()
+
+
+	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
+		raise NotImplementedError()
+
+
+	async def build_and_send_message(self, credentials: dict, template_id: str, locale: str, **kwargs):
+		message = await self.build_message(credentials, template_id, locale, **kwargs)
+		await self.send_message(credentials, message, **kwargs)
+
 
 	def _get_template(self, locale, template_name):
 		template_file_name = self.TemplateFilenameFormat.format(

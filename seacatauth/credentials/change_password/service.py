@@ -148,7 +148,7 @@ class ChangePasswordService(asab.Service):
 			await self.CommunicationService.password_reset(
 				credentials=credentials,
 				reset_url=reset_url,
-				welcome=is_new_user
+				new_user=is_new_user
 			)
 			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
 		except exceptions.MessageDeliveryError as e:
