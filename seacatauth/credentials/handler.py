@@ -328,7 +328,8 @@ class CredentialsHandler(object):
 			try:
 				reset_url = await change_pwd_svc.init_password_reset_by_admin(
 					credentials,
-					expiration=json_data.get("expiration")
+					expiration=json_data.get("expiration"),
+					is_new_user=True,
 				)
 			except exceptions.CredentialsNotFoundError:
 				L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found", struct_data={
