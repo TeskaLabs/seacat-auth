@@ -9,6 +9,13 @@ from .abc import CommunicationProviderABC
 L = logging.getLogger(__name__)
 
 
+TEMPLATE_FILES = {
+	"invitation": "Invitation.md",
+	"new_user_password": "Credentials Created.md",
+	"password_reset": "Password Reset.md",
+}
+
+
 class AsabIrisEmailProvider(CommunicationProviderABC):
 
 	Channel = "email"
@@ -68,12 +75,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 
 	def _get_template_path(self, template_id: str) -> str:
-		templates = {
-			"invitation": "Invitation.md",
-			"new_user_password": "Credentials Created.md",
-			"password_reset": "Password Reset.md",
-		}
-		return "{}{}".format(self.TemplateBasePath, templates[template_id])
+		return "{}{}".format(self.TemplateBasePath, TEMPLATE_FILES[template_id])
 
 
 def _get_email_address(credentials: dict) -> str:
