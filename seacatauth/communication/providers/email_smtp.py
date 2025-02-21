@@ -17,6 +17,7 @@ class SMTPEmailProvider(CommunicationProviderABC):
 	TemplateExtension = "html"
 
 	ConfigDefaults = {
+		"from": "auth@seacatauth.info",
 		"host": "localhost",
 		"port": "",
 		"user": "",
@@ -35,7 +36,7 @@ class SMTPEmailProvider(CommunicationProviderABC):
 		self.Host = self.Config.get("host")
 		self.User = self.Config.get("user")
 		self.Password = self.Config.get("password")
-		self.From = self.Config.get("from", None)
+		self.From = self.Config.get("from")
 
 		self.MockMode = (self.Host == "<mocked>")
 		if self.MockMode:
