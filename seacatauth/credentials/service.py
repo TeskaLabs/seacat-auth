@@ -133,9 +133,9 @@ class CredentialsService(asab.Service):
 
 
 	async def locate(self, ident: str, stop_at_first: bool = False, login_dict: dict = None):
-		'''
+		"""
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
-		'''
+		"""
 		ident = ident.strip()
 		credentials_ids = []
 		pending = [
@@ -239,13 +239,23 @@ class CredentialsService(asab.Service):
 				return False
 
 
-	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, try_global_search: bool = False):
+	async def list(self, search_params: generic.SearchParams, try_global_search: bool = False):
 		"""
 		List credentials that are members of currently authorized tenants.
 		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
 		"""
-		searched_tenants = _authorize_searched_tenants(session, search_params, try_global_search)
-		searched_roles = _authorize_searched_roles(session, search_params)
+		authz = asab.contextvars.Authz.get()
+		tenant = asab.contextvars.Tenant.get()
+		if tenant:
+			authz.require_tenant_access()
+		else:
+			if try_global_search and authz.has_superuser_access():
+				tenant = None
+			else:
+				tenant = [t for t in authz.get_claim("resources", {}) if t != "*"].pop()
+
+		searched_tenants = [tenant] if tenant else None
+		searched_roles = _authorize_searched_roles(search_params)
 
 		credentials = []
 		offset = search_params.Page * search_params.ItemsPerPage
@@ -649,14 +659,14 @@ class CredentialsService(asab.Service):
 
 
 def _authorize_searched_tenants(
-	session: SessionAdapter,
 	search_params: generic.SearchParams,
 	try_global_search: bool = False
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
 	Authorize and return a list of tenants to filter by.
 	"""
-	if not session.is_superuser():
+	authz = asab.contextvars.Authz.get()
+	if not authz.has_superuser_access():
 		# Return only tenant members
 		try_global_search = False
 
@@ -685,13 +695,14 @@ def _authorize_searched_tenants(
 
 
 def _authorize_searched_roles(
-	session: SessionAdapter,
 	search_params: generic.SearchParams
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
 	Authorize and return a list of roles to filter by.
 	"""
-	authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
+	authz = asab.contextvars.Authz.get()
+	tenant = asab.contextvars.Tenant.get()
+	authorized_tenants = [tenant for tenant in authz. if tenant != "*"]
 	role_id = search_params.AdvancedFilter.get("role")
 	if not role_id:
 		return None

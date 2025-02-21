@@ -2,21 +2,18 @@ import datetime
 import json
 import logging
 import typing
-
 import aiohttp.web
-
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.utils
 import asab.exceptions
 
-from ...decorators import access_control
+from ...const import ResourceId
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RegistrationHandler(object):
@@ -51,12 +48,6 @@ class RegistrationHandler(object):
 		web_app_public.router.add_post(
 			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
-		web_app_public.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
-		# <<<
-
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
@@ -66,7 +57,7 @@ class RegistrationHandler(object):
 			"email": {"type": "string"},
 		}
 	})
-	@access_control("seacat:tenant:assign")
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Common user request to invite a new user to join specified tenant and create an account
@@ -122,7 +113,7 @@ class RegistrationHandler(object):
 			},
 		},
 	})
-	@access_control("seacat:tenant:assign")
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
@@ -234,7 +225,8 @@ class RegistrationHandler(object):
 		return credentials_id, None
 
 
-	@access_control("seacat:tenant:assign")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def resend_invitation(self, request):
 		"""
 		Resend invitation to an already invited user and extend the expiration of the invitation.
@@ -278,6 +270,7 @@ class RegistrationHandler(object):
 				"description": "User email to send the invitation to."},
 		},
 	})
+	@asab.web.auth.noauth
 	async def request_self_invitation(self, request, *, json_data):
 		"""
 		Anonymous user request to register themself.
@@ -311,6 +304,8 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, payload)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def get_registration(self, request):
 		"""
 		Get credentials by registration handle
@@ -366,6 +361,8 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def update_registration(self, request):
 		"""
 		Update drafted credentials
@@ -387,7 +384,8 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def complete_registration(self, request):
 		"""
 		Complete the registration either by activating the draft credentials

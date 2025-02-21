@@ -1,20 +1,19 @@
 import logging
 import uuid
-
 import aiohttp
 import aiohttp.web
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
 from .. import exceptions, AuditLogger
 from .. import generic
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CookieHandler(object):
@@ -101,12 +100,9 @@ class CookieHandler(object):
 		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
 
-		# TODO: Insecure, back-compat only - remove after 2024-03-31
-		if asab.Config.getboolean("seacatauth:introspection", "_enable_insecure_legacy_endpoints", fallback=False):
-			web_app_public.router.add_post("/cookie/nginx", self.nginx)
-			web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
 
-
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def nginx(self, request):
 		"""
 		Cookie introspection
@@ -178,6 +174,8 @@ class CookieHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def nginx_anonymous(self, request):
 		"""
 		Anonymous (guest) cookie introspection
@@ -288,6 +286,8 @@ class CookieHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def bouncer_get(self, request):
 		"""
 		Exchange authorization code for cookie and redirect to specified redirect URI.
@@ -323,6 +323,8 @@ class CookieHandler(object):
 		return await self._bouncer(request, params)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def bouncer_post(self, request):
 		"""
 		Exchange authorization code for cookie and redirect to specified redirect URI.

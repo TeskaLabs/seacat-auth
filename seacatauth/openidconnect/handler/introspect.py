@@ -1,9 +1,11 @@
 import urllib
 import logging
 import aiohttp.web
-
 import asab
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
 from ... import exceptions
 from ...generic import nginx_introspection, get_bearer_token_value, get_access_token_value_from_websocket
@@ -47,6 +49,8 @@ class TokenIntrospectionHandler(object):
 			web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def introspect(self, request):
 		"""
 		OAuth 2.0 Access Token Introspection Endpoint
@@ -95,6 +99,8 @@ class TokenIntrospectionHandler(object):
 		return session
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def introspect_nginx(self, request):
 		"""
 		Access token introspection

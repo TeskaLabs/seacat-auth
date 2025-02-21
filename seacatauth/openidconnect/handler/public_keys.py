@@ -1,12 +1,10 @@
 import logging
-
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class PublicKeysHandler(object):
@@ -33,6 +31,8 @@ class PublicKeysHandler(object):
 		web_app_public.router.add_get(self.OpenIdConnectService.JwksPath, self.public_keys)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def public_keys(self, request):
 		"""
 		JSON Web Key Sets
