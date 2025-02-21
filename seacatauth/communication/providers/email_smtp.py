@@ -15,7 +15,6 @@ class SMTPEmailProvider(CommunicationProviderABC):
 
 	Channel = "email"
 	TemplateExtension = "html"
-
 	ConfigDefaults = {
 		"from": "auth@seacatauth.info",
 		"host": "localhost",
@@ -54,6 +53,14 @@ class SMTPEmailProvider(CommunicationProviderABC):
 				self.Port = 25
 		else:
 			self.Port = int(port)
+
+
+	def can_send_to_target(self, credentials: dict) -> bool:
+		try:
+			_get_email_address(credentials)
+			return True
+		except KeyError:
+			return False
 
 
 	async def build_message(self, credentials: dict, template_id, locale, **kwargs) -> dict:

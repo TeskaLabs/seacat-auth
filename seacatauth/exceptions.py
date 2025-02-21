@@ -221,6 +221,16 @@ class CommunicationNotConfiguredError(SeacatAuthError):
 		super().__init__("No communication channels are configured.", *args)
 
 
+class CommunicationChannelNotAvailableError(SeacatAuthError):
+	"""
+	Communication channel is not set up or not supported for specified credentials
+	"""
+	def __init__(self, message: str, channel: str, cid: typing.Optional[str] = None, *args):
+		self.Channel = channel
+		self.CredentialsId = cid
+		super().__init__(message, *args)
+
+
 class NoCookieError(SeacatAuthError):
 	"""
 	Request has no (root or client) cookie

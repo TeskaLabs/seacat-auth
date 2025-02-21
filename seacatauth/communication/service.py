@@ -79,9 +79,6 @@ class CommunicationService(asab.Service):
 
 
 	async def password_reset(self, *, credentials, reset_url, new_user=False):
-		if not self.is_enabled():
-			raise exceptions.CommunicationNotConfiguredError()
-		channels = ["email", "sms"]
 		template_id = "new_user_password" if new_user else "password_reset"
 		success = []
 		for channel in ["email", "sms"]:
@@ -93,7 +90,10 @@ class CommunicationService(asab.Service):
 					username=credentials.get("username"),
 					link=reset_url,
 				)
-				success.append(channel)
+			except exceptions.CommunicationChannelNotAvailableError:
+				L.debug("Channel is not available", struct_data={
+					"channel": channel, "template": template_id, "cid": credentials["_id"]
+				})
 				continue
 			except exceptions.MessageDeliveryError:
 				L.error("Failed to send message via specified channel.", struct_data={
@@ -101,28 +101,26 @@ class CommunicationService(asab.Service):
 				})
 				continue
 
+			success.append(channel)
+
 		if len(success) == 0:
 			raise exceptions.MessageDeliveryError(
 				"Failed to deliver message on all channels.", template_id=template_id, channel=channels)
 
 
 	async def invitation(self, *, credentials, tenants, registration_uri, expires_at=None):
-		if not self.is_enabled():
-			raise exceptions.CommunicationNotConfiguredError()
 		await self.build_and_send_message(
 			credentials=credentials,
 			template_id="invitation",
 			channel="email",
 			username=credentials.get("username"),
-			tenants=tenants,
+			tenant=", ".join(tenants),
 			link=registration_uri,
 			expires_at=expires_at,
 		)
 
 
 	async def sms_login(self, *, credentials: dict, otp: str):
-		if not self.is_enabled():
-			raise exceptions.CommunicationNotConfiguredError()
 		await self.build_and_send_message(
 			credentials=credentials,
 			template_id="login_otp",
@@ -146,7 +144,11 @@ class CommunicationService(asab.Service):
 		try:
 			provider = self.get_communication_provider(channel)
 		except KeyError:
-			raise exceptions.MessageDeliveryError("Communication channel not configured.", channel=channel)
+			raise exceptions.CommunicationChannelNotAvailableError("Channel not configured.", channel=channel)
+
+		if not provider.can_send_to_target(credentials):
+			raise exceptions.CommunicationChannelNotAvailableError(
+				"Channel not available for credentials.", channel=channel, cid=credentials["_id"])
 
 		locale = locale or self.DefaultLocale
 
