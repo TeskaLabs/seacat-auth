@@ -29,7 +29,6 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 
 	Channel = "sms"
 	TemplateExtension = "txt"
-
 	ConfigDefaults = {
 		"login": "",
 		"password": "",
@@ -53,18 +52,26 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				"Messages will not be sent, but instead will be printed to log.")
 
 
+	def can_send_to_target(self, credentials: dict) -> bool:
+		try:
+			_get_phone_number(credentials)
+			return True
+		except KeyError:
+			return False
+
+
 	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
 		template = self._get_template(locale, template_id)
 		message_body = _split_long_message(template.render(kwargs))
 		message = {
 			"message_body": message_body,
-			"phone": _get_phone(credentials)
+			"phone": _get_phone_number(credentials)
 		}
 		return message
 
 
 	async def send_message(self, credentials: dict, message: dict, **kwargs):
-		phone = _get_phone(credentials)
+		phone = _get_phone_number(credentials)
 
 		message_list = message["message_body"]
 		for text in message_list:
@@ -116,7 +123,7 @@ def _split_long_message(message_body: str) -> list:
 	return messages
 
 
-def _get_phone(credentials: dict) -> str:
+def _get_phone_number(credentials: dict) -> str:
 	phone = credentials.get("phone")
 	if not phone:
 		raise KeyError("Credentials do not contain 'phone'.")

@@ -12,7 +12,6 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 	Channel = "email"
 	TemplateExtension = None
-
 	ConfigDefaults = {
 		"url": "http://localhost:8896",
 		"template_path": "/Templates/Email/",
@@ -22,6 +21,14 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		super().__init__(app, config_section_name, config=config)
 		self.AsabIrisUrl = self.Config.get("url")
 		self.TemplateBasePath = self.Config.get("template_path")
+
+
+	def can_send_to_target(self, credentials: dict) -> bool:
+		try:
+			_get_email_address(credentials)
+			return True
+		except KeyError:
+			return False
 
 
 	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
@@ -34,7 +41,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 	async def build_and_send_message(self, credentials: dict, template_id: str, locale: str, **kwargs):
 		email_decl = {
-			"to": [credentials["email"]],
+			"to": [_get_email_address(credentials)],
 			"body": {
 				"template": self._get_template_path(template_id),
 				"params": kwargs,
@@ -65,3 +72,10 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 			"password_reset": "Password Reset.md",
 		}
 		return "{}{}".format(self.TemplateBasePath, templates[template_id])
+
+
+def _get_email_address(credentials: dict) -> str:
+	email = credentials.get("email")
+	if not email:
+		raise KeyError("Credentials do not contain 'email'.")
+	return email
