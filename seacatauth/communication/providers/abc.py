@@ -23,7 +23,6 @@ class CommunicationProviderABC(asab.Configurable, abc.ABC):
 				base_template_path=base_template_path,
 				channel=self.Channel
 			)
-		self.TemplateExtension = self.Config.get("template_extension")
 		self.JinjaEnv = jinja2.Environment(
 			loader=jinja2.FileSystemLoader(self.TemplatePath)
 		)
@@ -38,8 +37,8 @@ class CommunicationProviderABC(asab.Configurable, abc.ABC):
 
 
 	async def build_and_send_message(self, credentials: dict, template_id: str, locale: str, **kwargs):
-		message = await self.build(template_id, locale, **kwargs)
-		await self.send(credentials, message, **kwargs)
+		message = await self.build_message(credentials, template_id, locale, **kwargs)
+		await self.send_message(credentials, message, **kwargs)
 
 
 	def _get_template(self, locale, template_name):
