@@ -11,8 +11,8 @@ L = logging.getLogger(__name__)
 
 TEMPLATE_FILES = {
 	"invitation": "Invitation.md",
-	"new_user_password": "Credentials Created.md",
 	"password_reset": "Password Reset.md",
+	"new_user_password": "Welcome and Password Reset.md",
 }
 
 
