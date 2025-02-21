@@ -51,8 +51,8 @@ class CommunicationService(asab.Service):
 				raise ValueError("Another '{}' provider is already registered.".format(channel))
 
 			if channel == "email" and provider_name == "iris":
-				from .providers import IrisEmailProvider
-				self.CommunicationProviders[channel] = IrisEmailProvider(self.App, config_section_name)
+				from .providers import AsabIrisEmailProvider
+				self.CommunicationProviders[channel] = AsabIrisEmailProvider(self.App, config_section_name)
 			elif channel == "email" and provider_name == "smtp":
 				from .providers import SMTPEmailProvider
 				self.CommunicationProviders[channel] = SMTPEmailProvider(self.App, config_section_name)
@@ -78,11 +78,11 @@ class CommunicationService(asab.Service):
 		return provider
 
 
-	async def password_reset(self, *, credentials, reset_url, welcome=False):
+	async def password_reset(self, *, credentials, reset_url, new_user=False):
 		if not self.is_enabled():
 			raise exceptions.CommunicationNotConfiguredError()
 		channels = ["email", "sms"]
-		template_id = "password_reset_welcome" if welcome else "password_reset"
+		template_id = "new_user_password" if new_user else "password_reset"
 		success = []
 		for channel in ["email", "sms"]:
 			try:
@@ -91,7 +91,7 @@ class CommunicationService(asab.Service):
 					template_id=template_id,
 					channel=channel,
 					username=credentials.get("username"),
-					reset_url=reset_url,
+					link=reset_url,
 				)
 				success.append(channel)
 				continue
