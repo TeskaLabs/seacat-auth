@@ -3,7 +3,7 @@ import typing
 import asab
 import urllib.parse
 
-from .providers import CommunicationProviderABC
+from .providers.abc import CommunicationProviderABC
 from .. import exceptions
 
 

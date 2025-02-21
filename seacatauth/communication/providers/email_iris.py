@@ -1,9 +1,6 @@
 import logging
-import email.mime.multipart
-import email.mime.text
-import aiosmtplib
-import re
 import asab
+import aiohttp
 
 from .abc import CommunicationProviderABC
 
@@ -21,7 +18,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 	}
 
 	def __init__(self, app, config_section_name, config=None):
-		super().__init__(config_section_name, config=config)
+		super().__init__(app, config_section_name, config=config)
 		self.AsabIrisUrl = self.Config.get("url")
 		self.TemplateBasePath = "/Templates/Email/"
 
@@ -43,10 +40,14 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 			}
 		}
 
-		url = "{}/send_mail".format(self.AsabIrisUrl)
 		discovery_service = self.get_service("asab.DiscoveryService")
-		# TODO: Regular session if DiscoveryService is None
-		async with discovery_service.session() as session:
+		if discovery_service is not None:
+			open_session = discovery_service.session
+		else:
+			open_session = aiohttp.ClientSession
+
+		url = "{}/send_mail".format(self.AsabIrisUrl)
+		async with open_session() as session:
 			async with session.put(url, json=email_decl) as resp:
 				response = await resp.json()  # comes from asab-iris in the unified format (internationalization)
 				if resp.status == 200:

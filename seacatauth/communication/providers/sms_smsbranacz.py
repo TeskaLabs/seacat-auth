@@ -38,7 +38,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 	}
 
 	def __init__(self, app, config_section_name, config=None):
-		super().__init__(config_section_name, config=config)
+		super().__init__(app, config_section_name, config=config)
 		self.Login = self.Config.get("login")
 		self.Password = self.Config.get("password")
 		self.TimestampFormat = "%Y%m%dT%H%M%S"

@@ -26,7 +26,7 @@ class SMTPEmailProvider(CommunicationProviderABC):
 	}
 
 	def __init__(self, app, config_section_name, config=None):
-		super().__init__(config_section_name, config=config)
+		super().__init__(app, config_section_name, config=config)
 
 		if "smtp" in asab.Config:
 			self.Config.update(asab.Config["smtp"])
