@@ -115,7 +115,7 @@ class CommunicationService(asab.Service):
 			channel="email",
 			username=credentials.get("username"),
 			tenants=tenants,
-			registration_uri=registration_uri,
+			link=registration_uri,
 			expires_at=expires_at,
 		)
 
