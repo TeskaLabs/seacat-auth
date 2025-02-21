@@ -14,7 +14,7 @@ class SMSCodeFactor(LoginFactorABC):
 	Type = "smscode"
 
 	async def is_eligible(self, login_data) -> bool:
-		if not self.AuthenticationService.CommunicationService.is_enabled("sms"):
+		if not self.AuthenticationService.CommunicationService.is_channel_enabled("sms"):
 			# SMS provider is not configured
 			return False
 

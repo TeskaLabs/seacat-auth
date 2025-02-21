@@ -15,12 +15,13 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 	ConfigDefaults = {
 		"url": "http://localhost:8896",
+		"template_path": "/Templates/Email/",
 	}
 
 	def __init__(self, app, config_section_name, config=None):
 		super().__init__(app, config_section_name, config=config)
 		self.AsabIrisUrl = self.Config.get("url")
-		self.TemplateBasePath = "/Templates/Email/"
+		self.TemplateBasePath = self.Config.get("template_path")
 
 
 	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
@@ -40,26 +41,27 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 			}
 		}
 
-		discovery_service = self.get_service("asab.DiscoveryService")
+		discovery_service = self.App.get_service("asab.DiscoveryService")
 		if discovery_service is not None:
 			open_session = discovery_service.session
 		else:
 			open_session = aiohttp.ClientSession
 
-		url = "{}/send_mail".format(self.AsabIrisUrl)
+		url = "{}/send_email".format(self.AsabIrisUrl)
 		async with open_session() as session:
 			async with session.put(url, json=email_decl) as resp:
-				response = await resp.json()  # comes from asab-iris in the unified format (internationalization)
+				response = await resp.json()
 				if resp.status == 200:
-					L.log(asab.LOG_NOTICE, "Email sent.", struct_data={"result": response})
+					L.log(asab.LOG_NOTICE, "Email sent.")
 				else:
-					raise RuntimeError("Email delivery failed: Error response from ASAB Iris.")
+					L.error("Error response from ASAB Iris.", struct_data=response)
+					raise RuntimeError("Email delivery failed.")
 
 
 	def _get_template_path(self, template_id: str) -> str:
 		templates = {
-			"invitation": "Export.md",
-			"new_user_password": "Export.md",
-			"password_reset": "Export.md",
+			"invitation": "Invitation.md",
+			"new_user_password": "Credentials Created.md",
+			"password_reset": "Password Reset.md",
 		}
 		return "{}{}".format(self.TemplateBasePath, templates[template_id])
