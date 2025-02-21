@@ -1,6 +1,7 @@
 import logging
-import asab
 import aiohttp
+import asab
+import asab.web.rest.json
 
 from .abc import CommunicationProviderABC
 
@@ -19,7 +20,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 	def __init__(self, app, config_section_name, config=None):
 		super().__init__(app, config_section_name, config=config)
-		self.AsabIrisUrl = self.Config.get("url")
+		self.AsabIrisUrl = self.Config.get("url").rstrip("/") + "/"
 		self.TemplateBasePath = self.Config.get("template_path")
 
 
@@ -47,6 +48,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 				"params": kwargs,
 			}
 		}
+		data = asab.web.rest.json.JSONDumper(pretty=False)(email_decl)
 
 		discovery_service = self.App.get_service("asab.DiscoveryService")
 		if discovery_service is not None:
@@ -54,9 +56,9 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		else:
 			open_session = aiohttp.ClientSession
 
-		url = "{}/send_email".format(self.AsabIrisUrl)
+		url = "{}{}".format(self.AsabIrisUrl, "send_email")
 		async with open_session() as session:
-			async with session.put(url, json=email_decl) as resp:
+			async with session.put(url, data=data, headers={"Content-Type": "application/json"}) as resp:
 				response = await resp.json()
 				if resp.status == 200:
 					L.log(asab.LOG_NOTICE, "Email sent.")
