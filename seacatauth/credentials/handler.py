@@ -194,7 +194,7 @@ class CredentialsHandler(object):
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
-		authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
+		authorized_tenants = [t for t in authz.get_claim("resources") or {} if t != "*"]
 		if authorized_tenants:
 			tenant_ctx = asab.contextvars.Tenant.set(authorized_tenants.pop())
 		else:
