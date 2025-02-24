@@ -178,6 +178,7 @@ class CredentialsHandler(object):
 			description:
 			schema: {"type": "boolean"}
 		"""
+		authz = asab.contextvars.Authz.get()
 		search = generic.SearchParams(request.query)
 
 		# BACK-COMPAT: Convert the old "mode" search to advanced filters
@@ -193,8 +194,9 @@ class CredentialsHandler(object):
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
-		if "tenant" in search.AdvancedFilter:
-			tenant_ctx = asab.contextvars.Tenant.set(search.AdvancedFilter["tenant"])
+		authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
+		if authorized_tenants:
+			tenant_ctx = asab.contextvars.Tenant.set(authorized_tenants.pop())
 		else:
 			tenant_ctx = asab.contextvars.Tenant.set(None)
 
