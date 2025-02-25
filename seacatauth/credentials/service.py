@@ -11,7 +11,7 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, generic, exceptions
-from ..session import SessionAdapter
+from ..models import Session
 
 #
 
@@ -351,7 +351,7 @@ class CredentialsService(asab.Service):
 		self.register_provider(provider)
 
 
-	async def create_credentials(self, provider_id: str, credentials_data: dict, session: SessionAdapter = None):
+	async def create_credentials(self, provider_id: str, credentials_data: dict, session: Session = None):
 		# Record the requester's ID for logging purposes
 		agent_cid = session.Credentials.Id if session is not None else None
 
@@ -414,7 +414,7 @@ class CredentialsService(asab.Service):
 
 
 	# TODO: Implement editing for M2M credentials
-	async def update_credentials(self, credentials_id: str, update_dict: dict, session: SessionAdapter = None):
+	async def update_credentials(self, credentials_id: str, update_dict: dict, session: Session = None):
 		"""
 		Validate the input data in the update dict according to active policies
 		and update credentials in the respective provider.

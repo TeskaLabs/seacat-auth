@@ -79,7 +79,7 @@ class BatmanData:
 	Token: typing.Optional[str]
 
 
-class SessionAdapter:
+class Session:
 	"""
 	Light object that represent a momentary view on the persisted session
 	"""
@@ -438,44 +438,44 @@ class SessionAdapter:
 
 def rest_get(session_dict):
 	data = {
-		"_id": session_dict.get(SessionAdapter.FN.SessionId),
-		"_c": session_dict.get(SessionAdapter.FN.CreatedAt),
-		"_m": session_dict.get(SessionAdapter.FN.ModifiedAt),
-		"_v": session_dict.get(SessionAdapter.FN.Version),
-		"type": session_dict.get(SessionAdapter.FN.Session.Type),
-		"expiration": session_dict.get(SessionAdapter.FN.Session.Expiration),
-		"max_expiration": session_dict.get(SessionAdapter.FN.Session.MaxExpiration),
-		"credentials_id": session_dict.get(SessionAdapter.FN.Credentials.Id),
-		"authn_time": session_dict.get(SessionAdapter.FN.Authentication.AuthnTime),
-		"login_descriptor": session_dict.get(SessionAdapter.FN.Authentication.LoginDescriptor),
-		"login_factors": session_dict.get(SessionAdapter.FN.Authentication.LoginFactors),
-		"tenants": session_dict.get(SessionAdapter.FN.Authorization.AssignedTenants),
-		"resources": session_dict.get(SessionAdapter.FN.Authorization.Authz),
-		"track_id": session_dict.get(SessionAdapter.FN.Session.TrackId),
+		"_id": session_dict.get(Session.FN.SessionId),
+		"_c": session_dict.get(Session.FN.CreatedAt),
+		"_m": session_dict.get(Session.FN.ModifiedAt),
+		"_v": session_dict.get(Session.FN.Version),
+		"type": session_dict.get(Session.FN.Session.Type),
+		"expiration": session_dict.get(Session.FN.Session.Expiration),
+		"max_expiration": session_dict.get(Session.FN.Session.MaxExpiration),
+		"credentials_id": session_dict.get(Session.FN.Credentials.Id),
+		"authn_time": session_dict.get(Session.FN.Authentication.AuthnTime),
+		"login_descriptor": session_dict.get(Session.FN.Authentication.LoginDescriptor),
+		"login_factors": session_dict.get(Session.FN.Authentication.LoginFactors),
+		"tenants": session_dict.get(Session.FN.Authorization.AssignedTenants),
+		"resources": session_dict.get(Session.FN.Authorization.Authz),
+		"track_id": session_dict.get(Session.FN.Session.TrackId),
 	}
-	psid = session_dict.get(SessionAdapter.FN.Session.ParentSessionId)
+	psid = session_dict.get(Session.FN.Session.ParentSessionId)
 	if psid is not None:
 		data["parent_session_id"] = psid
 
-	client_id = session_dict.get(SessionAdapter.FN.OAuth2.ClientId)
+	client_id = session_dict.get(Session.FN.OAuth2.ClientId)
 	if client_id is not None:
 		data["client_id"] = client_id
-	scope = session_dict.get(SessionAdapter.FN.OAuth2.Scope)
+	scope = session_dict.get(Session.FN.OAuth2.Scope)
 	if scope is not None:
 		data["scope"] = scope
 
-	if session_dict.get(SessionAdapter.FN.OAuth2.AccessToken) is not None:
+	if session_dict.get(Session.FN.OAuth2.AccessToken) is not None:
 		data["access_token"] = True
-	if session_dict.get(SessionAdapter.FN.Cookie.Id) is not None:
+	if session_dict.get(Session.FN.Cookie.Id) is not None:
 		data["cookie"] = True
 
-	if session_dict.get(SessionAdapter.FN.Authentication.IsAnonymous) is True:
+	if session_dict.get(Session.FN.Authentication.IsAnonymous) is True:
 		data["anonymous"] = True
 
-	impersonator_cid = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId)
+	impersonator_cid = session_dict.get(Session.FN.Authentication.ImpersonatorCredentialsId)
 	if impersonator_cid is not None:
 		data["impersonator_cid"] = impersonator_cid
-	impersonator_sid = session_dict.get(SessionAdapter.FN.Authentication.ImpersonatorSessionId)
+	impersonator_sid = session_dict.get(Session.FN.Authentication.ImpersonatorSessionId)
 	if impersonator_sid is not None:
 		data["impersonator_sid"] = impersonator_sid
 
@@ -484,15 +484,15 @@ def rest_get(session_dict):
 
 # TODO: Use ASAB Authorization, this is a temporary solution.
 def build_system_session(session_service, session_id):
-	session = SessionAdapter({
-		SessionAdapter.FN.SessionId: session_id,
-		SessionAdapter.FN.Version: 0,
-		SessionAdapter.FN.CreatedAt: datetime.datetime.now(datetime.UTC),
-		SessionAdapter.FN.ModifiedAt: None,
-		SessionAdapter.FN.Session.Type: "SYSTEM",
-		SessionAdapter.FN.Session.Expiration: datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30),
-		SessionAdapter.FN.Authorization.Authz: {"*": ["authz:superuser"]},
-		SessionAdapter.FN.Credentials.Id: "SYSTEM",
+	session = Session({
+		Session.FN.SessionId: session_id,
+		Session.FN.Version: 0,
+		Session.FN.CreatedAt: datetime.datetime.now(datetime.UTC),
+		Session.FN.ModifiedAt: None,
+		Session.FN.Session.Type: "SYSTEM",
+		Session.FN.Session.Expiration: datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30),
+		Session.FN.Authorization.Authz: {"*": ["authz:superuser"]},
+		Session.FN.Credentials.Id: "SYSTEM",
 	})
 	AuditLogger.log(asab.LOG_NOTICE, "Created new system session.", struct_data={"session_id": session.SessionId})
 	return session

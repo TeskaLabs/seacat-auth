@@ -5,7 +5,7 @@ import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 
-from .adapter import SessionAdapter
+from ..models import SessionAdapter
 from ..const import ResourceId
 
 
@@ -76,7 +76,7 @@ class SessionHandler(object):
 		session_id = request.match_info["session_id"]
 		session = (await self.SessionService.get(session_id)).rest_get()
 		children = await self.SessionService.list(query_filter={
-			SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session_id)
+			Session.FN.Session.ParentSessionId: bson.ObjectId(session_id)
 		})
 		if children["count"] > 0:
 			session["children"] = children
@@ -133,7 +133,7 @@ class SessionHandler(object):
 		page = int(request.query.get("p", 1)) - 1
 		limit = int(request.query.get("i", 10))
 		sessions = await self.SessionService.list(page, limit, query_filter={
-			SessionAdapter.FN.Credentials.Id: credentials_id
+			Session.FN.Credentials.Id: credentials_id
 		})
 		return asab.web.rest.json_response(request, sessions)
 

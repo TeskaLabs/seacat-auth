@@ -16,7 +16,7 @@ import jwcrypto.jwk
 import jwcrypto.jws
 
 from ..generic import update_url_query_params
-from ..session.adapter import SessionAdapter
+from ..models import Session
 from .. import exceptions
 from . import pkce
 from ..authz import build_credentials_authz
@@ -105,10 +105,10 @@ class OpenIdConnectService(asab.Service):
 
 	async def refresh_session(
 		self,
-		session: SessionAdapter,
+		session: Session,
 		expires_at: typing.Optional[datetime.datetime] = None,
 		requested_scope: typing.Optional[typing.Iterable] = None,
-	) -> SessionAdapter:
+	) -> Session:
 		"""
 		Update/rebuild the session according to its authorization parameters
 
@@ -166,7 +166,7 @@ class OpenIdConnectService(asab.Service):
 		)
 
 		if expires_at:
-			session_builders.append(((SessionAdapter.FN.Session.Expiration, expires_at),))
+			session_builders.append(((Session.FN.Session.Expiration, expires_at),))
 
 		session = await self.SessionService.update_session(session.SessionId, session_builders)
 
@@ -418,7 +418,7 @@ class OpenIdConnectService(asab.Service):
 		Invalidate a valid token. Currently only access_token type is supported.
 		"""
 		try:
-			session: SessionAdapter = await self.get_session_by_access_token(token)
+			session: Session = await self.get_session_by_access_token(token)
 		except exceptions.SessionNotFoundError:
 			return
 
@@ -480,7 +480,7 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_authorization_code(
-		self, session: SessionAdapter,
+		self, session: Session,
 		code_challenge: str | None = None,
 		code_challenge_method: str | None = None,
 	) -> str:
@@ -521,7 +521,7 @@ class OpenIdConnectService(asab.Service):
 
 	async def create_access_token(
 		self,
-		session: SessionAdapter,
+		session: Session,
 		expires_at: datetime.datetime,
 	) -> str:
 		"""
@@ -546,7 +546,7 @@ class OpenIdConnectService(asab.Service):
 
 	async def create_refresh_token(
 		self,
-		session: SessionAdapter,
+		session: Session,
 		expires_at: datetime.datetime,
 	) -> str:
 		"""
