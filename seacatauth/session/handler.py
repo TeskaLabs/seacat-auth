@@ -4,7 +4,7 @@ import asab
 import asab.web.rest
 import bson
 
-from seacatauth.decorators import access_control
+from ..decorators import access_control
 from ..models import Session
 
 #

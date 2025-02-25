@@ -5,7 +5,7 @@ import aiohttp.client_exceptions
 import asab
 import asab.config
 
-from seacatauth.authz import build_credentials_authz
+from ..authz import build_credentials_authz
 
 #
 
