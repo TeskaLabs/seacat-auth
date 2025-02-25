@@ -7,11 +7,7 @@ from .. import exceptions
 from .. import generic
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class BatmanHandler(object):

@@ -5,11 +5,8 @@ import asab
 
 from ...exceptions import TenantNotSpecifiedError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RBACService(asab.Service):

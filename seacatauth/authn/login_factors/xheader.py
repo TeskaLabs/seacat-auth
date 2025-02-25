@@ -2,11 +2,8 @@ import logging
 
 from .abc import LoginFactorABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class XHeaderFactor(LoginFactorABC):

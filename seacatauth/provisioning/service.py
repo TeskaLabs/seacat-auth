@@ -10,11 +10,9 @@ from ..client.service import CLIENT_TEMPLATES
 from ..generic import SessionContext
 from ..models import build_system_session
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 _PROVISIONING_INTRO_MESSAGE = """
 

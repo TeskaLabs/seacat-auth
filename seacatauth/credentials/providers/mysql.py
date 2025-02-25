@@ -9,11 +9,8 @@ import re
 from .abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from ... import generic
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class MySQLCredentialsService(asab.Service):

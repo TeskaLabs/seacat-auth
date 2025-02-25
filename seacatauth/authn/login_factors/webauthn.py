@@ -4,11 +4,8 @@ import asab
 
 from .abc import LoginFactorABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class WebAuthnFactor(LoginFactorABC):

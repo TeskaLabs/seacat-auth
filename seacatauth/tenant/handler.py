@@ -8,11 +8,8 @@ from .. import exceptions
 from ..decorators import access_control
 from . import schemas
 
-###
 
 L = logging.getLogger(__name__)
-
-###
 
 
 class TenantHandler(object):

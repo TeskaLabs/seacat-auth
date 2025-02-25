@@ -6,11 +6,8 @@ from .generic import SessionContext
 from . import exceptions
 from .generic import get_bearer_token_value
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 def app_middleware_factory(app):

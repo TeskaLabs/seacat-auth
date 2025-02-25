@@ -4,11 +4,8 @@ import aiohttp.web
 import asab
 import asab.web.rest
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class UserInfoHandler(object):

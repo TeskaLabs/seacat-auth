@@ -3,11 +3,8 @@ import logging
 import asab
 import asab.web.rest
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class FeatureHandler(object):

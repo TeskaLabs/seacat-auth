@@ -14,11 +14,8 @@ from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
 from ...last_activity import EventCode
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class OAuthAuthorizeError(Exception):

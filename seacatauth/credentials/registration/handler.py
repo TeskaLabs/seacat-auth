@@ -12,11 +12,8 @@ import asab.exceptions
 
 from ...decorators import access_control
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RegistrationHandler(object):

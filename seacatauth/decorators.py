@@ -7,11 +7,8 @@ import asab
 
 from . import exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 def access_control(resource=None):

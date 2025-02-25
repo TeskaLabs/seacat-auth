@@ -13,11 +13,9 @@ from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderAB
 from .. import AuditLogger, generic, exceptions
 from ..models import Session
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 LOGIN_DESCRIPTOR_FAKE = [{
 	'id': 'default',

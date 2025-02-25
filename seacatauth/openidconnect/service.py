@@ -21,11 +21,9 @@ from .. import exceptions
 from . import pkce
 from ..authz import build_credentials_authz
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 # TODO: Use JWA algorithms?
 

@@ -14,11 +14,8 @@ from .schemas import (
 	UPDATE_MY_CREDENTIALS,
 )
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CredentialsHandler(object):

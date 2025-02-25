@@ -9,11 +9,7 @@ from ..utils import AuthOperation
 from ...events import EventTypes
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginStateStorage:

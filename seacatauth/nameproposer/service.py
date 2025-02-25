@@ -7,11 +7,7 @@ from .animals import ANIMALS
 from .adjectives import ADJECTIVES
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class NameProposerService(asab.Service):

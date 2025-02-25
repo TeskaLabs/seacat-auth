@@ -9,11 +9,7 @@ import asab.storage.exceptions
 from ...events import EventTypes
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginAccountStorage:

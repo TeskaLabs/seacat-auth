@@ -16,11 +16,8 @@ from ..models.session import CookieData
 from ..session.builders import cookie_session_builder
 from .. import AuditLogger
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CookieService(asab.Service):

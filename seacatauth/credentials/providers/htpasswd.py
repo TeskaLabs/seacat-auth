@@ -6,11 +6,8 @@ import typing
 import asab
 from .abc import CredentialsProviderABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class HTPasswdCredentialsService(asab.Service):

@@ -8,11 +8,8 @@ from ..decorators import access_control
 from .. import generic, exceptions
 from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ClientHandler(object):
