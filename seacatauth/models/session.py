@@ -5,8 +5,8 @@ import datetime
 import typing
 import asab
 
-from seacatauth import AuditLogger
-from seacatauth.authz.rbac.service import RBACService
+from .. import AuditLogger
+from ..authz.rbac.service import RBACService
 
 
 L = logging.getLogger(__name__)

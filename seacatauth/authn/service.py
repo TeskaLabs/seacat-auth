@@ -12,13 +12,12 @@ from .login_session import LoginSession
 from .. import exceptions, generic, AuditLogger
 from ..last_activity import EventCode
 from ..authz import build_credentials_authz
-
+from ..models import Session
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
 	authentication_session_builder,
 	available_factors_session_builder,
-	Session,
 )
 
 from ..events import EventTypes

@@ -6,7 +6,7 @@ import asab
 
 from .. import AuditLogger, generic
 from ..generic import nginx_introspection
-from ..session import Session
+from ..models import Session
 
 #
 

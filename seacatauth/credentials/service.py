@@ -11,7 +11,7 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, generic, exceptions
-from ..session import Session
+from ..models import Session
 
 #
 

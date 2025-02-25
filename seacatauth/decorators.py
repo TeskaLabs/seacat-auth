@@ -5,7 +5,7 @@ import inspect
 import aiohttp.web
 import asab
 
-from seacatauth import exceptions
+from . import exceptions
 
 #
 
