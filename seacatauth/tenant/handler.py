@@ -27,13 +27,13 @@ class TenantHandler(object):
 		self.NameProposerService = app.get_service("seacatauth.NameProposerService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/tenant", self.list)
 		web_app.router.add_get("/tenants", self.search)
-		web_app.router.add_get("/tenant/{tenant}", self.get)
-		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
 		web_app.router.add_put("/tenants", self.get_tenants_batch)
 
 		web_app.router.add_post("/tenant", self.create)
+		web_app.router.add_get("/tenant", self.list)
+		web_app.router.add_get("/tenant/{tenant}", self.get)
+		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
 		web_app.router.add_delete("/tenant/{tenant}", self.delete)
 
 		web_app.router.add_get("/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
@@ -51,6 +51,7 @@ class TenantHandler(object):
 		web_app_public.router.add_get("/tenant", self.list)
 
 
+	@asab.web.tenant.allow_no_tenant
 	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
 	async def list(self, request):
 		"""
@@ -60,6 +61,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def search(self, request):
 		"""
 		Search tenants.
@@ -198,6 +200,7 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler(schemas.SET_TENANTS)
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
+	@asab.web.tenant.allow_no_tenant
 	async def set_tenants(self, request, *, json_data):
 		"""
 		Specify a set of accessible tenants for requested credentials ID
@@ -248,6 +251,7 @@ class TenantHandler(object):
 
 
 	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
+	@asab.web.tenant.allow_no_tenant
 	async def get_tenants_by_credentials(self, request):
 		"""
 		Get list of tenants memberships of the requested credentials
@@ -266,6 +270,7 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler(schemas.GET_TENANTS_BATCH)
 	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
+	@asab.web.tenant.allow_no_tenant
 	async def get_tenants_batch(self, request, *, json_data):
 		"""
 		Get list of tenant memberships for each listed credential ID
