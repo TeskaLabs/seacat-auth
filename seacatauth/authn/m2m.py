@@ -6,7 +6,7 @@ import asab
 
 from .. import AuditLogger, generic
 from ..generic import nginx_introspection
-from ..session import SessionAdapter
+from ..session import Session
 
 #
 
@@ -82,7 +82,7 @@ class M2MIntrospectHandler(object):
 
 		# Find session object
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.Credentials.Id, credentials_id)
+			session = await self.SessionService.get_by(Session.FN.Credentials.Id, credentials_id)
 		except KeyError:
 			session = None
 

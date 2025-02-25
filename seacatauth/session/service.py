@@ -17,7 +17,8 @@ import pymongo
 
 from .. import exceptions
 from ..events import EventTypes
-from .adapter import SessionAdapter, rest_get
+from ..models import Session
+from ..models.session import rest_get
 from .algorithmic import AlgorithmicSessionProvider
 from .token import SessionTokenService
 from .builders import (
@@ -106,10 +107,10 @@ class SessionService(asab.Service):
 		# Access token
 		try:
 			await collection.create_index(
-				[(SessionAdapter.FN.OAuth2.AccessToken, pymongo.ASCENDING)],
+				[(Session.FN.OAuth2.AccessToken, pymongo.ASCENDING)],
 				unique=True,
 				partialFilterExpression={
-					SessionAdapter.FN.OAuth2.AccessToken: {"$exists": True, "$gt": b""}}
+					Session.FN.OAuth2.AccessToken: {"$exists": True, "$gt": b""}}
 			)
 		except Exception as e:
 			L.error("Failed to create index (access token): {}".format(e))
@@ -118,12 +119,12 @@ class SessionService(asab.Service):
 		try:
 			await collection.create_index(
 				[
-					(SessionAdapter.FN.Cookie.Id, pymongo.ASCENDING),
-					(SessionAdapter.FN.OAuth2.ClientId, pymongo.ASCENDING),
+					(Session.FN.Cookie.Id, pymongo.ASCENDING),
+					(Session.FN.OAuth2.ClientId, pymongo.ASCENDING),
 				],
 				unique=True,
 				partialFilterExpression={
-					SessionAdapter.FN.Cookie.Id: {"$exists": True, "$gt": b""}}
+					Session.FN.Cookie.Id: {"$exists": True, "$gt": b""}}
 			)
 		except Exception as e:
 			L.error("Failed to create compound index (cookie ID, client ID): {}".format(e))
@@ -133,7 +134,7 @@ class SessionService(asab.Service):
 		try:
 			await collection.create_index(
 				[
-					(SessionAdapter.FN.Session.Expiration, pymongo.DESCENDING)
+					(Session.FN.Session.Expiration, pymongo.DESCENDING)
 				]
 			)
 		except Exception as e:
@@ -144,7 +145,7 @@ class SessionService(asab.Service):
 		try:
 			await collection.create_index(
 				[
-					(SessionAdapter.FN.Session.ParentSessionId, pymongo.ASCENDING)
+					(Session.FN.Session.ParentSessionId, pymongo.ASCENDING)
 				]
 			)
 		except Exception as e:
@@ -167,7 +168,7 @@ class SessionService(asab.Service):
 		expired = []
 		async for session in self._iterate_raw(
 			query_filter={
-				SessionAdapter.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
+				Session.FN.Session.Expiration: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		):
 			expired.append(session["_id"])
 
@@ -192,9 +193,9 @@ class SessionService(asab.Service):
 		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie"]):
 			L.error("Unsupported session type", struct_data={"type": session_type})
 			return None
-		upsertor.set(SessionAdapter.FN.Session.Type, session_type)
+		upsertor.set(Session.FN.Session.Type, session_type)
 		if parent_session_id is not None:
-			upsertor.set(SessionAdapter.FN.Session.ParentSessionId, parent_session_id)
+			upsertor.set(Session.FN.Session.ParentSessionId, parent_session_id)
 
 		# Set up expiration variables
 		if expiration is not None:
@@ -211,20 +212,20 @@ class SessionService(asab.Service):
 		else:
 			touch_extension_seconds = self.TouchExtensionRatio * expiration.total_seconds()
 
-		upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
-		upsertor.set(SessionAdapter.FN.Session.MaxExpiration, max_expiration)
-		upsertor.set(SessionAdapter.FN.Session.ExpirationExtension, touch_extension_seconds)
+		upsertor.set(Session.FN.Session.Expiration, expires)
+		upsertor.set(Session.FN.Session.MaxExpiration, max_expiration)
+		upsertor.set(Session.FN.Session.ExpirationExtension, touch_extension_seconds)
 
 		# Add builder fields
 		if session_builders is None:
 			session_builders = list()
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				if key in SessionAdapter.EncryptedIdentifierFields and value is not None:
-					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
+				if key in Session.EncryptedIdentifierFields and value is not None:
+					value = Session.EncryptedPrefix + self.aes_encrypt(value)
 					upsertor.set(key, value)
 				else:
-					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
+					upsertor.set(key, value, encrypt=(key in Session.EncryptedAttributes))
 
 		session_id = await upsertor.execute(event_type=EventTypes.SESSION_CREATED)
 
@@ -251,11 +252,11 @@ class SessionService(asab.Service):
 
 		for session_builder in session_builders:
 			for key, value in session_builder:
-				if key in SessionAdapter.EncryptedIdentifierFields and value is not None:
-					value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
+				if key in Session.EncryptedIdentifierFields and value is not None:
+					value = Session.EncryptedPrefix + self.aes_encrypt(value)
 					upsertor.set(key, value)
 				else:
-					upsertor.set(key, value, encrypt=(key in SessionAdapter.EncryptedAttributes))
+					upsertor.set(key, value, encrypt=(key in Session.EncryptedAttributes))
 
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 		return await self.get(session_id)
@@ -272,24 +273,24 @@ class SessionService(asab.Service):
 			obj_id=session_id,
 			version=session_dict["_v"],
 		)
-		upsertor.set(SessionAdapter.FN.Session.Expiration, expires_at)
+		upsertor.set(Session.FN.Session.Expiration, expires_at)
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
 		L.log(asab.LOG_NOTICE, "Session expiration updated.", struct_data={
 			"sid": session_id,
-			"type": session_dict.get(SessionAdapter.FN.Session.Type),
+			"type": session_dict.get(Session.FN.Session.Type),
 		})
 		return await self.get(session_id)
 
 
 	async def get_by(self, key: str, value):
 		# Encrypt sensitive fields
-		if key in SessionAdapter.EncryptedIdentifierFields:
-			value = SessionAdapter.EncryptedPrefix + self.aes_encrypt(value)
+		if key in Session.EncryptedIdentifierFields:
+			value = Session.EncryptedPrefix + self.aes_encrypt(value)
 
 		try:
 			session_dict = await self.StorageService.get_by(
-				self.SessionCollection, key, value, decrypt=SessionAdapter.EncryptedAttributes)
+				self.SessionCollection, key, value, decrypt=Session.EncryptedAttributes)
 		except ValueError as e:
 			# Likely a problem with obsolete decryption
 			L.warning("ValueError when retrieving session: {}".format(e), struct_data={"key": key})
@@ -299,14 +300,14 @@ class SessionService(asab.Service):
 			raise exceptions.SessionNotFoundError("Session not found.", query={key: value})
 
 		# Do not return expired sessions
-		expires_at = session_dict[SessionAdapter.FN.Session.Expiration]
+		expires_at = session_dict[Session.FN.Session.Expiration]
 		if expires_at < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.SessionNotFoundError("Session expired.", query={key: value})
 
 		session_dict = self._decrypt_encrypted_session_identifiers(session_dict)
 
 		try:
-			session = SessionAdapter(session_dict)
+			session = Session(session_dict)
 		except Exception as e:
 			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
@@ -321,7 +322,7 @@ class SessionService(asab.Service):
 			session_id = bson.ObjectId(session_id)
 		try:
 			session_dict = await self.StorageService.get(
-				self.SessionCollection, session_id, decrypt=SessionAdapter.EncryptedAttributes)
+				self.SessionCollection, session_id, decrypt=Session.EncryptedAttributes)
 		except KeyError:
 			raise exceptions.SessionNotFoundError("Session not found.", session_id=session_id)
 		except ValueError as e:
@@ -330,13 +331,13 @@ class SessionService(asab.Service):
 			raise exceptions.SessionNotFoundError("Session not found.", session_id=session_id)
 
 		# Do not return expired sessions
-		if session_dict[SessionAdapter.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
+		if session_dict[Session.FN.Session.Expiration] < datetime.datetime.now(datetime.timezone.utc):
 			raise exceptions.SessionNotFoundError("Session expired.", session_id=session_id)
 
 		session_dict = self._decrypt_encrypted_session_identifiers(session_dict)
 
 		try:
-			session = SessionAdapter(session_dict)
+			session = Session(session_dict)
 		except Exception as e:
 			L.exception("Failed to create SessionAdapter from database object.", struct_data={
 				"sid": session_dict.get("_id"),
@@ -371,7 +372,7 @@ class SessionService(asab.Service):
 			query_filter = {}
 
 		if not include_expired:
-			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
+			query_filter[Session.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		sessions = []
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
@@ -393,10 +394,10 @@ class SessionService(asab.Service):
 			query_filter = {}
 
 		if not include_expired:
-			query_filter[SessionAdapter.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
+			query_filter[Session.FN.Session.Expiration] = {"$gt": datetime.datetime.now(datetime.timezone.utc)}
 
 		# Find only top-level sessions (with no parent)
-		query_filter.update({SessionAdapter.FN.Session.ParentSessionId: None})
+		query_filter.update({Session.FN.Session.ParentSessionId: None})
 
 		cursor = collection.find(query_filter)
 
@@ -409,16 +410,16 @@ class SessionService(asab.Service):
 		count = await collection.count_documents(query_filter)
 		async for session_dict in self._iterate_raw(page, limit, query_filter):
 			try:
-				session = SessionAdapter(session_dict).rest_get()
+				session = Session(session_dict).rest_get()
 			except Exception as e:
 				L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
 					"sid": session_dict.get("_id"),
 				})
-				await self.delete(session_dict.get(SessionAdapter.FN.SessionId))
+				await self.delete(session_dict.get(Session.FN.SessionId))
 				continue
 			# Include children sessions
 			children = await self.list(
-				query_filter={SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])},
+				query_filter={Session.FN.Session.ParentSessionId: bson.ObjectId(session["_id"])},
 				include_expired=include_expired,
 			)
 			if children["count"] > 0:
@@ -442,7 +443,7 @@ class SessionService(asab.Service):
 
 	async def touch(
 		self,
-		session: SessionAdapter,
+		session: Session,
 		expires: datetime.datetime = None,
 		*,
 		override_cooldown: bool = False
@@ -479,7 +480,7 @@ class SessionService(asab.Service):
 			version=version
 		)
 		if expires is not None:
-			upsertor.set(SessionAdapter.FN.Session.Expiration, expires)
+			upsertor.set(Session.FN.Session.Expiration, expires)
 			L.info("Extending session expiration.", struct_data={
 				"sid": session.Session.Id, "exp": expires, "v": version})
 
@@ -493,7 +494,7 @@ class SessionService(asab.Service):
 		return await self.get(session.SessionId)
 
 
-	def _calculate_extended_expiration(self, session: SessionAdapter, expires: datetime.datetime = None):
+	def _calculate_extended_expiration(self, session: Session, expires: datetime.datetime = None):
 		if session.Session.Expiration >= session.Session.MaxExpiration:
 			return None
 
@@ -516,7 +517,7 @@ class SessionService(asab.Service):
 
 	async def delete(self, session_id):
 		# Recursively delete all child sessions first
-		query_filter = {SessionAdapter.FN.Session.ParentSessionId: bson.ObjectId(session_id)}
+		query_filter = {Session.FN.Session.ParentSessionId: bson.ObjectId(session_id)}
 
 		to_delete = []
 		async for session_dict in self._iterate_raw(query_filter=query_filter):
@@ -569,15 +570,15 @@ class SessionService(asab.Service):
 
 	async def delete_sessions_by_credentials_id(self, credentials_id):
 		await self._delete_sessions_by_filter(
-			query_filter={SessionAdapter.FN.Credentials.Id: credentials_id})
+			query_filter={Session.FN.Credentials.Id: credentials_id})
 
 
 	async def delete_sessions_by_tenant_in_scope(self, tenant):
 		await self._delete_sessions_by_filter(
-			query_filter={"{}.{}".format(SessionAdapter.FN.Authorization.Authz, tenant): {"$exists": True}})
+			query_filter={"{}.{}".format(Session.FN.Authorization.Authz, tenant): {"$exists": True}})
 
 
-	async def inherit_track_id_from_root(self, session: SessionAdapter) -> SessionAdapter:
+	async def inherit_track_id_from_root(self, session: Session) -> Session:
 		"""
 		Fetch the session's parent and check for track ID. If there is any, copy it to the session.
 		"""
@@ -592,7 +593,7 @@ class SessionService(asab.Service):
 				})
 				# Transfer the new track ID from the root session to the new session
 				sub_session_builders = [
-					((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),),
+					((Session.FN.Session.TrackId, uuid.uuid4().bytes),),
 				]
 				await self.update_session(
 					session.SessionId,
@@ -602,8 +603,8 @@ class SessionService(asab.Service):
 
 
 	async def inherit_or_generate_new_track_id(
-		self, dst_session: SessionAdapter, src_session: SessionAdapter
-	) -> SessionAdapter:
+		self, dst_session: Session, src_session: Session
+	) -> Session:
 		"""
 		Check if the request has a session identifier (access token or cookie, in this order)
 		and try to inherit the track id.
@@ -614,7 +615,7 @@ class SessionService(asab.Service):
 			# Update the destination session with a new track ID
 			# Also update its root session if there is any
 			root_session_id = dst_session.Session.ParentSessionId
-			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			session_builders = [((Session.FN.Session.TrackId, uuid.uuid4().bytes),)]
 			await self.update_session(dst_session.SessionId, session_builders)
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
@@ -623,7 +624,7 @@ class SessionService(asab.Service):
 			L.info("Cannot transfer Track ID: Source session is not anonymous.", struct_data={
 				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
 			root_session_id = dst_session.Session.ParentSessionId
-			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			session_builders = [((Session.FN.Session.TrackId, uuid.uuid4().bytes),)]
 			await self.update_session(dst_session.SessionId, session_builders)
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
@@ -632,7 +633,7 @@ class SessionService(asab.Service):
 			L.info("Cannot transfer Track ID: Mismatching client IDs.", struct_data={
 				"src_clid": src_session.OAuth2.ClientId, "dst_clid": dst_session.OAuth2.ClientId})
 			root_session_id = dst_session.Session.ParentSessionId
-			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			session_builders = [((Session.FN.Session.TrackId, uuid.uuid4().bytes),)]
 			await self.update_session(dst_session.SessionId, session_builders)
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
@@ -641,7 +642,7 @@ class SessionService(asab.Service):
 			L.info("Cannot transfer Track ID: Source session has no Track ID.", struct_data={
 				"src_sid": src_session.SessionId, "dst_sid": dst_session.SessionId})
 			root_session_id = dst_session.Session.ParentSessionId
-			session_builders = [((SessionAdapter.FN.Session.TrackId, uuid.uuid4().bytes),)]
+			session_builders = [((Session.FN.Session.TrackId, uuid.uuid4().bytes),)]
 			await self.update_session(dst_session.SessionId, session_builders)
 			if root_session_id is not None:
 				await self.update_session(root_session_id, session_builders)
@@ -650,7 +651,7 @@ class SessionService(asab.Service):
 			# The destination session is authenticated while the source one is anonymous
 			# Transfer the track ID to the destination session and delete the source session
 			assert dst_session.Session.ParentSessionId is not None
-			session_builders = [((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),)]
+			session_builders = [((Session.FN.Session.TrackId, src_session.Session.TrackId),)]
 			await self.update_session(dst_session.SessionId, session_builders)
 			await self.update_session(dst_session.Session.ParentSessionId, session_builders)
 
@@ -659,7 +660,7 @@ class SessionService(asab.Service):
 			# Group them together under the same root session
 			root_session_id = dst_session.Session.ParentSessionId or src_session.Session.ParentSessionId
 			root_session_builders = [
-				((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),),
+				((Session.FN.Session.TrackId, src_session.Session.TrackId),),
 			]
 			if root_session_id is not None:
 				# Update the root session
@@ -669,14 +670,14 @@ class SessionService(asab.Service):
 			else:
 				# Create a new root session
 				root_session_builders.extend([
-					((SessionAdapter.FN.Credentials.Id, dst_session.Credentials.Id),),
-					((SessionAdapter.FN.Authentication.IsAnonymous, True),),
+					((Session.FN.Credentials.Id, dst_session.Credentials.Id),),
+					((Session.FN.Authentication.IsAnonymous, True),),
 				])
 				await self.create_session(
 					"root", session_builders=root_session_builders, expiration=self.AnonymousExpiration)
 			sub_session_builders = [
-				((SessionAdapter.FN.Session.ParentSessionId, root_session_id),),
-				((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),),
+				((Session.FN.Session.ParentSessionId, root_session_id),),
+				((Session.FN.Session.TrackId, src_session.Session.TrackId),),
 			]
 			await self.update_session(dst_session.SessionId, session_builders=sub_session_builders)
 			await self.update_session(src_session.SessionId, session_builders=sub_session_builders)
@@ -686,7 +687,7 @@ class SessionService(asab.Service):
 			# There shouldn't be more than one anonymous session per credentials per client per type
 			# Transfer the track ID and delete the source session
 			assert dst_session.Session.ParentSessionId is None
-			session_builders = [((SessionAdapter.FN.Session.TrackId, src_session.Session.TrackId),)]
+			session_builders = [((Session.FN.Session.TrackId, src_session.Session.TrackId),)]
 			old_session_group_id = src_session.Session.ParentSessionId or src_session.SessionId
 			await self.delete(old_session_group_id)
 			await self.update_session(dst_session.SessionId, session_builders)
@@ -725,7 +726,7 @@ class SessionService(asab.Service):
 
 	async def build_client_session(
 		self,
-		root_session: SessionAdapter,
+		root_session: Session,
 		client_id: str,
 		scope: typing.Iterable[str],
 		tenants: typing.Iterable[str] = None,
@@ -763,8 +764,8 @@ class SessionService(asab.Service):
 			session_builders.append(
 				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
 			session_builders.append([
-				(SessionAdapter.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
-				(SessionAdapter.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
+				(Session.FN.Authentication.LoginDescriptor, root_session.Authentication.LoginDescriptor),
+				(Session.FN.Authentication.LoginFactors, root_session.Authentication.LoginFactors),
 			])
 
 		if "batman" in scope:
@@ -772,24 +773,24 @@ class SessionService(asab.Service):
 			username = root_session.Credentials.Username
 			basic_auth = base64.b64encode("{}:{}".format(username, password).encode("ascii"))
 			session_builders.append([
-				(SessionAdapter.FN.Batman.Token, basic_auth),
+				(Session.FN.Batman.Token, basic_auth),
 			])
 
 		session_builders.append(oauth2_session_builder(client_id, scope, nonce, redirect_uri=redirect_uri))
 
 		# Obtain Track ID if there is any in the root session
 		if root_session.TrackId is not None:
-			session_builders.append(((SessionAdapter.FN.Session.TrackId, root_session.TrackId),))
+			session_builders.append(((Session.FN.Session.TrackId, root_session.TrackId),))
 
 		# Transfer impersonation data
 		if root_session.Authentication.ImpersonatorSessionId is not None:
 			session_builders.append((
 				(
-					SessionAdapter.FN.Authentication.ImpersonatorSessionId,
+					Session.FN.Authentication.ImpersonatorSessionId,
 					root_session.Authentication.ImpersonatorSessionId
 				),
 				(
-					SessionAdapter.FN.Authentication.ImpersonatorCredentialsId,
+					Session.FN.Authentication.ImpersonatorCredentialsId,
 					root_session.Authentication.ImpersonatorCredentialsId
 				),
 			))
@@ -818,7 +819,7 @@ class SessionService(asab.Service):
 
 
 	def _decrypt_encrypted_session_identifiers(self, session_dict: dict) -> dict:
-		for field in SessionAdapter.EncryptedIdentifierFields:
+		for field in Session.EncryptedIdentifierFields:
 			# BACK COMPAT: Handle nested dictionaries
 			obj = session_dict
 			keys = field.split(".")
@@ -830,6 +831,6 @@ class SessionService(asab.Service):
 				# BACK COMPAT: Keep values without prefix raw
 				# TODO: Remove support once proper m2m tokens are in place
 				value = obj.get(keys[-1])
-				if value is not None and value.startswith(SessionAdapter.EncryptedPrefix):
-					obj[keys[-1]] = self.aes_decrypt(value[len(SessionAdapter.EncryptedPrefix):])
+				if value is not None and value.startswith(Session.EncryptedPrefix):
+					obj[keys[-1]] = self.aes_decrypt(value[len(Session.EncryptedPrefix):])
 		return session_dict

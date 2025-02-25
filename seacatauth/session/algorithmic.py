@@ -10,7 +10,7 @@ import datetime
 import asab.web.rest
 import asab.metrics
 
-from .adapter import SessionAdapter
+from ..models import Session
 from .. import exceptions
 from ..authz import build_credentials_authz
 
@@ -59,7 +59,7 @@ class AlgorithmicSessionProvider:
 	async def create_anonymous_session(
 		self, created_at, track_id, client_dict, scope,
 		redirect_uri: str = None
-	) -> SessionAdapter:
+	) -> Session:
 		session = await self._build_anonymous_session(created_at, track_id, client_dict, scope, redirect_uri)
 		self.AnonymousSessionCounter.add("sessions", 1)
 		return session
@@ -67,20 +67,20 @@ class AlgorithmicSessionProvider:
 	async def _build_anonymous_session(
 		self, created_at, track_id, client_dict, scope,
 		redirect_uri: str = None
-	) -> SessionAdapter:
+	) -> Session:
 		session_dict = {
-			SessionAdapter.FN.SessionId: SessionAdapter.ALGORITHMIC_SESSION_ID,
-			SessionAdapter.FN.Version: None,
-			SessionAdapter.FN.CreatedAt: created_at,
-			SessionAdapter.FN.ModifiedAt: created_at,
-			SessionAdapter.FN.Session.TrackId: track_id,
-			SessionAdapter.FN.OAuth2.ClientId: client_dict["_id"],
-			SessionAdapter.FN.OAuth2.Scope: scope,
-			SessionAdapter.FN.Credentials.Id: client_dict["anonymous_cid"],
-			SessionAdapter.FN.Authentication.IsAnonymous: True,
+			Session.FN.SessionId: Session.ALGORITHMIC_SESSION_ID,
+			Session.FN.Version: None,
+			Session.FN.CreatedAt: created_at,
+			Session.FN.ModifiedAt: created_at,
+			Session.FN.Session.TrackId: track_id,
+			Session.FN.OAuth2.ClientId: client_dict["_id"],
+			Session.FN.OAuth2.Scope: scope,
+			Session.FN.Credentials.Id: client_dict["anonymous_cid"],
+			Session.FN.Authentication.IsAnonymous: True,
 		}
 		await self._add_session_authz(session_dict, client_dict["anonymous_cid"], scope)
-		return SessionAdapter(session_dict)
+		return Session(session_dict)
 
 
 	async def _add_session_authz(self, session_dict: dict, credentials_id: str, scope: set):
@@ -103,11 +103,11 @@ class AlgorithmicSessionProvider:
 				"authz": authz
 			}
 
-		session_dict[SessionAdapter.FN.Authorization.AssignedTenants] = available_tenants
-		session_dict[SessionAdapter.FN.Authorization.Authz] = authz
+		session_dict[Session.FN.Authorization.AssignedTenants] = available_tenants
+		session_dict[Session.FN.Authorization.Authz] = authz
 
 
-	async def deserialize(self, token_value) -> SessionAdapter | None:
+	async def deserialize(self, token_value) -> Session | None:
 		"""
 		Parse JWT token and build a SessionAdapter using the token data.
 		"""
@@ -139,7 +139,7 @@ class AlgorithmicSessionProvider:
 		return session
 
 
-	def serialize(self, session: SessionAdapter) -> str:
+	def serialize(self, session: Session) -> str:
 		"""
 		Serialize SessionAdapter into a minimal JWT token string.
 		"""
