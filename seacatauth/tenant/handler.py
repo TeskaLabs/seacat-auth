@@ -8,6 +8,7 @@ import asab.utils
 from .. import exceptions
 from ..const import ResourceId
 from . import schemas
+from .random_name import propose_name
 
 
 L = logging.getLogger(__name__)
@@ -295,8 +296,8 @@ class TenantHandler(object):
 		"""
 		Propose name for a new tenant.
 		"""
-		proposed_tenant = self.NameProposerService.propose_name()
-		return asab.web.rest.json_response(request, {"tenant_id": proposed_tenant})
+		tenant_id = propose_name()
+		return asab.web.rest.json_response(request, {"tenant_id": tenant_id})
 
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_ASSIGN_TENANTS)
