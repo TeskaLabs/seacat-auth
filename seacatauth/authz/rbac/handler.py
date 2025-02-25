@@ -1,15 +1,11 @@
 import logging
-
 import asab.web.rest
 
 from ...decorators import access_control
 from ...exceptions import TenantNotSpecifiedError
 
-###
 
 L = logging.getLogger(__name__)
-
-###
 
 
 class RBACHandler(object):

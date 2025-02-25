@@ -1,6 +1,5 @@
 import logging
 import uuid
-
 import aiohttp
 import aiohttp.web
 import asab.web.rest
@@ -10,11 +9,8 @@ from .. import exceptions, AuditLogger
 from .. import generic
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CookieHandler(object):

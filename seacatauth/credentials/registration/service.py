@@ -1,18 +1,14 @@
 import datetime
 import logging
 import secrets
-
 import asab
 import asab.storage.exceptions
 import asab.exceptions
 
 from ... import AuditLogger
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RegistrationService(asab.Service):

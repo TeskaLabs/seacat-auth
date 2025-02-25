@@ -1,5 +1,4 @@
 import typing
-
 import asab.exceptions
 import asab.web.rest
 

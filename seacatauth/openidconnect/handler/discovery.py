@@ -1,15 +1,10 @@
 import logging
-
 import asab.web.rest
 
 from .. import OpenIdConnectService
 
-#
 
 L = logging.getLogger(__name__)
-
-
-#
 
 
 class DiscoveryHandler(object):

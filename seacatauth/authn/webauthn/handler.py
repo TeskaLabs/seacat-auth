@@ -1,6 +1,5 @@
 import base64
 import logging
-
 import aiohttp.web
 import asab.web
 import asab.web.rest
@@ -8,11 +7,8 @@ import asab.web.rest
 from ... import exceptions
 from ...decorators import access_control
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class WebAuthnHandler(object):

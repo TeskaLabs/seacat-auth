@@ -1,5 +1,4 @@
 import logging
-
 import aiohttp.web
 import asab
 import asab.web.rest
@@ -7,11 +6,8 @@ import asab.exceptions
 
 from ....decorators import access_control
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RolesHandler(object):

@@ -2,7 +2,6 @@ import collections
 import logging
 import asyncio
 import re
-
 import asab
 import asab.storage.exceptions
 import asab.exceptions
@@ -13,11 +12,9 @@ from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderAB
 from .. import AuditLogger, generic, exceptions
 from ..models import Session
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 LOGIN_DESCRIPTOR_FAKE = [{
 	'id': 'default',

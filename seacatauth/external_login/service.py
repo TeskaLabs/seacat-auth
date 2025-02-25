@@ -2,7 +2,6 @@ import logging
 import secrets
 import aiohttp
 import typing
-
 import asab
 import asab.web.rest
 
@@ -20,11 +19,7 @@ from .exceptions import (
 )
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginService(asab.Service):

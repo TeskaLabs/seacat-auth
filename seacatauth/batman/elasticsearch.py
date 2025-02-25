@@ -7,17 +7,13 @@ import aiohttp
 import aiohttp.client_exceptions
 import urllib.parse
 import random
-
 import asab.config
 import asab.tls
 
 from ..authz import build_credentials_authz
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ElasticSearchIntegration(asab.config.Configurable):

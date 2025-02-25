@@ -4,11 +4,9 @@ import json
 import base64
 import logging
 import typing
-
 import asab
 import asab.web.rest
 import asab.exceptions
-
 import aiohttp.web
 import urllib.parse
 import jwcrypto.jwt
@@ -21,11 +19,9 @@ from .. import exceptions
 from . import pkce
 from ..authz import build_credentials_authz
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 # TODO: Use JWA algorithms?
 

@@ -1,18 +1,14 @@
 import urllib
 import logging
 import aiohttp.web
-
 import asab
 import asab.web.rest
 
 from ... import exceptions
 from ...generic import nginx_introspection, get_bearer_token_value, get_access_token_value_from_websocket
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class TokenIntrospectionHandler(object):

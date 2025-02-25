@@ -1,6 +1,5 @@
 import pymongo
 import logging
-
 import asab
 import asab.web.rest
 import asab.exceptions
@@ -9,11 +8,7 @@ import asab.storage.exceptions
 from ...events import EventTypes
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginAccountStorage:

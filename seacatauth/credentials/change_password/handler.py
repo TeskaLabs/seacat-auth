@@ -1,6 +1,5 @@
 import logging
 import asyncio
-
 import asab
 import asab.web.rest
 import asab.web.webcrypto
@@ -9,11 +8,8 @@ from ... import exceptions, generic, AuditLogger
 from ...last_activity import EventCode
 from ...decorators import access_control
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ChangePasswordHandler(object):

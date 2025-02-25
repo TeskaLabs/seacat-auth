@@ -1,5 +1,4 @@
 import logging
-
 import asab
 import asab.web.rest
 import asab.web.webcrypto
@@ -14,11 +13,8 @@ from .schemas import (
 	UPDATE_MY_CREDENTIALS,
 )
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CredentialsHandler(object):

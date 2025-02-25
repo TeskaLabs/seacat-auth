@@ -1,5 +1,4 @@
 import logging
-
 import asab
 import asab.web.rest
 import bson
@@ -7,11 +6,8 @@ import bson
 from ..decorators import access_control
 from ..models import Session
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class SessionHandler(object):

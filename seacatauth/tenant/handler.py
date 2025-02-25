@@ -1,5 +1,4 @@
 import logging
-
 import asab.web.rest
 import asab.exceptions
 import asab.utils
@@ -8,11 +7,8 @@ from .. import exceptions
 from ..decorators import access_control
 from . import schemas
 
-###
 
 L = logging.getLogger(__name__)
-
-###
 
 
 class TenantHandler(object):

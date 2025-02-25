@@ -4,7 +4,6 @@ import hashlib
 import re
 import logging
 import typing
-
 import asab
 import asab.storage
 import asab.exceptions
@@ -16,11 +15,8 @@ from ..models.session import CookieData
 from ..session.builders import cookie_session_builder
 from .. import AuditLogger
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CookieService(asab.Service):

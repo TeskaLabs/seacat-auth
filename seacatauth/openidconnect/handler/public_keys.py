@@ -1,12 +1,8 @@
 import logging
-
 import asab.web.rest
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class PublicKeysHandler(object):

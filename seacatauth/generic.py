@@ -10,12 +10,9 @@ import asab.utils
 import bcrypt
 import argon2
 
-#
 
 L = logging.getLogger(__name__)
 SessionContext = contextvars.ContextVar("request_session", default=None)
-
-#
 
 
 class SearchParams:

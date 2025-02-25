@@ -1,6 +1,5 @@
 import logging
 import re
-
 import asab.storage.exceptions
 import asab
 import asab.exceptions
@@ -8,11 +7,8 @@ import asab.exceptions
 from ...events import EventTypes
 from ... import exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ResourceService(asab.Service):
