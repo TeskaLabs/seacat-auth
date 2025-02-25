@@ -5,7 +5,6 @@ import asab.web.auth
 import asab.web.tenant
 
 from ..service import ExternalLoginService
-from ...const import ResourceId
 from ..exceptions import ExternalAccountNotFoundError
 
 
