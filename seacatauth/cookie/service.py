@@ -10,7 +10,9 @@ import asab.storage
 import asab.exceptions
 
 from .. import exceptions
-from ..session.adapter import SessionAdapter, CookieData
+from ..models import Session
+
+from ..models.session import CookieData
 from ..session.builders import cookie_session_builder
 from .. import AuditLogger
 
@@ -117,7 +119,7 @@ class CookieService(asab.Service):
 				"Cookie value is not base64", query={"cookie_value": cookie_value}) from e
 
 		try:
-			session = await self.SessionService.get_by(SessionAdapter.FN.Cookie.Id, cookie_value)
+			session = await self.SessionService.get_by(Session.FN.Cookie.Id, cookie_value)
 		except KeyError as e:
 			raise exceptions.SessionNotFoundError(
 				"Session not found", query={"cookie_value": cookie_value}) from e
@@ -204,7 +206,7 @@ class CookieService(asab.Service):
 		return session
 
 
-	async def extend_session_expiration(self, session: SessionAdapter, client: dict = None):
+	async def extend_session_expiration(self, session: Session, client: dict = None):
 		expiration = client.get("session_expiration") if client else None
 		if expiration:
 			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)

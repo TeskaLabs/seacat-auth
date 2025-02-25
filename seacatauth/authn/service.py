@@ -12,13 +12,12 @@ from .login_session import LoginSession
 from .. import exceptions, generic, AuditLogger
 from ..last_activity import EventCode
 from ..authz import build_credentials_authz
-
+from ..models import Session
 from ..session import (
 	credentials_session_builder,
 	authz_session_builder,
 	authentication_session_builder,
 	available_factors_session_builder,
-	SessionAdapter,
 )
 
 from ..events import EventTypes
@@ -327,7 +326,7 @@ class AuthenticationService(asab.Service):
 				break
 		return authenticated
 
-	async def login(self, login_session, root_session: SessionAdapter | None = None, from_info: list = None):
+	async def login(self, login_session, root_session: Session | None = None, from_info: list = None):
 		"""
 		Build and create a root session
 		"""
@@ -437,8 +436,8 @@ class AuthenticationService(asab.Service):
 			},
 		)
 		session_builders.append((
-			(SessionAdapter.FN.Authentication.ImpersonatorCredentialsId, impersonator_cid),
-			(SessionAdapter.FN.Authentication.ImpersonatorSessionId, impersonator_session.SessionId),
+			(Session.FN.Authentication.ImpersonatorCredentialsId, impersonator_cid),
+			(Session.FN.Authentication.ImpersonatorSessionId, impersonator_session.SessionId),
 		))
 
 		session = await self.SessionService.create_session(
