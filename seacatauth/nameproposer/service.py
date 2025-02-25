@@ -1,6 +1,5 @@
 import logging
 import random
-
 import asab
 
 from .animals import ANIMALS

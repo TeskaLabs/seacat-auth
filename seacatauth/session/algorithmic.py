@@ -1,6 +1,5 @@
 import logging
 import typing
-
 import jwcrypto.jwt
 import jwcrypto.jws
 import jwcrypto.jwk

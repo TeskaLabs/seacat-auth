@@ -1,6 +1,5 @@
 import logging
 import uuid
-
 import aiohttp
 import aiohttp.web
 import asab.web.rest

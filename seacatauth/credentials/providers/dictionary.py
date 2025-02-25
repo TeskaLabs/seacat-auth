@@ -3,7 +3,6 @@ import functools
 import hashlib
 import logging
 import typing
-
 import asab
 from .abc import EditableCredentialsProviderABC
 from ... import generic

@@ -4,7 +4,6 @@ import json
 import logging
 import secrets
 import urllib.parse
-
 import aiohttp
 import asab.storage
 import jwcrypto.jwt

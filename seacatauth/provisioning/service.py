@@ -2,7 +2,6 @@ import json
 import logging
 import urllib.parse
 import secrets
-
 import asab.exceptions
 import asab.storage.exceptions
 

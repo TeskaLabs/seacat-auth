@@ -1,6 +1,5 @@
 import logging
 import typing
-
 import aiohttp.web
 import asab
 import asab.web.rest

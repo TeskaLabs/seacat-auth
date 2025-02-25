@@ -1,7 +1,6 @@
 import logging
 import functools
 import inspect
-
 import aiohttp.web
 import asab
 

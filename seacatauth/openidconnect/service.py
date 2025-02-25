@@ -4,11 +4,9 @@ import json
 import base64
 import logging
 import typing
-
 import asab
 import asab.web.rest
 import asab.exceptions
-
 import aiohttp.web
 import urllib.parse
 import jwcrypto.jwt

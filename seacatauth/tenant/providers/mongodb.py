@@ -1,6 +1,5 @@
 import logging
 import typing
-
 import asab.storage.mongodb
 import asab.storage.exceptions
 

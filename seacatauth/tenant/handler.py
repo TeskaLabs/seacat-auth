@@ -1,5 +1,4 @@
 import logging
-
 import asab.web.rest
 import asab.exceptions
 import asab.utils

@@ -1,6 +1,5 @@
 import base64
 import logging
-
 import aiohttp.web
 import asab.web
 import asab.web.rest

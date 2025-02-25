@@ -3,7 +3,6 @@ import json
 import logging
 import re
 import urllib.parse
-
 import asab
 
 from .login_descriptor import LoginDescriptor

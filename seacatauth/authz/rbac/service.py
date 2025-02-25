@@ -1,6 +1,5 @@
 import logging
 import typing
-
 import asab
 
 from ...exceptions import TenantNotSpecifiedError
