@@ -5,15 +5,13 @@ import asab.storage.exceptions
 import asab
 import asab.exceptions
 
-from ...events import EventTypes
 from ... import exceptions
+from ...auth_provider import system_authz
+from ...events import EventTypes
 from ...const import ResourceId
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 SEACAT_AUTH_RESOURCES = {
@@ -101,7 +99,8 @@ class ResourceService(asab.Service):
 
 	async def initialize(self, app):
 		await super().initialize(app)
-		await self._ensure_builtin_resources()
+		with system_authz("RESOURCE_PROVISIONING", resources={ResourceId.SUPERUSER}):
+			await self._ensure_builtin_resources()
 
 
 	@staticmethod
