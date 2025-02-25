@@ -3,22 +3,12 @@ import logging
 import secrets
 import jwcrypto.jwk
 import urllib.parse
-
 import asab
-import asab.web
-import asab.metrics
-import asab.web.rest
-import asab.storage
-import asab.proactor
 
 from . import middleware
 
-#
 
 L = logging.getLogger(__name__)
-
-
-#
 
 
 class SeaCatAuthApplication(asab.Application):
@@ -36,9 +26,17 @@ class SeaCatAuthApplication(asab.Application):
 		self._prepare_public_urls()
 
 		# Load modules
+		import asab.web
+		import asab.web.rest
 		self.add_module(asab.web.Module)
+
+		import asab.proactor
 		self.add_module(asab.proactor.Module)
+
+		import asab.storage
 		self.add_module(asab.storage.Module)
+
+		import asab.metrics
 		self.add_module(asab.metrics.Module)
 
 		# Locate web service
@@ -58,17 +56,17 @@ class SeaCatAuthApplication(asab.Application):
 		self.add_module(asab.metrics.Module)
 
 		# Api service
-		from asab.api import ApiService
-		self.ApiService = ApiService(self)
+		import asab.api
+		self.ApiService = asab.api.ApiService(self)
 		self.ApiService.initialize_web(self.WebContainer)
 
 		if "sentry" in asab.Config:
-			from asab.sentry import SentryService
-			self.SentryService = SentryService(self)
+			import asab.sentry
+			self.SentryService = asab.sentry.SentryService(self)
 
 		if "zookeeper" in asab.Config:
-			from asab.zookeeper import Module
-			self.add_module(Module)
+			import asab.zookeeper
+			self.add_module(asab.zookeeper.Module)
 			self.ApiService.initialize_zookeeper()
 
 		from .last_activity import LastActivityService

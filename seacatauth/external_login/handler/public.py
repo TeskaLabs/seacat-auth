@@ -1,6 +1,5 @@
 import logging
 import typing
-
 import aiohttp.web
 import asab
 import asab.web.rest
@@ -17,11 +16,8 @@ from ..exceptions import (
 	PairingExternalAccountError,
 )
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginPublicHandler(object):

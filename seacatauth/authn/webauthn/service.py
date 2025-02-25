@@ -4,7 +4,6 @@ import json
 import logging
 import secrets
 import urllib.parse
-
 import aiohttp
 import asab.storage
 import jwcrypto.jwt
@@ -18,11 +17,8 @@ import cryptography.x509
 from ... import exceptions
 from ...events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 asab.Config.add_defaults({

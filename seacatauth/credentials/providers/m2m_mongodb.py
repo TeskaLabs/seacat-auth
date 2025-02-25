@@ -1,19 +1,14 @@
 import logging
-from typing import Optional
-
+import typing
 import asab.storage.exceptions
-
 import pymongo
 
 from .mongodb import MongoDBCredentialsProvider
 from ... import generic
 from ...events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class M2MMongoDBCredentialsService(asab.Service):
@@ -69,7 +64,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		except Exception as e:
 			L.warning("{}; fix it and restart the app".format(e))
 
-	async def create(self, credentials: dict) -> Optional[str]:
+	async def create(self, credentials: dict) -> typing.Optional[str]:
 		value = credentials.get("username")
 		if value is not None and len(value) > 0:
 			obj_id = self._create_credential_id(value)

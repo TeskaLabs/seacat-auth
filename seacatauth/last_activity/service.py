@@ -1,15 +1,12 @@
 import datetime
 import logging
-
 import asab.storage.exceptions
 
 from .codes import EventCode
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 asab.Config.add_defaults({
 	"seacatauth:audit": {

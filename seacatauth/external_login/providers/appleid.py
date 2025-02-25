@@ -2,16 +2,11 @@ import json
 import logging
 import typing
 import urllib.parse
-
-from typing import Optional
 from .generic import GenericOAuth2Login
 from ..exceptions import ExternalOAuthFlowError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class AppleIDOAuth2Login(GenericOAuth2Login):
@@ -97,7 +92,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 
 		return user_info
 
-	def _parse_user_data(self, user_json: Optional[str]) -> Optional[dict]:
+	def _parse_user_data(self, user_json: typing.Optional[str]) -> typing.Optional[dict]:
 		"""
 		The 'user' data is only available in the request after the first successful authorization with
 		Apple identity provider. Any subsequent authorizations will not have this property. To get it again, the user

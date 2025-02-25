@@ -4,11 +4,8 @@ import asab
 
 from .login_factors import LoginFactorABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class LoginDescriptor:

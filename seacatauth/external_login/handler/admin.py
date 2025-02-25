@@ -1,5 +1,4 @@
 import logging
-
 import asab
 import asab.web.rest
 
@@ -7,11 +6,8 @@ from ..service import ExternalLoginService
 from ...decorators import access_control
 from ..exceptions import ExternalAccountNotFoundError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginAdminHandler(object):

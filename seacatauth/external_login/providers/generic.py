@@ -4,7 +4,6 @@ import typing
 import urllib.parse
 import logging
 import contextlib
-
 import asab
 import aiohttp
 import aiohttp.web
@@ -14,11 +13,8 @@ import jwcrypto.jws
 
 from ..exceptions import ExternalOAuthFlowError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class GenericOAuth2Login(asab.Configurable):

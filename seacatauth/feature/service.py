@@ -1,12 +1,8 @@
 import logging
-
 import asab
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class FeatureService(asab.Service):

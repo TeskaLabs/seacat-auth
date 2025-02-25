@@ -1,6 +1,5 @@
 import logging
 import re
-
 import aiohttp.web
 import asab
 import asab.web.rest
@@ -9,11 +8,8 @@ import asab.exceptions
 from ... import exceptions
 from ...decorators import access_control
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ResourceHandler(object):

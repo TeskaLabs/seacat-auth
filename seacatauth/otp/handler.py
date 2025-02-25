@@ -1,16 +1,12 @@
 import logging
-
 import asab.web
 import asab.web.rest
 
 from ..decorators import access_control
 from .. import exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class OTPHandler(object):

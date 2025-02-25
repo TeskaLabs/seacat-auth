@@ -1,6 +1,5 @@
 import logging
 import typing
-
 import jwcrypto.jwt
 import jwcrypto.jws
 import jwcrypto.jwk
@@ -13,6 +12,7 @@ import asab.metrics
 from ..models import Session
 from .. import exceptions
 from ..authz import build_credentials_authz
+
 
 L = logging.getLogger(__name__)
 
