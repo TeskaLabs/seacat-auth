@@ -1,7 +1,7 @@
 import logging
 import functools
 import os
-from typing import Optional
+import typing
 
 import asab
 from .abc import CredentialsProviderABC
@@ -73,7 +73,7 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		}]
 
 
-	async def get(self, credentials_id, include=None) -> Optional[dict]:
+	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
 		if not credentials_id.startswith(prefix):
 			raise KeyError("Credentials '{}' not found".format(credentials_id))

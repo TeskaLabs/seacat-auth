@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+import typing
 
 import asab
 import aiomysql
@@ -70,7 +70,7 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 			self.DataFields = None
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> Optional[str]:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> typing.Optional[str]:
 		kwargs = {"ident": ident}
 		if login_dict is not None:
 			kwargs.update(login_dict)
@@ -83,11 +83,11 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 		return "{}{}".format(self.Prefix, result[self.IdField])
 
 
-	async def get_by(self, key: str, value) -> Optional[dict]:
+	async def get_by(self, key: str, value) -> typing.Optional[dict]:
 		raise NotImplementedError()
 
 
-	async def get(self, credentials_id, include=None) -> Optional[dict]:
+	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
 		mysql_id = credentials_id[len(self.Prefix):]
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
@@ -238,11 +238,11 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 		assert self.DeleteQuery, "MySQL credentials: 'delete' query must be specified"
 
 
-	async def get_by(self, key: str, value) -> Optional[dict]:
+	async def get_by(self, key: str, value) -> typing.Optional[dict]:
 		raise NotImplementedError()
 
 
-	async def create(self, credentials: dict) -> Optional[str]:
+	async def create(self, credentials: dict) -> typing.Optional[str]:
 		# Set unspecified parameters to None
 		for param in re.findall(r"[^%]%\((.+?)\)", self.CreateQuery) or []:
 			if param not in credentials:
@@ -266,7 +266,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 		return credentials_id
 
 
-	async def update(self, credentials_id, update: dict) -> Optional[str]:
+	async def update(self, credentials_id, update: dict) -> typing.Optional[str]:
 		mysql_id = credentials_id[len(self.Prefix):]
 		updated_fields = list(update.keys())
 
@@ -311,7 +311,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 		})
 
 
-	async def delete(self, credentials_id) -> Optional[str]:
+	async def delete(self, credentials_id) -> typing.Optional[str]:
 		mysql_id = credentials_id[len(self.Prefix):]
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:

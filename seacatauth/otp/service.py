@@ -1,21 +1,16 @@
-import datetime
-
-import pyotp
+import typing
 import logging
+import datetime
+import pyotp
 import urllib.parse
-
 import asab
 import asab.storage
 
-from typing import Optional
 from .. import exceptions
 from ..events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class OTPService(asab.Service):
@@ -146,13 +141,13 @@ class OTPService(asab.Service):
 		"""
 		data: dict = await self.StorageService.get(collection=self.PreparedTOTPCollection, obj_id=session_id, decrypt=["__s"])
 		secret: bytes = data["__s"]
-		expiration_time: Optional[datetime.datetime] = data["exp"]
+		expiration_time: typing.Optional[datetime.datetime] = data["exp"]
 		if expiration_time is None or expiration_time < datetime.datetime.now(datetime.timezone.utc):
 			raise KeyError("TOTP secret timed out")
 
 		return secret.decode("ascii")
 
-	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> Optional[str]:
+	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> typing.Optional[str]:
 		"""
 		Get TOTP secret from `TOTPCollection` by `credentials_id`.
 		Backwards compatibility: if not found, get TOTP from `CredentialsService`.
@@ -195,14 +190,14 @@ class OTPService(asab.Service):
 		"""
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also PreparedTOTPCollection.)
 		"""
-		secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
+		secret: typing.Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
 		if secret is not None and len(secret) > 0:
 			return True
 		return False
 
 
 	async def verify_request_totp(self, credentials_id, request_data: dict) -> bool:
-		totp_secret: Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
+		totp_secret: typing.Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
 
 		try:
 			totp_object: pyotp.TOTP = pyotp.TOTP(totp_secret)
