@@ -8,7 +8,7 @@ import asab.storage.exceptions
 
 from ..client.service import CLIENT_TEMPLATES
 from ..generic import SessionContext
-from ..session.adapter import build_system_session
+from ..models import build_system_session
 
 #
 

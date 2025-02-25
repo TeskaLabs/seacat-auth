@@ -11,7 +11,7 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, generic, exceptions
-from ..session import SessionAdapter
+from ..models import Session
 
 #
 
@@ -239,7 +239,7 @@ class CredentialsService(asab.Service):
 				return False
 
 
-	async def list(self, session: SessionAdapter, search_params: generic.SearchParams, try_global_search: bool = False):
+	async def list(self, session: Session, search_params: generic.SearchParams, try_global_search: bool = False):
 		"""
 		List credentials that are members of currently authorized tenants.
 		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
@@ -346,7 +346,7 @@ class CredentialsService(asab.Service):
 		self.register_provider(provider)
 
 
-	async def create_credentials(self, provider_id: str, credentials_data: dict, session: SessionAdapter = None):
+	async def create_credentials(self, provider_id: str, credentials_data: dict, session: Session = None):
 		# Record the requester's ID for logging purposes
 		agent_cid = session.Credentials.Id if session is not None else None
 
@@ -409,7 +409,7 @@ class CredentialsService(asab.Service):
 
 
 	# TODO: Implement editing for M2M credentials
-	async def update_credentials(self, credentials_id: str, update_dict: dict, session: SessionAdapter = None):
+	async def update_credentials(self, credentials_id: str, update_dict: dict, session: Session = None):
 		"""
 		Validate the input data in the update dict according to active policies
 		and update credentials in the respective provider.
@@ -649,7 +649,7 @@ class CredentialsService(asab.Service):
 
 
 def _authorize_searched_tenants(
-	session: SessionAdapter,
+	session: Session,
 	search_params: generic.SearchParams,
 	try_global_search: bool = False
 ) -> typing.Optional[typing.Iterable[str]]:
@@ -685,7 +685,7 @@ def _authorize_searched_tenants(
 
 
 def _authorize_searched_roles(
-	session: SessionAdapter,
+	session: Session,
 	search_params: generic.SearchParams
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
