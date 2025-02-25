@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha6
 - v25.05-alpha5
 - v25.05-alpha4
 - v25.05-alpha3
@@ -18,6 +19,7 @@
 - Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
 
 ### Refactoring
+- Rename SessionAdapter to Session and move to seacatauth.models (#443, v25.05-alpha6)
 - Refactor communication module, merge message builders into communication providers (#442, v25.05-alpha5)
 - Remove session adapter's dependency on session service (#441, v25.05-alpha4)
 
