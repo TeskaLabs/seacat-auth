@@ -22,11 +22,9 @@ from ..session import (
 
 from ..events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 LOGIN_DESCRIPTOR_FALLBACK = [
 	{

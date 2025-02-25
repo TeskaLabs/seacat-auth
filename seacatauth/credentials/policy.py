@@ -6,11 +6,8 @@ import fastjsonschema
 
 from .schemas import USERNAME_PATTERN
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CredentialsPolicy:

@@ -8,11 +8,8 @@ import asab.exceptions
 
 from ... import AuditLogger
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RegistrationService(asab.Service):

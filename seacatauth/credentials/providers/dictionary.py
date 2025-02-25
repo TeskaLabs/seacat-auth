@@ -8,12 +8,8 @@ import asab
 from .abc import EditableCredentialsProviderABC
 from ... import generic
 
-#
 
 L = logging.getLogger(__name__)
-
-
-#
 
 
 class DictCredentialsService(asab.Service):

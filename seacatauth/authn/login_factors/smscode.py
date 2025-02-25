@@ -3,11 +3,8 @@ import logging
 from .abc import LoginFactorABC
 from ...generic import generate_ergonomic_token
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class SMSCodeFactor(LoginFactorABC):

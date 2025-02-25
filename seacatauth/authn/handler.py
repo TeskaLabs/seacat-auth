@@ -15,11 +15,8 @@ from ..last_activity import EventCode
 from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 JWK_PARAMS = {

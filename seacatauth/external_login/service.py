@@ -20,11 +20,7 @@ from .exceptions import (
 )
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginService(asab.Service):

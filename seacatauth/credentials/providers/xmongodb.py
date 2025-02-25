@@ -12,11 +12,8 @@ import bson.json_util
 
 from .abc import CredentialsProviderABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class XMongoDBCredentialsService(asab.Service):

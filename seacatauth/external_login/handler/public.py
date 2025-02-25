@@ -17,11 +17,8 @@ from ..exceptions import (
 	PairingExternalAccountError,
 )
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginPublicHandler(object):

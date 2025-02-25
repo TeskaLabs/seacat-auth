@@ -5,11 +5,8 @@ import datetime
 from ..models import Session
 from ..authz import build_credentials_authz
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 async def credentials_session_builder(credentials_service, credentials_id, scope=None):

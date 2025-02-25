@@ -15,11 +15,8 @@ from ..utils import TokenRequestErrorResponseCode
 from ... import exceptions, AuditLogger
 from ... import generic
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class TokenHandler(object):

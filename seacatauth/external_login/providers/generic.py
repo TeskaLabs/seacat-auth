@@ -14,11 +14,8 @@ import jwcrypto.jws
 
 from ..exceptions import ExternalOAuthFlowError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class GenericOAuth2Login(asab.Configurable):

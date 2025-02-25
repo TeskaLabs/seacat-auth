@@ -10,11 +10,8 @@ import pymongo
 
 from ..events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class SessionTokenField:

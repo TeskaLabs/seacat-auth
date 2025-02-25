@@ -7,11 +7,8 @@ import asab.exceptions
 
 from .. import exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class TenantService(asab.Service):

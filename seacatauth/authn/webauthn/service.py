@@ -18,11 +18,8 @@ import cryptography.x509
 from ... import exceptions
 from ...events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 asab.Config.add_defaults({

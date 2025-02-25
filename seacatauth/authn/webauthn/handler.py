@@ -8,11 +8,8 @@ import asab.web.rest
 from ... import exceptions
 from ...decorators import access_control
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class WebAuthnHandler(object):

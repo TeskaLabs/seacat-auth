@@ -10,11 +10,8 @@ from .... import exceptions
 from ....decorators import access_control
 from .... import generic
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class RoleHandler(object):

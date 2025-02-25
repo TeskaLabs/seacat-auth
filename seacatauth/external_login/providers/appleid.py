@@ -7,11 +7,8 @@ import typing
 from .generic import GenericOAuth2Login
 from ..exceptions import ExternalOAuthFlowError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class AppleIDOAuth2Login(GenericOAuth2Login):

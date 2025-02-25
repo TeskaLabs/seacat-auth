@@ -4,11 +4,8 @@ import re
 import logging
 import asab.exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CodeChallengeFailedError(Exception):

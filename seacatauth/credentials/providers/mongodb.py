@@ -18,11 +18,8 @@ from .abc import EditableCredentialsProviderABC
 from ... import generic
 from ...events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class MongoDBCredentialsService(asab.Service):

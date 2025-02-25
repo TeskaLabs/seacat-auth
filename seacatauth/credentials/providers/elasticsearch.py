@@ -5,11 +5,8 @@ import aiohttp
 import asab
 from .abc import CredentialsProviderABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ElasticSearchCredentialsService(asab.Service):

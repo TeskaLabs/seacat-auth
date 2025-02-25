@@ -7,11 +7,9 @@ import asab.config
 
 from ..authz import build_credentials_authz
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 # TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
 

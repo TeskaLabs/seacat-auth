@@ -7,11 +7,8 @@ import bson
 from ..decorators import access_control
 from ..models import Session
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class SessionHandler(object):

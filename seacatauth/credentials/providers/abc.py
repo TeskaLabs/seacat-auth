@@ -6,11 +6,8 @@ import asab
 
 from ... import generic
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class CredentialsProviderABC(asab.Configurable, abc.ABC):

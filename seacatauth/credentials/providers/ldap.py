@@ -17,11 +17,8 @@ import asab.config
 
 from .abc import CredentialsProviderABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 _TLS_VERSION = {

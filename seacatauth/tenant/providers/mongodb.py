@@ -8,11 +8,8 @@ from .abc import EditableTenantsProviderABC
 
 from ...events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class MongoDBTenantProvider(EditableTenantsProviderABC):

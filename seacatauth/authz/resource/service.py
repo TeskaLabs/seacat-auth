@@ -8,11 +8,8 @@ import asab.exceptions
 from ...events import EventTypes
 from ... import exceptions
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class ResourceService(asab.Service):
