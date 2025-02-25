@@ -1,5 +1,4 @@
 import logging
-
 import asab.web
 import asab.web.rest
 

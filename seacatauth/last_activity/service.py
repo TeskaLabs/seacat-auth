@@ -1,6 +1,5 @@
 import datetime
 import logging
-
 import asab.storage.exceptions
 
 from .codes import EventCode

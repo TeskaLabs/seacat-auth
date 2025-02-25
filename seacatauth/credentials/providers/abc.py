@@ -1,7 +1,6 @@
 import abc
 import logging
 import typing
-
 import asab
 
 from ... import generic

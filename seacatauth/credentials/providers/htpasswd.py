@@ -2,7 +2,6 @@ import logging
 import functools
 import os
 import typing
-
 import asab
 from .abc import CredentialsProviderABC
 

@@ -2,8 +2,6 @@ import json
 import logging
 import typing
 import urllib.parse
-
-import typing
 from .generic import GenericOAuth2Login
 from ..exceptions import ExternalOAuthFlowError
 

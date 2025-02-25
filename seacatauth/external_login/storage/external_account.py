@@ -1,6 +1,5 @@
 import pymongo
 import logging
-
 import asab
 import asab.web.rest
 import asab.exceptions

@@ -4,13 +4,10 @@ import datetime
 import contextlib
 import typing
 
-import typing
-
 
 import ldap
 import ldap.resiter
 import ldap.filter
-
 import asab
 import asab.proactor
 import asab.config

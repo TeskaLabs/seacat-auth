@@ -1,12 +1,9 @@
 import datetime
 import logging
-
 import asab
 import asab.web.rest
 import asab.exceptions
-
 import aiohttp.web
-
 import urllib.parse
 import jwcrypto.jwk
 
