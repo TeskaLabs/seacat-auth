@@ -21,7 +21,6 @@ class OTPHandler(object):
 	def __init__(self, app, otp_svc):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.OTPService = otp_svc
-		web_app_public = app.PublicWebContainer.WebApp
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/account/totp", self.prepare_totp_if_not_active)

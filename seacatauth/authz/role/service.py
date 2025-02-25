@@ -193,11 +193,11 @@ class RoleService(asab.Service):
 				continue
 
 			async for role in view.iterate(
-					offset=offset,
-					limit=(limit - len(roles)) if limit else None,
-					sort=("_id", 1),
-					name_filter=name_filter,
-					resource_filter=resource_filter,
+				offset=offset,
+				limit=(limit - len(roles)) if limit else None,
+				sort=("_id", 1),
+				name_filter=name_filter,
+				resource_filter=resource_filter,
 			):
 				roles.append(role)
 
