@@ -2,11 +2,12 @@ import logging
 import asyncio
 import asab
 import asab.web.rest
-import asab.web.webcrypto
+import asab.web.auth
+import asab.web.tenant
 
 from ... import exceptions, generic, AuditLogger
+from ...const import ResourceId
 from ...last_activity import EventCode
-from ...decorators import access_control
 
 
 L = logging.getLogger(__name__)
@@ -38,13 +39,9 @@ class ChangePasswordHandler(object):
 		web_app_public.router.add_put("/public/password-reset", self.reset_password)
 		web_app_public.router.add_put("/public/lost-password", self.lost_password)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_put("/public/password-change", self.change_password)
-		web_app_public.router.add_put("/public/password-change", self.change_password)
-		# <<<
 
-
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def password_policy(self, request):
 		"""
 		Get minimum password requirements
@@ -64,7 +61,7 @@ class ChangePasswordHandler(object):
 			"newpassword": {"type": "string"},
 		}
 	})
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def change_password(self, request, *, json_data):
 		"""
 		Set a new password (with current password authentication)
@@ -145,6 +142,8 @@ class ChangePasswordHandler(object):
 			},
 		}
 	})
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def reset_password(self, request, *, json_data):
 		"""
 		Set a new password (with password token authentication)
@@ -217,7 +216,8 @@ class ChangePasswordHandler(object):
 			"expiration": {"type": "number"},
 		}
 	})
-	@access_control("seacat:credentials:edit")
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
@@ -267,6 +267,8 @@ class ChangePasswordHandler(object):
 			"ident": {"type": "string"},
 		}
 	})
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def lost_password(self, request, *, json_data):
 		"""
 		Request a password reset link

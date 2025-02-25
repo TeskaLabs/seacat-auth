@@ -41,7 +41,7 @@ class OTPService(asab.Service):
 		Delete active TOTP secret for requested credentials.
 		"""
 		if not await self.has_activated_totp(credentials_id):
-			L.log(asab.LOG_NOTICE, "Cannot deactivate TOTP because it is already active.", struct_data={
+			L.log(asab.LOG_NOTICE, "Cannot deactivate TOTP because it is not active.", struct_data={
 				"cid": credentials_id})
 			raise exceptions.TOTPDeactivationError("TOTP is not active.", credentials_id)
 		try:

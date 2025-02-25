@@ -6,6 +6,8 @@ import jwcrypto.jwt
 import json
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.web.rest.json
 import asab.exceptions
 
@@ -47,6 +49,8 @@ class TokenHandler(object):
 		web_app_public.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def token_request(self, request):
 		"""
 		OAuth 2.0 Token Request
@@ -359,6 +363,8 @@ class TokenHandler(object):
 			"token_type_hint": {"type": "string"},
 		}
 	})
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def token_revoke(self, request, *, json_data):
 		"""
 		OAuth 2.0 Token revocation
@@ -389,6 +395,9 @@ class TokenHandler(object):
 		}, status=400)
 
 
+	# TODO: Remove. This is basically token introspection.
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def validate_id_token(self, request):
 		"""
 		Check the validity of a JWToken

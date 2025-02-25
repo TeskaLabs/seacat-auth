@@ -3,9 +3,10 @@ import typing
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
-from ...decorators import access_control
 from ..service import ExternalLoginService
 from ... import exceptions, generic, AuditLogger
 from ..utils import AuthOperation
@@ -47,7 +48,7 @@ class ExternalLoginPublicHandler(object):
 		web_app_public.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def pair_external_account(self, request):
 		"""
 		Initialize pairing an external account with the current user's credentials.
@@ -69,6 +70,8 @@ class ExternalLoginPublicHandler(object):
 		return aiohttp.web.HTTPFound(authorization_url)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def login_with_external_account(self, request):
 		"""
 		Initialize login with external account.
@@ -92,6 +95,8 @@ class ExternalLoginPublicHandler(object):
 		return aiohttp.web.HTTPFound(authorization_url)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def sign_up_with_external_account(self, request):
 		"""
 		Initialize sign up with external account.
@@ -116,6 +121,8 @@ class ExternalLoginPublicHandler(object):
 		return aiohttp.web.HTTPFound(authorization_url)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def external_auth_callback(self, request):
 		"""
 		Finalize external account login, sign-up or pairing.
