@@ -1,6 +1,6 @@
 import abc
 import logging
-from typing import Optional
+import typing
 
 import asab
 
@@ -51,7 +51,7 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 		"""
 		return None
 
-	async def get_by(self, key: str, value) -> Optional[dict]:
+	async def get_by(self, key: str, value) -> typing.Optional[dict]:
 		"""
 		Get credentials by an indexed key
 		"""
@@ -65,7 +65,7 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 
 	@abc.abstractmethod
-	async def get(self, credentials_id, include=None) -> Optional[dict]:
+	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
 		raise NotImplementedError('in {}'.format(self.Type))
 
 
@@ -113,13 +113,13 @@ class EditableCredentialsProviderABC(CredentialsProviderABC):
 	RegistrationEnabled = False
 
 	@abc.abstractmethod
-	async def create(self, credentials: dict) -> Optional[str]:
+	async def create(self, credentials: dict) -> typing.Optional[str]:
 		pass
 
 	@abc.abstractmethod
-	async def update(self, credentials_id, credentials: dict) -> Optional[str]:
+	async def update(self, credentials_id, credentials: dict) -> typing.Optional[str]:
 		pass
 
 	@abc.abstractmethod
-	async def delete(self, credentials_id) -> Optional[str]:
+	async def delete(self, credentials_id) -> typing.Optional[str]:
 		pass

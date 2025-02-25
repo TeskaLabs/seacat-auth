@@ -2,7 +2,7 @@ import datetime
 import functools
 import hashlib
 import logging
-from typing import Optional
+import typing
 
 import asab
 from .abc import EditableCredentialsProviderABC
@@ -53,7 +53,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 	# 	]
 	# 	return info
 
-	async def create(self, credentials: dict) -> Optional[str]:
+	async def create(self, credentials: dict) -> typing.Optional[str]:
 		username = credentials.get("username") or credentials.get("email") or credentials.get("phone")
 		if username is None:
 			raise ValueError("Cannot determine user name")
@@ -80,7 +80,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		self.Dictionary[credentials_id] = credentials_object
 		return "{}:{}:{}".format(self.Type, self.ProviderID, credentials_id)
 
-	async def update(self, credentials_id, update: dict) -> Optional[str]:
+	async def update(self, credentials_id, update: dict) -> typing.Optional[str]:
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
 		if not credentials_id.startswith(prefix):
 			raise KeyError("Credentials '{}' not found".format(credentials_id))
@@ -101,7 +101,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		credentials["_m"] = datetime.datetime.now(datetime.timezone.utc)
 
 
-	async def delete(self, credentials_id) -> Optional[str]:
+	async def delete(self, credentials_id) -> typing.Optional[str]:
 		prefix = "{}:{}:".format(self.Type, self.ProviderID)
 		self.Dictionary.pop(credentials_id[len(prefix):])
 		return "OK"

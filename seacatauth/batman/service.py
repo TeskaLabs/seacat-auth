@@ -1,15 +1,11 @@
-import base64
 import logging
-
-from cryptography.hazmat.primitives import hashes
+import base64
+import cryptography.hazmat.primitives.hashes
 import cryptography.hazmat.backends
 import asab
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class BatmanService(asab.Service):
@@ -55,7 +51,10 @@ class BatmanService(asab.Service):
 		"""
 		Generate a basic auth password using credentials ID and configured batman key.
 		"""
-		digest = hashes.Hash(hashes.SHA256(), cryptography.hazmat.backends.default_backend())
+		digest = cryptography.hazmat.primitives.hashes.Hash(
+			cryptography.hazmat.primitives.hashes.SHA256(),
+			cryptography.hazmat.backends.default_backend()
+		)
 		digest.update(credentials_id.encode("utf-8"))
 		digest.update(self.Key)
 		return base64.b85encode(digest.finalize()).decode("ascii")

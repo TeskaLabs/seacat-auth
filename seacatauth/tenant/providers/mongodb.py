@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+import typing
 
 import asab.storage.mongodb
 import asab.storage.exceptions
@@ -90,7 +90,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		description: str = None,
 		data: dict = None,
 		creator_id: str = None
-	) -> Optional[str]:
+	) -> typing.Optional[str]:
 		u = self.MongoDBStorageService.upsertor(self.TenantsCollection, obj_id=tenant_id, version=0)
 		if label is not None:
 			u.set("label", label)
@@ -110,7 +110,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		label: str = None,
 		description: str = None,
 		data: dict = None
-	) -> Optional[str]:
+	) -> typing.Optional[str]:
 		tenant = await self.get(tenant_id)
 		u = self.MongoDBStorageService.upsertor(
 			self.TenantsCollection,
@@ -129,7 +129,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		return "OK"
 
 
-	async def delete(self, tenant_id: str) -> Optional[bool]:
+	async def delete(self, tenant_id: str) -> typing.Optional[bool]:
 		"""
 		Delete tenant
 		"""
@@ -137,7 +137,7 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		L.log(asab.LOG_NOTICE, "Tenant deleted.", struct_data={"tenant": tenant_id})
 
 
-	async def get(self, tenant_id) -> Optional[dict]:
+	async def get(self, tenant_id) -> typing.Optional[dict]:
 		"""
 		Get tenant
 		"""

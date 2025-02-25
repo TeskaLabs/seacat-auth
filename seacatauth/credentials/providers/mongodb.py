@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import re
-from typing import Optional
+import typing
 
 import asab
 import asab.storage.mongodb
@@ -127,7 +127,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			L.warning("{}; fix it and restart the app".format(e))
 
 
-	async def create(self, credentials: dict) -> Optional[str]:
+	async def create(self, credentials: dict) -> typing.Optional[str]:
 		for attribute in ("username", "email", "phone"):
 			value = credentials.get(attribute)
 			if value is not None and len(value) > 0:
@@ -151,7 +151,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return "{}{}".format(self.Prefix, credentials_id)
 
 
-	async def update(self, credentials_id, update: dict) -> Optional[str]:
+	async def update(self, credentials_id, update: dict) -> typing.Optional[str]:
 		if not credentials_id.startswith(self.Prefix):
 			raise KeyError("Credentials '{}' not found".format(credentials_id))
 
@@ -198,7 +198,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 				raise asab.exceptions.Conflict()
 
 
-	async def delete(self, credentials_id) -> Optional[str]:
+	async def delete(self, credentials_id) -> typing.Optional[str]:
 		# TODO: Soft-delete by change of the `_id`
 		await self.MongoDBStorageService.delete(
 			self.CredentialsCollection,
@@ -207,7 +207,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return "OK"
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> Optional[str]:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> typing.Optional[str]:
 		"""
 		Locate credentials by matching ident string against configured ident fields.
 		"""
@@ -230,7 +230,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 		return "{}{}".format(self.Prefix, obj["_id"])
 
-	async def get_by(self, key: str, value, include=None) -> Optional[dict]:
+	async def get_by(self, key: str, value, include=None) -> typing.Optional[dict]:
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
 		obj = await coll.find_one({key: value})
 		if obj is None:
@@ -238,7 +238,7 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		return self._normalize_credentials(obj, include)
 
 
-	async def get(self, credentials_id, include=None) -> Optional[dict]:
+	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
 		if not credentials_id.startswith(self.Prefix):
 			raise KeyError("Credentials '{}' not found".format(credentials_id))
 

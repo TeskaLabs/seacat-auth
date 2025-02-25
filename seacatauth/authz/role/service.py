@@ -1,8 +1,6 @@
 import logging
 import re
 import typing
-from typing import Optional
-
 import asab.storage.exceptions
 import asab.exceptions
 
@@ -12,11 +10,9 @@ from ... import exceptions
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 SuperuserRoleId = "*/superuser"
 SuperuserRoleProperties = {
@@ -164,7 +160,7 @@ class RoleService(asab.Service):
 
 	async def list(
 		self,
-		tenant_id: Optional[str] = None,
+		tenant_id: typing.Optional[str] = None,
 		page: int = 0,
 		limit: int = None,
 		name_filter: str = None,

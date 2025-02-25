@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Optional
+import typing
 
 import asab
 import bson
@@ -84,7 +84,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		return bson.json_util.loads(bound_query)
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> Optional[str]:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> typing.Optional[str]:
 		kwargs = {"ident": ident}
 		if login_dict is not None:
 			kwargs.update(login_dict)
@@ -99,11 +99,11 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		return "{}{}".format(self.Prefix, result[self.IdField])
 
 
-	async def get_by(self, key: str, value) -> Optional[dict]:
+	async def get_by(self, key: str, value) -> typing.Optional[dict]:
 		raise NotImplementedError()
 
 
-	async def get(self, credentials_id, include=None) -> Optional[dict]:
+	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
 		mongodb_id = credentials_id[len(self.Prefix):]
 		query = self._prepare_query(self.GetQuery, {self.IdField: mongodb_id})
 		cursor = self.Collection.aggregate(query)
