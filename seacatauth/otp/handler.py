@@ -3,6 +3,7 @@ import asab.web
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
+import asab.contextvars
 
 from .. import exceptions
 
@@ -29,19 +30,20 @@ class OTPHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	async def prepare_totp_if_not_active(self, request, *, credentials_id):
+	async def prepare_totp_if_not_active(self, request):
 		"""
 		Return the status of TOTP setting
 
 		If not activated, generate and return a new TOTP secret.
 		"""
-		if await self.OTPService.has_activated_totp(credentials_id):
+		authz = asab.contextvars.Authz.get()
+		if await self.OTPService.has_activated_totp(authz.CredentialsId):
 			response: dict = {
 				"result": "OK",
 				"active": True
 			}
 		else:
-			response: dict = await self.OTPService.prepare_totp(request.Session, credentials_id)
+			response: dict = await self.OTPService.prepare_totp(authz.Session, authz.CredentialsId)
 			response.update({
 				"result": "OK",
 				"active": False
@@ -57,29 +59,31 @@ class OTPHandler(object):
 		}
 	})
 	@asab.web.tenant.allow_no_tenant
-	async def activate_totp(self, request, *, credentials_id, json_data):
+	async def activate_totp(self, request, *, json_data):
 		"""
 		Activate TOTP for the current user
 
 		This requires that a TOTP secret is already prepared for the user.
 		"""
+		authz = asab.contextvars.Authz.get()
 		otp = json_data.get("otp")
 		try:
-			await self.OTPService.activate_prepared_totp(request.Session, credentials_id, otp)
+			await self.OTPService.activate_prepared_totp(authz.Session, authz.CredentialsId, otp)
 		except exceptions.TOTPActivationError:
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@asab.web.tenant.allow_no_tenant
-	async def deactivate_totp(self, request, *, credentials_id):
+	async def deactivate_totp(self, request):
 		"""
 		Deactivate TOTP for the current user
 
 		The user's TOTP secret is deleted.
 		"""
+		authz = asab.contextvars.Authz.get()
 		try:
-			await self.OTPService.deactivate_totp(credentials_id)
+			await self.OTPService.deactivate_totp(authz.CredentialsId)
 		except exceptions.TOTPDeactivationError:
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
 
