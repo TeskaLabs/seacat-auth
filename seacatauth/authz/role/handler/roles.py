@@ -6,6 +6,7 @@ import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
+from . import schema
 from ....const import ResourceId
 
 
@@ -48,6 +49,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get_credentials_global_roles(self, request):
 		"""
 		Get credentials' global roles
@@ -57,11 +59,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"description": "Credential IDs",
-		"items": {"type": "string"}
-	})
+	@asab.web.rest.json_schema_handler(schema.BATCH_GET_CREDENTIALS_ROLES)
 	@asab.web.tenant.allow_no_tenant
 	async def batch_get_credentials_roles(self, request, *, json_data):
 		"""
@@ -75,11 +73,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"description": "Credential IDs",
-		"items": {"type": "string"}
-	})
+	@asab.web.rest.json_schema_handler(schema.BATCH_GET_CREDENTIALS_ROLES)
 	@asab.web.tenant.allow_no_tenant
 	async def batch_get_credentials_global_roles(self, request, *, json_data):
 		"""
@@ -92,13 +86,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"properties": {
-			"roles": {
-				"type": "array",
-				"items": {"type": "string"}}}
-	})
+	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
 	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def set_credentials_roles(self, request, *, json_data):
 		"""
@@ -129,14 +117,9 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"properties": {
-			"roles": {
-				"type": "array",
-				"items": {"type": "string"}}}
-	})
+	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
 	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
 	async def set_credentials_global_roles(self, request, *, json_data):
 		"""
 		Set credentials' global roles
@@ -162,6 +145,7 @@ class RolesHandler(object):
 
 
 	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
 	async def assign_credentials_global_role(self, request):
 		"""
 		Assign global role to credentials
@@ -188,6 +172,7 @@ class RolesHandler(object):
 
 
 	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
 	async def unassign_credentials_global_role(self, request):
 		"""
 		Unassign global role from credentials

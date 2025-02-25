@@ -1,5 +1,4 @@
 import logging
-import aiohttp.web
 import asab
 import asab.contextvars
 import asab.web.rest
@@ -11,6 +10,7 @@ import asab.exceptions
 from .... import exceptions
 from .... import generic
 from ....const import ResourceId
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -28,17 +28,21 @@ class RoleHandler(object):
 		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/role", self.list_all)
-		web_app.router.add_get("/role/{tenant}", self.list)
-		web_app.router.add_get("/role/{tenant}/{role_name}", self.get)
-		web_app.router.add_post("/role/{tenant}/{role_name}", self.create)
-		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete)
-		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
+		web_app.router.add_get("/role", self.list_all_roles)
+		web_app.router.add_get("/role/{tenant}", self.list_roles)
+		web_app.router.add_get("/role/{tenant}/{role_name}", self.get_role)
+		web_app.router.add_get("/role/*/{role_name}", self.get_global_role)
+		web_app.router.add_post("/role/{tenant}/{role_name}", self.create_role)
+		web_app.router.add_post("/role/*/{role_name}", self.create_global_role)
+		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_role)
+		web_app.router.add_put("/role/*/{role_name}", self.update_global_role)
+		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete_role)
+		web_app.router.add_delete("/role/*/{role_name}", self.delete_global_role)
 
 
 	@asab.web.auth.require_superuser
 	@asab.web.tenant.allow_no_tenant
-	async def list_all(self, request):
+	async def list_all_roles(self, request):
 		"""
 		List roles from all tenants
 
@@ -63,7 +67,7 @@ class RoleHandler(object):
 		return await self._list(request, tenant_id=None)
 
 
-	async def list(self, request):
+	async def list_roles(self, request):
 		"""
 		List tenant roles
 
@@ -92,50 +96,31 @@ class RoleHandler(object):
 				enum:
 				- true
 		"""
-		return await self._list(request, tenant_id=request.match_info["tenant"])
-
-	async def _list(self, request, *, tenant_id):
-		search = generic.SearchParams(request.query)
-		result = await self.RoleService.list(
-			tenant_id=tenant_id,
-			page=search.Page,
-			limit=search.ItemsPerPage,
-			name_filter=search.SimpleFilter,
-			resource_filter=search.get("resource"),
-		)
-		return asab.web.rest.json_response(request, result)
+		tenant_id = asab.contextvars.Tenant.get()
+		return await self._list(request, tenant_id=tenant_id)
 
 
-	async def get(self, request):
+	async def get_role(self, request):
 		"""
 		Get role detail
 		"""
-		tenant_id = request.match_info["tenant"]
-		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant_id, role_name)
-		try:
-			result = await self.RoleService.get(role_id)
-		except KeyError:
-			L.log(asab.LOG_NOTICE, "Couldn't find role '{}'".format(role_id))
-			return aiohttp.web.HTTPNotFound()
-		return asab.web.rest.json_response(request, result)
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
+		return await self._get_role(request, role_id)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"label": {"type": "string"},
-			"description": {"type": "string"},
-			"propagated": {"type": "boolean"},
-			"resources": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-		}
-	})
+	@asab.web.tenant.allow_no_tenant
+	async def get_global_role(self, request):
+		"""
+		Get global role detail
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
+		return await self._get_role(request, role_id)
+
+
+	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
 	@asab.web.auth.require(ResourceId.ROLE_EDIT)
-	async def create(self, request, *, tenant, json_data):
+	async def create_role(self, request, *, json_data):
 		"""
 		Create a new role
 
@@ -149,8 +134,98 @@ class RoleHandler(object):
 			schema:
 				type: string
 		"""
-		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant, role_name)
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
+		return await self._create_role(request, role_id, json_data)
+
+
+	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
+	@asab.web.auth.require_superuser
+	async def create_global_role(self, request, *, json_data):
+		"""
+		Create a new global role
+
+		---
+		parameters:
+		-	name: copy
+			in: query
+			description:
+				Copy resources and description from a specified existing role.
+				Resources non-applicable for the new role will be excluded.
+			schema:
+				type: string
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
+		return await self._create_role(request, role_id, json_data)
+
+
+	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
+	@asab.web.auth.require(ResourceId.ROLE_EDIT)
+	async def update_role(self, request, *, json_data):
+		"""
+		Edit role description and resources
+		"""
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
+		return await self._update_role(request, role_id, json_data)
+
+
+	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def update_global_role(self, request, *, json_data):
+		"""
+		Edit global role description and resources
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
+		return await self._update_role(request, role_id, json_data)
+
+
+	@asab.web.auth.require(ResourceId.ROLE_EDIT)
+	async def delete_role(self, request):
+		"""
+		Delete role
+		"""
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
+		return await self._delete_role(request, role_id)
+
+
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def delete_global_role(self, request):
+		"""
+		Delete global role
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
+		return await self._delete_role(request, role_id)
+
+
+	async def _list(self, request, tenant_id):
+		search = generic.SearchParams(request.query)
+		result = await self.RoleService.list(
+			tenant_id=tenant_id,
+			page=search.Page,
+			limit=search.ItemsPerPage,
+			name_filter=search.SimpleFilter,
+			resource_filter=search.get("resource"),
+		)
+		return asab.web.rest.json_response(request, result)
+
+
+	async def _get_role(self, request, role_id):
+		try:
+			result = await self.RoleService.get(role_id)
+		except KeyError:
+			return asab.web.rest.json_response(
+				request,
+				{"result": "ERROR", "tech_err": "Role not found."},
+				status=404
+			)
+		return asab.web.rest.json_response(request, result)
+
+
+	async def _create_role(self, request, role_id, json_data):
 		try:
 			role_id = await self.RoleService.create(role_id, from_role=request.query.get("copy"), **json_data)
 		except exceptions.ResourceNotFoundError as e:
@@ -171,14 +246,25 @@ class RoleHandler(object):
 		})
 
 
-	@asab.web.auth.require(ResourceId.ROLE_EDIT)
-	async def delete(self, request, *, tenant):
-		"""
-		Delete role
-		"""
-		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant, role_name)
+	async def _update_role(self, request, role_id, json_data):
+		try:
+			result = await self.RoleService.update(
+				role_id,
+				label=json_data.get("label"),
+				description=json_data.get("description"),
+				resources_to_set=json_data.get("set"),
+				resources_to_add=json_data.get("add"),
+				resources_to_remove=json_data.get("del"),
+			)
+		except exceptions.RoleNotFoundError:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR", "tech_err": "Role not found."})
+		except exceptions.NotEditableError as e:
+			return e.json_response(request)
+		return asab.web.rest.json_response(request, data={"result": result})
 
+
+	async def _delete_role(self, request, role_id):
 		try:
 			result = await self.RoleService.delete(role_id)
 		except exceptions.RoleNotFoundError:
@@ -187,61 +273,3 @@ class RoleHandler(object):
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		return asab.web.rest.json_response(request, result)
-
-
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"label": {"type": "string"},
-			"description": {"type": "string"},
-			"add": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-			"del": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-			"set": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-		}
-	})
-	@asab.web.auth.require(ResourceId.ROLE_EDIT)
-	async def update(self, request, *, json_data, tenant):
-		"""
-		Edit role description and resources
-		"""
-		role_name = request.match_info["role_name"]
-		role_id = "{}/{}".format(tenant, role_name)
-		resources_to_set = json_data.get("set")
-		resources_to_add = json_data.get("add")
-		resources_to_remove = json_data.get("del")
-
-		# Perform extra validations when the request is not superuser-authorized
-		if not request.is_superuser:
-			# Cannot edit global roles
-			if tenant in (None, "*"):
-				L.log(asab.LOG_NOTICE, "Not authorized to edit global roles", struct_data={
-					"role_id": role_id,
-					"cid": request.CredentialsId
-				})
-				return aiohttp.web.HTTPForbidden()
-
-		try:
-			result = await self.RoleService.update(
-				role_id,
-				label=json_data.get("label"),
-				description=json_data.get("description"),
-				resources_to_set=resources_to_set,
-				resources_to_add=resources_to_add,
-				resources_to_remove=resources_to_remove,
-			)
-		except exceptions.RoleNotFoundError:
-			return asab.web.rest.json_response(request, status=404, data={
-				"result": "ERROR", "tech_err": "Role not found."})
-		except exceptions.NotEditableError as e:
-			return e.json_response(request)
-		return asab.web.rest.json_response(request, data={"result": result})
