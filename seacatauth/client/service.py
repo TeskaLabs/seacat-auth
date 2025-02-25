@@ -6,21 +6,18 @@ import re
 import secrets
 import typing
 import urllib.parse
-
 import asab.storage.exceptions
 import asab.exceptions
 import pymongo
-from asab.utils import convert_to_seconds
+import asab.utils
 
 from .. import exceptions
 from .. import generic
 from ..events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 # TODO: Supported OAuth/OIDC param values should be managed by the OpenIdConnect module, not Client.
@@ -401,8 +398,8 @@ class ClientService(asab.Service):
 
 		session_expiration = kwargs.get("session_expiration")
 		if session_expiration is not None:
-			if isinstance(convert_to_seconds, str):
-				session_expiration = convert_to_seconds(convert_to_seconds)
+			if isinstance(session_expiration, str):
+				session_expiration = asab.utils.convert_to_seconds(session_expiration)
 			upsertor.set("session_expiration", session_expiration)
 
 		# Optional client metadata
@@ -476,7 +473,7 @@ class ClientService(asab.Service):
 			else:
 				if k == "session_expiration" and isinstance(v, str):
 					try:
-						v = convert_to_seconds(v)
+						v = asab.utils.convert_to_seconds(v)
 					except ValueError as e:
 						raise asab.exceptions.ValidationError(
 							"{!r} must be either a number or a duration string.".format(k)) from e

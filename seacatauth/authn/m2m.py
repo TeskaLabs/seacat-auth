@@ -9,11 +9,8 @@ from .. import AuditLogger, generic
 from ..generic import nginx_introspection
 from ..models import Session
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class M2MIntrospectHandler(object):

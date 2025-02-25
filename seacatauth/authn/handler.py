@@ -1,15 +1,12 @@
 import datetime
 import logging
-
 import asab
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 import asab.contextvars
-
 import aiohttp.web
-
 import urllib.parse
 import jwcrypto.jwk
 
@@ -17,11 +14,8 @@ from .. import exceptions, AuditLogger, generic, const
 from ..last_activity import EventCode
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 JWK_PARAMS = {

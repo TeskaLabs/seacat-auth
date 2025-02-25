@@ -2,7 +2,6 @@ import hashlib
 import logging
 import datetime
 import re
-
 import asab
 import asab.exceptions
 
@@ -10,11 +9,8 @@ from ... import exceptions
 from ...generic import generate_ergonomic_token
 from ...events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class InvalidPasswordResetTokenError(ValueError):

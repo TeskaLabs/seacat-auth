@@ -1,6 +1,5 @@
 import abc
-from typing import Optional
-
+import typing
 import asab
 
 
@@ -35,13 +34,13 @@ class TenantsProviderABC(asab.Configurable, abc.ABC):
 class EditableTenantsProviderABC(TenantsProviderABC):
 
 	@abc.abstractmethod
-	async def create(self, tenant: dict) -> Optional[str]:
+	async def create(self, tenant: dict) -> typing.Optional[str]:
 		pass
 
 	@abc.abstractmethod
-	async def delete(self, tenant_id: str) -> Optional[str]:
+	async def delete(self, tenant_id: str) -> typing.Optional[str]:
 		pass
 
 	@abc.abstractmethod
-	async def update(self, tenant_id: str, **kwargs) -> Optional[str]:
+	async def update(self, tenant_id: str, **kwargs) -> typing.Optional[str]:
 		pass

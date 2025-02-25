@@ -3,7 +3,6 @@ import json
 import logging
 import re
 import urllib.parse
-
 import asab
 
 from .login_descriptor import LoginDescriptor
@@ -22,11 +21,9 @@ from ..session import (
 
 from ..events import EventTypes
 
-#
 
 L = logging.getLogger(__name__)
 
-#
 
 LOGIN_DESCRIPTOR_FALLBACK = [
 	{

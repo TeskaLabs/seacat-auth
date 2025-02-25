@@ -9,11 +9,8 @@ from .. import exceptions
 from ..const import ResourceId
 from . import schemas
 
-###
 
 L = logging.getLogger(__name__)
-
-###
 
 
 class TenantHandler(object):

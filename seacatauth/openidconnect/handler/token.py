@@ -4,7 +4,6 @@ import aiohttp.web
 import jwcrypto.jws
 import jwcrypto.jwt
 import json
-
 import asab
 import asab.web.rest
 import asab.web.auth
@@ -17,11 +16,8 @@ from ..utils import TokenRequestErrorResponseCode
 from ... import exceptions, AuditLogger
 from ... import generic
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class TokenHandler(object):

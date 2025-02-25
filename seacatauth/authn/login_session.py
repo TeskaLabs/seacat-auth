@@ -2,7 +2,6 @@ import datetime
 import json
 import secrets
 import typing
-
 import cryptography.hazmat.backends
 import cryptography.hazmat.primitives.asymmetric.ec
 import cryptography.hazmat.primitives.serialization

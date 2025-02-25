@@ -3,22 +3,10 @@ import logging
 import secrets
 import jwcrypto.jwk
 import urllib.parse
-
 import asab
-import asab.web
-import asab.web.auth
-import asab.web.tenant
-import asab.metrics
-import asab.web.rest
-import asab.storage
-import asab.proactor
 
-#
 
 L = logging.getLogger(__name__)
-
-
-#
 
 
 class SeaCatAuthApplication(asab.Application):
@@ -36,9 +24,17 @@ class SeaCatAuthApplication(asab.Application):
 		self._prepare_public_urls()
 
 		# Load modules
+		import asab.web
+		import asab.web.rest
 		self.add_module(asab.web.Module)
+
+		import asab.proactor
 		self.add_module(asab.proactor.Module)
+
+		import asab.storage
 		self.add_module(asab.storage.Module)
+
+		import asab.metrics
 		self.add_module(asab.metrics.Module)
 
 		# Locate web service
@@ -52,29 +48,28 @@ class SeaCatAuthApplication(asab.Application):
 		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 
+		import asab.web.tenant
 		self.AsabTenantService = asab.web.tenant.TenantService(self)
 		self.AsabTenantService.install(self.WebContainer)
 		self.AsabTenantService.install(self.PublicWebContainer)
 
+		import asab.web.auth
 		self.AsabAuthService = asab.web.auth.AuthService(self)
 		self.AsabAuthService.install(self.WebContainer)
 		self.AsabAuthService.install(self.PublicWebContainer)
 
-		# Initialize metrics service
-		self.add_module(asab.metrics.Module)
-
 		# Api service
-		from asab.api import ApiService
-		self.ApiService = ApiService(self)
+		import asab.api
+		self.ApiService = asab.api.ApiService(self)
 		self.ApiService.initialize_web(self.WebContainer)
 
 		if "sentry" in asab.Config:
-			from asab.sentry import SentryService
-			self.SentryService = SentryService(self)
+			import asab.sentry
+			self.SentryService = asab.sentry.SentryService(self)
 
 		if "zookeeper" in asab.Config:
-			from asab.zookeeper import Module
-			self.add_module(Module)
+			import asab.zookeeper
+			self.add_module(asab.zookeeper.Module)
 			self.ApiService.initialize_zookeeper()
 
 		from .last_activity import LastActivityService

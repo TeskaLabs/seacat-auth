@@ -8,11 +8,8 @@ import asab.web.tenant
 from ... import AuditLogger, exceptions
 from ...generic import get_bearer_token_value
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class SessionHandler(object):

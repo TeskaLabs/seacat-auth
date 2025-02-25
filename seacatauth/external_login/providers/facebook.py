@@ -6,11 +6,8 @@ import aiohttp
 from .generic import GenericOAuth2Login
 from ..exceptions import ExternalOAuthFlowError
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 class FacebookOAuth2Login(GenericOAuth2Login):

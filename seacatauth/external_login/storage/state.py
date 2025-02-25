@@ -1,7 +1,6 @@
 import datetime
 import logging
 import typing
-
 import asab
 import asab.web.rest
 
@@ -9,11 +8,7 @@ from ..utils import AuthOperation
 from ...events import EventTypes
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class ExternalLoginStateStorage:

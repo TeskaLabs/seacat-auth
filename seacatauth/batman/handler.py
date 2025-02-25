@@ -1,17 +1,12 @@
 import logging
 import asab
-
 import aiohttp.web
 
 from .. import exceptions
 from .. import generic
 
 
-#
-
 L = logging.getLogger(__name__)
-
-#
 
 
 class BatmanHandler(object):

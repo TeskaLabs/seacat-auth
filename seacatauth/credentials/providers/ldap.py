@@ -4,24 +4,18 @@ import datetime
 import contextlib
 import typing
 
-from typing import Optional
-
 
 import ldap
 import ldap.resiter
 import ldap.filter
-
 import asab
 import asab.proactor
 import asab.config
 
 from .abc import CredentialsProviderABC
 
-#
 
 L = logging.getLogger(__name__)
-
-#
 
 
 _TLS_VERSION = {
@@ -97,7 +91,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			self.IdentFields.append(self.Config["attrusername"])
 
 
-	async def get(self, credentials_id: str, include: typing.Optional[typing.Iterable[str]] = None) -> Optional[dict]:
+	async def get(self, credentials_id: str, include: typing.Optional[typing.Iterable[str]] = None) -> typing.Optional[dict]:
 		if not credentials_id.startswith(self.Prefix):
 			raise KeyError("Credentials {!r} not found".format(credentials_id))
 		cn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
@@ -207,7 +201,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			ldap_client.unbind_s()
 
 
-	def _get_worker(self, cn: str) -> Optional[typing.Dict]:
+	def _get_worker(self, cn: str) -> typing.Optional[typing.Dict]:
 		with self._ldap_client() as ldap_client:
 			try:
 				results = ldap_client.search_s(
