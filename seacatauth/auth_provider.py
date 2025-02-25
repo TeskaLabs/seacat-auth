@@ -100,7 +100,7 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 def system_authz(
 	issuer: str,
 	resources: typing.Collection[str],
-	tenant: str | None,
+	tenant: str | None = None,
 	expiration: int = 60
 ) -> Authorization:
 	if tenant is None:
