@@ -5,7 +5,7 @@ import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 
-from ..models import SessionAdapter
+from ..models import Session
 from ..const import ResourceId
 
 

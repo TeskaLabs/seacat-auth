@@ -15,14 +15,14 @@ import asab.web.auth.providers.key_providers
 import asab.exceptions
 
 from .exceptions import SessionNotFoundError
-from .session import SessionAdapter
+from .models import Session
 
 
 L = logging.getLogger(__name__)
 
 
 class Authorization(asab.web.auth.Authorization):
-	def __init__(self, claims: dict, session: SessionAdapter):
+	def __init__(self, claims: dict, session: Session):
 		super().__init__(claims)
 		self.Session = session
 
@@ -111,16 +111,16 @@ def system_authz(
 	session_id = secrets.token_urlsafe(16)
 	now = datetime.datetime.now(datetime.UTC)
 	session_dict = {
-		SessionAdapter.FN.SessionId: session_id,
-		SessionAdapter.FN.Version: 0,
-		SessionAdapter.FN.CreatedAt: now,
-		SessionAdapter.FN.ModifiedAt: None,
-		SessionAdapter.FN.Session.Type: "SYSTEM",
-		SessionAdapter.FN.Session.Expiration: now + datetime.timedelta(seconds=expiration),
-		SessionAdapter.FN.Authorization.Authz: authorized_resources,
-		SessionAdapter.FN.Credentials.Id: "SYSTEM",
+		Session.FN.SessionId: session_id,
+		Session.FN.Version: 0,
+		Session.FN.CreatedAt: now,
+		Session.FN.ModifiedAt: None,
+		Session.FN.Session.Type: "SYSTEM",
+		Session.FN.Session.Expiration: now + datetime.timedelta(seconds=expiration),
+		Session.FN.Authorization.Authz: authorized_resources,
+		Session.FN.Credentials.Id: "SYSTEM",
 	}
-	session = SessionAdapter(session_dict)
+	session = Session(session_dict)
 
 	claims = {
 		"resources": authorized_resources,

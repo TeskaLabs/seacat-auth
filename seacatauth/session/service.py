@@ -309,7 +309,7 @@ class SessionService(asab.Service):
 		try:
 			session = Session(session_dict)
 		except Exception as e:
-			L.exception("Failed to create SessionAdapter from database object.", struct_data={
+			L.exception("Failed to create Session from database object.", struct_data={
 				"sid": session_dict.get("_id"),
 			})
 			raise exceptions.SessionNotFoundError("Session deserialization failed.", query={key: value}) from e
@@ -339,7 +339,7 @@ class SessionService(asab.Service):
 		try:
 			session = Session(session_dict)
 		except Exception as e:
-			L.exception("Failed to create SessionAdapter from database object.", struct_data={
+			L.exception("Failed to create Session from database object.", struct_data={
 				"sid": session_dict.get("_id"),
 			})
 			raise exceptions.SessionNotFoundError("Session deserialization failed.", session_id=session_id) from e
@@ -412,7 +412,7 @@ class SessionService(asab.Service):
 			try:
 				session = Session(session_dict).rest_get()
 			except Exception as e:
-				L.error("Failed to create SessionAdapter from database object: {}".format(e), struct_data={
+				L.error("Failed to create Session from database object: {}".format(e), struct_data={
 					"sid": session_dict.get("_id"),
 				})
 				await self.delete(session_dict.get(Session.FN.SessionId))
