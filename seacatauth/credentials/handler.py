@@ -429,7 +429,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials

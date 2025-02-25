@@ -32,7 +32,7 @@ class ExternalLoginAdminHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def list_external_accounts(self, request):
 		"""
 		List user's external login accounts
@@ -43,7 +43,7 @@ class ExternalLoginAdminHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def get_external_account(self, request):
 		"""
 		Get external login account detail
@@ -58,7 +58,7 @@ class ExternalLoginAdminHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def remove_external_account(self, request):
 		"""
 		Remove external login account

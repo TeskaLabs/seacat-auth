@@ -36,7 +36,7 @@ class RoleHandler(object):
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
 
 
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	@asab.web.tenant.allow_no_tenant
 	async def list_all(self, request):
 		"""

@@ -98,7 +98,7 @@ class SessionHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def delete_all(self, request, *, credentials_id):
 		"""
 		Terminate all sessions

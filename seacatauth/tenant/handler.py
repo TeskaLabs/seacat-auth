@@ -134,7 +134,7 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler(schemas.CREATE_TENANT)
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
@@ -296,7 +296,7 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_ASSIGN_TENANTS)
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
 		Grant tenant access and/or assign roles to a list of credentials
@@ -372,7 +372,7 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_UNASSIGN_TENANTS)
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.SUPERUSER)
+	@asab.web.auth.require_superuser
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
 		Revoke tenant access and/or unassign roles from a list of credentials

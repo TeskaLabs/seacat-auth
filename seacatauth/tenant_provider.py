@@ -25,6 +25,8 @@ class AsabTenantProvider(asab.web.tenant.providers.abc.TenantProviderABC):
 
 
 	async def is_tenant_known(self, tenant: str) -> bool:
+		if tenant == "*":
+			L.warning("Tenant param is '*', FIX IT!")
 		try:
 			await self.SeacatAuthTenantService.get_tenant(tenant)
 			return True
