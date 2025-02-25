@@ -85,10 +85,6 @@ class SeaCatAuthApplication(asab.Application):
 		from .communication import CommunicationService
 		self.CommunicationService = CommunicationService(self)
 
-		# Init Name Proposer service
-		from .nameproposer import NameProposerService
-		self.NameProposerService = NameProposerService(self)
-
 		# Init Session service
 		from .session import SessionService, SessionHandler
 		self.SessionService = SessionService(self)
