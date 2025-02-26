@@ -8,6 +8,7 @@ from ...models.const import ResourceId
 from ... import exceptions, generic, AuditLogger
 from ...last_activity import EventCode
 from ...decorators import access_control
+from .. import schema
 
 
 L = logging.getLogger(__name__)
@@ -48,17 +49,7 @@ class ChangePasswordHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": [
-			"oldpassword",
-			"newpassword",
-		],
-		"properties": {
-			"oldpassword": {"type": "string"},
-			"newpassword": {"type": "string"},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.CHANGE_PASSWORD)
 	@access_control()
 	async def change_password(self, request, *, json_data):
 		"""
@@ -124,22 +115,7 @@ class ChangePasswordHandler(object):
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": [
-			"newpassword",
-			"pwd_token"  # Password reset token
-		],
-		"properties": {
-			"newpassword": {
-				"type": "string"
-			},
-			"pwd_token": {
-				"type": "string",
-				"description": "One-time code for password reset"
-			},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.RESET_PASSWORD)
 	async def reset_password(self, request, *, json_data):
 		"""
 		Set a new password (with password token authentication)
@@ -204,14 +180,7 @@ class ChangePasswordHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["credentials_id"],
-		"properties": {
-			"credentials_id": {"type": "string"},
-			"expiration": {"type": "number"},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.REQUEST_PASSWORD_RESET_ADMIN)
 	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
@@ -255,13 +224,7 @@ class ChangePasswordHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["ident"],
-		"properties": {
-			"ident": {"type": "string"},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.REQUEST_LOST_PASSWORD_RESET)
 	async def lost_password(self, request, *, json_data):
 		"""
 		Request a password reset link
