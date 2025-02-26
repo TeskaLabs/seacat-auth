@@ -5,6 +5,7 @@ import asab.web.webcrypto
 import asab.exceptions
 import asab.utils
 
+from ..models.const import ResourceId
 from .. import exceptions, generic
 from ..decorators import access_control
 from .schemas import (
@@ -292,7 +293,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(CREATE_CREDENTIALS)
-	@access_control("seacat:credentials:edit")
+	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
@@ -347,7 +348,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(UPDATE_CREDENTIALS)
-	@access_control("seacat:credentials:edit")
+	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def update_credentials(self, request, *, json_data):
 		"""
 		Update credentials
@@ -397,7 +398,7 @@ class CredentialsHandler(object):
 			}
 		}
 	})
-	@access_control("seacat:credentials:edit")
+	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def enforce_factors(self, request, *, json_data):
 		"""
 		Specify authentication factors to be enforced from the user
@@ -419,7 +420,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	@access_control("seacat:credentials:edit")
+	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials

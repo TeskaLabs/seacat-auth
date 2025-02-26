@@ -3,6 +3,7 @@ import asab.web.rest
 import asab.exceptions
 import asab.utils
 
+from ..models.const import ResourceId
 from .. import exceptions
 from ..decorators import access_control
 from . import schemas
@@ -92,7 +93,7 @@ class TenantHandler(object):
 			for tenant, rs in request.Session.Authorization.Authz.items():
 				if tenant == "*":
 					continue
-				if "seacat:tenant:access" in rs:
+				if ResourceId.TENANT_ACCESS in rs:
 					tenants.append(await self.TenantService.get_tenant(tenant))
 			count = len(tenants)
 			return asab.web.rest.json_response(request, data={"data": tenants, "count": count})
@@ -122,7 +123,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control("seacat:tenant:access")
+	@access_control(ResourceId.TENANT_ACCESS)
 	async def get(self, request):
 		"""
 		Get tenant detail
@@ -133,7 +134,7 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.CREATE_TENANT)
-	@access_control("authz:superuser")  # TODO: "seacat:tenant:create"
+	@access_control(ResourceId.SUPERUSER)  # TODO: "seacat:tenant:create"
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
@@ -177,7 +178,7 @@ class TenantHandler(object):
 			request, data={"id": tenant_id})
 
 	@asab.web.rest.json_schema_handler(schemas.UPDATE_TENANT)
-	@access_control("seacat:tenant:edit")
+	@access_control(ResourceId.TENANT_EDIT)
 	async def update_tenant(self, request, *, json_data, tenant):
 		"""
 		Update tenant description and/or its structured data
@@ -186,7 +187,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control("seacat:tenant:delete")
+	@access_control(ResourceId.TENANT_DELETE)
 	async def delete(self, request, *, tenant):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
@@ -196,7 +197,7 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.SET_TENANTS)
-	@access_control("seacat:tenant:assign")
+	@access_control(ResourceId.TENANT_ASSIGN)
 	async def set_tenants(self, request, *, json_data):
 		"""
 		Specify a set of accessible tenants for requested credentials ID
@@ -220,7 +221,7 @@ class TenantHandler(object):
 		)
 
 
-	@access_control("seacat:tenant:assign")
+	@access_control(ResourceId.TENANT_ASSIGN)
 	async def assign_tenant(self, request, *, tenant):
 		"""
 		Grant specified tenant access to requested credentials
@@ -232,7 +233,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("seacat:tenant:assign")
+	@access_control(ResourceId.TENANT_ASSIGN)
 	async def unassign_tenant(self, request, *, tenant):
 		"""
 		Revoke specified tenant access to requested credentials
@@ -292,8 +293,8 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_ASSIGN_TENANTS)
-	@access_control("authz:superuser")
-	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
+	@access_control(ResourceId.SUPERUSER)
+	# TODO: For single tenant bulks, require only ResourceId.TENANT_ASSIGN
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
 		Grant tenant access and/or assign roles to a list of credentials
@@ -368,8 +369,8 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schemas.BULK_UNASSIGN_TENANTS)
-	@access_control("authz:superuser")
-	# TODO: For single tenant bulks, require only "seacat:tenant:assign"
+	@access_control(ResourceId.SUPERUSER)
+	# TODO: For single tenant bulks, require only ResourceId.TENANT_ASSIGN
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
 		Revoke tenant access and/or unassign roles from a list of credentials

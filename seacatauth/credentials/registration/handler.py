@@ -9,6 +9,7 @@ import asab.web.rest
 import asab.utils
 import asab.exceptions
 
+from ...models.const import ResourceId
 from ...decorators import access_control
 
 
@@ -62,7 +63,7 @@ class RegistrationHandler(object):
 			"email": {"type": "string"},
 		}
 	})
-	@access_control("seacat:tenant:assign")
+	@access_control(ResourceId.TENANT_ASSIGN)
 	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Common user request to invite a new user to join specified tenant and create an account
@@ -118,7 +119,7 @@ class RegistrationHandler(object):
 			},
 		},
 	})
-	@access_control("seacat:tenant:assign")
+	@access_control(ResourceId.TENANT_ASSIGN)
 	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
@@ -230,7 +231,7 @@ class RegistrationHandler(object):
 		return credentials_id, None
 
 
-	@access_control("seacat:tenant:assign")
+	@access_control(ResourceId.TENANT_ASSIGN)
 	async def resend_invitation(self, request):
 		"""
 		Resend invitation to an already invited user and extend the expiration of the invitation.

@@ -5,6 +5,7 @@ import asab
 import asab.web.rest
 import asab.exceptions
 
+from ...models.const import ResourceId
 from ... import exceptions
 from ...decorators import access_control
 
@@ -119,7 +120,7 @@ class ResourceHandler(object):
 		"properties": {
 			"description": {"type": "string"}}
 	})
-	@access_control("seacat:resource:edit")
+	@access_control(ResourceId.RESOURCE_EDIT)
 	async def create_or_undelete(self, request, *, json_data):
 		"""
 		Create a new resource or undelete a resource that has been soft-deleted
@@ -150,7 +151,7 @@ class ResourceHandler(object):
 			"description": {"type": "string"},
 		}
 	})
-	@access_control("seacat:resource:edit")
+	@access_control(ResourceId.RESOURCE_EDIT)
 	async def update(self, request, *, json_data):
 		"""
 		Update resource description or rename resource
@@ -171,7 +172,7 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("seacat:resource:edit")
+	@access_control(ResourceId.RESOURCE_EDIT)
 	async def delete(self, request, *, credentials_id):
 		"""
 		Delete resource

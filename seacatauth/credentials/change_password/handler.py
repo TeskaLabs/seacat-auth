@@ -4,6 +4,7 @@ import asab
 import asab.web.rest
 import asab.web.webcrypto
 
+from ...models.const import ResourceId
 from ... import exceptions, generic, AuditLogger
 from ...last_activity import EventCode
 from ...decorators import access_control
@@ -217,7 +218,7 @@ class ChangePasswordHandler(object):
 			"expiration": {"type": "number"},
 		}
 	})
-	@access_control("seacat:credentials:edit")
+	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
