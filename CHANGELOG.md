@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha9
 - v25.05-alpha8
 - v25.05-alpha7
 - v25.05-alpha6
@@ -21,6 +22,7 @@
 - Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
 
 ### Refactoring
+- Replace resource ID literals with constants (#446, v25.05-alpha9)
 - Refactor name proposer service into a function (#445, v25.05-alpha8)
 - Clean up imports and code style (#444, v25.05-alpha7)
 - Rename SessionAdapter to Session and move to seacatauth.models (#443, v25.05-alpha6)
