@@ -97,11 +97,6 @@ class CookieHandler(object):
 		web_app_public.router.add_get("/cookie/entry", self.bouncer_get)
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
 
-		# TODO: Insecure, back-compat only - remove after 2024-03-31
-		if asab.Config.getboolean("seacatauth:introspection", "_enable_insecure_legacy_endpoints", fallback=False):
-			web_app_public.router.add_post("/cookie/nginx", self.nginx)
-			web_app_public.router.add_post("/cookie/nginx/anonymous", self.nginx_anonymous)
-
 
 	async def nginx(self, request):
 		"""

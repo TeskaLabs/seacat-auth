@@ -20,23 +20,12 @@ class OTPHandler(object):
 	def __init__(self, app, otp_svc):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.OTPService = otp_svc
-		web_app_public = app.PublicWebContainer.WebApp
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/account/totp", self.prepare_totp_if_not_active)
 		web_app.router.add_put("/account/set-totp", self.activate_totp)
 		web_app.router.add_put("/account/unset-totp", self.deactivate_totp)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_get("/public/totp", self.prepare_totp_if_not_active)
-		web_app.router.add_put("/public/set-totp", self.activate_totp)
-		web_app.router.add_put("/public/unset-totp", self.deactivate_totp)
-
-		web_app_public.router.add_get("/public/totp", self.prepare_totp_if_not_active)
-		web_app_public.router.add_put("/public/set-totp", self.activate_totp)
-		web_app_public.router.add_put("/public/unset-totp", self.deactivate_totp)
-		# <<<
 
 	@access_control()
 	async def prepare_totp_if_not_active(self, request, *, credentials_id):

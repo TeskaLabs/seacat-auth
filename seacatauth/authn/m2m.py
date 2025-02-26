@@ -26,11 +26,6 @@ class M2MIntrospectHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/nginx/introspect/m2m", self.nginx)
 
-		# TODO: Insecure, back-compat only - remove after 2024-03-31
-		if asab.Config.getboolean("seacatauth:introspection", "_enable_insecure_legacy_endpoints", fallback=False):
-			web_app_public = app.PublicWebContainer.WebApp
-			web_app_public.router.add_post("/m2m/nginx", self.nginx)
-
 
 	async def _authenticate_request(self, request, client_id):
 		# Get credentials from request
