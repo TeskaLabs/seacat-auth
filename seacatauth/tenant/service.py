@@ -4,6 +4,7 @@ import asab
 import asab.storage.exceptions
 import asab.exceptions
 
+from ..models.const import ResourceId
 from .. import exceptions
 
 
@@ -196,7 +197,7 @@ class TenantService(asab.Service):
 					"message": message,
 				}
 			# Check permission
-			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["seacat:tenant:assign"]):
+			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, [ResourceId.TENANT_ASSIGN]):
 				message = "Not authorized for tenant assignment."
 				L.error(message, struct_data={
 					"agent_cid": session.Credentials.Id,
@@ -210,7 +211,7 @@ class TenantService(asab.Service):
 
 		for tenant in tenants_to_unassign:
 			# Check permission
-			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, ["seacat:tenant:assign"]):
+			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, [ResourceId.TENANT_ASSIGN]):
 				message = "Not authorized for tenant unassignment."
 				L.error(message, struct_data={
 					"agent_cid": session.Credentials.Id,

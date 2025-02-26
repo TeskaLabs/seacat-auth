@@ -3,6 +3,7 @@ import asab
 import asab.web.rest
 import bson
 
+from ..models.const import ResourceId
 from ..decorators import access_control
 from ..models import Session
 
@@ -40,7 +41,7 @@ class SessionHandler(object):
 		# <<<
 
 
-	@access_control("seacat:session:access")
+	@access_control(ResourceId.SESSION_ACCESS)
 	async def session_list(self, request):
 		"""
 		List sessions
@@ -72,7 +73,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control("seacat:session:access")
+	@access_control(ResourceId.SESSION_ACCESS)
 	async def session_detail(self, request):
 		"""
 		Get session detail
@@ -87,7 +88,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, session)
 
 
-	@access_control("seacat:session:terminate")
+	@access_control(ResourceId.SESSION_TERMINATE)
 	async def session_delete(self, request):
 		"""
 		Terminate a session
@@ -100,7 +101,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control("authz:superuser")
+	@access_control(ResourceId.SUPERUSER)
 	async def delete_all(self, request, *, credentials_id):
 		"""
 		Terminate all sessions
@@ -112,7 +113,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("seacat:session:access")
+	@access_control(ResourceId.SESSION_ACCESS)
 	async def search_by_credentials_id(self, request):
 		"""
 		List all active sessions of given credentials
@@ -139,7 +140,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, sessions)
 
 
-	@access_control("seacat:session:terminate")
+	@access_control(ResourceId.SESSION_TERMINATE)
 	async def delete_by_credentials_id(self, request, *, credentials_id):
 		"""
 		Terminate all sessions of given credentials
