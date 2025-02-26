@@ -8,11 +8,7 @@ import asab.utils
 from ..models.const import ResourceId
 from .. import exceptions, generic
 from ..decorators import access_control
-from .schemas import (
-	CREATE_CREDENTIALS,
-	UPDATE_CREDENTIALS,
-	UPDATE_MY_CREDENTIALS,
-)
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -202,12 +198,7 @@ class CredentialsHandler(object):
 		})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"items": {
-			"type": "string"
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.GET_IDENTS_FROM_IDS)
 	async def get_idents_from_ids(self, request, *, json_data):
 		"""
 		Get human-intelligible identifiers for a list of credential IDs
@@ -280,7 +271,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, credentials)
 
 
-	@asab.web.rest.json_schema_handler(CREATE_CREDENTIALS)
+	@asab.web.rest.json_schema_handler(schema.CREATE_CREDENTIALS)
 	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def create_credentials(self, request, *, json_data):
 		"""
@@ -335,7 +326,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
-	@asab.web.rest.json_schema_handler(UPDATE_CREDENTIALS)
+	@asab.web.rest.json_schema_handler(schema.UPDATE_CREDENTIALS)
 	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def update_credentials(self, request, *, json_data):
 		"""
@@ -354,7 +345,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@asab.web.rest.json_schema_handler(UPDATE_MY_CREDENTIALS)
+	@asab.web.rest.json_schema_handler(schema.UPDATE_MY_CREDENTIALS)
 	@access_control()
 	async def update_my_credentials(self, request, *, json_data, credentials_id):
 		"""
@@ -374,18 +365,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"required": ["factors"],
-		"properties": {
-			"factors": {
-				"type": "array",
-				"description": "Factors to enforce/reset",
-				"items": {"type": "string"}
-			}
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.ENFORCE_FACTORS)
 	@access_control(ResourceId.CREDENTIALS_EDIT)
 	async def enforce_factors(self, request, *, json_data):
 		"""
