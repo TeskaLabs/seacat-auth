@@ -66,14 +66,15 @@ class ChangePasswordHandler(object):
 		"""
 		Set a new password (with current password authentication)
 		"""
+		authz = asab.contextvars.Authz.get()
 		new_password = json_data.get("newpassword")
 		old_password = json_data.get("oldpassword")
-		credentials_id = request.Session.Credentials.Id
+		credentials_id = authz.CredentialsId
 		from_ip = generic.get_request_access_ips(request)
 
 		# Authenticate with the old password
 		authenticated = await self.CredentialsService.authenticate(
-			request.Session.Credentials.Id, {"password": old_password})
+			credentials_id, {"password": old_password})
 		if not authenticated:
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: Authentication failed", struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
@@ -125,6 +126,7 @@ class ChangePasswordHandler(object):
 			EventCode.PASSWORD_CHANGE_SUCCESS, credentials_id=credentials_id, from_ip=from_ip)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
+
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",

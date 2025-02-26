@@ -11,6 +11,7 @@ import asab.utils
 import asab.exceptions
 
 from ...const import ResourceId
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -28,8 +29,10 @@ class RegistrationHandler(object):
 		self.RegistrationService = registration_svc
 		self.CredentialsService = credentials_svc
 
+		self.AsabAuthService = app.get_service("asab.AuthService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
+		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
@@ -391,20 +394,23 @@ class RegistrationHandler(object):
 		Complete the registration either by activating the draft credentials
 		or by transferring their tenants and roles to the currently authenticated user.
 		"""
+		try:
+			root_session = await self.CookieService.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			root_session = None
+
 		registration_code = request.match_info["registration_code"]
 
 		# TODO: Make sure that self-registered users create their new tenant
 
-		if request.Session is not None:
-			# Use the registration data to update the currently authenticated user
-			# Make sure this is explicit
-			if request.query.get("update_current") != "true":
-				raise asab.exceptions.ValidationError(
-					"To complete the registration with your current credentials, "
-					"include 'update_current=true' in the query.")
-			credentials_id = request.Session.Credentials.Id
+		if request.query.get("update_current") == "true":
+			if root_session is None:
+				# Use the registration data to update the currently authenticated user
+				# Make sure this is explicit
+				raise asab.exceptions.NotAuthenticatedError()
+
 			await self.RegistrationService.complete_registration_with_existing_credentials(
-				registration_code, credentials_id)
+				registration_code, root_session.Credentials.Id)
 
 		else:
 			# Complete the registration with the new credentials

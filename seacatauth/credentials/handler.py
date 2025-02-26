@@ -109,8 +109,6 @@ class CredentialsHandler(object):
 		"""
 		Get the current user's last successful/failed login data.
 		"""
-		if request.Session.is_anonymous():
-			raise asab.exceptions.AccessDeniedError()
 		data = await self.LastActivityService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
@@ -266,12 +264,14 @@ class CredentialsHandler(object):
 				type: boolean
 				default: no
 		"""
+		authz = asab.contextvars.Authz.get()
 		credentials_id = request.match_info["credentials_id"]
 
 		# Check authorization:
 		#   the requester must be authorized in at least one of the tenants that the requested is a member of
-		if not request.Session.is_superuser():
-			for tenant in request.Session.Authorization.Authz:
+		if not authz.has_superuser_access():
+			authorized_tenants = [t for t in authz.get_claim("resources") or {} if t!= "*"]
+			for tenant in authorized_tenants:
 				if tenant == "*":
 					continue
 				if await self.TenantService.has_tenant_assigned(credentials_id, tenant):
@@ -310,7 +310,7 @@ class CredentialsHandler(object):
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
 		# Create credentials
-		result = await self.CredentialsService.create_credentials(provider_id, json_data, request.Session)
+		result = await self.CredentialsService.create_credentials(provider_id, json_data)
 
 		if result["status"] != "OK":
 			return asab.web.rest.json_response(request, result, status=400)
@@ -363,7 +363,7 @@ class CredentialsHandler(object):
 		credentials_id = request.match_info["credentials_id"]
 
 		# Update credentials
-		result = await self.CredentialsService.update_credentials(credentials_id, json_data, request.Session)
+		result = await self.CredentialsService.update_credentials(credentials_id, json_data)
 
 		result["result"] = result["status"]  # TODO: Unify response format
 
@@ -382,7 +382,6 @@ class CredentialsHandler(object):
 		result = await self.CredentialsService.update_credentials(
 			credentials_id,
 			json_data,
-			request.Session,
 		)
 
 		result["result"] = result["status"]  # TODO: Unify response format

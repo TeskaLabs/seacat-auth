@@ -2,7 +2,9 @@ import json
 import logging
 import re
 import fastjsonschema
+import asab.contextvars
 
+from ..const import ResourceId
 from .schemas import USERNAME_PATTERN
 
 
@@ -69,6 +71,7 @@ class CredentialsPolicy:
 		},
 	}
 
+
 	def __init__(self, rbac_svc, policy_file):
 		self.RBACService = rbac_svc
 
@@ -82,6 +85,7 @@ class CredentialsPolicy:
 		}
 
 		self._load_policy(policy_file)
+
 
 	def _load_policy(self, policy_file):
 		"""
@@ -105,6 +109,7 @@ class CredentialsPolicy:
 				self.RegistrationPolicy[attribute] = attribute_policy["registration"]
 			if attribute_policy["editable_by"] != "nobody":
 				self.UpdatePolicy[attribute] = attribute_policy["editable_by"]
+
 
 	def _validate_credentials_data(self, credentials_data: dict, policy: dict):
 		validated_data = {}
@@ -142,6 +147,7 @@ class CredentialsPolicy:
 
 		return validated_data
 
+
 	def validate_creation_data(self, creation_data: dict):
 		validated_data = self._validate_credentials_data(creation_data, self.CreationPolicy)
 		if validated_data is None:
@@ -154,48 +160,46 @@ class CredentialsPolicy:
 			return None
 		return validated_data
 
+
 	def validate_m2m_creation_data(self, creation_data: dict):
 		return self._validate_credentials_data(creation_data, self.M2MCreationPolicy)
+
 
 	def validate_registration_data(self, registration_data: dict):
 		return self._validate_credentials_data(registration_data, self.RegistrationPolicy)
 
-	def _can_update(self, attribute, authz=None):
+
+	def _can_update(self, credentials_id: str, attribute):
+		authz = asab.contextvars.Authz.get()
+
 		# Credentials suspension is always allowed for admins only
 		if attribute == "suspended":
-			if authz is None:
-				return False
-			return self.RBACService.has_resource_access(
-				authz,
-				tenant=None,
-				requested_resources=["seacat:credentials:edit"],
-			)
+			return authz.has_resource_access(ResourceId.CREDENTIALS_EDIT)
 
 		policy = self.UpdatePolicy.get(attribute)
 
 		if policy is None:
 			return False
 
-		elif policy == "anybody":
-			return True
-
 		elif policy == "admin_only":
-			if authz is None:
-				return False
-			return self.RBACService.has_resource_access(
-				authz,
-				tenant=None,
-				requested_resources=["seacat:credentials:edit"],
-			)
+			return authz.has_resource_access(ResourceId.CREDENTIALS_EDIT)
 
-		# TODO: Check configurable resource-based policy
+		elif policy == "anybody":
+			if authz.has_resource_access(ResourceId.CREDENTIALS_EDIT):
+				return True
+			elif credentials_id == authz.CredentialsId:
+				return True
+			else:
+				return False
+
 		else:
 			L.error("Invalid policy value", struct_data={"attribute": attribute, "policy": policy})
 			return False
 
-	def validate_update_data(self, update_data: dict, authz: dict):
+
+	def validate_update_data(self, credentials_id: str, update_data: dict):
 		for field in update_data:
-			if not self._can_update(field, authz):
+			if not self._can_update(credentials_id, field):
 				L.error("Cannot update credentials: Field update not permitted", struct_data={
 					"field": field,
 				})

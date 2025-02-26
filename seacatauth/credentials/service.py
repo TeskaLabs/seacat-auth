@@ -348,9 +348,10 @@ class CredentialsService(asab.Service):
 		self.register_provider(provider)
 
 
-	async def create_credentials(self, provider_id: str, credentials_data: dict, session: Session = None):
+	async def create_credentials(self, provider_id: str, credentials_data: dict):
 		# Record the requester's ID for logging purposes
-		agent_cid = session.Credentials.Id if session is not None else None
+		authz = asab.contextvars.Authz.get()
+		agent_cid = authz.CredentialsId
 
 		# Get provider
 		provider = self.CredentialProviders[provider_id]
@@ -411,7 +412,7 @@ class CredentialsService(asab.Service):
 
 
 	# TODO: Implement editing for M2M credentials
-	async def update_credentials(self, credentials_id: str, update_dict: dict, session: Session = None):
+	async def update_credentials(self, credentials_id: str, update_dict: dict):
 		"""
 		Validate the input data in the update dict according to active policies
 		and update credentials in the respective provider.
@@ -422,10 +423,11 @@ class CredentialsService(asab.Service):
 			in the respective credentials provider
 		"""
 		# Record the requester's ID for logging purposes
-		agent_cid = session.Credentials.Id if session is not None else None
+		authz = asab.contextvars.Authz.get()
+		agent_cid = authz.CredentialsId
 
 		# Credentials outside the current tenant are invisible (except if superuser)
-		if not await self.can_access_credentials(session, credentials_id):
+		if not await self.can_access_credentials(credentials_id):
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		# Disallow sensitive field updates
@@ -462,11 +464,7 @@ class CredentialsService(asab.Service):
 		custom_data = update_dict.pop("data", None)
 
 		# Check credentials policy
-		if session is not None:
-			authz = session.Authorization.Authz
-		else:
-			authz = None
-		validated_data = self.Policy.validate_update_data(update_dict, authz)
+		validated_data = self.Policy.validate_update_data(credentials_id, update_dict)
 		if validated_data is None:
 			L.error("Update failed: Data does not comply with update policy", struct_data={
 				"provider_id": provider.ProviderID,
@@ -631,21 +629,24 @@ class CredentialsService(asab.Service):
 		return info
 
 
-	async def can_access_credentials(self, session, credentials_id: str) -> bool:
+	async def can_access_credentials(self, credentials_id: str) -> bool:
 		"""
 		Check if the target user is a member of currently authorized tenant
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz:
+			raise ValueError("Missing authorization.")
+
 		tenant_service = self.App.get_service("seacatauth.TenantService")
-		if not session:
-			return False
-		if session.is_superuser():
+		if authz.has_superuser_access():
 			return True
-		for tenant_id in session.Authorization.Authz.keys():
+		for tenant_id in authz.get_clain("resources", {}):
 			if tenant_id == "*":
 				continue
 			if await tenant_service.has_tenant_assigned(credentials_id, tenant_id):
 				# User is member of currently authorized tenant
 				return True
+
 		# The request and the target credentials have no tenant in common
 		return False
 
