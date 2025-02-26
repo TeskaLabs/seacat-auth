@@ -10,7 +10,7 @@ import asab.web.tenant
 import asab.utils
 import asab.exceptions
 
-from ...const import ResourceId
+from ...models.const import ResourceId
 from ... import exceptions
 
 

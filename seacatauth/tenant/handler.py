@@ -7,7 +7,7 @@ import asab.utils
 import asab.contextvars
 
 from .. import exceptions
-from ..const import ResourceId
+from ..models.const import ResourceId
 from . import schemas
 from .random_name import propose_name
 

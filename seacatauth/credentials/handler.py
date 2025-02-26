@@ -7,7 +7,7 @@ import asab.exceptions
 import asab.utils
 
 from .. import exceptions, generic
-from ..const import ResourceId
+from ..models.const import ResourceId
 from .schemas import (
 	CREATE_CREDENTIALS,
 	UPDATE_CREDENTIALS,

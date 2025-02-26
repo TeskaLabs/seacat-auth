@@ -9,7 +9,7 @@ import asab.exceptions
 
 from .service import GLOBAL_ONLY_RESOURCES
 from ... import exceptions
-from ...const import ResourceId
+from ...models.const import ResourceId
 
 
 L = logging.getLogger(__name__)

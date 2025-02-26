@@ -2,7 +2,7 @@ import typing
 import asab
 import asab.web.auth.authorization
 
-from ...const import ResourceId
+from ...models.const import ResourceId
 
 
 # TODO: Deprecated. Replace with ASAB auth functions entirely.

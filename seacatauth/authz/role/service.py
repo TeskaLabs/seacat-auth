@@ -10,7 +10,7 @@ import asab.exceptions
 
 from ... import exceptions
 from ...auth_provider import system_authz
-from ...const import ResourceId
+from ...models.const import ResourceId
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 from .view.propagated_role import global_role_id_to_propagated

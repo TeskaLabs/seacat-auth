@@ -6,7 +6,7 @@ import asab.web.auth
 import asab.web.tenant
 
 from ... import exceptions, generic, AuditLogger
-from ...const import ResourceId
+from ...models.const import ResourceId
 from ...last_activity import EventCode
 
 

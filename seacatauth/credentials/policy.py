@@ -4,7 +4,7 @@ import re
 import fastjsonschema
 import asab.contextvars
 
-from ..const import ResourceId
+from ..models.const import ResourceId
 from .schemas import USERNAME_PATTERN
 
 

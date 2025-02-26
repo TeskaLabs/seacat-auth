@@ -10,7 +10,8 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
-from .. import exceptions, AuditLogger, generic, const
+from .. import exceptions, AuditLogger, generic
+from ..models.const import ResourceId
 from ..last_activity import EventCode
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 
@@ -435,7 +436,7 @@ class AuthenticationHandler(object):
 			"credentials_id": "mongodb:default:abc123def456",
 			"expiration": "5m"}
 	})
-	@asab.web.auth.require(const.ResourceId.IMPERSONATE)
+	@asab.web.auth.require(ResourceId.IMPERSONATE)
 	@asab.web.tenant.allow_no_tenant
 	async def impersonate(self, request, *, json_data):
 		"""
@@ -469,7 +470,7 @@ class AuthenticationHandler(object):
 		return response
 
 
-	@asab.web.auth.require(const.ResourceId.IMPERSONATE)
+	@asab.web.auth.require(ResourceId.IMPERSONATE)
 	@asab.web.tenant.allow_no_tenant
 	async def impersonate_and_redirect(self, request):
 		"""

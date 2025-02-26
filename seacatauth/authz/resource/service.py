@@ -7,7 +7,7 @@ import asab.exceptions
 from ... import exceptions
 from ...auth_provider import system_authz
 from ...events import EventTypes
-from ...const import ResourceId
+from ...models.const import ResourceId
 
 
 L = logging.getLogger(__name__)

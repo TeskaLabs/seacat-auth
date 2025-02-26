@@ -6,7 +6,7 @@ import asab.web.tenant
 import asab.exceptions
 
 from .. import generic, exceptions
-from ..const import ResourceId
+from ..models.const import ResourceId
 from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
 
 

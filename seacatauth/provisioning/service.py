@@ -7,7 +7,7 @@ import asab.storage.exceptions
 
 from ..client.service import CLIENT_TEMPLATES
 from ..auth_provider import system_authz
-from ..const import ResourceId
+from ..models.const import ResourceId
 
 
 L = logging.getLogger(__name__)

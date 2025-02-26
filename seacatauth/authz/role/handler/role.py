@@ -9,7 +9,7 @@ import asab.exceptions
 
 from .... import exceptions
 from .... import generic
-from ....const import ResourceId
+from ....models.const import ResourceId
 from . import schema
 
 

@@ -6,7 +6,7 @@ import asab.web.auth
 import asab.web.tenant
 
 from ..models import Session
-from ..const import ResourceId
+from ..models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
