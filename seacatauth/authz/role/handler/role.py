@@ -9,6 +9,7 @@ from ....models.const import ResourceId
 from .... import exceptions
 from ....decorators import access_control
 from .... import generic
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -118,19 +119,7 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"label": {"type": "string"},
-			"description": {"type": "string"},
-			"propagated": {"type": "boolean"},
-			"resources": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
 	@access_control(ResourceId.ROLE_EDIT)
 	async def create(self, request, *, tenant, json_data):
 		"""
@@ -186,26 +175,7 @@ class RoleHandler(object):
 		return asab.web.rest.json_response(request, result)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"label": {"type": "string"},
-			"description": {"type": "string"},
-			"add": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-			"del": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-			"set": {
-				"type": "array",
-				"items": {"type": "string"},
-			},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
 	@access_control(ResourceId.ROLE_EDIT)
 	async def update(self, request, *, json_data, tenant):
 		"""

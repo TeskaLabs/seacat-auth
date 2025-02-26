@@ -6,6 +6,7 @@ import asab.exceptions
 
 from ....models.const import ResourceId
 from ....decorators import access_control
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -47,11 +48,7 @@ class RolesHandler(object):
 		return aiohttp.web.HTTPForbidden()
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "array",
-		"description": "Credential IDs",
-		"items": {"type": "string"}
-	})
+	@asab.web.rest.json_schema_handler(schema.BATCH_GET_CREDENTIALS_ROLES)
 	async def get_roles_batch(self, request, *, json_data):
 		"""
 		Get the assigned roles for several credentials
@@ -70,13 +67,7 @@ class RolesHandler(object):
 		return aiohttp.web.HTTPForbidden()
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"properties": {
-			"roles": {
-				"type": "array",
-				"items": {"type": "string"}}}
-	})
+	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
 	@access_control(ResourceId.ROLE_ASSIGN)
 	async def set_roles(self, request, *, json_data, tenant, resources):
 		"""
