@@ -39,12 +39,6 @@ class ChangePasswordHandler(object):
 		web_app_public.router.add_put("/public/password-reset", self.reset_password)
 		web_app_public.router.add_put("/public/lost-password", self.lost_password)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_put("/public/password-change", self.change_password)
-		web_app_public.router.add_put("/public/password-change", self.change_password)
-		# <<<
-
 
 	async def password_policy(self, request):
 		"""

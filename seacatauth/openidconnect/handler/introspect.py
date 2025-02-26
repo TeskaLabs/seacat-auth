@@ -31,17 +31,6 @@ class TokenIntrospectionHandler(object):
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
 		web_app.router.add_post("/nginx/introspect/openidconnect", self.introspect_nginx)
 
-		# TODO: Insecure, back-compat only - remove after 2024-03-31
-		if asab.Config.getboolean("seacatauth:introspection", "_enable_legacy_endpoints", fallback=False):
-			asab.LogObsolete.warning(
-				"Insecure legacy introspection endpoints are enabled. Please migrate your Nginx configuration to the "
-				"new recommended endpoints and then turn off the '_enable_legacy_endpoints' option. "
-				"See https://github.com/TeskaLabs/seacat-auth/pull/311 for migration details.",
-				struct_data={"eol": "2024-03-31"}
-			)
-			web_app_public = app.PublicWebContainer.WebApp
-			web_app_public.router.add_post("/openidconnect/introspect/nginx", self.introspect_nginx)
-
 
 	async def introspect(self, request):
 		"""

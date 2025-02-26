@@ -61,14 +61,6 @@ class AuthenticationHandler(object):
 		web_app_public.router.add_put("/public/login/{lsid}/webauthn", self.prepare_webauthn_login_challenge)
 		web_app_public.router.add_put("/public/logout", self.logout)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_put("/impersonate", self.impersonate)
-		web_app.router.add_post("/impersonate", self.impersonate_and_redirect)
-		web_app_public.router.add_put("/impersonate", self.impersonate)
-		web_app_public.router.add_post("/impersonate", self.impersonate_and_redirect)
-		# <<<
-
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",

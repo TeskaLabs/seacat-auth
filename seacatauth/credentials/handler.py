@@ -54,18 +54,6 @@ class CredentialsHandler(object):
 		web_app.router.add_put("/account/credentials", self.update_my_credentials)
 		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app.router.add_put("/public/credentials", self.update_my_credentials)
-		web_app.router.add_get("/public/last_login", self.get_my_last_login_data)
-
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_put("/public/credentials", self.update_my_credentials)
-		web_app_public.router.add_get("/public/provider", self.get_my_provider_info)
-		web_app_public.router.add_get("/public/last_login", self.get_my_last_login_data)
-		# <<<
-
 
 	async def list_providers(self, request):
 		"""
