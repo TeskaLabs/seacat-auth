@@ -98,7 +98,7 @@ class ResourceService(asab.Service):
 
 	async def initialize(self, app):
 		await super().initialize(app)
-		with system_authz("RESOURCE_PROVISIONING", resources={ResourceId.SUPERUSER}):
+		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._ensure_builtin_resources()
 
 

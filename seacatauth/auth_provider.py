@@ -98,13 +98,16 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 
 @contextlib.contextmanager
 def system_authz(
-	subject: str,
+	service_name: str,
 	resources: typing.Collection[str],
 	tenant: str | None = None,
 	expiration: int = 60
 ) -> Authorization:
-	app_name = "seacat-auth"
-	subject = "!internal:{}:{}".format(app_name, subject)
+	"""
+	Create internal system Authorization object with ephemeral Seacat Auth Session.
+	"""
+	app_name = "seacatauth"
+	subject = "!internal:{}".format(service_name)
 	authorized_resources = {
 		tenant or "*": set(resources),
 	}

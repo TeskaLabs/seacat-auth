@@ -87,7 +87,7 @@ class RoleService(asab.Service):
 
 
 	async def initialize(self, app):
-		with system_authz("ROLE_PROVISIONING", resources={ResourceId.SUPERUSER}):
+		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._ensure_system_roles()
 
 

@@ -67,13 +67,12 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.initialize(app)
 		await self.ClientService.initialize(app)
 
-		with system_authz("PROVISIONING_START", resources={ResourceId.SUPERUSER}):
+		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._set_up_provisioning(app)
 
 
-
 	async def finalize(self, app):
-		with system_authz("PROVISIONING_END", resources={ResourceId.SUPERUSER}):
+		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._tear_down_provisioning(app)
 		await super().finalize(app)
 
