@@ -3,6 +3,7 @@ import logging
 import re
 import fastjsonschema
 
+from ..models.const import ResourceId
 from .schemas import USERNAME_PATTERN
 
 
@@ -168,7 +169,7 @@ class CredentialsPolicy:
 			return self.RBACService.has_resource_access(
 				authz,
 				tenant=None,
-				requested_resources=["seacat:credentials:edit"],
+				requested_resources=[ResourceId.CREDENTIALS_EDIT],
 			)
 
 		policy = self.UpdatePolicy.get(attribute)
@@ -185,7 +186,7 @@ class CredentialsPolicy:
 			return self.RBACService.has_resource_access(
 				authz,
 				tenant=None,
-				requested_resources=["seacat:credentials:edit"],
+				requested_resources=[ResourceId.CREDENTIALS_EDIT],
 			)
 
 		# TODO: Check configurable resource-based policy

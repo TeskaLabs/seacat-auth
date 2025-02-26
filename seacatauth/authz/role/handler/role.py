@@ -5,6 +5,7 @@ import asab.web.rest
 import asab.storage.exceptions
 import asab.exceptions
 
+from ....models.const import ResourceId
 from .... import exceptions
 from ....decorators import access_control
 from .... import generic
@@ -33,7 +34,7 @@ class RoleHandler(object):
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update)
 
 
-	@access_control("authz:superuser")
+	@access_control(ResourceId.SUPERUSER)
 	async def list_all(self, request):
 		"""
 		List roles from all tenants
@@ -130,7 +131,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control("seacat:role:edit")
+	@access_control(ResourceId.ROLE_EDIT)
 	async def create(self, request, *, tenant, json_data):
 		"""
 		Create a new role
@@ -167,7 +168,7 @@ class RoleHandler(object):
 		})
 
 
-	@access_control("seacat:role:edit")
+	@access_control(ResourceId.ROLE_EDIT)
 	async def delete(self, request, *, tenant):
 		"""
 		Delete role
@@ -205,7 +206,7 @@ class RoleHandler(object):
 			},
 		}
 	})
-	@access_control("seacat:role:edit")
+	@access_control(ResourceId.ROLE_EDIT)
 	async def update(self, request, *, json_data, tenant):
 		"""
 		Edit role description and resources

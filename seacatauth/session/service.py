@@ -13,6 +13,7 @@ import asab
 import asab.storage
 import pymongo
 
+from ..models.const import ResourceId
 from .. import exceptions
 from ..events import EventTypes
 from ..models import Session
@@ -741,7 +742,7 @@ class SessionService(asab.Service):
 		# TODO: Choose builders based on scope
 		# Make sure dangerous resources are removed from impersonated sessions
 		if root_session.Authentication.ImpersonatorSessionId is not None:
-			exclude_resources = {"authz:superuser", "authz:impersonate"}
+			exclude_resources = {ResourceId.SUPERUSER, ResourceId.IMPERSONATE}
 		else:
 			exclude_resources = set()
 

@@ -4,6 +4,7 @@ import inspect
 import aiohttp.web
 import asab
 
+from .models.const import ResourceId
 from . import exceptions
 
 
@@ -107,7 +108,7 @@ def access_control(resource=None):
 			# (if the decorator specifies a required `resource`)
 			if resource is not None:
 				if resource not in request.Resources \
-					and "authz:superuser" not in request.Resources:
+					and ResourceId.SUPERUSER not in request.Resources:
 					L.log(asab.LOG_NOTICE, "Unauthorized resource access", struct_data={
 						"cid": request.CredentialsId,
 						"tenant": request.Tenant,
@@ -152,7 +153,7 @@ async def _authorize_tenant(request):
 			# Tenant accessible
 			# Add resources from all roles under the requested_tenant
 			available_resources = available_resources.union(request.Session.Authorization.Authz.get(requested_tenant))
-		elif "authz:superuser" in available_resources:
+		elif ResourceId.SUPERUSER in available_resources:
 			# Bypassing tenant-access check as superuser
 			pass
 		else:

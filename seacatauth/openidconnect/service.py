@@ -13,6 +13,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from ..models.const import ResourceId
 from ..generic import update_url_query_params
 from ..models import Session
 from .. import exceptions
@@ -137,7 +138,7 @@ class OpenIdConnectService(asab.Service):
 
 		# Exclude critical resource grants from impersonated sessions
 		if root_session.Authentication.ImpersonatorSessionId is not None:
-			exclude_resources = {"authz:superuser", "authz:impersonate"}
+			exclude_resources = {ResourceId.SUPERUSER, ResourceId.IMPERSONATE}
 		else:
 			exclude_resources = set()
 
@@ -378,9 +379,9 @@ class OpenIdConnectService(asab.Service):
 
 	async def authorize_tenants_by_scope(self, scope, session, client_id):
 		has_access_to_all_tenants = self.RBACService.has_resource_access(
-			session.Authorization.Authz, tenant=None, requested_resources=["authz:superuser"]) \
+			session.Authorization.Authz, tenant=None, requested_resources=[ResourceId.SUPERUSER]) \
 			or self.RBACService.has_resource_access(
-			session.Authorization.Authz, tenant=None, requested_resources=["authz:tenant:access"])
+			session.Authorization.Authz, tenant=None, requested_resources=[ResourceId.ACCESS_ALL_TENANTS])
 		try:
 			tenants = await self.TenantService.get_tenants_by_scope(
 				scope, session.Credentials.Id, has_access_to_all_tenants)

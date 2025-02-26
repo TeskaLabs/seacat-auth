@@ -2,6 +2,7 @@ import logging
 import typing
 import asab
 
+from ...models.const import ResourceId
 from ...exceptions import TenantNotSpecifiedError
 
 
@@ -19,7 +20,7 @@ class RBACService(asab.Service):
 			resource
 			for resource in authz["*"]
 		)
-		return "authz:superuser" in global_resources
+		return ResourceId.SUPERUSER in global_resources
 
 	@staticmethod
 	def can_access_all_tenants(authz: dict) -> bool:
@@ -27,7 +28,7 @@ class RBACService(asab.Service):
 			resource
 			for resource in authz["*"]
 		)
-		return "authz:superuser" in global_resources or "authz:tenant:access" in global_resources
+		return ResourceId.SUPERUSER in global_resources or ResourceId.ACCESS_ALL_TENANTS in global_resources
 
 	@staticmethod
 	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list) -> bool:

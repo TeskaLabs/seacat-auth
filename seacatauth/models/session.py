@@ -5,6 +5,7 @@ import datetime
 import typing
 import asab
 
+from ..models.const import ResourceId
 from .. import AuditLogger
 from ..authz.rbac.service import RBACService
 
@@ -491,7 +492,7 @@ def build_system_session(session_service, session_id):
 		Session.FN.ModifiedAt: None,
 		Session.FN.Session.Type: "SYSTEM",
 		Session.FN.Session.Expiration: datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30),
-		Session.FN.Authorization.Authz: {"*": ["authz:superuser"]},
+		Session.FN.Authorization.Authz: {"*": [ResourceId.SUPERUSER]},
 		Session.FN.Credentials.Id: "SYSTEM",
 	})
 	AuditLogger.log(asab.LOG_NOTICE, "Created new system session.", struct_data={"session_id": session.SessionId})

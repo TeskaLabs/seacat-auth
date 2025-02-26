@@ -7,6 +7,7 @@ import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
+from ..models.const import ResourceId
 from .. import exceptions, AuditLogger, generic
 from ..last_activity import EventCode
 from ..decorators import access_control
@@ -429,7 +430,7 @@ class AuthenticationHandler(object):
 			"credentials_id": "mongodb:default:abc123def456",
 			"expiration": "5m"}
 	})
-	@access_control("authz:impersonate")
+	@access_control(ResourceId.IMPERSONATE)
 	async def impersonate(self, request, *, json_data):
 		"""
 		Impersonate another user
@@ -461,7 +462,7 @@ class AuthenticationHandler(object):
 		return response
 
 
-	@access_control("authz:impersonate")
+	@access_control(ResourceId.IMPERSONATE)
 	async def impersonate_and_redirect(self, request):
 		"""
 		Impersonate another user
