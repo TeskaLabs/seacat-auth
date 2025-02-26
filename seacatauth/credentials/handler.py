@@ -1,13 +1,13 @@
 import logging
 import asab
 import asab.web.rest
-import asab.web.webcrypto
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 import asab.utils
 
-from ..models.const import ResourceId
 from .. import exceptions, generic
-from ..decorators import access_control
+from ..models.const import ResourceId
 from . import schema
 
 
@@ -51,6 +51,7 @@ class CredentialsHandler(object):
 		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def list_providers(self, request):
 		"""
 		Get credential providers and their metadata
@@ -61,6 +62,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, providers)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get_provider_info(self, request):
 		"""
 		Get the metadata of the requested credential provider.
@@ -74,7 +76,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def get_my_provider_info(self, request, *, credentials_id):
 		"""
 		Get the metadata of the current user's credential provider.
@@ -88,6 +90,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get_last_login_data(self, request):
 		"""
 		Get the credentials' last successful/failed login data.
@@ -97,17 +100,16 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def get_my_last_login_data(self, request, *, credentials_id):
 		"""
 		Get the current user's last successful/failed login data.
 		"""
-		if request.Session.is_anonymous():
-			raise asab.exceptions.AccessDeniedError()
 		data = await self.LastActivityService.get_last_logins(credentials_id)
 		return asab.web.rest.json_response(request, data)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def locate_credentials(self, request):
 		"""
 		Return the IDs of credentials that match the specified ident.
@@ -135,7 +137,7 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"credentials_ids": credentials_ids})
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def list_credentials(self, request):
 		"""
 		List credentials that are members of currently authorized tenant
@@ -170,6 +172,7 @@ class CredentialsHandler(object):
 			description:
 			schema: {"type": "boolean"}
 		"""
+		authz = asab.contextvars.Authz.get()
 		search = generic.SearchParams(request.query)
 
 		# BACK-COMPAT: Convert the old "mode" search to advanced filters
@@ -185,13 +188,22 @@ class CredentialsHandler(object):
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
+		authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
+		if authorized_tenants:
+			tenant_ctx = asab.contextvars.Tenant.set(authorized_tenants.pop())
+		else:
+			tenant_ctx = asab.contextvars.Tenant.set(None)
+
 		try:
-			result = await self.CredentialsService.list(request.Session, search, try_global_search)
+			result = await self.CredentialsService.list(search, try_global_search)
 		except exceptions.AccessDeniedError as e:
 			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
 			return asab.web.rest.json_response(request, status=403, data={
 				"result": "ACCESS-DENIED",
 			})
+		finally:
+			asab.contextvars.Tenant.reset(tenant_ctx)
+
 		return asab.web.rest.json_response(request, {
 			"result": "OK",
 			**result
@@ -199,6 +211,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.GET_IDENTS_FROM_IDS)
+	@asab.web.tenant.allow_no_tenant
 	async def get_idents_from_ids(self, request, *, json_data):
 		"""
 		Get human-intelligible identifiers for a list of credential IDs
@@ -226,6 +239,8 @@ class CredentialsHandler(object):
 			"data": result_data
 		})
 
+
+	@asab.web.tenant.allow_no_tenant
 	async def get_credentials(self, request):
 		"""
 		Get requested credentials' detail
@@ -240,12 +255,14 @@ class CredentialsHandler(object):
 				type: boolean
 				default: no
 		"""
+		authz = asab.contextvars.Authz.get()
 		credentials_id = request.match_info["credentials_id"]
 
 		# Check authorization:
 		#   the requester must be authorized in at least one of the tenants that the requested is a member of
-		if not request.Session.is_superuser():
-			for tenant in request.Session.Authorization.Authz:
+		if not authz.has_superuser_access():
+			authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
+			for tenant in authorized_tenants:
 				if tenant == "*":
 					continue
 				if await self.TenantService.has_tenant_assigned(credentials_id, tenant):
@@ -272,7 +289,8 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_CREDENTIALS)
-	@access_control(ResourceId.CREDENTIALS_EDIT)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
@@ -283,7 +301,7 @@ class CredentialsHandler(object):
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
 		# Create credentials
-		result = await self.CredentialsService.create_credentials(provider_id, json_data, request.Session)
+		result = await self.CredentialsService.create_credentials(provider_id, json_data)
 
 		if result["status"] != "OK":
 			return asab.web.rest.json_response(request, result, status=400)
@@ -327,7 +345,8 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_CREDENTIALS)
-	@access_control(ResourceId.CREDENTIALS_EDIT)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def update_credentials(self, request, *, json_data):
 		"""
 		Update credentials
@@ -335,7 +354,7 @@ class CredentialsHandler(object):
 		credentials_id = request.match_info["credentials_id"]
 
 		# Update credentials
-		result = await self.CredentialsService.update_credentials(credentials_id, json_data, request.Session)
+		result = await self.CredentialsService.update_credentials(credentials_id, json_data)
 
 		result["result"] = result["status"]  # TODO: Unify response format
 
@@ -346,7 +365,7 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_MY_CREDENTIALS)
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def update_my_credentials(self, request, *, json_data, credentials_id):
 		"""
 		Update the current user's own credentials
@@ -354,7 +373,6 @@ class CredentialsHandler(object):
 		result = await self.CredentialsService.update_credentials(
 			credentials_id,
 			json_data,
-			request.Session,
 		)
 
 		result["result"] = result["status"]  # TODO: Unify response format
@@ -366,7 +384,8 @@ class CredentialsHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.ENFORCE_FACTORS)
-	@access_control(ResourceId.CREDENTIALS_EDIT)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def enforce_factors(self, request, *, json_data):
 		"""
 		Specify authentication factors to be enforced from the user
@@ -388,7 +407,8 @@ class CredentialsHandler(object):
 		return asab.web.rest.json_response(request, {"result": result})
 
 
-	@access_control(ResourceId.CREDENTIALS_EDIT)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
 	async def delete_credentials(self, request, *, credentials_id):
 		"""
 		Delete credentials

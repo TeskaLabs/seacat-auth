@@ -1,11 +1,12 @@
 import logging
+import bson
 import asab
 import asab.web.rest
-import bson
+import asab.web.auth
+import asab.web.tenant
 
-from ..models.const import ResourceId
-from ..decorators import access_control
 from ..models import Session
+from ..models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
@@ -33,7 +34,8 @@ class SessionHandler(object):
 		web_app.router.add_delete("/account/sessions", self.delete_own_sessions)
 
 
-	@access_control(ResourceId.SESSION_ACCESS)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SESSION_ACCESS)
 	async def session_list(self, request):
 		"""
 		List sessions
@@ -65,7 +67,8 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@access_control(ResourceId.SESSION_ACCESS)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SESSION_ACCESS)
 	async def session_detail(self, request):
 		"""
 		Get session detail
@@ -80,7 +83,8 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, session)
 
 
-	@access_control(ResourceId.SESSION_TERMINATE)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SESSION_TERMINATE)
 	async def session_delete(self, request):
 		"""
 		Terminate a session
@@ -93,7 +97,8 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control(ResourceId.SUPERUSER)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
 	async def delete_all(self, request, *, credentials_id):
 		"""
 		Terminate all sessions
@@ -105,7 +110,8 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control(ResourceId.SESSION_ACCESS)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SESSION_ACCESS)
 	async def search_by_credentials_id(self, request):
 		"""
 		List all active sessions of given credentials
@@ -132,7 +138,8 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, sessions)
 
 
-	@access_control(ResourceId.SESSION_TERMINATE)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.SESSION_TERMINATE)
 	async def delete_by_credentials_id(self, request, *, credentials_id):
 		"""
 		Terminate all sessions of given credentials
@@ -148,7 +155,7 @@ class SessionHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def delete_own_sessions(self, request, *, credentials_id):
 		"""
 		Terminate all the current user's sessions
