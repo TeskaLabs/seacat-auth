@@ -6,8 +6,8 @@ import asab.exceptions
 import asab.storage.exceptions
 
 from ..client.service import CLIENT_TEMPLATES
-from ..generic import SessionContext
-from ..models import build_system_session
+from ..auth_provider import system_authz
+from ..const import ResourceId
 
 
 L = logging.getLogger(__name__)
@@ -67,20 +67,14 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.initialize(app)
 		await self.ClientService.initialize(app)
 
-		session = build_system_session(
-			self.SessionService,
-			session_id="PROVISIONING"
-		)
-		session_ctx = SessionContext.set(session)
-		try:
+		with system_authz("PROVISIONING_START", resources={ResourceId.SUPERUSER}):
 			await self._set_up_provisioning(app)
-		finally:
-			SessionContext.reset(session_ctx)
-			del session
+
 
 
 	async def finalize(self, app):
-		await self._tear_down_provisioning(app)
+		with system_authz("PROVISIONING_END", resources={ResourceId.SUPERUSER}):
+			await self._tear_down_provisioning(app)
 		await super().finalize(app)
 
 
