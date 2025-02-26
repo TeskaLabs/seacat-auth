@@ -30,22 +30,6 @@ class WebAuthnHandler(object):
 		web_app.router.add_put("/account/webauthn/{wacid}", self.update_credential)
 		web_app.router.add_get("/account/webauthn", self.list_credentials)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_get('/public/webauthn/register-options', self.get_registration_options)
-		web_app.router.add_put('/public/webauthn/register', self.register_credential)
-		web_app.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
-		web_app.router.add_put('/public/webauthn/{wacid}', self.update_credential)
-		web_app.router.add_get('/public/webauthn', self.list_credentials)
-
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_get('/public/webauthn/register-options', self.get_registration_options)
-		web_app_public.router.add_put('/public/webauthn/register', self.register_credential)
-		web_app_public.router.add_delete('/public/webauthn/{wacid}', self.remove_credential)
-		web_app_public.router.add_put('/public/webauthn/{wacid}', self.update_credential)
-		web_app_public.router.add_get('/public/webauthn', self.list_credentials)
-		# <<<
-
 
 	@access_control()
 	async def get_registration_options(self, request):

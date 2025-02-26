@@ -48,12 +48,6 @@ class RegistrationHandler(object):
 		web_app_public.router.add_post(
 			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
-		web_app_public.router.add_post("/public/{tenant}/invite", self.public_create_invitation)
-		# <<<
-
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
