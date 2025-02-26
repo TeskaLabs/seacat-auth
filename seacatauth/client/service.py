@@ -63,7 +63,7 @@ class ClientService(asab.Service):
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 		if not self._AllowCustomClientID:
-			CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
+			schema.CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
