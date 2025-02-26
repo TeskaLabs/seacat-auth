@@ -13,6 +13,7 @@ from .. import pkce
 from ..utils import TokenRequestErrorResponseCode
 from ... import exceptions, AuditLogger
 from ... import generic
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -351,14 +352,7 @@ class TokenHandler(object):
 		return session
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["token"],
-		"properties": {
-			"token": {"type": "string"},
-			"token_type_hint": {"type": "string"},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.TOKEN_REVOKE)
 	async def token_revoke(self, request, *, json_data):
 		"""
 		OAuth 2.0 Token revocation
