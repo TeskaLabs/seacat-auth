@@ -79,6 +79,12 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 			L.error("Session not found.", struct_data={"sid": claims["sid"]})
 			raise asab.exceptions.NotAuthenticatedError()
 
+		# Deny anonymous sessions
+		if session.is_anonymous():
+			L.error("Seacat Auth API access denied to anonymous session.", struct_data={
+				"sid": session.SessionId, "cid": session.Credentials.Id})
+			raise asab.exceptions.NotAuthenticatedError()
+
 		authz = Authorization(claims, session)
 
 		self.Authorizations[id_token] = authz
