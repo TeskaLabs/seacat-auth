@@ -6,7 +6,8 @@ import asab.exceptions
 from ..models.const import ResourceId
 from ..decorators import access_control
 from .. import generic, exceptions
-from .service import REGISTER_CLIENT_SCHEMA, UPDATE_CLIENT_SCHEMA, CLIENT_TEMPLATES, is_client_confidential
+from .service import is_client_confidential
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -89,15 +90,15 @@ class ClientHandler(object):
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 		"""
 		result = {
-			"metadata_schema": REGISTER_CLIENT_SCHEMA,
-			"templates": CLIENT_TEMPLATES,
+			"metadata_schema": schema.REGISTER_CLIENT,
+			"templates": schema.CLIENT_TEMPLATES,
 		}
 		return asab.web.rest.json_response(
 			request, result
 		)
 
 
-	@asab.web.rest.json_schema_handler(REGISTER_CLIENT_SCHEMA)
+	@asab.web.rest.json_schema_handler(schema.REGISTER_CLIENT)
 	@access_control(ResourceId.CLIENT_EDIT)
 	async def register(self, request, *, json_data):
 		"""
@@ -123,7 +124,7 @@ class ClientHandler(object):
 		return asab.web.rest.json_response(request, data=response_data)
 
 
-	@asab.web.rest.json_schema_handler(UPDATE_CLIENT_SCHEMA)
+	@asab.web.rest.json_schema_handler(schema.UPDATE_CLIENT)
 	@access_control(ResourceId.CLIENT_EDIT)
 	async def update(self, request, *, json_data):
 		"""
