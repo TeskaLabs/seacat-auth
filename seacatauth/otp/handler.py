@@ -4,6 +4,7 @@ import asab.web.rest
 
 from ..decorators import access_control
 from .. import exceptions
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -48,13 +49,7 @@ class OTPHandler(object):
 
 		return asab.web.rest.json_response(request, response)
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["otp"],
-		"properties": {
-			"otp": {"type": "string"}
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.ACTIVATE_OTP)
 	@access_control()
 	async def activate_totp(self, request, *, credentials_id, json_data):
 		"""
