@@ -10,6 +10,7 @@ import random
 import asab.config
 import asab.tls
 
+from ..models.const import ResourceId
 from ..authz import build_credentials_authz
 
 
@@ -44,7 +45,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		"tenant_indices": "tenant-{tenant}-*",
 
 		# IDs of Elasticsearch resources
-		"elasticsearch_superuser_resource_id": "authz:superuser",  # Superuser access to the entire Elasticsearch cluster
+		"elasticsearch_superuser_resource_id": ResourceId.SUPERUSER,  # Superuser access to the entire Elasticsearch cluster
 	}
 
 
@@ -351,7 +352,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		for tenant_id, authorized_resources in authz.items():
 			if tenant_id == "*":
 				# Seacat superuser is mapped to Elasticsearch "superuser" role
-				if "authz:superuser" in authorized_resources:
+				if ResourceId.SUPERUSER in authorized_resources:
 					elk_roles.add("superuser")
 				continue
 			elk_roles.add(get_index_access_role_name(tenant_id, "read"))

@@ -4,6 +4,7 @@ import asab
 import asab.web.rest
 import asab.exceptions
 
+from ....models.const import ResourceId
 from ....decorators import access_control
 
 
@@ -76,7 +77,7 @@ class RolesHandler(object):
 				"type": "array",
 				"items": {"type": "string"}}}
 	})
-	@access_control("seacat:role:assign")
+	@access_control(ResourceId.ROLE_ASSIGN)
 	async def set_roles(self, request, *, json_data, tenant, resources):
 		"""
 		Set credentials' roles
@@ -96,7 +97,7 @@ class RolesHandler(object):
 		requested_roles = json_data["roles"]
 
 		# Determine whether global roles will be un/assigned
-		if "authz:superuser" in resources:
+		if ResourceId.SUPERUSER in resources:
 			include_global = True
 		elif tenant == "*":
 			L.log(asab.LOG_NOTICE, "Not authorized to manage global roles.", struct_data={
@@ -110,7 +111,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control("seacat:role:assign")
+	@access_control(ResourceId.ROLE_ASSIGN)
 	async def assign_role(self, request, *, tenant):
 		"""
 		Assign role to credentials
@@ -141,7 +142,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control("seacat:role:assign")
+	@access_control(ResourceId.ROLE_ASSIGN)
 	async def unassign_role(self, request, *, tenant):
 		"""
 		Unassign role from credentials

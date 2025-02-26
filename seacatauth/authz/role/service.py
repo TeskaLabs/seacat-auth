@@ -4,11 +4,12 @@ import typing
 import asab.storage.exceptions
 import asab.exceptions
 
-from .view.propagated_role import global_role_id_to_propagated
+from ...models.const import ResourceId
 from ...generic import SessionContext
 from ... import exceptions
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
+from .view.propagated_role import global_role_id_to_propagated
 
 
 L = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ SuperuserRoleId = "*/superuser"
 SuperuserRoleProperties = {
 	"label": "Superuser",
 	"description": "Has superuser access. Passes any access control check, including the access to any tenant.",
-	"resources": ["authz:superuser"],
+	"resources": [ResourceId.SUPERUSER],
 	"managed_by": "seacat-auth",
 }
 
@@ -28,13 +29,13 @@ TenantAdminRoleProperties = {
 		"Manages access control. Creates and modifies tenant roles, invites new tenant members and "
 		"assigns roles to them.",
 	"resources": [
-		"seacat:tenant:access",
-		"seacat:tenant:edit",
-		"seacat:tenant:assign",
-		"seacat:tenant:delete",
-		"seacat:role:access",
-		"seacat:role:edit",
-		"seacat:role:assign",
+		ResourceId.TENANT_ACCESS,
+		ResourceId.TENANT_EDIT,
+		ResourceId.TENANT_ASSIGN,
+		ResourceId.TENANT_DELETE,
+		ResourceId.ROLE_ACCESS,
+		ResourceId.ROLE_EDIT,
+		ResourceId.ROLE_ASSIGN,
 	],
 	"propagated": True,
 }
@@ -313,7 +314,7 @@ class RoleService(asab.Service):
 		session = SessionContext.get()
 		if not (session and session.is_superuser()):
 			raise exceptions.AccessDeniedError(
-				subject=session.Credentials.Id if session else None, resource="authz:superuser")
+				subject=session.Credentials.Id if session else None, resource=ResourceId.SUPERUSER)
 
 
 	def parse_role_id(self, role_id: str) -> (typing.Optional[str], str):
@@ -596,7 +597,7 @@ class RoleService(asab.Service):
 
 		if verify_credentials_has_tenant and tenant != "*":
 			# NOTE: This check does not take into account tenant access granted via global resources
-			# such as "authz:superuser" or "authz:tenant:access", which is correct.
+			# such as "authz:superuser" or ResourceId.ACCESS_ALL_TENANTS, which is correct.
 			# To get a tenant role assigned, the user needs to have the tenant explicitly assigned.
 			if not await self.TenantService.has_tenant_assigned(credentials_id, tenant):
 				raise exceptions.TenantNotAssignedError(credentials_id, tenant)
