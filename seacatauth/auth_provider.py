@@ -98,36 +98,48 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 
 @contextlib.contextmanager
 def system_authz(
-	issuer: str,
+	subject: str,
 	resources: typing.Collection[str],
 	tenant: str | None = None,
 	expiration: int = 60
 ) -> Authorization:
-	if tenant is None:
-		tenant = "*"
+	app_name = "seacat-auth"
+	subject = "!internal:{}:{}".format(app_name, subject)
 	authorized_resources = {
-		tenant: set(resources),
+		tenant or "*": set(resources),
 	}
-	session_id = secrets.token_urlsafe(16)
 	now = datetime.datetime.now(datetime.UTC)
+	session_id = "!internal:{}:{}".format(now.strftime("%y%m%d%H%M%S"), secrets.token_urlsafe(8))
 	session_dict = {
 		Session.FN.SessionId: session_id,
-		Session.FN.Version: 0,
-		Session.FN.CreatedAt: now,
+		Session.FN.Version: None,
+		Session.FN.CreatedAt: None,
 		Session.FN.ModifiedAt: None,
-		Session.FN.Session.Type: "SYSTEM",
+		Session.FN.Session.Type: "internal",
 		Session.FN.Session.Expiration: now + datetime.timedelta(seconds=expiration),
 		Session.FN.Authorization.Authz: authorized_resources,
-		Session.FN.Credentials.Id: "SYSTEM",
+		Session.FN.Credentials.Id: None,
+		Session.FN.OAuth2.ClientId: subject,
 	}
 	session = Session(session_dict)
+	L.info("Internal system session created.", struct_data={
+		"sid": session_id, "sub": subject})
 
 	claims = {
-		"resources": authorized_resources,
-		"sid": session_id,
-		"iss": issuer,
+		# Authorized by
+		"iss": app_name,
+		# Authorized for
+		"aud": app_name,
+		# Who is authorized
+		"sub": subject,
+		# Issued at
 		"iat": now.timestamp(),
+		# Expires at
 		"exp": now.timestamp() + expiration,
+		# Authorization scope (tenants and resources)
+		"resources": authorized_resources,
+		# Seacat Auth session ID
+		"sid": session_id,
 	}
 	authz = Authorization(claims, session)
 
@@ -138,3 +150,5 @@ def system_authz(
 		asab.contextvars.Authz.reset(authz_ctx)
 		del authz
 		del session
+		L.info("Internal system session terminated.", struct_data={
+			"sid": session_id, "sub": subject})
