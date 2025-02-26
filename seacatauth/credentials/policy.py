@@ -5,7 +5,7 @@ import fastjsonschema
 import asab.contextvars
 
 from ..models.const import ResourceId
-from .schemas import USERNAME_PATTERN
+from .schema import USERNAME_PATTERN
 
 
 L = logging.getLogger(__name__)

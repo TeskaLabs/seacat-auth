@@ -7,6 +7,7 @@ import asab.web.tenant
 import asab.contextvars
 
 from ... import exceptions
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -45,41 +46,8 @@ class WebAuthnHandler(object):
 		return aiohttp.web.Response(body=options, content_type="application/json")
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": [
-			"id",
-			"rawId",
-			"response",
-			"type",
-		],
-		"properties": {
-			"id": {
-				# Credentials ID
-				"type": "string"
-			},
-			"rawId": {
-				# The ID again, but in binary form
-				"type": "string"
-			},
-			"response": {
-				# The actual WebAuthn login data
-				"type": "object",
-				"required": [
-					"clientDataJSON",
-					"attestationObject",
-				],
-				"properties": {
-					"clientDataJSON": {"type": "string"},
-					"attestationObject": {"type": "string"},
-				}
-			},
-			"type": {
-				"type": "string",
-				"enum": ["public-key"],
-			},
-		}
-	})
+
+	@asab.web.rest.json_schema_handler(schema.REGISTER_WEBAUTHN_CREDENTIAL)
 	@asab.web.tenant.allow_no_tenant
 	async def register_credential(self, request, *, json_data):
 		"""
@@ -117,20 +85,7 @@ class WebAuthnHandler(object):
 			"count": len(wa_credentials),
 		})
 
-
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": [
-			"name",
-		],
-		"properties": {
-			"name": {
-				"type": "string",
-				"minLength": 3,
-				"maxLength": 128,
-			},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.UPDATE_WEBAUTHN_CREDENTIAL)
 	@asab.web.tenant.allow_no_tenant
 	async def update_credential(self, request, *, json_data):
 		"""

@@ -8,8 +8,8 @@ import asab.contextvars
 
 from .. import exceptions
 from ..models.const import ResourceId
-from . import schemas
 from .random_name import propose_name
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data)
 
 
-	@asab.web.rest.json_schema_handler(schemas.CREATE_TENANT)
+	@asab.web.rest.json_schema_handler(schema.CREATE_TENANT)
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
 	async def create(self, request, *, json_data):
@@ -181,7 +181,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(
 			request, data={"id": tenant_id})
 
-	@asab.web.rest.json_schema_handler(schemas.UPDATE_TENANT)
+	@asab.web.rest.json_schema_handler(schema.UPDATE_TENANT)
 	@asab.web.auth.require(ResourceId.TENANT_EDIT)
 	async def update_tenant(self, request, *, json_data):
 		"""
@@ -202,7 +202,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@asab.web.rest.json_schema_handler(schemas.SET_TENANTS)
+	@asab.web.rest.json_schema_handler(schema.SET_TENANTS)
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	@asab.web.tenant.allow_no_tenant
 	async def set_tenants(self, request, *, json_data):
@@ -276,7 +276,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, tenants)
 
 
-	@asab.web.rest.json_schema_handler(schemas.GET_TENANTS_BATCH)
+	@asab.web.rest.json_schema_handler(schema.GET_TENANTS_BATCH)
 	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
 	@asab.web.tenant.allow_no_tenant
 	async def get_tenants_batch(self, request, *, json_data):
@@ -308,7 +308,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, {"tenant_id": tenant_id})
 
 
-	@asab.web.rest.json_schema_handler(schemas.BULK_ASSIGN_TENANTS)
+	@asab.web.rest.json_schema_handler(schema.BULK_ASSIGN_TENANTS)
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
 	async def bulk_assign_tenants(self, request, *, json_data):
@@ -384,7 +384,7 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=data)
 
 
-	@asab.web.rest.json_schema_handler(schemas.BULK_UNASSIGN_TENANTS)
+	@asab.web.rest.json_schema_handler(schema.BULK_UNASSIGN_TENANTS)
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
 	async def bulk_unassign_tenants(self, request, *, json_data):

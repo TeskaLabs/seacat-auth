@@ -7,9 +7,10 @@ import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
-from .service import GLOBAL_ONLY_RESOURCES
 from ... import exceptions
 from ...models.const import ResourceId
+from . import schema
+from .service import GLOBAL_ONLY_RESOURCES
 
 
 L = logging.getLogger(__name__)
@@ -118,12 +119,7 @@ class ResourceHandler(object):
 		)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"description": {"type": "string"}}
-	})
+	@asab.web.rest.json_schema_handler(schema.CREATE_OR_UNDELETE_RESOURCE)
 	@asab.web.auth.require(ResourceId.RESOURCE_EDIT)
 	@asab.web.tenant.allow_no_tenant
 	async def create_or_undelete(self, request, *, json_data):
@@ -148,14 +144,7 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"additionalProperties": False,
-		"properties": {
-			"name": {"type": "string"},
-			"description": {"type": "string"},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.UPDATE_RESOURCE)
 	@asab.web.auth.require(ResourceId.RESOURCE_EDIT)
 	@asab.web.tenant.allow_no_tenant
 	async def update(self, request, *, json_data):

@@ -6,8 +6,8 @@ import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
-from . import schema
 from ....models.const import ResourceId
+from . import schema
 
 
 L = logging.getLogger(__name__)

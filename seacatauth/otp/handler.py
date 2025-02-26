@@ -6,6 +6,7 @@ import asab.web.tenant
 import asab.contextvars
 
 from .. import exceptions
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -51,13 +52,7 @@ class OTPHandler(object):
 
 		return asab.web.rest.json_response(request, response)
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["otp"],
-		"properties": {
-			"otp": {"type": "string"}
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.ACTIVATE_OTP)
 	@asab.web.tenant.allow_no_tenant
 	async def activate_totp(self, request, *, json_data):
 		"""

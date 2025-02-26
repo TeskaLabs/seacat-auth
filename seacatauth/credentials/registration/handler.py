@@ -12,6 +12,7 @@ import asab.exceptions
 
 from ...models.const import ResourceId
 from ... import exceptions
+from .. import schema
 
 
 L = logging.getLogger(__name__)
@@ -52,14 +53,7 @@ class RegistrationHandler(object):
 			"/public/register/{registration_code:[-_=a-zA-Z0-9]{16,}}", self.complete_registration)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["email"],  # TODO: Enable more communication options
-		"additionalProperties": False,
-		"properties": {
-			"email": {"type": "string"},
-		}
-	})
+	@asab.web.rest.json_schema_handler(schema.CREATE_INVITATION_PUBLIC)
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
@@ -96,26 +90,7 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["credentials"],
-		"additionalProperties": False,
-		"properties": {
-			"credentials": {
-				"required": ["email"],  # TODO: Enable more communication options
-				"properties": {
-					"email": {"type": "string"},
-					"username": {"type": "string"},
-					"phone": {"type": "string"},
-				}
-			},
-			"expiration": {
-				"oneOf": [{"type": "string"}, {"type": "number"}],
-				"description": "How long until the invitation expires.",
-				"example": "6 h",
-			},
-		},
-	})
+	@asab.web.rest.json_schema_handler(schema.CREATE_INVITATION_ADMIN)
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
 		"""
@@ -263,16 +238,7 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"required": ["email"],
-		"additionalProperties": False,
-		"properties": {
-			"email": {
-				"type": "string",
-				"description": "User email to send the invitation to."},
-		},
-	})
+	@asab.web.rest.json_schema_handler(schema.REQUEST_SELF_INVITATION)
 	@asab.web.auth.noauth
 	async def request_self_invitation(self, request, *, json_data):
 		"""
