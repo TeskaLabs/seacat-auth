@@ -6,7 +6,7 @@ import asab.utils
 from ..models.const import ResourceId
 from .. import exceptions
 from ..decorators import access_control
-from . import schemas
+from . import schema
 from .random_name import propose_name
 
 
