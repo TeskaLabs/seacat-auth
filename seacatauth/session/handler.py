@@ -32,14 +32,6 @@ class SessionHandler(object):
 
 		web_app.router.add_delete("/account/sessions", self.delete_own_sessions)
 
-		# Back-compat; To be removed in next major version
-		# >>>
-		web_app.router.add_delete("/public/sessions", self.delete_own_sessions)
-
-		web_app_public = app.PublicWebContainer.WebApp
-		web_app_public.router.add_delete("/public/sessions", self.delete_own_sessions)
-		# <<<
-
 
 	@access_control(ResourceId.SESSION_ACCESS)
 	async def session_list(self, request):
