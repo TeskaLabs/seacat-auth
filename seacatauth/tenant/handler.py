@@ -93,7 +93,7 @@ class TenantHandler(object):
 		if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
 			# List only tenants authorized in the current session
 			# NOTE: This ignores pagination and filtering
-			authorized_tenants = [t for t in authz.get_claim("resources") or {} if t != "*"]
+			authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
 			tenants = []
 			count = 0
 			for tenant in authorized_tenants:

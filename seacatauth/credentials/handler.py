@@ -192,7 +192,7 @@ class CredentialsHandler(object):
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
-		authorized_tenants = [t for t in authz.get_claim("resources") or {} if t != "*"]
+		authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
 		if authorized_tenants:
 			tenant_ctx = asab.contextvars.Tenant.set(authorized_tenants.pop())
 		else:
@@ -270,7 +270,7 @@ class CredentialsHandler(object):
 		# Check authorization:
 		#   the requester must be authorized in at least one of the tenants that the requested is a member of
 		if not authz.has_superuser_access():
-			authorized_tenants = [t for t in authz.get_claim("resources") or {} if t!= "*"]
+			authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
 			for tenant in authorized_tenants:
 				if tenant == "*":
 					continue
