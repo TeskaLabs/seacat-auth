@@ -161,9 +161,9 @@ class TenantService(asab.Service):
 
 
 	def get_provider(self):
-		'''
+		"""
 		This method can return None when a 'tenant' feature is not enabled.
-		'''
+		"""
 		return self.TenantProvider
 
 
@@ -181,7 +181,6 @@ class TenantService(asab.Service):
 		"""
 		authz = asab.contextvars.Authz.get()
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
-		rbac_svc = self.App.get_service("seacatauth.RBACService")
 
 		# Check if credentials exist
 		try:

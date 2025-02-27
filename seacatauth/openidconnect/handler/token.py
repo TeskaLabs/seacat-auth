@@ -367,9 +367,6 @@ class TokenHandler(object):
 		"""
 		# TODO: Confidential clients must authenticate (query params or Authorization header)
 		# TODO: Public clients are not allowed to revoke other clients' tokens
-		if request.Session is None:
-			return aiohttp.web.HTTPUnauthorized()
-
 		token_type_hint = json_data.get("token_type_hint")  # Optional `access_token` or `refresh_token`
 		await self.OpenIdConnectService.revoke_token(json_data["token"], token_type_hint)
 		return aiohttp.web.HTTPOk()
