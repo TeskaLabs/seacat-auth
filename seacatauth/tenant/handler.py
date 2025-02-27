@@ -216,7 +216,6 @@ class TenantHandler(object):
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		data = await self.TenantService.set_tenants(
-			session=request.Session,
 			credentials_id=credentials_id,
 			tenants=json_data["tenants"]
 		)
@@ -266,7 +265,7 @@ class TenantHandler(object):
 		tenants = await self.TenantService.get_tenants(request.match_info["credentials_id"])
 		if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
 			# Get the intersection of my tenants and the target tenants
-			my_tenants = set(await self.TenantService.get_tenants(request.Session.Credentials.Id))
+			my_tenants = set(await self.TenantService.get_tenants(authz.CredentialsId))
 			# Preserve ordering
 			tenants = [
 				tenant for tenant in tenants
@@ -285,7 +284,7 @@ class TenantHandler(object):
 		"""
 		authz = asab.contextvars.Authz.get()
 		if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
-			my_tenants = await self.TenantService.get_tenants(request.Session.Credentials.Id)
+			my_tenants = await self.TenantService.get_tenants(authz.CredentialsId)
 		else:
 			my_tenants = True  # All tenants
 
