@@ -77,11 +77,12 @@ class CredentialsHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	async def get_my_provider_info(self, request, *, credentials_id):
+	async def get_my_provider_info(self, request):
 		"""
 		Get the metadata of the current user's credential provider.
 		"""
-		provider = self.CredentialsService.get_provider(credentials_id)
+		authz = asab.contextvars.Authz.get()
+		provider = self.CredentialsService.get_provider(authz.CredentialsId)
 		data = self.CredentialsService.get_provider_info(provider.ProviderID)
 		response = {
 			"result": "OK",
@@ -101,11 +102,12 @@ class CredentialsHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	async def get_my_last_login_data(self, request, *, credentials_id):
+	async def get_my_last_login_data(self, request):
 		"""
 		Get the current user's last successful/failed login data.
 		"""
-		data = await self.LastActivityService.get_last_logins(credentials_id)
+		authz = asab.contextvars.Authz.get()
+		data = await self.LastActivityService.get_last_logins(authz.CredentialsId)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -366,12 +368,13 @@ class CredentialsHandler(object):
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_MY_CREDENTIALS)
 	@asab.web.tenant.allow_no_tenant
-	async def update_my_credentials(self, request, *, json_data, credentials_id):
+	async def update_my_credentials(self, request, *, json_data):
 		"""
 		Update the current user's own credentials
 		"""
+		authz = asab.contextvars.Authz.get()
 		result = await self.CredentialsService.update_credentials(
-			credentials_id,
+			authz.CredentialsId,
 			json_data,
 		)
 
@@ -395,7 +398,6 @@ class CredentialsHandler(object):
 
 		enforce_factors = json_data.get("factors")
 
-		# TODO: Implement and use LoginFactor.can_be_enforced() method
 		for factor in enforce_factors:
 			if factor not in frozenset(["totp", "smscode", "password"]):
 				raise ValueError("Login factor cannot be enforced", {"factor": factor})
@@ -409,11 +411,11 @@ class CredentialsHandler(object):
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
-	async def delete_credentials(self, request, *, credentials_id):
+	async def delete_credentials(self, request):
 		"""
 		Delete credentials
 		"""
-		agent_cid = credentials_id  # Who called the request
+		authz = asab.contextvars.Authz.get()
 		credentials_id = request.match_info["credentials_id"]  # Who will be deleted
-		result = await self.CredentialsService.delete_credentials(credentials_id, agent_cid)
+		result = await self.CredentialsService.delete_credentials(credentials_id, authz.CredentialsId)
 		return asab.web.rest.json_response(request, {"result": result})

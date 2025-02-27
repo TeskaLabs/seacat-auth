@@ -74,7 +74,7 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 
 		# Pair authorization with Seacat Auth session
 		try:
-			session = self.SessionService.get(claims["sid"])
+			session = await self.SessionService.get(claims["sid"])
 		except SessionNotFoundError:
 			L.error("Session not found.", struct_data={"sid": claims["sid"]})
 			raise asab.exceptions.NotAuthenticatedError()

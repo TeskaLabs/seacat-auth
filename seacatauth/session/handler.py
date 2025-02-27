@@ -99,12 +99,13 @@ class SessionHandler(object):
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
-	async def delete_all(self, request, *, credentials_id):
+	async def delete_all(self, request):
 		"""
 		Terminate all sessions
 		"""
+		authz = asab.contextvars.Authz.get()
 		L.warning("Deleting all sessions", struct_data={
-			"requested_by": credentials_id
+			"requested_by": authz.CredentialsId
 		})
 		await self.SessionService.delete_all_sessions()
 		return asab.web.rest.json_response(request, {"result": "OK"})
@@ -140,28 +141,28 @@ class SessionHandler(object):
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.SESSION_TERMINATE)
-	async def delete_by_credentials_id(self, request, *, credentials_id):
+	async def delete_by_credentials_id(self, request):
 		"""
 		Terminate all sessions of given credentials
 		"""
-		requester_cid = credentials_id
-
+		authz = asab.contextvars.Authz.get()
 		credentials_id = request.match_info.get("credentials_id")
 		L.warning("Deleting all user sessions", struct_data={
 			"cid": credentials_id,
-			"requested_by": requester_cid
+			"requested_by": authz.CredentialsId,
 		})
 		await self.SessionService.delete_sessions_by_credentials_id(credentials_id)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@asab.web.tenant.allow_no_tenant
-	async def delete_own_sessions(self, request, *, credentials_id):
+	async def delete_own_sessions(self, request):
 		"""
 		Terminate all the current user's sessions
 		"""
+		authz = asab.contextvars.Authz.get()
 		L.warning("Deleting all user sessions", struct_data={
-			"cid": credentials_id
+			"cid": authz.CredentialsId,
 		})
-		await self.SessionService.delete_sessions_by_credentials_id(credentials_id)
+		await self.SessionService.delete_sessions_by_credentials_id(authz.CredentialsId)
 		return asab.web.rest.json_response(request, {"result": "OK"})

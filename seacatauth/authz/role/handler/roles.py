@@ -160,11 +160,12 @@ class RolesHandler(object):
 
 
 	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
-	async def unassign_credentials_role(self, request, *, tenant):
+	async def unassign_credentials_role(self, request):
 		"""
 		Unassign role from credentials
 		"""
-		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		await self.RoleService.unassign_role(
 			credentials_id=request.match_info["credentials_id"],
 			role_id=role_id

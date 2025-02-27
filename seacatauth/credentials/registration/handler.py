@@ -55,11 +55,13 @@ class RegistrationHandler(object):
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_INVITATION_PUBLIC)
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
-	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
+	async def public_create_invitation(self, request, *, json_data):
 		"""
 		Common user request to invite a new user to join specified tenant and create an account
 		if they don't have one yet. The invited user gets a registration link in their email.
 		"""
+		authz = asab.contextvars.Authz.get()
+		tenant_id = asab.contextvars.Tenant.get()
 		# TODO: Limit the number of requests
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
@@ -79,12 +81,12 @@ class RegistrationHandler(object):
 
 		# Prepare credentials, assign tenant and send invitation email
 		invited_credentials_id, registration_url = await self._prepare_invitation(
-			tenant, credential_data, expiration, access_ips,
-			invited_by_cid=credentials_id
+			tenant_id, credential_data, expiration, access_ips,
+			invited_by_cid=authz.CredentialsId
 		)
 		if registration_url:
 			L.log(asab.LOG_NOTICE, "Including invitation URL in REST response.", struct_data={
-				"cid": invited_credentials_id, "requested_by": credentials_id})
+				"cid": invited_credentials_id, "requested_by": authz.CredentialsId})
 			response_data["registration_url"] = registration_url
 
 		return asab.web.rest.json_response(request, response_data)
@@ -92,11 +94,14 @@ class RegistrationHandler(object):
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_INVITATION_ADMIN)
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
-	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
+	async def admin_create_invitation(self, request, *, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
 		Generate a registration code and send a registration link to the user's email.
 		"""
+		authz = asab.contextvars.Authz.get()
+		tenant_id = asab.contextvars.Tenant.get()
+
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
 		forwarded_for = request.headers.get("X-Forwarded-For")
@@ -113,8 +118,8 @@ class RegistrationHandler(object):
 
 		# Prepare credentials and assign tenant
 		invited_credentials_id, registration_url = await self._prepare_invitation(
-			tenant, credential_data, expiration, access_ips,
-			invited_by_cid=credentials_id
+			tenant_id, credential_data, expiration, access_ips,
+			invited_by_cid=authz.CredentialsId
 		)
 
 		response_data = {
