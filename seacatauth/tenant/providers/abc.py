@@ -3,7 +3,7 @@ import typing
 import asab
 
 
-class TenantsProviderABC(asab.Configurable, abc.ABC):
+class TenantProviderABC(asab.Configurable, abc.ABC):
 
 
 	def __init__(self, provider_id, config_section_name, config=None):
@@ -22,16 +22,16 @@ class TenantsProviderABC(asab.Configurable, abc.ABC):
 
 
 	@abc.abstractmethod
-	async def iterate_assigned(self, credatials_id: str, page: int = 10, limit: int = None):
+	async def iterate_assigned(self, credentials_id: str, page: int = 10, limit: int = None):
 		pass
 
 
 	@abc.abstractmethod
-	async def get_assignment(self, credatials_id: str, tenant: str):
+	async def get_assignment(self, credentials_id: str, tenant: str):
 		pass
 
 
-class EditableTenantsProviderABC(TenantsProviderABC):
+class EditableTenantProviderABC(TenantProviderABC):
 
 	@abc.abstractmethod
 	async def create(self, tenant: dict) -> typing.Optional[str]:
