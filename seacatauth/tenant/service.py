@@ -25,6 +25,8 @@ class TenantService(asab.Service):
 
 	async def initialize(self, app):
 		await super().initialize(app)
+		if self.TenantsProvider is None:
+			L.warning("No tenant provider is configured.")
 
 
 	def create_provider(self, provider_id, config_section_name):
@@ -153,7 +155,6 @@ class TenantService(asab.Service):
 
 
 	async def get_tenants(self, credentials_id: str):
-		assert (self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		# TODO: This has to be cached agressivelly
 		result = []
 		async for obj in self.TenantsProvider.iterate_assigned(credentials_id):
@@ -165,7 +166,6 @@ class TenantService(asab.Service):
 		"""
 		Assign `credentials_id` to all tenants listed in `tenants`, unassign it from all tenants that are not listed.
 		"""
-		assert (self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
 		rbac_svc = self.App.get_service("seacatauth.RBACService")
 
@@ -260,7 +260,6 @@ class TenantService(asab.Service):
 		Grant tenant access to specified credentials.
 		Optionally, verify first that the tenant and the credentials exist.
 		"""
-		assert (self.is_enabled())
 		assert tenant != "*"
 
 		if verify_tenant:
@@ -301,7 +300,6 @@ class TenantService(asab.Service):
 		"""
 		Revoke credentials' access to specified tenant and unassign the tenant's roles.
 		"""
-		assert (self.is_enabled())
 		assert tenant != "*"
 
 		# Unassign tenant roles
@@ -314,13 +312,6 @@ class TenantService(asab.Service):
 
 		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
 		self.App.PubSub.publish("Tenant.unassigned!", credentials_id=credentials_id, tenant_id=tenant)
-
-
-	def is_enabled(self):
-		"""
-		Tenants are optional, SeaCat Auth can operate without tenant.
-		"""
-		return self.TenantsProvider is not None
 
 
 	async def get_tenants_by_scope(self, scope: list, credential_id: str, has_access_to_all_tenants: bool = False):
