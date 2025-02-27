@@ -78,11 +78,6 @@ class CredentialsService(asab.Service):
 			provider = service.create_provider(provider_name, section)
 			providers.append((provider.Order, provider))
 
-			if tenant_service is not None:
-				if not provider.Config.getboolean('tenants'):
-					continue
-				tenant_service.create_provider(provider_name, section)
-
 		# Sort providers by their configured order
 		providers.sort(key=lambda item: item[0])
 		for order, provider in providers:
