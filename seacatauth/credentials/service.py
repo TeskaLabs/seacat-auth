@@ -635,7 +635,7 @@ class CredentialsService(asab.Service):
 		tenant_service = self.App.get_service("seacatauth.TenantService")
 		if authz.has_superuser_access():
 			return True
-		for tenant_id in authz.get_clain("resources", {}):
+		for tenant_id in authz.get_claim("resources", {}):
 			if tenant_id == "*":
 				continue
 			if await tenant_service.has_tenant_assigned(credentials_id, tenant_id):
