@@ -3,7 +3,7 @@ import typing
 import asab.storage.mongodb
 import asab.storage.exceptions
 
-from .abc import EditableTenantsProviderABC
+from .abc import EditableTenantProviderABC
 
 from ...events import EventTypes
 
@@ -11,13 +11,13 @@ from ...events import EventTypes
 L = logging.getLogger(__name__)
 
 
-class MongoDBTenantProvider(EditableTenantsProviderABC):
+class MongoDBTenantProvider(EditableTenantProviderABC):
 
 	Type = "mongodb"
 
 	ConfigDefaults = {
-		'tenant_collection': 't',
-		'assign_collection': 'ct',
+		"tenant_collection": "t",
+		"assign_collection": "ct",
 	}
 
 	def __init__(self, app, provider_id, config_section_name):
@@ -26,12 +26,12 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		self.App = app
 		self.MongoDBStorageService = asab.storage.mongodb.StorageService(
 			app,
-			"seacatauth.tenant.mongodb.{}.storage".format(provider_id),
+			"seacatauth.tenant.{}.{}.storage".format(self.Type, self.ProviderID),
 			config_section_name=config_section_name
 		)
 
-		self.TenantsCollection = self.Config['tenant_collection']
-		self.AssignCollection = self.Config['assign_collection']
+		self.TenantsCollection = self.Config["tenant_collection"]
+		self.AssignCollection = self.Config["assign_collection"]
 
 
 	async def iterate(self, page: int = 1, limit: int = None, filter: str = None):
@@ -161,9 +161,9 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 	# 	return tenant_assignment
 
 
-	async def iterate_assigned(self, credatials_id: str, page: int = 10, limit: int = None):
+	async def iterate_assigned(self, credentials_id: str, page: int = 10, limit: int = None):
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
-		filter = {"c": credatials_id}
+		filter = {"c": credentials_id}
 		cursor = collection.find(filter)
 		cursor.sort("t", 1)
 		if limit is not None:
@@ -235,9 +235,9 @@ class MongoDBTenantProvider(EditableTenantsProviderABC):
 		})
 
 
-	async def get_assignment(self, credatials_id: str, tenant: str) -> dict:
+	async def get_assignment(self, credentials_id: str, tenant: str) -> dict:
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
-		query = {"c": credatials_id, "t": tenant}
+		query = {"c": credentials_id, "t": tenant}
 		result = await collection.find_one(query)
 		if result is None:
 			raise KeyError("Tenant assignment not found")

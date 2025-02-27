@@ -28,7 +28,7 @@ async def build_credentials_authz(
 	authz[tenant] = list(authz[tenant])
 
 	# Add tenant-specific roles and resources
-	if tenant_service.is_enabled() and tenants is not None:
+	if tenants is not None:
 		for tenant in tenants:
 			authz[tenant] = set()
 			for role in await role_service.get_roles_by_credentials(credentials_id, [tenant]):

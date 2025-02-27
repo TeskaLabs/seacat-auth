@@ -52,7 +52,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 	ConfigDefaults = {
 		"credentials_collection": "c",
-		"tenants": "yes",
 		"registration": "yes",
 	}
 

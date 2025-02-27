@@ -16,35 +16,50 @@ class TenantService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.TenantService"):
 		super().__init__(app, service_name)
-		self.TenantsProvider = None
+		self.TenantProvider = None
 		self.AdditionalIdCharacters = asab.Config.get(
 			"seacatauth:tenant", "additional_allowed_id_characters", fallback="")
 		self.TenantIdRegex = re.compile(self.TenantIdPattern.format(re.escape(self.AdditionalIdCharacters)))
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 
+		for section_name in asab.Config:
+			if section_name.startswith("seacatauth:tenant:"):
+				self.create_provider(section_name)
+				# Only one provider is supported at the moment
+				break
+		else:
+			# Create default mongodb provider
+			section_name = "seacatauth:tenant:mongodb:default"
+			asab.Config[section_name] = {}
+			self.create_provider(section_name)
+
 
 	async def initialize(self, app):
 		await super().initialize(app)
+		if self.TenantProvider is None:
+			L.warning("No tenant provider is configured.")
 
 
-	def create_provider(self, provider_id, config_section_name):
-		assert (self.TenantsProvider is None)  # We support only one tenant provider for now
-		_, creds, provider_type, provider_name = config_section_name.rsplit(":", 3)
+	def create_provider(self, config_section_name):
+		if self.TenantProvider is not None:
+			# We support only one tenant provider for now
+			raise RuntimeError("Another tenant provider is already registered.")
+
+		_, _, provider_type, provider_name = config_section_name.rsplit(":", 3)
 		if provider_type == "mongodb":
 			from .providers.mongodb import MongoDBTenantProvider
-			provider = MongoDBTenantProvider(self.App, provider_id, config_section_name)
+			provider = MongoDBTenantProvider(self.App, provider_name, config_section_name)
 
 		else:
-			raise RuntimeError("Unsupported tenant provider '{}'".format(provider_type))
+			raise RuntimeError("Unsupported tenant provider {!r}.".format(provider_type))
 
-		self.TenantsProvider = provider
+		self.TenantProvider = provider
 
 
 	async def list_tenant_ids(self):
 		"""
 		List all registered tenant IDs
 		"""
-		# TODO: This has to be cached agressivelly
 		provider = self.get_provider()
 		result = []
 		async for tenant in provider.iterate():
@@ -64,7 +79,7 @@ class TenantService(asab.Service):
 
 	async def get_tenant(self, tenant_id: str):
 		try:
-			return await self.TenantsProvider.get(tenant_id)
+			return await self.TenantProvider.get(tenant_id)
 		except KeyError:
 			raise exceptions.TenantNotFoundError(tenant_id)
 
@@ -93,7 +108,7 @@ class TenantService(asab.Service):
 			raise asab.exceptions.ValidationError(message)
 
 		try:
-			tenant_id = await self.TenantsProvider.create(
+			tenant_id = await self.TenantProvider.create(
 				tenant_id, label=label, description=description, data=data, creator_id=creator_id)
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
@@ -105,7 +120,7 @@ class TenantService(asab.Service):
 
 
 	async def update_tenant(self, tenant_id: str, **kwargs):
-		result = await self.TenantsProvider.update(tenant_id, **kwargs)
+		result = await self.TenantProvider.update(tenant_id, **kwargs)
 
 		self.App.PubSub.publish("Tenant.updated!", tenant_id=tenant_id)
 
@@ -134,10 +149,10 @@ class TenantService(asab.Service):
 				continue
 
 		# Unassign tenant from credentials
-		await self.TenantsProvider.delete_tenant_assignments(tenant_id)
+		await self.TenantProvider.delete_tenant_assignments(tenant_id)
 
 		# Delete tenant from provider
-		await self.TenantsProvider.delete(tenant_id)
+		await self.TenantProvider.delete(tenant_id)
 
 		self.App.PubSub.publish("Tenant.deleted!", tenant_id=tenant_id)
 
@@ -149,14 +164,13 @@ class TenantService(asab.Service):
 		'''
 		This method can return None when a 'tenant' feature is not enabled.
 		'''
-		return self.TenantsProvider
+		return self.TenantProvider
 
 
 	async def get_tenants(self, credentials_id: str):
-		assert (self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		# TODO: This has to be cached agressivelly
 		result = []
-		async for obj in self.TenantsProvider.iterate_assigned(credentials_id):
+		async for obj in self.TenantProvider.iterate_assigned(credentials_id):
 			result.append(obj["t"])
 		return result
 
@@ -165,7 +179,6 @@ class TenantService(asab.Service):
 		"""
 		Assign `credentials_id` to all tenants listed in `tenants`, unassign it from all tenants that are not listed.
 		"""
-		assert (self.is_enabled())  # TODO: Replace this by a L.warning("Tenants are not configured.") & raise RuntimeError()
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
 		rbac_svc = self.App.get_service("seacatauth.RBACService")
 
@@ -188,7 +201,7 @@ class TenantService(asab.Service):
 		for tenant in tenants_to_assign:
 			# Check if tenant exists
 			try:
-				await self.TenantsProvider.get(tenant)
+				await self.TenantProvider.get(tenant)
 			except KeyError:
 				message = "Tenant not found"
 				L.error(message, struct_data={"tenant": tenant})
@@ -260,7 +273,6 @@ class TenantService(asab.Service):
 		Grant tenant access to specified credentials.
 		Optionally, verify first that the tenant and the credentials exist.
 		"""
-		assert (self.is_enabled())
 		assert tenant != "*"
 
 		if verify_tenant:
@@ -274,7 +286,7 @@ class TenantService(asab.Service):
 				raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		try:
-			await self.TenantsProvider.assign_tenant(credentials_id, tenant)
+			await self.TenantProvider.assign_tenant(credentials_id, tenant)
 		except asab.storage.exceptions.DuplicateError as e:
 			if e.KeyValue is not None:
 				key, value = e.KeyValue.popitem()
@@ -301,7 +313,6 @@ class TenantService(asab.Service):
 		"""
 		Revoke credentials' access to specified tenant and unassign the tenant's roles.
 		"""
-		assert (self.is_enabled())
 		assert tenant != "*"
 
 		# Unassign tenant roles
@@ -312,15 +323,8 @@ class TenantService(asab.Service):
 			tenant=tenant
 		)
 
-		await self.TenantsProvider.unassign_tenant(credentials_id, tenant)
+		await self.TenantProvider.unassign_tenant(credentials_id, tenant)
 		self.App.PubSub.publish("Tenant.unassigned!", credentials_id=credentials_id, tenant_id=tenant)
-
-
-	def is_enabled(self):
-		"""
-		Tenants are optional, SeaCat Auth can operate without tenant.
-		"""
-		return self.TenantsProvider is not None
 
 
 	async def get_tenants_by_scope(self, scope: list, credential_id: str, has_access_to_all_tenants: bool = False):
@@ -377,4 +381,4 @@ class TenantService(asab.Service):
 
 
 	async def get_assigned_tenant(self, credatials_id: str, tenant: str) -> dict:
-		return await self.TenantsProvider.get_assignment(credatials_id, tenant)
+		return await self.TenantProvider.get_assignment(credatials_id, tenant)
