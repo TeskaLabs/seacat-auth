@@ -1,11 +1,12 @@
 import logging
-import aiohttp.web
 import asab
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
 from ....models.const import ResourceId
-from ....decorators import access_control
 from . import schema
 
 
@@ -26,136 +27,159 @@ class RolesHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/roles/{tenant}/{credentials_id}", self.get_roles_by_credentials)
-		web_app.router.add_put("/roles/{tenant}/{credentials_id}", self.set_roles)
-		web_app.router.add_put("/roles/{tenant}", self.get_roles_batch)
-		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_role)
-		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_role)
+		web_app.router.add_get("/roles/*/{credentials_id}", self.get_credentials_global_roles)
+		web_app.router.add_put("/roles/*/{credentials_id}", self.set_credentials_global_roles)
+		web_app.router.add_put("/roles/*", self.batch_get_credentials_global_roles)
+		web_app.router.add_post("/role_assign/{credentials_id}/*/{role_name}", self.assign_credentials_global_role)
+		web_app.router.add_delete("/role_assign/{credentials_id}/*/{role_name}", self.unassign_credentials_global_role)
+
+		web_app.router.add_get("/roles/{tenant}/{credentials_id}", self.get_credentials_roles)
+		web_app.router.add_put("/roles/{tenant}/{credentials_id}", self.set_credentials_roles)
+		web_app.router.add_put("/roles/{tenant}", self.batch_get_credentials_roles)
+		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_credentials_role)
+		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_credentials_role)
 
 
-	async def get_roles_by_credentials(self, request):
+	async def get_credentials_roles(self, request):
 		"""
 		Get credentials' roles
 		"""
+		tenant_id = asab.contextvars.Tenant.get()
 		creds_id = request.match_info["credentials_id"]
-		tenant_id = request.match_info["tenant"]
-		if tenant_id == "*" or request.can_access_all_tenants \
-			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
-			result = await self.RoleService.get_roles_by_credentials(creds_id, [tenant_id])
-			return asab.web.rest.json_response(request, result)
-		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={
-			"cid": request.Session.Credentials.Id, "t": tenant_id})
-		return aiohttp.web.HTTPForbidden()
+		result = await self.RoleService.get_roles_by_credentials(creds_id, tenants=[tenant_id])
+		return asab.web.rest.json_response(request, result)
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def get_credentials_global_roles(self, request):
+		"""
+		Get credentials' global roles
+		"""
+		creds_id = request.match_info["credentials_id"]
+		result = await self.RoleService.get_roles_by_credentials(creds_id, tenants=[])
+		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.rest.json_schema_handler(schema.BATCH_GET_CREDENTIALS_ROLES)
-	async def get_roles_batch(self, request, *, json_data):
+	@asab.web.tenant.allow_no_tenant
+	async def batch_get_credentials_roles(self, request, *, json_data):
 		"""
 		Get the assigned roles for several credentials
 		"""
-		tenant_id = request.match_info["tenant"]
-		if tenant_id == "*" or request.can_access_all_tenants \
-			or await self.RoleService.TenantService.has_tenant_assigned(request.Session.Credentials.Id, tenant_id):
-			response = {
-				cid: await self.RoleService.get_roles_by_credentials(cid, [tenant_id])
-				for cid in json_data
-			}
-			return asab.web.rest.json_response(request, response)
+		tenant = asab.contextvars.Tenant.get()
+		response = {
+			cid: await self.RoleService.get_roles_by_credentials(cid, tenants=[tenant])
+			for cid in json_data
+		}
+		return asab.web.rest.json_response(request, response)
 
-		L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={
-			"cid": request.Session.Credentials.Id, "t": tenant_id})
-		return aiohttp.web.HTTPForbidden()
+
+	@asab.web.rest.json_schema_handler(schema.BATCH_GET_CREDENTIALS_ROLES)
+	@asab.web.tenant.allow_no_tenant
+	async def batch_get_credentials_global_roles(self, request, *, json_data):
+		"""
+		Get the assigned global roles for several credentials
+		"""
+		response = {
+			cid: await self.RoleService.get_roles_by_credentials(cid, tenants=[])
+			for cid in json_data
+		}
+		return asab.web.rest.json_response(request, response)
 
 
 	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
-	@access_control(ResourceId.ROLE_ASSIGN)
-	async def set_roles(self, request, *, json_data, tenant, resources):
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
+	async def set_credentials_roles(self, request, *, json_data):
 		"""
 		Set credentials' roles
 
 		For given credentials ID, assign listed roles and unassign existing roles that are not in the list
 
 		Cases:
-		1) The requester is superuser AND requested `tenant` is "*":
-			Only global roles will be un/assigned.
-		2) The requester is superuser AND requested `tenant` is "tenant-name":
+		1) The requester is superuser AND requested `tenant` is "tenant-name":
 			Roles from "tenant-name/..." + global roles will be un/assigned.
-		3) The requester is not superuser AND requested `tenant` is "tenant-name":
+		2) The requester is not superuser AND requested `tenant` is "tenant-name":
 			Only "tenant-name/..." roles will be un/assigned.
 		ELSE) In other cases the role assignment fails.
 		"""
+		authz = asab.contextvars.Authz.get()
+		tenant_id = asab.contextvars.Tenant.get()
 		credentials_id = request.match_info["credentials_id"]
 		requested_roles = json_data["roles"]
 
 		# Determine whether global roles will be un/assigned
-		if ResourceId.SUPERUSER in resources:
+		if authz.has_superuser_access():
 			include_global = True
-		elif tenant == "*":
-			L.log(asab.LOG_NOTICE, "Not authorized to manage global roles.", struct_data={
-				"cid": request.CredentialsId})
-			return aiohttp.web.HTTPForbidden()
 		else:
 			include_global = False
 
-		await self.RoleService.set_roles(credentials_id, requested_roles, tenant, include_global)
+		await self.RoleService.set_roles(credentials_id, requested_roles, tenant_id, include_global)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-	@access_control(ResourceId.ROLE_ASSIGN)
-	async def assign_role(self, request, *, tenant):
+	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def set_credentials_global_roles(self, request, *, json_data):
+		"""
+		Set credentials' global roles
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		requested_roles = json_data["roles"]
+		await self.RoleService.set_roles(credentials_id, requested_roles, tenant="*", include_global=True)
+		return asab.web.rest.json_response(request, {"result": "OK"})
+
+
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
+	async def assign_credentials_role(self, request):
 		"""
 		Assign role to credentials
 		"""
-		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
-		if tenant == "*":
-			# Assigning global roles requires superuser
-			if not self.RBACService.is_superuser(request.Session.Authorization.Authz):
-				message = "Missing permissions to un/assign global role"
-				L.warning(message, struct_data={
-					"agent_cid": request.Session.Credentials.Id,
-					"role": role_id,
-				})
-				return asab.web.rest.json_response(
-					request,
-					data={
-						"result": "FORBIDDEN",
-						"message": message
-					},
-					status=403
-				)
-
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		await self.RoleService.assign_role(
 			credentials_id=request.match_info["credentials_id"],
 			role_id=role_id
 		)
-
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control(ResourceId.ROLE_ASSIGN)
-	async def unassign_role(self, request, *, tenant):
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def assign_credentials_global_role(self, request):
+		"""
+		Assign global role to credentials
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
+		await self.RoleService.assign_role(
+			credentials_id=request.match_info["credentials_id"],
+			role_id=role_id
+		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
+
+
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
+	async def unassign_credentials_role(self, request):
 		"""
 		Unassign role from credentials
 		"""
-		role_id = "{}/{}".format(tenant, request.match_info["role_name"])
-		if tenant == "*":
-			# Unassigning global roles requires superuser
-			if not self.RBACService.is_superuser(request.Session.Authorization.Authz):
-				message = "Missing permissions to un/assign global role"
-				L.warning(message, struct_data={
-					"agent_cid": request.Session.Credentials.Id,
-					"role": role_id,
-				})
-				return asab.web.rest.json_response(
-					request,
-					data={
-						"result": "FORBIDDEN",
-						"message": message
-					},
-					status=403
-				)
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
+		await self.RoleService.unassign_role(
+			credentials_id=request.match_info["credentials_id"],
+			role_id=role_id
+		)
+		return asab.web.rest.json_response(request, data={"result": "OK"})
 
+
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def unassign_credentials_global_role(self, request):
+		"""
+		Unassign global role from credentials
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
 		await self.RoleService.unassign_role(
 			credentials_id=request.match_info["credentials_id"],
 			role_id=role_id

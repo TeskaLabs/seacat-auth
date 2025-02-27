@@ -1,4 +1,3 @@
-import contextvars
 import random
 import logging
 import re
@@ -7,12 +6,12 @@ import urllib.parse
 import aiohttp.web
 import asab
 import asab.utils
+import asab.exceptions
 import bcrypt
 import argon2
 
 
 L = logging.getLogger(__name__)
-SessionContext = contextvars.ContextVar("request_session", default=None)
 
 
 class SearchParams:
@@ -336,12 +335,12 @@ def argon2_verify(hash: bytes | str, secret: bytes | str) -> bool:
 
 
 def generate_ergonomic_token(length: int):
-	'''
+	"""
 	This function generates random string that is "ergonomic".
 	This means that it contains only the letters and numbers that are unlikely to be misread by people.
-	'''
+	"""
 	assert (length >= 1)
-	return ''.join(random.choice(ergonomic_characters) for _ in range(length))
+	return "".join(random.choice(ergonomic_characters) for _ in range(length))
 
 
 # These are characters that are safe (prevents confusion with other characters)

@@ -2,7 +2,10 @@ import logging
 import uuid
 import aiohttp
 import aiohttp.web
+import asab.contextvars
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 
 from .. import exceptions, AuditLogger
@@ -98,6 +101,8 @@ class CookieHandler(object):
 		web_app_public.router.add_post("/cookie/entry", self.bouncer_post)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def nginx(self, request):
 		"""
 		Cookie introspection
@@ -169,6 +174,8 @@ class CookieHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def nginx_anonymous(self, request):
 		"""
 		Anonymous (guest) cookie introspection
@@ -279,6 +286,8 @@ class CookieHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def bouncer_get(self, request):
 		"""
 		Exchange authorization code for cookie and redirect to specified redirect URI.
@@ -314,6 +323,8 @@ class CookieHandler(object):
 		return await self._bouncer(request, params)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def bouncer_post(self, request):
 		"""
 		Exchange authorization code for cookie and redirect to specified redirect URI.
