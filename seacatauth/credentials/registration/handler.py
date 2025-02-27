@@ -130,7 +130,7 @@ class RegistrationHandler(object):
 			# URL was not sent because CommunicationService is disabled
 			# Add the URL to admin response
 			L.log(asab.LOG_NOTICE, "Including invitation URL in REST response.", struct_data={
-				"cid": invited_credentials_id, "requested_by": credentials_id})
+				"cid": invited_credentials_id, "requested_by": authz.CredentialsId})
 			response_data["registration_url"] = registration_url
 
 		return asab.web.rest.json_response(request, response_data)

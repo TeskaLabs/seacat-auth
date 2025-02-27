@@ -5,7 +5,7 @@ import asab.storage.exceptions
 import asab.exceptions
 
 from ..models.const import ResourceId
-from .. import exceptions, generic
+from .. import exceptions
 
 
 L = logging.getLogger(__name__)

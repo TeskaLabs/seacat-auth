@@ -10,7 +10,6 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, generic, exceptions
-from ..models import Session
 
 
 L = logging.getLogger(__name__)
