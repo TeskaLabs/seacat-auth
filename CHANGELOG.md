@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha12
 - v25.05-alpha11
 - v25.05-alpha10
 - v25.05-alpha9
@@ -24,6 +25,7 @@
 - Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
 
 ### Refactoring
+- Always initialize tenant provider (#449, v25.05-alpha12)
 - Separate JSON schemas (#448, v25.05-alpha11)
 - Remove obsolete back-compat endpoints (#447, v25.05-alpha10)
 - Replace resource ID literals with constants (#446, v25.05-alpha9)
