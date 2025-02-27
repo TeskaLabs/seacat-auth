@@ -172,10 +172,16 @@ class ExternalLoginPublicHandler(object):
 
 
 	async def _login_callback(self, request, authorization_data):
+		cookie_service = self.App.get_service("seacatauth.CookieService")
+		try:
+			sso_session = await cookie_service.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			sso_session = None
+
 		access_ips = generic.get_request_access_ips(request)
 		try:
 			operation, new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
-				session_context=request.Session, from_ip=access_ips, **authorization_data)
+				session_context=sso_session.Session, from_ip=access_ips, **authorization_data)
 		except LoginWithExternalAccountError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
@@ -201,10 +207,16 @@ class ExternalLoginPublicHandler(object):
 
 
 	async def _signup_callback(self, request, authorization_data):
+		cookie_service = self.App.get_service("seacatauth.CookieService")
+		try:
+			sso_session = await cookie_service.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			sso_session = None
+
 		access_ips = generic.get_request_access_ips(request)
 		try:
 			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_signup_with_external_account(
-				session_context=request.Session, from_ip=access_ips, **authorization_data)
+				session_context=sso_session, from_ip=access_ips, **authorization_data)
 		except SignupWithExternalAccountError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "Sign-up failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
@@ -217,10 +229,16 @@ class ExternalLoginPublicHandler(object):
 
 
 	async def _pair_account_callback(self, request, authorization_data):
+		cookie_service = self.App.get_service("seacatauth.CookieService")
+		try:
+			sso_session = await cookie_service.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			sso_session = None
+
 		access_ips = generic.get_request_access_ips(request)
 		try:
 			redirect_uri = await self.ExternalLoginService.finalize_pairing_external_account(
-				session_context=request.Session, **authorization_data)
+				session_context=sso_session, **authorization_data)
 		except PairingExternalAccountError as e:
 			L.log(asab.LOG_NOTICE, "Failed to pair external account.", struct_data={
 				"ext_provider_type": e.ProviderType,

@@ -34,7 +34,8 @@ class ExternalLoginAccountHandler(object):
 		"""
 		List the current user's external login accounts
 		"""
-		data = await self.ExternalLoginService.list_external_accounts(request.Session.Credentials.Id)
+		authz = asab.contextvars.Authz.get()
+		data = await self.ExternalLoginService.list_external_accounts(authz.CredentialsId)
 		return asab.web.rest.json_response(request, data)
 
 
@@ -43,11 +44,12 @@ class ExternalLoginAccountHandler(object):
 		"""
 		Get the current user's external login credentials detail
 		"""
+		authz = asab.contextvars.Authz.get()
 		provider_type = request.match_info["provider_type"]
 		subject_id = request.match_info["subject_id"]
 		try:
 			data = await self.ExternalLoginService.get_external_account(
-				provider_type, subject_id, credentials_id=request.Session.Credentials.Id)
+				provider_type, subject_id, credentials_id=authz.CredentialsId)
 			return asab.web.rest.json_response(request, data)
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
@@ -58,11 +60,12 @@ class ExternalLoginAccountHandler(object):
 		"""
 		Remove the current user's external login account
 		"""
+		authz = asab.contextvars.Authz.get()
 		provider_type = request.match_info["provider_type"]
 		subject_id = request.match_info["subject_id"]
 		try:
 			await self.ExternalLoginService.remove_external_account(
-				provider_type, subject_id, credentials_id=request.Session.Credentials.Id)
+				provider_type, subject_id, credentials_id=authz.CredentialsId)
 			return asab.web.rest.json_response(request, {"result": "OK"})
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
