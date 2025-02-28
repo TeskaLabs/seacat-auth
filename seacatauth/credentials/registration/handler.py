@@ -27,13 +27,13 @@ class RegistrationHandler(object):
 	"""
 
 	def __init__(self, app, registration_svc, credentials_svc):
+		self.App = app
 		self.RegistrationService = registration_svc
 		self.CredentialsService = credentials_svc
 
 		self.AsabAuthService = app.get_service("asab.AuthService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
-		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
@@ -365,8 +365,9 @@ class RegistrationHandler(object):
 		Complete the registration either by activating the draft credentials
 		or by transferring their tenants and roles to the currently authenticated user.
 		"""
+		cookie_service = self.App.get_service("seacatauth.CookieService")
 		try:
-			root_session = await self.CookieService.get_session_by_request_cookie(request)
+			root_session = await cookie_service.get_session_by_request_cookie(request)
 		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
 			root_session = None
 
