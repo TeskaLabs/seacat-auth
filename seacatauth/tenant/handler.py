@@ -54,6 +54,7 @@ class TenantHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	# IMPORTANT: This endpoint needs to be compatible with asab.web.tenant.providers.WebTenantProvider
 	async def list(self, request):
 		"""
