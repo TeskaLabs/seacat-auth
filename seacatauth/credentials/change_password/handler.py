@@ -2,12 +2,12 @@ import logging
 import asyncio
 import asab
 import asab.web.rest
-import asab.web.webcrypto
+import asab.web.auth
+import asab.web.tenant
 
-from ...models.const import ResourceId
 from ... import exceptions, generic, AuditLogger
+from ...models.const import ResourceId
 from ...last_activity import EventCode
-from ...decorators import access_control
 from .. import schema
 
 
@@ -41,6 +41,8 @@ class ChangePasswordHandler(object):
 		web_app_public.router.add_put("/public/lost-password", self.lost_password)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def password_policy(self, request):
 		"""
 		Get minimum password requirements
@@ -50,19 +52,20 @@ class ChangePasswordHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.CHANGE_PASSWORD)
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def change_password(self, request, *, json_data):
 		"""
 		Set a new password (with current password authentication)
 		"""
+		authz = asab.contextvars.Authz.get()
 		new_password = json_data.get("newpassword")
 		old_password = json_data.get("oldpassword")
-		credentials_id = request.Session.Credentials.Id
+		credentials_id = authz.CredentialsId
 		from_ip = generic.get_request_access_ips(request)
 
 		# Authenticate with the old password
 		authenticated = await self.CredentialsService.authenticate(
-			request.Session.Credentials.Id, {"password": old_password})
+			credentials_id, {"password": old_password})
 		if not authenticated:
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: Authentication failed", struct_data={
 				"cid": credentials_id, "from_ip": from_ip})
@@ -116,6 +119,8 @@ class ChangePasswordHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 	@asab.web.rest.json_schema_handler(schema.RESET_PASSWORD)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def reset_password(self, request, *, json_data):
 		"""
 		Set a new password (with password token authentication)
@@ -181,7 +186,8 @@ class ChangePasswordHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.REQUEST_PASSWORD_RESET_ADMIN)
-	@access_control(ResourceId.CREDENTIALS_EDIT)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
 		Send a password reset link to specified user
@@ -225,6 +231,8 @@ class ChangePasswordHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.REQUEST_LOST_PASSWORD_RESET)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def lost_password(self, request, *, json_data):
 		"""
 		Request a password reset link

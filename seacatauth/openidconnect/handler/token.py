@@ -6,6 +6,8 @@ import jwcrypto.jwt
 import json
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.web.rest.json
 import asab.exceptions
 
@@ -48,6 +50,8 @@ class TokenHandler(object):
 		web_app_public.router.add_put("/openidconnect/token/validate", self.validate_id_token)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def token_request(self, request):
 		"""
 		OAuth 2.0 Token Request
@@ -353,6 +357,8 @@ class TokenHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.TOKEN_REVOKE)
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def token_revoke(self, request, *, json_data):
 		"""
 		OAuth 2.0 Token revocation
@@ -361,9 +367,6 @@ class TokenHandler(object):
 		"""
 		# TODO: Confidential clients must authenticate (query params or Authorization header)
 		# TODO: Public clients are not allowed to revoke other clients' tokens
-		if request.Session is None:
-			return aiohttp.web.HTTPUnauthorized()
-
 		token_type_hint = json_data.get("token_type_hint")  # Optional `access_token` or `refresh_token`
 		await self.OpenIdConnectService.revoke_token(json_data["token"], token_type_hint)
 		return aiohttp.web.HTTPOk()
@@ -383,6 +386,9 @@ class TokenHandler(object):
 		}, status=400)
 
 
+	# TODO: Remove. This is basically token introspection.
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def validate_id_token(self, request):
 		"""
 		Check the validity of a JWToken
