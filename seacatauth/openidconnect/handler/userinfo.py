@@ -23,6 +23,7 @@ class UserInfoHandler(object):
 
 	def __init__(self, app, oidc_svc):
 		self.OpenIdConnectService = oidc_svc
+		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get(self.OpenIdConnectService.UserInfoPath, self.userinfo)
@@ -44,18 +45,28 @@ class UserInfoHandler(object):
 		"""
 
 		token_value = generic.get_bearer_token_value(request)
-		if token_value is None:
-			L.warning("Invalid or missing Bearer token")
-			return aiohttp.web.HTTPBadRequest()
-
-		try:
-			session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
-		except ValueError:
+		if token_value is not None:
 			try:
-				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-			except exceptions.SessionNotFoundError:
-				L.log(asab.LOG_NOTICE, "Authentication required")
-				return self.error_response("invalid_token", "Access token or cookie is invalid.")
+				# Non-canonical
+				session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
+				if session is None:
+					L.log(asab.LOG_NOTICE, "Authentication required.")
+					return self.error_response("invalid_token", "ID token is invalid.")
+			except ValueError:
+				try:
+					# Canonical
+					session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
+					L.log(asab.LOG_NOTICE, "Authentication required.")
+					return self.error_response("invalid_token", "Access token is invalid.")
+
+		else:
+			try:
+				# Non-canonical
+				session = await self.CookieService.get_session_by_request_cookie(request)
+			except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+				L.log(asab.LOG_NOTICE, "Authentication required.")
+				return self.error_response("invalid_token", "Cookie is missing or invalid.")
 
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
