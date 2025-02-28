@@ -468,9 +468,6 @@ class RoleService(asab.Service):
 		"""
 		Assign a list of roles to given credentials and unassign all their current roles that are not listed
 		"""
-		# Determine whether tenant roles can be assigned
-		has_tenant_assigned = await self.TenantService.has_tenant_assigned(credentials_id, tenant)
-
 		# Sort the requested roles
 		requested_tenant_roles = set()
 		requested_global_roles = set()
@@ -479,13 +476,15 @@ class RoleService(asab.Service):
 			if t == "*":
 				requested_global_roles.add(role)
 			elif t == tenant:
-				if not has_tenant_assigned:
-					raise asab.exceptions.ValidationError(
-						"Cannot assign role {!r}: Credentials {!r} does not have access to tenant {!r}.".format(
-							role, credentials_id, tenant))
 				requested_tenant_roles.add(role)
 			else:
 				raise KeyError("Role {} not found in tenant {}.".format(role, tenant))
+
+		if len(requested_tenant_roles) > 0:
+			# Verify the target's tenant access
+			if not await self.TenantService.has_tenant_assigned(credentials_id, tenant):
+				raise asab.exceptions.ValidationError(
+					"Credentials {!r} do not have access to tenant {!r}.".format(credentials_id, tenant))
 
 		# Sort the credentials' currently assigned roles
 		current_tenant_roles = set()
