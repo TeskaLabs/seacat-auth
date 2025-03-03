@@ -98,7 +98,7 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 		try:
 			return asab.web.auth.utils.get_id_token_claims(id_token, self.TrustedJwkSet)
 		except (jwcrypto.jws.InvalidJWSSignature, jwcrypto.jwt.JWTMissingKey) as e:
-			L.error("Cannot authenticate request: {}".format(str(e)))
+			L.debug("Cannot authenticate request: {}".format(str(e)))
 			raise asab.exceptions.NotAuthenticatedError()
 
 
@@ -131,7 +131,7 @@ def system_authz(
 		Session.FN.OAuth2.ClientId: subject,
 	}
 	session = Session(session_dict)
-	L.info("Internal system session created.", struct_data={
+	L.debug("Internal system session created.", struct_data={
 		"sid": session_id, "sub": subject})
 
 	claims = {
@@ -159,5 +159,5 @@ def system_authz(
 		asab.contextvars.Authz.reset(authz_ctx)
 		del authz
 		del session
-		L.info("Internal system session terminated.", struct_data={
+		L.debug("Internal system session terminated.", struct_data={
 			"sid": session_id, "sub": subject})
