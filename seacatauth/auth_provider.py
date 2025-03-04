@@ -10,8 +10,6 @@ import jwcrypto.jws
 import asab
 import asab.exceptions
 import asab.web.auth
-import asab.web.auth.providers
-import asab.web.auth.providers.key_providers
 import asab.exceptions
 
 from .exceptions import SessionNotFoundError
