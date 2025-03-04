@@ -5,7 +5,7 @@ import secrets
 import asab.exceptions
 import asab.storage.exceptions
 
-from ..client.service import CLIENT_TEMPLATES
+from ..client.schema import CLIENT_TEMPLATES
 from ..auth_provider import system_authz
 from ..models.const import ResourceId
 
