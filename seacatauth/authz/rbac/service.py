@@ -22,3 +22,7 @@ class RBACService(asab.Service):
 	@staticmethod
 	def has_resource_access(authz: dict, tenant: typing.Union[str, None], requested_resources: list) -> bool:
 		return asab.web.auth.authorization.has_resource_access(authz, requested_resources, tenant)
+
+	@staticmethod
+	def has_tenant_access(authz: dict, tenant: typing.Union[str, None]) -> bool:
+		return asab.web.auth.authorization.has_tenant_access(authz, tenant)
