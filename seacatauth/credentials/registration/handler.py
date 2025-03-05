@@ -76,7 +76,7 @@ class RegistrationHandler(object):
 		# Prepare credentials, assign tenant and send invitation email
 		return await self._prepare_invitation(
 			request, tenant, credential_data, expiration, access_ips,
-			link_output=json_data.get("link_output"),
+			link_output=json_data.get("invitation_link"),
 			invited_by_cid=credentials_id
 		)
 
@@ -105,7 +105,7 @@ class RegistrationHandler(object):
 		# Prepare credentials and assign tenant
 		return await self._prepare_invitation(
 			request, tenant, credential_data, expiration, access_ips,
-			link_output=json_data.get("link_output"),
+			link_output=json_data.get("invitation_link"),
 			invited_by_cid=credentials_id
 		)
 
