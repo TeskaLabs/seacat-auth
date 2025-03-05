@@ -197,7 +197,8 @@ class ChangePasswordHandler(object):
 		try:
 			reset_url = await self.ChangePasswordService.init_password_reset_by_admin(
 				credentials,
-				expiration=json_data.get("expiration")
+				link_output=json_data.get("password_reset_link", False),
+				expiration=json_data.get("expiration"),
 			)
 		except exceptions.CredentialsNotFoundError:
 			L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found", struct_data={
@@ -217,8 +218,6 @@ class ChangePasswordHandler(object):
 
 		response_data = {"result": "OK"}
 		if reset_url:
-			# Password reset URL was not sent because CommunicationService is disabled
-			# Add the URL to admin response
 			response_data["reset_url"] = reset_url
 
 		return asab.web.rest.json_response(request, response_data)

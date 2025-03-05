@@ -277,7 +277,12 @@ class CredentialsHandler(object):
 		"""
 		Create new credentials
 		"""
-		password_link = json_data.pop("passwordlink", False)
+		if "passwordlink" in json_data:
+			link_output = json_data.pop("passwordlink") and "email"
+		elif "password_reset_link" in json_data:
+			link_output = json_data.pop("password_reset_link")
+		else:
+			link_output = False
 
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
@@ -297,13 +302,14 @@ class CredentialsHandler(object):
 			"_provider_id": provider.ProviderID
 		}
 
-		if password_link:
+		if link_output:
 			change_pwd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
 			credentials = await self.CredentialsService.get(credentials_id)
 			try:
 				reset_url = await change_pwd_svc.init_password_reset_by_admin(
 					credentials,
 					expiration=json_data.get("expiration"),
+					link_output=link_output,
 					is_new_user=True,
 				)
 			except exceptions.CredentialsNotFoundError:
@@ -319,8 +325,6 @@ class CredentialsHandler(object):
 				return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
 			if reset_url:
-				# Password reset URL was not sent because CommunicationService is disabled
-				# Add the URL to admin response
 				response_data["reset_url"] = reset_url
 
 		return asab.web.rest.json_response(request, response_data)
