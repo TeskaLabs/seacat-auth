@@ -120,6 +120,9 @@ CREATE_INVITATION_PUBLIC = {
 	"additionalProperties": False,
 	"properties": {
 		"email": {"type": "string"},
+		"link_output": {
+			"enum": ["email", "response"],
+		},
 	}
 }
 
@@ -135,6 +138,9 @@ CREATE_INVITATION_ADMIN = {
 				"username": {"type": "string"},
 				"phone": {"type": "string"},
 			}
+		},
+		"link_output": {
+			"enum": ["email", "response"],
 		},
 		"expiration": {
 			"oneOf": [{"type": "string"}, {"type": "number"}],
