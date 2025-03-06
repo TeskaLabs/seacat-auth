@@ -58,17 +58,18 @@ CREATE_CREDENTIALS = {
 	"additionalProperties": False,
 	"properties": {
 		**{
-		field: schema
-		for field, schema in _FIELDS.items()
-		if field in frozenset([
-			"username",
-			"email",
-			"phone",
-			"password",  # M2M credentials allow direct setting of password
-			"passwordlink",    # DEPRECATED
-			"password_reset_link",
-		])
-	}},
+			field: schema
+			for field, schema in _FIELDS.items()
+			if field in frozenset([
+				"username",
+				"email",
+				"phone",
+				"password",  # M2M credentials allow direct setting of password
+				"passwordlink",    # DEPRECATED
+				"password_reset_link",
+			])
+		}
+	},
 }
 
 UPDATE_CREDENTIALS = {
