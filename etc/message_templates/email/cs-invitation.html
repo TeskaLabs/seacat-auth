@@ -43,13 +43,13 @@
 			{%- endfor %} ve službě {{ app_name }}.
 		</p>
 		<p>
-			<a href="{{ link }}" class="button">
+			<a href="{{ registration_url }}" class="button">
 				Přijmout pozvánku
 			</a>
 		</p>
 		<p>
 			<small>{% if expires_at %}Tato pozvánka platí do {{ expires_at.strftime('%d/%m/%Y %H:%M %Z') }}.{% endif %}
-				Pokud vám tlačítko nefunguje, otevřete si v prohlížeči následující odkaz: <a href="{{ link }}">{{ link }}</a></small>
+				Pokud vám tlačítko nefunguje, otevřete si v prohlížeči následující odkaz: <a href="{{ registration_url }}">{{ registration_url }}</a></small>
 		<p>
 		<p>
 			Pokud jste o registraci nežádali, tuto zprávu můžete ignorovat.

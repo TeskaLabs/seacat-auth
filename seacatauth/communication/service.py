@@ -89,7 +89,7 @@ class CommunicationService(asab.Service):
 					template_id=template_id,
 					channel=channel,
 					username=credentials.get("username"),
-					link=reset_url,
+					password_reset_url=reset_url,
 				)
 			except exceptions.CommunicationChannelNotAvailableError:
 				L.debug("Channel is not available", struct_data={
@@ -116,7 +116,7 @@ class CommunicationService(asab.Service):
 			channel="email",
 			username=credentials.get("username"),
 			tenant=", ".join(tenants),
-			link=registration_uri,
+			registration_url=registration_uri,
 			expires_at=expires_at,
 		)
 
