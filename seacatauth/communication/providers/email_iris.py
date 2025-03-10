@@ -31,12 +31,27 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		self.TemplateBasePath = self.Config.get("template_path")
 
 
-	def can_send_to_target(self, credentials: dict) -> bool:
+	async def can_send_to_target(self, credentials: dict) -> bool:
+		if not await self.is_enabled():
+			return False
 		try:
 			_get_email_address(credentials)
 			return True
 		except KeyError:
 			return False
+
+
+	async def is_enabled(self) -> bool:
+		url = "{}{}".format(self.AsabIrisUrl, "features")
+		async with _asab_iris_session(self.App) as session:
+			async with session.get(url) as resp:
+				response = await resp.json()
+				if resp.status != 200:
+					L.error("Error response from ASAB Iris.", struct_data=response)
+					return False
+
+		enabled_orchestrators = response.get("orchestrators", [])
+		return "email" in enabled_orchestrators
 
 
 	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:
@@ -57,14 +72,8 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		}
 		data = asab.web.rest.json.JSONDumper(pretty=False)(email_decl)
 
-		discovery_service = self.App.get_service("asab.DiscoveryService")
-		if discovery_service is not None:
-			open_session = discovery_service.session
-		else:
-			open_session = aiohttp.ClientSession
-
 		url = "{}{}".format(self.AsabIrisUrl, "send_email")
-		async with open_session() as session:
+		async with _asab_iris_session(self.App) as session:
 			async with session.put(url, data=data, headers={"Content-Type": "application/json"}) as resp:
 				response = await resp.json()
 				if resp.status == 200:
@@ -83,3 +92,11 @@ def _get_email_address(credentials: dict) -> str:
 	if not email:
 		raise KeyError("Credentials do not contain 'email'.")
 	return email
+
+
+def _asab_iris_session(app, *args, **kwargs):
+	discovery_service = app.get_service("asab.DiscoveryService")
+	if discovery_service is not None:
+		return discovery_service.session(*args, **kwargs)
+	else:
+		return aiohttp.ClientSession(*args, **kwargs)
