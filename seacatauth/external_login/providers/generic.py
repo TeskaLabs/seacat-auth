@@ -113,11 +113,17 @@ class GenericOAuth2Login(asab.Configurable):
 		else:
 			self.CallbackUrl = external_login_svc.CallbackUrlTemplate.format(provider_type=self.Type)
 
+		external_login_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
 
 	async def initialize(self, app):
 		await self._prepare_jwks()
 
 
+	async def _on_housekeeping(self, event_name):
+		await self._prepare_jwks(speculative=False)
+
+	
 	def acr_value(self) -> str:
 		"""
 		Authentication Context Class Reference (ACR)
@@ -153,7 +159,7 @@ class GenericOAuth2Login(asab.Configurable):
 				jwks = await resp.text()
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
 		self.JwkSetLastUpdate = datetime.datetime.now(datetime.timezone.utc)
-		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type, "date": self.JwkSetLastUpdate})
+		L.info("JWK set was loaded.", struct_data={"type": self.Type, "date": self.JwkSetLastUpdate})
 
 	def get_authorize_uri(
 		self, redirect_uri: typing.Optional[str] = None,
@@ -271,7 +277,7 @@ class GenericOAuth2Login(asab.Configurable):
 			L.error("Error reading ID token - Invalid key in JWKSet.", struct_data={
 				"provider": self.Type})
 			# provider probably change jwks - refresh them
-			await self._prepare_jwks()
+			await self._prepare_jwks(speculative=False)
 			raise ExternalOAuthFlowError("Error reading ID token - Invalid key in JWKSet.")
 		except jwcrypto.jwt.JWTMissingClaim:
 			L.error("Missing ID token claim.", struct_data={"provider": self.Type})
