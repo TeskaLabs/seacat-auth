@@ -103,7 +103,7 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 
 
 @contextlib.contextmanager
-def system_authz(
+def local_authz(
 	service_name: str,
 	resources: typing.Collection[str],
 	tenant: str | None = None,

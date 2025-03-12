@@ -5,7 +5,7 @@ import asab
 import asab.exceptions
 
 from ... import exceptions
-from ...auth_provider import system_authz
+from ...auth_provider import local_authz
 from ...events import EventTypes
 from ...models.const import ResourceId
 
@@ -98,7 +98,7 @@ class ResourceService(asab.Service):
 
 	async def initialize(self, app):
 		await super().initialize(app)
-		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
+		with local_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._ensure_builtin_resources()
 
 

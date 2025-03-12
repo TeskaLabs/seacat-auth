@@ -9,7 +9,7 @@ import asab.storage.exceptions
 import asab.exceptions
 
 from ... import exceptions
-from ...auth_provider import system_authz
+from ...auth_provider import local_authz
 from ...models.const import ResourceId
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
@@ -87,7 +87,7 @@ class RoleService(asab.Service):
 
 
 	async def initialize(self, app):
-		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
+		with local_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._ensure_system_roles()
 
 

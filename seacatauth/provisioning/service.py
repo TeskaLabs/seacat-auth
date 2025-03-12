@@ -6,7 +6,7 @@ import asab.exceptions
 import asab.storage.exceptions
 
 from ..client.schema import CLIENT_TEMPLATES
-from ..auth_provider import system_authz
+from ..auth_provider import local_authz
 from ..models.const import ResourceId
 
 
@@ -67,12 +67,12 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.initialize(app)
 		await self.ClientService.initialize(app)
 
-		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
+		with local_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._set_up_provisioning(app)
 
 
 	async def finalize(self, app):
-		with system_authz(self.Name, resources={ResourceId.SUPERUSER}):
+		with local_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._tear_down_provisioning(app)
 		await super().finalize(app)
 
