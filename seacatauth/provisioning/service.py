@@ -6,7 +6,7 @@ import asab.exceptions
 import asab.storage.exceptions
 
 from ..client.schema import CLIENT_TEMPLATES
-from ..auth_provider import local_authz
+from ..api import local_authz
 from ..models.const import ResourceId
 
 

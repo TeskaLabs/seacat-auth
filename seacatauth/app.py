@@ -180,11 +180,11 @@ class SeaCatAuthApplication(asab.Application):
 
 
 	async def initialize(self):
-		from .auth_provider import AsabAuthProvider
+		from .api import AsabAuthProvider
 		auth_provider = AsabAuthProvider(self)
 		self.AsabAuthService.Providers.insert(0, auth_provider)  # High priority
 
-		from .tenant_provider import AsabTenantProvider
+		from .api import AsabTenantProvider
 		tenant_provider = AsabTenantProvider(self, self.AsabTenantService)
 		self.AsabTenantService.Providers.insert(0, tenant_provider)  # High priority
 

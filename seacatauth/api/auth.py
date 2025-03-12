@@ -14,8 +14,8 @@ import asab.web.auth.providers
 import asab.web.auth.providers.key_providers
 import asab.exceptions
 
-from .exceptions import SessionNotFoundError
-from .models import Session
+from ..exceptions import SessionNotFoundError
+from ..models import Session
 
 
 L = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ import asab.storage.exceptions
 import asab.exceptions
 
 from ... import exceptions
-from ...auth_provider import local_authz
+from ...api import local_authz
 from ...models.const import ResourceId
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView

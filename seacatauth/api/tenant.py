@@ -4,7 +4,7 @@ import typing
 import asab.web.tenant.providers.abc
 import asab.exceptions
 
-from .exceptions import TenantNotFoundError
+from seacatauth.exceptions import TenantNotFoundError
 
 
 L = logging.getLogger(__name__)

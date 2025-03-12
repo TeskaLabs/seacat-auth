@@ -5,7 +5,7 @@ import asab
 import asab.exceptions
 
 from ... import exceptions
-from ...auth_provider import local_authz
+from ...api import local_authz
 from ...events import EventTypes
 from ...models.const import ResourceId
 
