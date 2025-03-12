@@ -738,6 +738,7 @@ class SessionService(asab.Service):
 		tenant_service = self.App.get_service("seacatauth.TenantService")
 		role_service = self.App.get_service("seacatauth.RoleService")
 		batman_service = self.App.get_service("seacatauth.BatmanService")
+		client_service = self.App.get_service("seacatauth.ClientService")
 
 		# TODO: Choose builders based on scope
 		# Make sure dangerous resources are removed from impersonated sessions
@@ -745,6 +746,9 @@ class SessionService(asab.Service):
 			exclude_resources = {ResourceId.SUPERUSER, ResourceId.IMPERSONATE}
 		else:
 			exclude_resources = set()
+		
+		client = await client_service.get(client_id)
+		show_tenant_list = client.get("tenant_list_in_jwt", False)
 
 		session_builders = [
 			await credentials_session_builder(credentials_service, root_session.Credentials.Id, scope),
@@ -754,6 +758,7 @@ class SessionService(asab.Service):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 				exclude_resources=exclude_resources,
+				show_tenant_list=show_tenant_list,
 			)
 		]
 

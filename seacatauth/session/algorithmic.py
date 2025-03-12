@@ -89,21 +89,18 @@ class AlgorithmicSessionProvider:
 		"""
 		data = self.AuthzCache.get((credentials_id, frozenset(scope)))
 		if data and datetime.datetime.now(datetime.timezone.utc) < data["exp"]:
-			available_tenants = data["available_tenants"]
 			authz = data["authz"]
 		else:
-			available_tenants = await self.TenantService.get_tenants(credentials_id)
 			requested_tenants = await self.TenantService.get_tenants_by_scope(
 				scope, credentials_id)
 			authz = await build_credentials_authz(
 				self.TenantService, self.RoleService, credentials_id, requested_tenants)
 			self.AuthzCache[(credentials_id, frozenset(scope))] = {
 				"exp": datetime.datetime.now(datetime.timezone.utc) + self.AuthzCacheExpiration,
-				"available_tenants": available_tenants,
 				"authz": authz
 			}
 
-		session_dict[Session.FN.Authorization.AssignedTenants] = available_tenants
+		session_dict[Session.FN.Authorization.AssignedTenants] = []
 		session_dict[Session.FN.Authorization.Authz] = authz
 
 
