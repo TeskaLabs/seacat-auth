@@ -113,25 +113,25 @@ def local_authz(
 	Create internal system Authorization object with ephemeral Seacat Auth Session.
 	"""
 	app_name = "seacatauth"
-	subject = "!internal:{}".format(service_name)
+	subject = "!{}".format(service_name)
 	authorized_resources = {
 		tenant or "*": set(resources),
 	}
 	now = datetime.datetime.now(datetime.UTC)
-	session_id = "!internal:{}:{}".format(now.strftime("%y%m%d%H%M%S"), secrets.token_urlsafe(8))
+	session_id = "!local:{}:{}".format(now.strftime("%y%m%d%H%M%S"), secrets.token_urlsafe(8))
 	session_dict = {
 		Session.FN.SessionId: session_id,
 		Session.FN.Version: None,
 		Session.FN.CreatedAt: None,
 		Session.FN.ModifiedAt: None,
-		Session.FN.Session.Type: "internal",
+		Session.FN.Session.Type: "local",
 		Session.FN.Session.Expiration: now + datetime.timedelta(seconds=expiration),
 		Session.FN.Authorization.Authz: authorized_resources,
 		Session.FN.Credentials.Id: None,
 		Session.FN.OAuth2.ClientId: subject,
 	}
 	session = Session(session_dict)
-	L.debug("Internal system session created.", struct_data={
+	L.debug("Local auth session created.", struct_data={
 		"sid": session_id, "sub": subject})
 
 	claims = {
@@ -159,5 +159,5 @@ def local_authz(
 		asab.contextvars.Authz.reset(authz_ctx)
 		del authz
 		del session
-		L.debug("Internal system session terminated.", struct_data={
+		L.debug("Local auth session terminated.", struct_data={
 			"sid": session_id, "sub": subject})
