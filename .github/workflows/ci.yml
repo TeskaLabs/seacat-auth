@@ -60,7 +60,7 @@ jobs:
         pip install bcrypt
         pip install argon2
         pip install jwcrypto
-        pip install "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git@feature/auth-providers"
+        pip install "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
     
     - name: Test with unittest
       run: |
