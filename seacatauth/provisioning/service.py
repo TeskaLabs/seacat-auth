@@ -5,9 +5,9 @@ import secrets
 import asab.exceptions
 import asab.storage.exceptions
 
-from ..client.service import CLIENT_TEMPLATES
+from ..client.schema import CLIENT_TEMPLATES
 from ..generic import SessionContext
-from ..models import build_system_session
+from ..models.session import build_system_session
 
 
 L = logging.getLogger(__name__)

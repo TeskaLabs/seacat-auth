@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha14
 - v25.05-alpha13
 - v25.05-alpha12
 - v25.05-alpha11
@@ -21,6 +22,7 @@
 - Handle FIDO MDS ClientConnectionError (#438, v25.05-alpha1)
 
 ### Features
+- Dedicated resource ID for tenant creation (#454, v25.05-alpha14)
 - Support ASAB Iris for sending emails (#442, v25.05-alpha5)
 - Configurable default tenant roles (#436, v25.05-alpha3)
 - Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
