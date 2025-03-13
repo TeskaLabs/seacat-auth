@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha14
 - v25.05-alpha13
 - v25.05-alpha12
 - v25.05-alpha11
