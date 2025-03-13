@@ -3,14 +3,15 @@ import json
 import logging
 import typing
 import aiohttp.web
-
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.utils
 import asab.exceptions
 
 from ...models.const import ResourceId
-from ...decorators import access_control
+from ... import exceptions
 from .. import schema
 
 
@@ -26,9 +27,11 @@ class RegistrationHandler(object):
 	"""
 
 	def __init__(self, app, registration_svc, credentials_svc):
+		self.App = app
 		self.RegistrationService = registration_svc
 		self.CredentialsService = credentials_svc
 
+		self.AsabAuthService = app.get_service("asab.AuthService")
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.TenantService = app.get_service("seacatauth.TenantService")
 
@@ -51,12 +54,14 @@ class RegistrationHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_INVITATION_PUBLIC)
-	@access_control(ResourceId.TENANT_ASSIGN)
-	async def public_create_invitation(self, request, *, tenant, credentials_id, json_data):
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
+	async def public_create_invitation(self, request, *, json_data):
 		"""
 		Common user request to invite a new user to join specified tenant and create an account
 		if they don't have one yet. The invited user gets a registration link in their email.
 		"""
+		authz = asab.contextvars.Authz.get()
+		tenant_id = asab.contextvars.Tenant.get()
 		# TODO: Limit the number of requests
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
@@ -76,24 +81,27 @@ class RegistrationHandler(object):
 
 		# Prepare credentials, assign tenant and send invitation email
 		invited_credentials_id, registration_url = await self._prepare_invitation(
-			tenant, credential_data, expiration, access_ips,
-			invited_by_cid=credentials_id
+			tenant_id, credential_data, expiration, access_ips,
+			invited_by_cid=authz.CredentialsId
 		)
 		if registration_url:
 			L.log(asab.LOG_NOTICE, "Including invitation URL in REST response.", struct_data={
-				"cid": invited_credentials_id, "requested_by": credentials_id})
+				"cid": invited_credentials_id, "requested_by": authz.CredentialsId})
 			response_data["registration_url"] = registration_url
 
 		return asab.web.rest.json_response(request, response_data)
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_INVITATION_ADMIN)
-	@access_control(ResourceId.TENANT_ASSIGN)
-	async def admin_create_invitation(self, request, *, tenant, credentials_id, json_data):
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
+	async def admin_create_invitation(self, request, *, json_data):
 		"""
 		Admin request to register a new user and invite them to the specified tenant.
 		Generate a registration code and send a registration link to the user's email.
 		"""
+		authz = asab.contextvars.Authz.get()
+		tenant_id = asab.contextvars.Tenant.get()
+
 		# Get IPs of the invitation issuer
 		access_ips = [request.remote]
 		forwarded_for = request.headers.get("X-Forwarded-For")
@@ -110,8 +118,8 @@ class RegistrationHandler(object):
 
 		# Prepare credentials and assign tenant
 		invited_credentials_id, registration_url = await self._prepare_invitation(
-			tenant, credential_data, expiration, access_ips,
-			invited_by_cid=credentials_id
+			tenant_id, credential_data, expiration, access_ips,
+			invited_by_cid=authz.CredentialsId
 		)
 
 		response_data = {
@@ -122,7 +130,7 @@ class RegistrationHandler(object):
 			# URL was not sent because CommunicationService is disabled
 			# Add the URL to admin response
 			L.log(asab.LOG_NOTICE, "Including invitation URL in REST response.", struct_data={
-				"cid": invited_credentials_id, "requested_by": credentials_id})
+				"cid": invited_credentials_id, "requested_by": authz.CredentialsId})
 			response_data["registration_url"] = registration_url
 
 		return asab.web.rest.json_response(request, response_data)
@@ -200,7 +208,8 @@ class RegistrationHandler(object):
 		return credentials_id, None
 
 
-	@access_control(ResourceId.TENANT_ASSIGN)
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def resend_invitation(self, request):
 		"""
 		Resend invitation to an already invited user and extend the expiration of the invitation.
@@ -235,6 +244,7 @@ class RegistrationHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.REQUEST_SELF_INVITATION)
+	@asab.web.auth.noauth
 	async def request_self_invitation(self, request, *, json_data):
 		"""
 		Anonymous user request to register themself.
@@ -268,6 +278,8 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, payload)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def get_registration(self, request):
 		"""
 		Get credentials by registration handle
@@ -323,6 +335,8 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, response_data)
 
 
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def update_registration(self, request):
 		"""
 		Update drafted credentials
@@ -344,26 +358,31 @@ class RegistrationHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
 	async def complete_registration(self, request):
 		"""
 		Complete the registration either by activating the draft credentials
 		or by transferring their tenants and roles to the currently authenticated user.
 		"""
+		cookie_service = self.App.get_service("seacatauth.CookieService")
+		try:
+			root_session = await cookie_service.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			root_session = None
+
 		registration_code = request.match_info["registration_code"]
 
 		# TODO: Make sure that self-registered users create their new tenant
 
-		if request.Session is not None:
-			# Use the registration data to update the currently authenticated user
-			# Make sure this is explicit
-			if request.query.get("update_current") != "true":
-				raise asab.exceptions.ValidationError(
-					"To complete the registration with your current credentials, "
-					"include 'update_current=true' in the query.")
-			credentials_id = request.Session.Credentials.Id
+		if request.query.get("update_current") == "true":
+			if root_session is None:
+				# Use the registration data to update the currently authenticated user
+				# Make sure this is explicit
+				raise asab.exceptions.NotAuthenticatedError()
+
 			await self.RegistrationService.complete_registration_with_existing_credentials(
-				registration_code, credentials_id)
+				registration_code, root_session.Credentials.Id)
 
 		else:
 			# Complete the registration with the new credentials

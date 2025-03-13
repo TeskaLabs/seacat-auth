@@ -1,5 +1,7 @@
 import logging
 import asab
+import asab.web.auth
+import asab.web.tenant
 import aiohttp.web
 
 from .. import exceptions
@@ -23,6 +25,8 @@ class BatmanHandler(object):
 		web_app.router.add_post("/nginx/introspect/batman", self.batman_nginx)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def batman_nginx(self, request):
 		"""
 		Cookie introspection for basic auth apps
