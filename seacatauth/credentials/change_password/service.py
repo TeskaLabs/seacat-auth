@@ -2,10 +2,12 @@ import hashlib
 import logging
 import datetime
 import re
+import typing
+
 import asab
 import asab.exceptions
 
-from ... import exceptions
+from ... import exceptions, generic
 from ...generic import generate_ergonomic_token
 from ...events import EventTypes
 
@@ -123,12 +125,18 @@ class ChangePasswordService(asab.Service):
 	async def init_password_reset_by_admin(
 		self,
 		credentials: dict,
+		link_output: typing.Optional[str] = None,
 		is_new_user: bool = False,
 		expiration: float = None,
 	):
 		"""
 		Create a password reset link and send it to the user via email or other way
 		"""
+		session_ctx = generic.SessionContext.get()
+		if link_output == "response":
+			if not session_ctx.is_superuser():
+				raise exceptions.AccessDeniedError("Not allowed to receive password reset URL in response.")
+
 		# Deny password reset to suspended credentials
 		if credentials.get("suspended") is True:
 			raise exceptions.CredentialsSuspendedError(credentials["_id"])
@@ -136,21 +144,23 @@ class ChangePasswordService(asab.Service):
 		password_reset_token = await self.create_password_reset_token(credentials, expiration=expiration)
 		reset_url = self.format_password_reset_url(password_reset_token)
 
-		if not self.CommunicationService.is_enabled():
+		if link_output == "email":
+			# Send the message
+			try:
+				await self.CommunicationService.password_reset(
+					credentials=credentials,
+					reset_url=reset_url,
+					new_user=is_new_user
+				)
+				L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
+			except exceptions.MessageDeliveryError as e:
+				raise e
+
+		elif link_output == "response":
 			return reset_url
 
-		# Send the message
-		try:
-			await self.CommunicationService.password_reset(
-				credentials=credentials,
-				reset_url=reset_url,
-				new_user=is_new_user
-			)
-			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
-		except exceptions.MessageDeliveryError as e:
-			raise e
-
-		return None
+		else:
+			return None
 
 
 	async def init_lost_password_reset(self, credentials: dict):

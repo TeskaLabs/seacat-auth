@@ -44,25 +44,31 @@ _FIELDS = {
 		"type": "string",
 		"description": "Password",
 	},
-	"passwordlink": {
+	"passwordlink": {  # DEPRECATED
 		"type": "boolean",
+	},
+	"password_reset_link": {
+		"enum": [False, "email", "response"],
 		"description": "Send a link for password reset?",
-	}
+	},
 }
 
 CREATE_CREDENTIALS = {
 	"type": "object",
 	"additionalProperties": False,
 	"properties": {
-		field: schema
-		for field, schema in _FIELDS.items()
-		if field in frozenset([
-			"username",
-			"email",
-			"phone",
-			"password",  # May be used for M2M credentials
-			"passwordlink",
-		])
+		**{
+			field: schema
+			for field, schema in _FIELDS.items()
+			if field in frozenset([
+				"username",
+				"email",
+				"phone",
+				"password",  # M2M credentials allow direct setting of password
+				"passwordlink",    # DEPRECATED
+				"password_reset_link",
+			])
+		}
 	},
 }
 
@@ -120,6 +126,9 @@ CREATE_INVITATION_PUBLIC = {
 	"additionalProperties": False,
 	"properties": {
 		"email": {"type": "string"},
+		"invitation_link": {
+			"enum": ["email", "response"],
+		},
 	}
 }
 
@@ -135,6 +144,9 @@ CREATE_INVITATION_ADMIN = {
 				"username": {"type": "string"},
 				"phone": {"type": "string"},
 			}
+		},
+		"invitation_link": {
+			"enum": ["email", "response"],
 		},
 		"expiration": {
 			"oneOf": [{"type": "string"}, {"type": "number"}],
@@ -190,6 +202,9 @@ REQUEST_PASSWORD_RESET_ADMIN = {
 	"properties": {
 		"credentials_id": {"type": "string"},
 		"expiration": {"type": "number"},
+		"password_reset_link": {
+			"enum": ["email", "response"],
+		},
 	}
 }
 
