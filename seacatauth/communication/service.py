@@ -67,6 +67,12 @@ class CommunicationService(asab.Service):
 		return len(self.CommunicationProviders) > 0
 
 
+	async def can_send_to_target(self, credentials: dict, channel: str) -> bool:
+		if not channel in self.CommunicationProviders:
+			return False
+		return await self.CommunicationProviders[channel].can_send_to_target(credentials)
+
+
 	async def is_channel_enabled(self, channel) -> bool:
 		if not channel in self.CommunicationProviders:
 			return False
