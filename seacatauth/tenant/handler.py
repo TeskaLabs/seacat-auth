@@ -134,7 +134,7 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_TENANT)
-	@access_control(ResourceId.SUPERUSER)  # TODO: "seacat:tenant:create"
+	@access_control(ResourceId.TENANT_CREATE)
 	async def create(self, request, *, credentials_id, json_data):
 		"""
 		Create a tenant
