@@ -145,9 +145,6 @@ CREATE_INVITATION_ADMIN = {
 				"phone": {"type": "string"},
 			}
 		},
-		"invitation_link": {
-			"enum": ["email", "response"],
-		},
 		"expiration": {
 			"oneOf": [{"type": "string"}, {"type": "number"}],
 			"description": "How long until the invitation expires.",

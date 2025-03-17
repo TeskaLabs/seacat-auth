@@ -9,7 +9,7 @@ import asab.web.rest
 import asab.utils
 import asab.exceptions
 
-from ... import generic
+from ... import generic, exceptions
 from ...models.const import ResourceId
 from ...decorators import access_control
 from .. import schema
@@ -76,7 +76,6 @@ class RegistrationHandler(object):
 		# Prepare credentials, assign tenant and send invitation email
 		return await self._prepare_invitation(
 			request, tenant, credential_data, expiration, access_ips,
-			link_output=json_data.get("invitation_link"),
 			invited_by_cid=credentials_id
 		)
 
@@ -105,7 +104,6 @@ class RegistrationHandler(object):
 		# Prepare credentials and assign tenant
 		return await self._prepare_invitation(
 			request, tenant, credential_data, expiration, access_ips,
-			link_output=json_data.get("invitation_link"),
 			invited_by_cid=credentials_id
 		)
 
@@ -117,7 +115,6 @@ class RegistrationHandler(object):
 		credential_data: dict,
 		expiration: float,
 		access_ips: list,
-		link_output: typing.Optional[str] = None,
 		invited_by_cid: typing.Optional[str] = None,
 	) -> aiohttp.web.Response:
 		"""
@@ -131,29 +128,21 @@ class RegistrationHandler(object):
 			invited_by_cid: Credentials ID of the invitation request
 		"""
 		session_ctx = generic.SessionContext.get()
-		link_output = link_output or "email"
-
-		# Ensure there is a way to communicate the invitation link
-		# TODO: Refactor, de-duplicate
-		if link_output == "email":
-			if not self.RegistrationService.CommunicationService.is_enabled():
-				return asab.web.rest.json_response(request, status=400, data={
-					"result": "ERROR",
-					"tech_err": "Sending emails is not supported."
-				})
-		elif link_output == "response":
-			if not session_ctx.is_superuser():
-				return asab.web.rest.json_response(request, status=403, data={
-					"result": "ERROR",
-					"tech_err": "Not allowed to receive invitation link in response."
-				})
-		else:
-			raise asab.exceptions.ValidationError("Unsupported 'link_output' value: {!r}".format(link_output))
+		can_send_email = (
+			"email" in credential_data
+			and await self.RegistrationService.CommunicationService.is_channel_enabled("email")
+		)
+		if not (can_send_email or session_ctx.is_superuser()):
+			# Cannot send email, cannot return link in response
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "ERROR",
+				"tech_err": "Sending emails is not supported."
+			})
 
 		# Prepare credentials and registration code
-		registration_code = None
+		already_registered = False
 		try:
-			credentials_id, registration_code = await self.RegistrationService.draft_credentials(
+			credentials_id = await self.RegistrationService.draft_credentials(
 				credential_data=credential_data,
 				expiration=expiration,
 				invited_by_cid=invited_by_cid,
@@ -166,15 +155,14 @@ class RegistrationHandler(object):
 			credentials_id = await self.CredentialsService.locate(credential_data["email"], stop_at_first=True)
 			credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
 
-			if "__registration" in credentials:
-				# Registration in progress
-				registration_code = credentials["__registration"]["code"]
-			else:
+			if "__registration" not in credentials:
+				already_registered = True
 				L.log(
 					asab.LOG_NOTICE,
 					"Invitation matches credentials that are already registered.",
 					struct_data={"cid": credentials_id, **credential_data}
 				)
+
 
 		# Assign tenant
 		try:
@@ -187,19 +175,28 @@ class RegistrationHandler(object):
 			"credentials_id": credentials_id,
 		}
 
-		# (Re)send invitation email
-		if registration_code:
-			registration_url = self.RegistrationService.format_registration_uri(registration_code)
-			if link_output == "email":
+		if not already_registered:
+			registration_code = await self.RegistrationService.refresh_registration_code(credentials_id)
+			registration_url = self.RegistrationService.format_registration_url(registration_code)
+			if session_ctx.is_superuser():
+				response_data["registration_url"] = registration_url
+
+			if not can_send_email:
+				response_data["result"] = "ERROR"
+				response_data["tech_err"] = "Failed to send invitation link."
+				return asab.web.rest.json_response(request, response_data, status=400)
+
+			try:
 				await self.RegistrationService.CommunicationService.invitation(
 					credentials=credential_data,
 					registration_uri=registration_url,
 					tenants=[tenant],
 					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 				)
-
-			elif link_output == "response":
-				response_data["registration_url"] = registration_url
+			except exceptions.MessageDeliveryError:
+				response_data["result"] = "ERROR"
+				response_data["tech_err"] = "Failed to send invitation link."
+				return asab.web.rest.json_response(request, response_data, status=400)
 
 		return asab.web.rest.json_response(request, response_data)
 
@@ -210,26 +207,15 @@ class RegistrationHandler(object):
 		Resend invitation to an already invited user and extend the expiration of the invitation.
 		"""
 		session_ctx = generic.SessionContext.get()
-		link_output = request.match_info.get("link_output", "email")
-		# Ensure there is a way to communicate the invitation link
-		# TODO: Refactor, de-duplicate
-		if link_output == "email":
-			if not self.RegistrationService.CommunicationService.is_enabled():
-				return asab.web.rest.json_response(request, status=400, data={
-					"result": "ERROR",
-					"tech_err": "Sending emails is not supported."
-				})
-		elif link_output == "response":
-			if not session_ctx.is_superuser():
-				return asab.web.rest.json_response(request, status=403, data={
-					"result": "ERROR",
-					"tech_err": "Not allowed to receive invitation link in response."
-				})
-		else:
-			raise asab.exceptions.ValidationError("Unsupported 'link_output' value: {!r}".format(link_output))
-
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
+		can_send_email = await self.RegistrationService.CommunicationService.can_send_to_target(credentials, "email")
+		if not (can_send_email or session_ctx.is_superuser()):
+			# Cannot send email, cannot return link in response
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "ERROR",
+				"tech_err": "Sending emails is not supported."
+			})
 
 		if "__registration" not in credentials:
 			raise asab.exceptions.ValidationError("Credentials already registered.")
@@ -245,19 +231,30 @@ class RegistrationHandler(object):
 		else:
 			expiration = credentials["__registration"]["exp"]
 
+		registration_code = await self.RegistrationService.refresh_registration_code(credentials_id)
+		registration_url = self.RegistrationService.format_registration_url(registration_code)
+
 		response_data = {"result": "OK"}
-		registration_url = self.RegistrationService.format_registration_uri(credentials["__registration"]["code"])
-		if link_output == "email":
-			tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
+		if session_ctx.is_superuser():
+			response_data["registration_url"] = registration_url
+
+		if not can_send_email:
+			response_data["result"] = "ERROR"
+			response_data["tech_err"] = "Failed to send invitation link."
+			return asab.web.rest.json_response(request, response_data, status=400)
+
+		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
+		try:
 			await self.RegistrationService.CommunicationService.invitation(
 				credentials=credentials,
 				registration_uri=registration_url,
 				tenants=tenants,
 				expires_at=expiration,
 			)
-
-		elif link_output == "response":
-			response_data["registration_url"] = registration_url
+		except exceptions.MessageDeliveryError:
+			response_data["result"] = "ERROR"
+			response_data["tech_err"] = "Failed to send invitation link."
+			return asab.web.rest.json_response(request, response_data, status=400)
 
 		return asab.web.rest.json_response(request, response_data)
 
