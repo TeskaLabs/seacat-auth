@@ -211,7 +211,7 @@ class ChangePasswordHandler(object):
 		# Check if password reset link can be sent (in email or at least in the response)
 		if not (
 			session_ctx.is_superuser()
-			or await self.CredentialsService.CommunicationService.can_send_to_target(credentials, "email")
+			or await self.ChangePasswordService.CommunicationService.can_send_to_target(credentials, "email")
 		):
 			L.error("Password reset denied: No way to communicate password reset link.", struct_data={
 				"cid": credentials_id})
@@ -233,7 +233,7 @@ class ChangePasswordHandler(object):
 
 		# Email the link to the user
 		try:
-			await self.CredentialsService.CommunicationService.password_reset(
+			await self.ChangePasswordService.CommunicationService.password_reset(
 				credentials=credentials,
 				reset_url=password_reset_url,
 				new_user=False
@@ -258,7 +258,7 @@ class ChangePasswordHandler(object):
 		await asyncio.sleep(5)  # Safety time cooldown
 		access_ips = generic.get_request_access_ips(request)
 		ident = json_data["ident"]
-		credentials_id = await self.ChangePasswordService.CredentialsService.locate(ident, stop_at_first=True)
+		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True)
 		if credentials_id is None:
 			L.log(asab.LOG_NOTICE, "Lost password reset denied: Ident matched no credentials", struct_data={
 				"ident": ident, "from": access_ips})
@@ -283,8 +283,8 @@ class ChangePasswordHandler(object):
 			})
 
 		# Check if password reset link can be sent
-		if not await self.CredentialsService.CommunicationService.can_send_to_target(credentials, "email"):
-			L.error("Lost password reset failed: No way to communicate password reset link.", struct_data={
+		if not await self.ChangePasswordService.CommunicationService.can_send_to_target(credentials, "email"):
+			L.log(asab.LOG_NOTICE, "Lost password reset failed: No way to communicate password reset link.", struct_data={
 				"cid": credentials_id, "from": access_ips})
 			# Avoid information disclosure
 			return asab.web.rest.json_response(request, {"result": "OK"})
@@ -294,7 +294,7 @@ class ChangePasswordHandler(object):
 
 		# Email the link to the user
 		try:
-			await self.CredentialsService.CommunicationService.password_reset(
+			await self.ChangePasswordService.CommunicationService.password_reset(
 				credentials=credentials,
 				reset_url=password_reset_url,
 				new_user=False
