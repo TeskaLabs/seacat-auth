@@ -28,7 +28,11 @@ class CommunicationProviderABC(asab.Configurable, abc.ABC):
 		)
 
 
-	def can_send_to_target(self, credentials: dict) -> bool:
+	async def can_send_to_target(self, credentials: dict) -> bool:
+		return await self.is_enabled()
+
+
+	async def is_enabled(self) -> bool:
 		raise NotImplementedError()
 
 

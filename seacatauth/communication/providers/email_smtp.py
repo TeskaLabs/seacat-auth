@@ -55,12 +55,18 @@ class SMTPEmailProvider(CommunicationProviderABC):
 			self.Port = int(port)
 
 
-	def can_send_to_target(self, credentials: dict) -> bool:
+	async def can_send_to_target(self, credentials: dict) -> bool:
+		if not await self.is_enabled():
+			return False
 		try:
 			_get_email_address(credentials)
 			return True
 		except KeyError:
 			return False
+
+
+	async def is_enabled(self) -> bool:
+		return True
 
 
 	async def build_message(self, credentials: dict, template_id, locale, **kwargs) -> dict:
