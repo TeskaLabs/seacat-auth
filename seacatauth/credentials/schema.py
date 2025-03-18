@@ -47,10 +47,6 @@ _FIELDS = {
 	"passwordlink": {  # DEPRECATED
 		"type": "boolean",
 	},
-	"password_reset_link": {
-		"enum": [False, "email", "response"],
-		"description": "Send a link for password reset?",
-	},
 }
 
 CREATE_CREDENTIALS = {
@@ -65,8 +61,7 @@ CREATE_CREDENTIALS = {
 				"email",
 				"phone",
 				"password",  # M2M credentials allow direct setting of password
-				"passwordlink",    # DEPRECATED
-				"password_reset_link",
+				"passwordlink",
 			])
 		}
 	},
@@ -126,9 +121,6 @@ CREATE_INVITATION_PUBLIC = {
 	"additionalProperties": False,
 	"properties": {
 		"email": {"type": "string"},
-		"invitation_link": {
-			"enum": ["email", "response"],
-		},
 	}
 }
 
@@ -199,9 +191,6 @@ REQUEST_PASSWORD_RESET_ADMIN = {
 	"properties": {
 		"credentials_id": {"type": "string"},
 		"expiration": {"type": "number"},
-		"password_reset_link": {
-			"enum": ["email", "response"],
-		},
 	}
 }
 

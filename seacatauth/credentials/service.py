@@ -609,7 +609,6 @@ class CredentialsService(asab.Service):
 		# Add "passwordlink" field if phone or email is present
 		if "email" in self.Policy.CreationPolicy or "phone" in self.Policy.CreationPolicy:
 			info["creation"].append({"type": "passwordlink"})
-			info["creation"].append({"type": "password_reset_link"})
 
 		if len(self.Policy.UpdatePolicy) > 0:
 			info["update"] = [
