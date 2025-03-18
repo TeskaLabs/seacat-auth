@@ -5,7 +5,6 @@ import asab.web.auth.authorization
 from ...models.const import ResourceId
 
 
-# TODO: Deprecated. Replace with ASAB auth functions entirely.
 class RBACService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.RBACService"):
