@@ -298,7 +298,13 @@ class RegistrationHandler(object):
 		Get credentials by registration handle
 		"""
 		registration_code = request.match_info["registration_code"]
-		credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
+		try:
+			credentials = await self.RegistrationService.get_credential_by_registration_code(registration_code)
+		except KeyError:
+			return asab.web.rest.json_response(request, status=404, data={
+				"result": "ERROR",
+				"tech_err": "Registration code not found."
+			})
 
 		# TODO: Get "required" and "editable" values from credential policy
 		email_data = {
