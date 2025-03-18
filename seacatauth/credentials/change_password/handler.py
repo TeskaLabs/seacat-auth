@@ -244,6 +244,7 @@ class ChangePasswordHandler(object):
 			response_data["tech_err"] = "Failed to send password reset link."
 			return asab.web.rest.json_response(request, response_data, status=400)
 
+		response_data["result"] = "OK"
 		return asab.web.rest.json_response(request, response_data)
 
 

@@ -23,6 +23,7 @@ class CredentialsHandler(object):
 	"""
 
 	def __init__(self, app, credentials_svc):
+		self.App = app
 		self.CredentialsService = credentials_svc
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
@@ -299,14 +300,15 @@ class CredentialsHandler(object):
 		}
 
 		if reset_password:
-			change_pwd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
+			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
+			comm_svc = self.App.get_service("seacatauth.CommunicationService")
 			credentials = await self.CredentialsService.get(credentials_id)
 
 			# Check if password reset link can be sent (in email or at least in the response)
 			session_ctx = generic.SessionContext.get()
 			if not (
 				session_ctx.is_superuser()
-				or await self.CredentialsService.CommunicationService.can_send_to_target(credentials, "email")
+				or await comm_svc.can_send_to_target(credentials, "email")
 			):
 				L.error("Password reset denied: No way to communicate password reset link.", struct_data={
 					"cid": credentials_id})
@@ -331,7 +333,7 @@ class CredentialsHandler(object):
 
 			# Email the link to the user
 			try:
-				await self.CredentialsService.CommunicationService.password_reset(
+				await comm_svc.password_reset(
 					credentials=credentials,
 					reset_url=password_reset_url,
 					new_user=True
