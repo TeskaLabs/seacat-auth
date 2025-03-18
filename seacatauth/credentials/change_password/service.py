@@ -2,12 +2,11 @@ import hashlib
 import logging
 import datetime
 import re
-import typing
 
 import asab
 import asab.exceptions
 
-from ... import exceptions, generic
+from ... import exceptions
 from ...generic import generate_ergonomic_token
 from ...events import EventTypes
 

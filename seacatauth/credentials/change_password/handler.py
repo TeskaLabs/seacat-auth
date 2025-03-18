@@ -1,7 +1,6 @@
 import logging
 import asyncio
 
-import aiohttp.web
 import asab
 import asab.web.rest
 import asab.web.webcrypto

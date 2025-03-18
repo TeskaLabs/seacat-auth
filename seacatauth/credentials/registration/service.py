@@ -6,7 +6,7 @@ import asab
 import asab.storage.exceptions
 import asab.exceptions
 
-from ... import AuditLogger, generic
+from ... import AuditLogger
 
 
 L = logging.getLogger(__name__)
