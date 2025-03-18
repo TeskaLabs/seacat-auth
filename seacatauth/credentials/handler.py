@@ -23,6 +23,7 @@ class CredentialsHandler(object):
 	"""
 
 	def __init__(self, app, credentials_svc):
+		self.App = app
 		self.CredentialsService = credentials_svc
 
 		self.SessionService = app.get_service("seacatauth.SessionService")
@@ -277,8 +278,7 @@ class CredentialsHandler(object):
 		"""
 		Create new credentials
 		"""
-		password_link = json_data.pop("passwordlink", False)
-
+		reset_password = json_data.pop("passwordlink")
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
@@ -286,42 +286,66 @@ class CredentialsHandler(object):
 		result = await self.CredentialsService.create_credentials(provider_id, json_data, request.Session)
 
 		if result["status"] != "OK":
+			result["result"] = result["status"]
 			return asab.web.rest.json_response(request, result, status=400)
 
 		credentials_id = result["credentials_id"]
 
 		response_data = {
-			"status": "OK",
+			"result": "OK",
+			"status": "OK",  # Backward compatibility
 			"_id": credentials_id,
 			"_type": provider.Type,
-			"_provider_id": provider.ProviderID
+			"_provider_id": provider.ProviderID,
 		}
 
-		if password_link:
-			change_pwd_svc = self.SessionService.App.get_service("seacatauth.ChangePasswordService")
+		if reset_password:
+			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
+			comm_svc = self.App.get_service("seacatauth.CommunicationService")
 			credentials = await self.CredentialsService.get(credentials_id)
-			try:
-				reset_url = await change_pwd_svc.init_password_reset_by_admin(
-					credentials,
-					expiration=json_data.get("expiration"),
-					is_new_user=True,
-				)
-			except exceptions.CredentialsNotFoundError:
-				L.log(asab.LOG_NOTICE, "Password reset denied: Credentials not found", struct_data={
-					"cid": credentials_id})
-				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
-			except exceptions.CredentialsSuspendedError:
-				L.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
-					"cid": credentials_id})
-				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
-			except exceptions.MessageDeliveryError as e:
-				L.error("Failed to send password change link: {}".format(e), struct_data={"cid": credentials_id})
-				return asab.web.rest.json_response(request, {"result": "FAILED"}, status=500)
 
-			if reset_url:
-				# Password reset URL was not sent because CommunicationService is disabled
-				# Add the URL to admin response
-				response_data["reset_url"] = reset_url
+			# Check if password reset link can be sent (in email or at least in the response)
+			session_ctx = generic.SessionContext.get()
+			if not (
+				session_ctx.is_superuser()
+				or await comm_svc.can_send_to_target(credentials, "email")
+			):
+				L.error("Password reset denied: No way to communicate password reset link.", struct_data={
+					"cid": credentials_id})
+				password_reset_response = {
+					"result": "ERROR",
+					"tech_err": "Password reset link cannot be sent.",
+				}
+				response_data["password_reset"] = password_reset_response
+				return asab.web.rest.json_response(request, response_data)
+
+			password_reset_response = {}
+
+			# Create the password reset link
+			password_reset_url = await change_pwd_svc.init_password_reset(
+				credentials,
+				expiration=json_data.get("expiration"),
+			)
+
+			# Superusers receive the password reset link in response
+			if session_ctx.is_superuser():
+				password_reset_response["password_reset_url"] = password_reset_url
+
+			# Email the link to the user
+			try:
+				await comm_svc.password_reset(
+					credentials=credentials,
+					reset_url=password_reset_url,
+					new_user=True
+				)
+			except exceptions.MessageDeliveryError:
+				password_reset_response["result"] = "ERROR"
+				password_reset_response["tech_err"] = "Failed to send password reset link."
+				response_data["password_reset"] = password_reset_response
+				return asab.web.rest.json_response(request, response_data, status=400)
+
+			password_reset_response["result"] = "OK"
+			response_data["password_reset"] = password_reset_response
 
 		return asab.web.rest.json_response(request, response_data)
 

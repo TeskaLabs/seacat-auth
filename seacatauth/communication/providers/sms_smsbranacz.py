@@ -52,12 +52,18 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				"Messages will not be sent, but instead will be printed to log.")
 
 
-	def can_send_to_target(self, credentials: dict) -> bool:
+	async def can_send_to_target(self, credentials: dict) -> bool:
+		if not await self.is_enabled():
+			return False
 		try:
 			_get_phone_number(credentials)
 			return True
 		except KeyError:
 			return False
+
+
+	async def is_enabled(self) -> bool:
+		return True
 
 
 	async def build_message(self, credentials: dict, template_id: str, locale: str, **kwargs) -> dict:

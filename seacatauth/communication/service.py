@@ -67,8 +67,16 @@ class CommunicationService(asab.Service):
 		return len(self.CommunicationProviders) > 0
 
 
-	def is_channel_enabled(self, channel):
-		return channel in self.CommunicationProviders
+	async def can_send_to_target(self, credentials: dict, channel: str) -> bool:
+		if channel not in self.CommunicationProviders:
+			return False
+		return await self.CommunicationProviders[channel].can_send_to_target(credentials)
+
+
+	async def is_channel_enabled(self, channel) -> bool:
+		if channel not in self.CommunicationProviders:
+			return False
+		return await self.CommunicationProviders[channel].is_enabled()
 
 
 	def get_communication_provider(self, channel):
@@ -147,7 +155,7 @@ class CommunicationService(asab.Service):
 		except KeyError:
 			raise exceptions.CommunicationChannelNotAvailableError("Channel not configured.", channel=channel)
 
-		if not provider.can_send_to_target(credentials):
+		if not await provider.can_send_to_target(credentials):
 			raise exceptions.CommunicationChannelNotAvailableError(
 				"Channel not available for credentials.", channel=channel, cid=credentials["_id"])
 
