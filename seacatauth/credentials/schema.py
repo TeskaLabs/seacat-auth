@@ -44,25 +44,26 @@ _FIELDS = {
 		"type": "string",
 		"description": "Password",
 	},
-	"passwordlink": {
+	"passwordlink": {  # DEPRECATED
 		"type": "boolean",
-		"description": "Send a link for password reset?",
-	}
+	},
 }
 
 CREATE_CREDENTIALS = {
 	"type": "object",
 	"additionalProperties": False,
 	"properties": {
-		field: schema
-		for field, schema in _FIELDS.items()
-		if field in frozenset([
-			"username",
-			"email",
-			"phone",
-			"password",  # May be used for M2M credentials
-			"passwordlink",
-		])
+		**{
+			field: schema
+			for field, schema in _FIELDS.items()
+			if field in frozenset([
+				"username",
+				"email",
+				"phone",
+				"password",  # M2M credentials allow direct setting of password
+				"passwordlink",
+			])
+		}
 	},
 }
 

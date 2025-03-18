@@ -2,6 +2,7 @@ import hashlib
 import logging
 import datetime
 import re
+
 import asab
 import asab.exceptions
 
@@ -120,62 +121,16 @@ class ChangePasswordService(asab.Service):
 		}
 
 
-	async def init_password_reset_by_admin(
+	async def init_password_reset(
 		self,
 		credentials: dict,
-		is_new_user: bool = False,
 		expiration: float = None,
 	):
 		"""
 		Create a password reset link and send it to the user via email or other way
 		"""
-		# Deny password reset to suspended credentials
-		if credentials.get("suspended") is True:
-			raise exceptions.CredentialsSuspendedError(credentials["_id"])
-
 		password_reset_token = await self.create_password_reset_token(credentials, expiration=expiration)
-		reset_url = self.format_password_reset_url(password_reset_token)
-
-		if not self.CommunicationService.is_enabled():
-			return reset_url
-
-		# Send the message
-		try:
-			await self.CommunicationService.password_reset(
-				credentials=credentials,
-				reset_url=reset_url,
-				new_user=is_new_user
-			)
-			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
-		except exceptions.MessageDeliveryError as e:
-			raise e
-
-		return None
-
-
-	async def init_lost_password_reset(self, credentials: dict):
-		"""
-		Create a password reset link and send it to the user via email or other way
-		"""
-		# Deny password reset to suspended credentials
-		if credentials.get("suspended") is True:
-			raise exceptions.CredentialsSuspendedError(credentials["_id"])
-
-		password_reset_token = await self.create_password_reset_token(credentials)
-		reset_url = self.format_password_reset_url(password_reset_token)
-
-		# Send the message
-		try:
-			await self.CommunicationService.password_reset(
-				credentials=credentials,
-				reset_url=reset_url,
-			)
-			L.log(asab.LOG_NOTICE, "Password reset message sent.", struct_data={"cid": credentials["_id"]})
-		except Exception as e:
-			L.log(asab.LOG_NOTICE, "Failed to send password reset message: {}".format(e), struct_data={
-				"cid": credentials["_id"]})
-			await self.delete_password_reset_token(password_reset_token)
-			raise e
+		return self.format_password_reset_url(password_reset_token)
 
 
 	def format_password_reset_url(self, password_reset_token):

@@ -137,7 +137,7 @@ class TenantHandler(object):
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_TENANT)
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.TENANT_CREATE)
 	async def create(self, request, *, json_data):
 		"""
 		Create a tenant

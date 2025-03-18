@@ -50,6 +50,9 @@ SEACAT_AUTH_RESOURCES = {
 	ResourceId.TENANT_ACCESS: {
 		"description": "List tenants, view tenant detail and see tenant members.",
 	},
+	ResourceId.TENANT_CREATE: {
+		"description": "Create new tenants.",
+	},
 	ResourceId.TENANT_EDIT: {
 		"description": "Edit tenant data.",
 	},
@@ -81,6 +84,7 @@ GLOBAL_ONLY_RESOURCES = frozenset({
 	ResourceId.RESOURCE_EDIT,
 	ResourceId.CLIENT_ACCESS,
 	ResourceId.CLIENT_EDIT,
+	ResourceId.TENANT_CREATE,
 })
 
 

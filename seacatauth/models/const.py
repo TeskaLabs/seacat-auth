@@ -10,6 +10,7 @@ class ResourceId:
 	CREDENTIALS_EDIT = "seacat:credentials:edit"
 
 	TENANT_ACCESS = "seacat:tenant:access"
+	TENANT_CREATE = "seacat:tenant:create"
 	TENANT_EDIT = "seacat:tenant:edit"
 	TENANT_DELETE = "seacat:tenant:delete"
 	TENANT_ASSIGN = "seacat:tenant:assign"
