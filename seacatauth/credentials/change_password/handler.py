@@ -5,6 +5,7 @@ import asab
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
+import asab.contextvars
 
 from ... import exceptions, generic, AuditLogger
 from ...models.const import ResourceId
@@ -194,7 +195,7 @@ class ChangePasswordHandler(object):
 		Send a password reset link to specified user
 		"""
 		response_data = {}
-		session_ctx = generic.SessionContext.get()
+		authz = asab.contextvars.Authz.get()
 		credentials_id = json_data.get("credentials_id")
 		try:
 			credentials = await self.CredentialsService.get(credentials_id)
@@ -215,7 +216,7 @@ class ChangePasswordHandler(object):
 
 		# Check if password reset link can be sent (in email or at least in the response)
 		if not (
-			session_ctx.is_superuser()
+			authz.has_superuser_access()
 			or await self.ChangePasswordService.CommunicationService.can_send_to_target(credentials, "email")
 		):
 			L.error("Password reset denied: No way to communicate password reset link.", struct_data={
@@ -232,8 +233,7 @@ class ChangePasswordHandler(object):
 		)
 
 		# Superusers receive the password reset link in response
-		session_ctx = generic.SessionContext.get()
-		if session_ctx.is_superuser():
+		if authz.has_superuser_access():
 			response_data["password_reset_url"] = password_reset_url
 
 		# Email the link to the user
