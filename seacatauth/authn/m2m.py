@@ -4,6 +4,7 @@ import logging
 import aiohttp.web
 import asab
 import asab.web.auth
+import asab.web.tenant
 
 from .. import AuditLogger, generic
 from ..generic import nginx_introspection
@@ -113,6 +114,7 @@ class M2MIntrospectHandler(object):
 
 
 	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def nginx(self, request):
 		"""
 		M2M (machine-to-machine) introspection
