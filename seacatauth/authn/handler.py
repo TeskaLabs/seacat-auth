@@ -2,15 +2,17 @@ import datetime
 import logging
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
+import asab.contextvars
 import aiohttp.web
 import urllib.parse
 import jwcrypto.jwk
 
-from ..models.const import ResourceId
 from .. import exceptions, AuditLogger, generic
+from ..models.const import ResourceId
 from ..last_activity import EventCode
-from ..decorators import access_control
 from ..openidconnect.utils import AUTHORIZE_PARAMETERS
 from . import schema
 
@@ -54,6 +56,8 @@ class AuthenticationHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.LOGIN_PROLOGUE)
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def login_prologue(self, request, *, json_data):
 		"""
 		Initiate a new login process
@@ -123,6 +127,8 @@ class AuthenticationHandler(object):
 		return asab.web.rest.json_response(request, response)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def login(self, request):
 		"""
 		Submit login
@@ -196,9 +202,11 @@ class AuthenticationHandler(object):
 			)
 
 		# If there already is a root session with the same credentials ID, refresh it instead of creating a new one
-		if request.Session is not None and request.Session.Credentials.Id == login_session.SeacatLogin.CredentialsId:
-			root_session = request.Session
-		else:
+		try:
+			root_session = await self.CookieService.get_session_by_request_cookie(request)
+			if root_session.Credentials.Id != login_session.SeacatLogin.CredentialsId:
+				root_session = None
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
 			root_session = None
 
 		# Do the actual login
@@ -240,6 +248,8 @@ class AuthenticationHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def logout(self, request):
 		"""
 		Log out
@@ -290,6 +300,8 @@ class AuthenticationHandler(object):
 		return response
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def prepare_smslogin_challenge(self, request):
 		"""
 		Prepare authentication via SMS code
@@ -326,6 +338,8 @@ class AuthenticationHandler(object):
 		return aiohttp.web.Response(body=login_session.encrypt(body))
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def prepare_webauthn_login_challenge(self, request):
 		"""
 		Prepare authentication via FIDO2/WebAuthn
@@ -383,7 +397,8 @@ class AuthenticationHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.IMPERSONATE)
-	@access_control(ResourceId.IMPERSONATE)
+	@asab.web.auth.require(ResourceId.IMPERSONATE)
+	@asab.web.tenant.allow_no_tenant
 	async def impersonate(self, request, *, json_data):
 		"""
 		Impersonate another user
@@ -397,10 +412,11 @@ class AuthenticationHandler(object):
 			from_info.extend(ff.split(", "))
 
 		target_cid = json_data["credentials_id"]
-		if request.Session.Session.ParentSessionId is None:
-			impersonator_root_session = request.Session
+		authz = asab.contextvars.Authz.get()
+		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type in {"root", "m2m"}:
+			impersonator_root_session = authz.Session
 		else:
-			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
+			impersonator_root_session = await self.SessionService.get(authz.Session.Session.ParentSessionId)
 
 		try:
 			session = await self._impersonate(impersonator_root_session, from_info, target_cid)
@@ -415,7 +431,8 @@ class AuthenticationHandler(object):
 		return response
 
 
-	@access_control(ResourceId.IMPERSONATE)
+	@asab.web.auth.require(ResourceId.IMPERSONATE)
+	@asab.web.tenant.allow_no_tenant
 	async def impersonate_and_redirect(self, request):
 		"""
 		Impersonate another user
@@ -464,10 +481,11 @@ class AuthenticationHandler(object):
 
 		request_data = await request.post()
 		target_cid = request_data["credentials_id"]
-		if request.Session.Session.Type == "root":
-			impersonator_root_session = request.Session
+		authz = asab.contextvars.Authz.get()
+		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type in {"root", "m2m"}:
+			impersonator_root_session = authz.Session
 		else:
-			impersonator_root_session = await self.SessionService.get(request.Session.Session.ParentSessionId)
+			impersonator_root_session = await self.SessionService.get(authz.Session.Session.ParentSessionId)
 
 		try:
 			session = await self._impersonate(impersonator_root_session, from_info, target_cid)

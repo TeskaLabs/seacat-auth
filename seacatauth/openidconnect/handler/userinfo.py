@@ -3,6 +3,11 @@ import aiohttp
 import aiohttp.web
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
+
+from ... import generic
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -18,9 +23,9 @@ class UserInfoHandler(object):
 
 	def __init__(self, app, oidc_svc):
 		self.OpenIdConnectService = oidc_svc
+		self.CookieService = app.get_service("seacatauth.CookieService")
 
 		web_app = app.WebContainer.WebApp
-		# The Client sends the UserInfo Request using either HTTP GET or HTTP POST.
 		web_app.router.add_get(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 		web_app.router.add_post(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 
@@ -30,6 +35,8 @@ class UserInfoHandler(object):
 		web_app_public.router.add_post(self.OpenIdConnectService.UserInfoPath, self.userinfo)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def userinfo(self, request):
 		"""
 		OAuth 2.0 UserInfo Endpoint
@@ -37,13 +44,29 @@ class UserInfoHandler(object):
 		OpenID Connect Core 1.0, chapter 5.3. UserInfo Endpoint
 		"""
 
-		session = request.Session
+		token_value = generic.get_bearer_token_value(request)
+		if token_value is not None:
+			try:
+				# Non-canonical
+				session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
+				if session is None:
+					L.log(asab.LOG_NOTICE, "Authentication required.")
+					return self.error_response("invalid_token", "ID token is invalid.")
+			except ValueError:
+				try:
+					# Canonical
+					session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+				except exceptions.SessionNotFoundError:
+					L.log(asab.LOG_NOTICE, "Authentication required.")
+					return self.error_response("invalid_token", "Access token is invalid.")
 
-		if session is None:
-			L.log(asab.LOG_NOTICE, "Authentication required")
-			return self.error_response("invalid_token", "Access token or cookie is invalid.")
-
-		# # if authorized get provider for this identity
+		else:
+			try:
+				# Non-canonical
+				session = await self.CookieService.get_session_by_request_cookie(request)
+			except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+				L.log(asab.LOG_NOTICE, "Authentication required.")
+				return self.error_response("invalid_token", "Cookie is missing or invalid.")
 
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
