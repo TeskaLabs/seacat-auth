@@ -3,11 +3,12 @@ import logging
 import urllib.parse
 import secrets
 import asab.exceptions
+import asab.contextvars
 import asab.storage.exceptions
 
 from ..client.schema import CLIENT_TEMPLATES
-from ..generic import SessionContext
-from ..models.session import build_system_session
+from ..api import local_authz
+from ..models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
@@ -67,20 +68,13 @@ class ProvisioningService(asab.Service):
 		await self.RoleService.initialize(app)
 		await self.ClientService.initialize(app)
 
-		session = build_system_session(
-			self.SessionService,
-			session_id="PROVISIONING"
-		)
-		session_ctx = SessionContext.set(session)
-		try:
+		with local_authz(self.Name, resources={ResourceId.SUPERUSER}):
 			await self._set_up_provisioning(app)
-		finally:
-			SessionContext.reset(session_ctx)
-			del session
 
 
 	async def finalize(self, app):
-		await self._tear_down_provisioning(app)
+		with local_authz(self.Name, resources={ResourceId.SUPERUSER}):
+			await self._tear_down_provisioning(app)
 		await super().finalize(app)
 
 
@@ -108,19 +102,20 @@ class ProvisioningService(asab.Service):
 		except asab.exceptions.Conflict:
 			L.log(asab.LOG_NOTICE, "Tenant already exists.", struct_data={"tenant": self.TenantID})
 
-		# Assign tenant to provisioning user
-		try:
-			await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
-		except asab.exceptions.Conflict:
-			L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={
-				"cid": self.SuperuserID, "tenant": self.TenantID})
+		with asab.contextvars.tenant_context(self.TenantID):
+			# Assign tenant to provisioning user
+			try:
+				await self.TenantService.assign_tenant(self.SuperuserID, self.TenantID)
+			except asab.exceptions.Conflict:
+				L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={
+					"cid": self.SuperuserID, "tenant": self.TenantID})
 
-		# Assign superuser role to the provisioning user
-		try:
-			await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
-		except asab.exceptions.Conflict:
-			L.log(asab.LOG_NOTICE, "Role already assigned.", struct_data={
-				"cid": self.SuperuserID, "role": self.SuperroleID})
+			# Assign superuser role to the provisioning user
+			try:
+				await self.RoleService.assign_role(self.SuperuserID, self.SuperroleID)
+			except asab.exceptions.Conflict:
+				L.log(asab.LOG_NOTICE, "Role already assigned.", struct_data={
+					"cid": self.SuperuserID, "role": self.SuperroleID})
 
 		await self._initialize_admin_ui_client()
 

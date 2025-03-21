@@ -1,6 +1,7 @@
 import logging
 import asab
 import asab.web.rest
+import asab.web.tenant
 
 from ..service import ExternalLoginService
 from ..exceptions import ExternalAccountNotFoundError
@@ -28,37 +29,43 @@ class ExternalLoginAccountHandler(object):
 		web_app.router.add_delete("/account/ext-login/{provider_type}/{subject_id}", self.remove_my_external_account)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def list_my_external_accounts(self, request):
 		"""
 		List the current user's external login accounts
 		"""
-		data = await self.ExternalLoginService.list_external_accounts(request.Session.Credentials.Id)
+		authz = asab.contextvars.Authz.get()
+		data = await self.ExternalLoginService.list_external_accounts(authz.CredentialsId)
 		return asab.web.rest.json_response(request, data)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def get_my_external_account(self, request):
 		"""
 		Get the current user's external login credentials detail
 		"""
+		authz = asab.contextvars.Authz.get()
 		provider_type = request.match_info["provider_type"]
 		subject_id = request.match_info["subject_id"]
 		try:
 			data = await self.ExternalLoginService.get_external_account(
-				provider_type, subject_id, credentials_id=request.Session.Credentials.Id)
+				provider_type, subject_id, credentials_id=authz.CredentialsId)
 			return asab.web.rest.json_response(request, data)
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
 
+	@asab.web.tenant.allow_no_tenant
 	async def remove_my_external_account(self, request):
 		"""
 		Remove the current user's external login account
 		"""
+		authz = asab.contextvars.Authz.get()
 		provider_type = request.match_info["provider_type"]
 		subject_id = request.match_info["subject_id"]
 		try:
 			await self.ExternalLoginService.remove_external_account(
-				provider_type, subject_id, credentials_id=request.Session.Credentials.Id)
+				provider_type, subject_id, credentials_id=authz.CredentialsId)
 			return asab.web.rest.json_response(request, {"result": "OK"})
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)

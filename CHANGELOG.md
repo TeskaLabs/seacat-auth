@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha16
 - v25.05-alpha15
 - v25.05-alpha14
 - v25.05-alpha13
@@ -31,6 +32,7 @@
 - Provisioning service initialization uses system Session object (#439, v25.05-alpha2)
 
 ### Refactoring
+- Use ASAB AuthService and TenantService for API authorization (#440, v25.05-alpha16)
 - Rename email template parameters (#451, v25.05-alpha13)
 - Always initialize tenant provider (#449, v25.05-alpha12)
 - Separate JSON schemas (#448, v25.05-alpha11)

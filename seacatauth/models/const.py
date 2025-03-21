@@ -1,5 +1,8 @@
+import asab.web.auth
+
+
 class ResourceId:
-	SUPERUSER = "authz:superuser"
+	SUPERUSER = asab.web.auth.SUPERUSER_RESOURCE_ID
 	IMPERSONATE = "authz:impersonate"
 	ACCESS_ALL_TENANTS = "authz:tenant:access"
 

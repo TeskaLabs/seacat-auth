@@ -10,7 +10,6 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, generic, exceptions
-from ..models import Session
 
 
 L = logging.getLogger(__name__)
@@ -125,9 +124,9 @@ class CredentialsService(asab.Service):
 
 
 	async def locate(self, ident: str, stop_at_first: bool = False, login_dict: dict = None):
-		'''
+		"""
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
-		'''
+		"""
 		ident = ident.strip()
 		credentials_ids = []
 		pending = [
@@ -231,13 +230,18 @@ class CredentialsService(asab.Service):
 				return False
 
 
-	async def list(self, session: Session, search_params: generic.SearchParams, try_global_search: bool = False):
+	async def list(self, search_params: generic.SearchParams, try_global_search: bool = False):
 		"""
 		List credentials that are members of currently authorized tenants.
 		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
 		"""
-		searched_tenants = _authorize_searched_tenants(session, search_params, try_global_search)
-		searched_roles = _authorize_searched_roles(session, search_params)
+		authz = asab.contextvars.Authz.get()
+		tenant_ctx = asab.contextvars.Tenant.get()
+		if tenant_ctx:
+			authz.require_tenant_access()
+
+		searched_tenants = _authorize_searched_tenants(search_params, try_global_search)
+		searched_roles = _authorize_searched_roles(search_params)
 
 		credentials = []
 		offset = search_params.Page * search_params.ItemsPerPage
@@ -338,9 +342,10 @@ class CredentialsService(asab.Service):
 		self.register_provider(provider)
 
 
-	async def create_credentials(self, provider_id: str, credentials_data: dict, session: Session = None):
+	async def create_credentials(self, provider_id: str, credentials_data: dict):
 		# Record the requester's ID for logging purposes
-		agent_cid = session.Credentials.Id if session is not None else None
+		authz = asab.contextvars.Authz.get()
+		agent_cid = authz.CredentialsId
 
 		# Get provider
 		provider = self.CredentialProviders[provider_id]
@@ -401,7 +406,7 @@ class CredentialsService(asab.Service):
 
 
 	# TODO: Implement editing for M2M credentials
-	async def update_credentials(self, credentials_id: str, update_dict: dict, session: Session = None):
+	async def update_credentials(self, credentials_id: str, update_dict: dict):
 		"""
 		Validate the input data in the update dict according to active policies
 		and update credentials in the respective provider.
@@ -412,10 +417,11 @@ class CredentialsService(asab.Service):
 			in the respective credentials provider
 		"""
 		# Record the requester's ID for logging purposes
-		agent_cid = session.Credentials.Id if session is not None else None
+		authz = asab.contextvars.Authz.get()
+		agent_cid = authz.CredentialsId
 
 		# Credentials outside the current tenant are invisible (except if superuser)
-		if not await self.can_access_credentials(session, credentials_id):
+		if not await self.can_access_credentials(credentials_id):
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		# Disallow sensitive field updates
@@ -452,11 +458,7 @@ class CredentialsService(asab.Service):
 		custom_data = update_dict.pop("data", None)
 
 		# Check credentials policy
-		if session is not None:
-			authz = session.Authorization.Authz
-		else:
-			authz = None
-		validated_data = self.Policy.validate_update_data(update_dict, authz)
+		validated_data = self.Policy.validate_update_data(credentials_id, update_dict)
 		if validated_data is None:
 			L.error("Update failed: Data does not comply with update policy", struct_data={
 				"provider_id": provider.ProviderID,
@@ -621,84 +623,87 @@ class CredentialsService(asab.Service):
 		return info
 
 
-	async def can_access_credentials(self, session, credentials_id: str) -> bool:
+	async def can_access_credentials(self, credentials_id: str) -> bool:
 		"""
 		Check if the target user is a member of currently authorized tenant
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz:
+			raise ValueError("Missing authorization.")
+
 		tenant_service = self.App.get_service("seacatauth.TenantService")
-		if not session:
-			return False
-		if session.is_superuser():
+		if authz.has_superuser_access():
 			return True
-		for tenant_id in session.Authorization.Authz.keys():
+		for tenant_id in authz.get_claim("resources", {}):
 			if tenant_id == "*":
 				continue
 			if await tenant_service.has_tenant_assigned(credentials_id, tenant_id):
 				# User is member of currently authorized tenant
 				return True
+
 		# The request and the target credentials have no tenant in common
 		return False
 
 
 def _authorize_searched_tenants(
-	session: Session,
 	search_params: generic.SearchParams,
 	try_global_search: bool = False
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
 	Authorize and return a list of tenants to filter by.
 	"""
-	if not session.is_superuser():
-		# Return only tenant members
-		try_global_search = False
+	authz = asab.contextvars.Authz.get()
+	tenant_ctx = asab.contextvars.Tenant.get()
+	if tenant_ctx:
+		authz.require_tenant_access()
 
-	authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
+	searched_tenant = search_params.AdvancedFilter.get("tenant")
+	if searched_tenant:
+		if authz.has_superuser_access():
+			# Superuser can search any tenant
+			return [searched_tenant]
+		elif searched_tenant == tenant_ctx:
+			# Regular user can only search the authorized tenant in context
+			return [searched_tenant]
+		else:
+			raise exceptions.TenantAccessDeniedError(tenant=searched_tenant, subject=authz.CredentialsId)
 
-	# Authorize searched tenants
-	if "tenant" in search_params.AdvancedFilter:
-		# Search only requested tenant
-		tenant_id = search_params.AdvancedFilter["tenant"]
-		# Check tenant access
-		if not (tenant_id in authorized_tenants or session.is_superuser()):
-			raise exceptions.AccessDeniedError(
-				"Not authorized to access tenant members",
-				subject=session.Credentials.Id,
-				resource={"tenant_id": tenant_id}
-			)
-		searched_tenants = [tenant_id]
-	elif try_global_search:
-		# Search all credentials, ignore tenants
-		searched_tenants = None
+	elif try_global_search and authz.has_superuser_access():
+		# Superuser can search globally
+		return None
+
 	else:
-		# Search currently authorized tenants
-		searched_tenants = authorized_tenants
-
-	return searched_tenants
+		# Default to the authorized tenant in context
+		return [tenant_ctx]
 
 
 def _authorize_searched_roles(
-	session: Session,
 	search_params: generic.SearchParams
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
 	Authorize and return a list of roles to filter by.
 	"""
-	authorized_tenants = [tenant for tenant in session.Authorization.Authz if tenant != "*"]
-	role_id = search_params.AdvancedFilter.get("role")
-	if not role_id:
+	authz = asab.contextvars.Authz.get()
+	tenant_ctx = asab.contextvars.Tenant.get()
+	if tenant_ctx:
+		authz.require_tenant_access()
+
+	searched_role = search_params.AdvancedFilter.get("role")
+	if not searched_role:
 		return None
 
-	role_id = search_params.AdvancedFilter["role"]
-	tenant_id = role_id.split("/")[0]
+	if authz.has_superuser_access():
+		# Superuser can search anything
+		return [searched_role]
 
-	# Check tenant access
-	#  - global role is always accessible
-	#  - role in my authorized tenants is accessible
-	#  - superuser can access anything
-	if not (tenant_id == "*" or tenant_id in authorized_tenants or session.is_superuser()):
-		raise exceptions.AccessDeniedError(
-			"Not authorized to access role.",
-			subject=session.Credentials.Id,
-			resource={"role_id": role_id}
-		)
-	return [role_id]
+	tenant_id = searched_role.split("/")[0]
+	if tenant_id == "*":
+		# Global roles are searchable by anybody
+		return [searched_role]
+
+	elif tenant_id == tenant_ctx:
+		# Regular users can only search roles in the currently authorized tenant
+		return [searched_role]
+
+	else:
+		raise exceptions.TenantAccessDeniedError(tenant=tenant_id, subject=authz.CredentialsId)

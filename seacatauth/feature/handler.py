@@ -1,6 +1,8 @@
 import logging
 import asab
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
 
 L = logging.getLogger(__name__)
@@ -25,6 +27,9 @@ class FeatureHandler(object):
 		web_app_public = app.PublicWebContainer.WebApp
 		web_app_public.router.add_get("/public/features", self.get_features)
 
+
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def get_features(self, request):
 		"""
 		Get public login and registration features
