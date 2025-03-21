@@ -4,6 +4,10 @@ import urllib.parse
 import aiohttp
 import aiohttp.web
 import asab
+import asab.contextvars
+import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 
 from ..service import AuthorizationCode
 from ...authz import build_credentials_authz
@@ -91,6 +95,8 @@ class AuthorizeHandler(object):
 		web_app_public.router.add_post(self.AuthorizePath, self.authorize_post)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def authorize_get(self, request):
 		"""
 		OAuth 2.0 Authorize Endpoint
@@ -206,6 +212,8 @@ class AuthorizeHandler(object):
 				state=e.State)
 
 
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
 	async def authorize_post(self, request):
 		"""
 		OAuth 2.0 Authorize Endpoint
@@ -337,7 +345,10 @@ class AuthorizeHandler(object):
 				struct_data={"reason": "code_challenge_error"})
 
 		# Only root sessions can be used to authorize client sessions
-		root_session = request.Session
+		try:
+			root_session = await self.CookieService.get_session_by_request_cookie(request)
+		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			root_session = None
 		if root_session is not None:
 			if root_session.Session.Type != "root":
 				L.error("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})

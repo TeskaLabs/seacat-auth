@@ -1,11 +1,6 @@
-import logging
 import asab.web.rest
-
-from ...decorators import access_control
-from ...exceptions import TenantNotSpecifiedError
-
-
-L = logging.getLogger(__name__)
+import asab.contextvars
+import asab.web.tenant
 
 
 class RBACHandler(object):
@@ -23,8 +18,9 @@ class RBACHandler(object):
 		web_app.router.add_get("/rbac/{resources}", self.rbac)
 		web_app.router.add_get("/rbac/{tenant}/{resources}", self.rbac)
 
-	@access_control()
-	async def rbac(self, request, *, tenant=None):
+
+	@asab.web.tenant.allow_no_tenant
+	async def rbac(self, request):
 		"""
 		Verify whether the current session is authorized to access requested resources
 
@@ -33,22 +29,18 @@ class RBACHandler(object):
 		# Obtain the resources and credentials ID
 		requested_resources = request.match_info["resources"].split('+')
 
-		try:
-			if self.RBACService.has_resource_access(request.Session.Authorization.Authz, tenant, requested_resources):
-				return asab.web.rest.json_response(
-					request,
-					data={"result": "OK"},
-					reason=200
-				)
-			else:
-				return asab.web.rest.json_response(
-					request,
-					data={"result": "NOT-AUTHORIZED"},
-					reason=401
-				)
-		except TenantNotSpecifiedError:
+		authz = asab.contextvars.Authz.get()
+		tenant = asab.contextvars.Tenant.get()
+
+		if self.RBACService.has_resource_access(authz.get_claim("resources", {}), tenant, requested_resources):
 			return asab.web.rest.json_response(
 				request,
-				data={"result": "TENANT-NOT-SPECIFIED"},
-				reason=400
+				data={"result": "OK"},
+				reason=200
+			)
+		else:
+			return asab.web.rest.json_response(
+				request,
+				data={"result": "NOT-AUTHORIZED"},
+				reason=401
 			)

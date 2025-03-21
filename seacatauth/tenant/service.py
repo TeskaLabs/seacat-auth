@@ -161,9 +161,9 @@ class TenantService(asab.Service):
 
 
 	def get_provider(self):
-		'''
+		"""
 		This method can return None when a 'tenant' feature is not enabled.
-		'''
+		"""
 		return self.TenantProvider
 
 
@@ -175,12 +175,12 @@ class TenantService(asab.Service):
 		return result
 
 
-	async def set_tenants(self, session, credentials_id: str, tenants: list):
+	async def set_tenants(self, credentials_id: str, tenants: list):
 		"""
 		Assign `credentials_id` to all tenants listed in `tenants`, unassign it from all tenants that are not listed.
 		"""
+		authz = asab.contextvars.Authz.get()
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
-		rbac_svc = self.App.get_service("seacatauth.RBACService")
 
 		# Check if credentials exist
 		try:
@@ -209,32 +209,21 @@ class TenantService(asab.Service):
 					"result": "NOT-FOUND",
 					"message": message,
 				}
-			# Check permission
-			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, [ResourceId.TENANT_ASSIGN]):
-				message = "Not authorized for tenant assignment."
-				L.error(message, struct_data={
-					"agent_cid": session.Credentials.Id,
-					"tenant": tenant
-				})
-				return {
-					"result": "NOT-AUTHORIZED",
-					"message": message,
-					"error_data": {"tenant": tenant},
-				}
 
-		for tenant in tenants_to_unassign:
+		for tenant in tenants_to_unassign.union(tenants_to_assign):
 			# Check permission
-			if not rbac_svc.has_resource_access(session.Authorization.Authz, tenant, [ResourceId.TENANT_ASSIGN]):
-				message = "Not authorized for tenant unassignment."
-				L.error(message, struct_data={
-					"agent_cid": session.Credentials.Id,
-					"tenant": tenant
-				})
-				return {
-					"result": "NOT-AUTHORIZED",
-					"message": message,
-					"error_data": {"tenant": tenant},
-				}
+			with asab.contextvars.tenant_context(tenant):
+				if not authz.has_resource_access(ResourceId.TENANT_ASSIGN):
+					message = "Not authorized for tenant un/assignment."
+					L.error(message, struct_data={
+						"agent_cid": authz.CredentialsId,
+						"tenant": tenant
+					})
+					return {
+						"result": "NOT-AUTHORIZED",
+						"message": message,
+						"error_data": {"tenant": tenant},
+					}
 
 		failed_count = 0
 		for tenant in tenants_to_assign:
@@ -255,7 +244,7 @@ class TenantService(asab.Service):
 
 		L.log(asab.LOG_NOTICE, "Tenants successfully assigned to credentials", struct_data={
 			"cid": credentials_id,
-			"agent_cid": session.Credentials.Id,
+			"agent_cid": authz.CredentialsId,
 			"assigned_count": len(tenants_to_assign),
 			"unassigned_count": len(tenants_to_unassign),
 			"failed_count": failed_count,

@@ -5,8 +5,6 @@ import jwcrypto.jwk
 import urllib.parse
 import asab
 
-from . import middleware
-
 
 L = logging.getLogger(__name__)
 
@@ -45,15 +43,20 @@ class SeaCatAuthApplication(asab.Application):
 		# Create admin container
 		self.WebContainer = asab.web.WebContainer(self.WebService, "web")
 		self.WebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
-		self.WebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
 		# Create public container
 		self.PublicWebContainer = asab.web.WebContainer(self.WebService, "web:public")
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
-		self.PublicWebContainer.WebApp.middlewares.append(middleware.app_middleware_factory(self))
 
-		# Initialize metrics service
-		self.add_module(asab.metrics.Module)
+		import asab.web.tenant
+		self.AsabTenantService = asab.web.tenant.TenantService(self)
+		self.AsabTenantService.install(self.WebContainer)
+		self.AsabTenantService.install(self.PublicWebContainer)
+
+		import asab.web.auth
+		self.AsabAuthService = asab.web.auth.AuthService(self)
+		self.AsabAuthService.install(self.WebContainer)
+		self.AsabAuthService.install(self.PublicWebContainer)
 
 		# Api service
 		import asab.api
@@ -154,10 +157,6 @@ class SeaCatAuthApplication(asab.Application):
 		from .openidconnect import OpenIdConnectModule
 		self.add_module(OpenIdConnectModule)
 
-		# Depends on: OpenIDService
-		self.WebContainer.WebApp.middlewares.append(middleware.private_auth_middleware_factory(self))
-		self.PublicWebContainer.WebApp.middlewares.append(middleware.public_auth_middleware_factory(self))
-
 		from .otp import OTPHandler, OTPService
 		self.OTPService = OTPService(self)
 		self.OTPHandler = OTPHandler(self, self.OTPService)
@@ -178,6 +177,17 @@ class SeaCatAuthApplication(asab.Application):
 		if self.Provisioning:
 			from .provisioning import ProvisioningService
 			self.ProvisioningService = ProvisioningService(self)
+
+
+	async def initialize(self):
+		from .api import AsabAuthProvider
+		auth_provider = AsabAuthProvider(self)
+		self.AsabAuthService.Providers.insert(0, auth_provider)  # High priority
+
+		from .api import AsabTenantProvider
+		tenant_provider = AsabTenantProvider(self, self.AsabTenantService)
+		self.AsabTenantService.Providers.insert(0, tenant_provider)  # High priority
+
 
 	def _check_encryption_config(self):
 		if len(asab.Config.get("asab:storage", "aes_key", fallback="")) == 0:
@@ -285,29 +295,8 @@ class SeaCatAuthApplication(asab.Application):
 		return private_key
 
 
-	def create_argument_parser(
-		self,
-		prog=None,
-		usage=None,
-		description=None,
-		epilog=None,
-		prefix_chars='-',
-		fromfile_prefix_chars=None,
-		argument_default=None,
-		conflict_handler='error',
-		add_help=True
-	):
-		parser = super().create_argument_parser(
-			prog=prog,
-			usage=usage,
-			description=description,
-			epilog=epilog,
-			prefix_chars=prefix_chars,
-			fromfile_prefix_chars=fromfile_prefix_chars,
-			argument_default=argument_default,
-			conflict_handler=conflict_handler,
-			add_help=add_help
-		)
+	def create_argument_parser(self, *args, **kwargs):
+		parser = super().create_argument_parser(*args, **kwargs)
 		parser.add_argument("--provisioning", help="run SeaCat Auth in provisioning mode", action="store_true")
 		return parser
 

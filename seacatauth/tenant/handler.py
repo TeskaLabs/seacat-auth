@@ -1,13 +1,15 @@
 import logging
 import asab.web.rest
+import asab.web.auth
+import asab.web.tenant
 import asab.exceptions
 import asab.utils
+import asab.contextvars
 
-from ..models.const import ResourceId
 from .. import exceptions
-from ..decorators import access_control
-from . import schema
+from ..models.const import ResourceId
 from .random_name import propose_name
+from . import schema
 
 
 L = logging.getLogger(__name__)
@@ -27,13 +29,13 @@ class TenantHandler(object):
 		self.NameProposerService = app.get_service("seacatauth.NameProposerService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/tenant", self.list)
 		web_app.router.add_get("/tenants", self.search)
-		web_app.router.add_get("/tenant/{tenant}", self.get)
-		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
 		web_app.router.add_put("/tenants", self.get_tenants_batch)
 
 		web_app.router.add_post("/tenant", self.create)
+		web_app.router.add_get("/tenant", self.list)
+		web_app.router.add_get("/tenant/{tenant}", self.get)
+		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
 		web_app.router.add_delete("/tenant/{tenant}", self.delete)
 
 		web_app.router.add_get("/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
@@ -51,7 +53,9 @@ class TenantHandler(object):
 		web_app_public.router.add_get("/tenant", self.list)
 
 
-	# IMPORTANT: This endpoint needs to be compatible with `/tenant` handler in Asab Tenant Service
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth
+	# IMPORTANT: This endpoint needs to be compatible with asab.web.tenant.providers.WebTenantProvider
 	async def list(self, request):
 		"""
 		List all registered tenant IDs
@@ -60,13 +64,13 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def search(self, request):
 		"""
 		Search tenants.
 
 		Results include only the tenants that are authorized in the current session.
-		To search all tenants, access to `authz:superuser` or `authz:tenant:access` is required.
+		To search all tenants, access to `authz:tenant:access` is required.
 
 		---
 		parameters:
@@ -86,16 +90,16 @@ class TenantHandler(object):
 			schema:
 				type: string
 		"""
-		if not request.can_access_all_tenants:
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
 			# List only tenants authorized in the current session
 			# NOTE: This ignores pagination and filtering
+			authorized_tenants = [t for t in authz.get_claim("resources", {}) if t != "*"]
 			tenants = []
-			for tenant, rs in request.Session.Authorization.Authz.items():
-				if tenant == "*":
-					continue
-				if ResourceId.TENANT_ACCESS in rs:
-					tenants.append(await self.TenantService.get_tenant(tenant))
-			count = len(tenants)
+			count = 0
+			for tenant in authorized_tenants:
+				tenants.append(await self.TenantService.get_tenant(tenant))
+				count += 1
 			return asab.web.rest.json_response(request, data={"data": tenants, "count": count})
 
 		page = int(request.query.get("p", 1)) - 1
@@ -108,9 +112,7 @@ class TenantHandler(object):
 			filter = None
 
 		provider = self.TenantService.get_provider()
-
 		count = await provider.count(filter=filter)
-
 		tenants = []
 		async for tenant in provider.iterate(page, limit, filter):
 			tenants.append(tenant)
@@ -123,19 +125,20 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control(ResourceId.TENANT_ACCESS)
+	@asab.web.auth.require(ResourceId.TENANT_ACCESS)
 	async def get(self, request):
 		"""
 		Get tenant detail
 		"""
-		tenant_id = request.match_info.get("tenant")
+		tenant_id = asab.contextvars.Tenant.get()
 		data = await self.TenantService.get_tenant(tenant_id)
 		return asab.web.rest.json_response(request, data)
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_TENANT)
-	@access_control(ResourceId.TENANT_CREATE)
-	async def create(self, request, *, credentials_id, json_data):
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require(ResourceId.TENANT_CREATE)
+	async def create(self, request, *, json_data):
 		"""
 		Create a tenant
 
@@ -147,7 +150,7 @@ class TenantHandler(object):
 			schema:
 				type: boolean
 		"""
-		role_service = self.App.get_service("seacatauth.RoleService")
+		authz = asab.contextvars.Authz.get()
 		tenant_id = json_data["id"]
 
 		# Create tenant
@@ -156,21 +159,23 @@ class TenantHandler(object):
 			label=json_data.get("label"),
 			description=json_data.get("description"),
 			data=json_data.get("data"),
-			creator_id=credentials_id)
+		)
 
 		if asab.utils.string_to_boolean(request.query.get("assign_me", "false")):
 			# Give the user access to the tenant
+			role_service = self.App.get_service("seacatauth.RoleService")
 			try:
-				await self.TenantService.assign_tenant(credentials_id, tenant_id)
+				await self.TenantService.assign_tenant(authz.CredentialsId, tenant_id)
 			except Exception as e:
 				L.error(
 					"Error assigning tenant: {}".format(e),
 					exc_info=True,
-					struct_data={"cid": credentials_id, "tenant": tenant_id})
+					struct_data={"cid": authz.CredentialsId, "tenant": tenant_id}
+				)
 
 			# Assign the admin role to the user
 			try:
-				await role_service.assign_tenant_admin_role(credentials_id, tenant_id)
+				await role_service.assign_tenant_admin_role(authz.CredentialsId, tenant_id)
 			except exceptions.RoleNotFoundError:
 				L.debug("Tenant admin role not available.")
 
@@ -178,26 +183,29 @@ class TenantHandler(object):
 			request, data={"id": tenant_id})
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_TENANT)
-	@access_control(ResourceId.TENANT_EDIT)
-	async def update_tenant(self, request, *, json_data, tenant):
+	@asab.web.auth.require(ResourceId.TENANT_EDIT)
+	async def update_tenant(self, request, *, json_data):
 		"""
 		Update tenant description and/or its structured data
 		"""
-		result = await self.TenantService.update_tenant(tenant, **json_data)
+		tenant_id = asab.contextvars.Tenant.get()
+		result = await self.TenantService.update_tenant(tenant_id, **json_data)
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@access_control(ResourceId.TENANT_DELETE)
-	async def delete(self, request, *, tenant):
+	@asab.web.auth.require(ResourceId.TENANT_DELETE)
+	async def delete(self, request):
 		"""
 		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
 		"""
-		await self.TenantService.delete_tenant(tenant)
+		tenant_id = asab.contextvars.Tenant.get()
+		await self.TenantService.delete_tenant(tenant_id)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	@asab.web.rest.json_schema_handler(schema.SET_TENANTS)
-	@access_control(ResourceId.TENANT_ASSIGN)
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
+	@asab.web.tenant.allow_no_tenant
 	async def set_tenants(self, request, *, json_data):
 		"""
 		Specify a set of accessible tenants for requested credentials ID
@@ -209,7 +217,6 @@ class TenantHandler(object):
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		data = await self.TenantService.set_tenants(
-			session=request.Session,
 			credentials_id=credentials_id,
 			tenants=json_data["tenants"]
 		)
@@ -221,39 +228,45 @@ class TenantHandler(object):
 		)
 
 
-	@access_control(ResourceId.TENANT_ASSIGN)
-	async def assign_tenant(self, request, *, tenant):
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
+	async def assign_tenant(self, request):
 		"""
 		Grant specified tenant access to requested credentials
 		"""
+		tenant_id = asab.contextvars.Tenant.get()
 		await self.TenantService.assign_tenant(
 			request.match_info["credentials_id"],
-			tenant,
+			tenant_id,
 		)
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@access_control(ResourceId.TENANT_ASSIGN)
-	async def unassign_tenant(self, request, *, tenant):
+	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
+	async def unassign_tenant(self, request):
 		"""
 		Revoke specified tenant access to requested credentials
 
 		The tenant's roles are unassigned in the process.
 		"""
+		tenant_id = asab.contextvars.Tenant.get()
 		await self.TenantService.unassign_tenant(
 			request.match_info["credentials_id"],
-			tenant,
+			tenant_id,
 		)
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
+	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
+	@asab.web.tenant.allow_no_tenant
 	async def get_tenants_by_credentials(self, request):
 		"""
 		Get list of tenants memberships of the requested credentials
 		"""
+		authz = asab.contextvars.Authz.get()
 		tenants = await self.TenantService.get_tenants(request.match_info["credentials_id"])
-		if not request.can_access_all_tenants:
-			my_tenants = set(await self.TenantService.get_tenants(request.Session.Credentials.Id))
+		if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
+			# Get the intersection of my tenants and the target tenants
+			my_tenants = set(await self.TenantService.get_tenants(authz.CredentialsId))
 			# Preserve ordering
 			tenants = [
 				tenant for tenant in tenants
@@ -264,26 +277,29 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.GET_TENANTS_BATCH)
+	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
+	@asab.web.tenant.allow_no_tenant
 	async def get_tenants_batch(self, request, *, json_data):
 		"""
 		Get list of tenant memberships for each listed credential ID
 		"""
-		if not request.can_access_all_tenants:
-			my_tenants = await self.TenantService.get_tenants(request.Session.Credentials.Id)
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
+			my_tenants = await self.TenantService.get_tenants(authz.CredentialsId)
 		else:
 			my_tenants = True  # All tenants
 
 		response = {}
 		for cid in json_data:
 			tenants = set(await self.TenantService.get_tenants(cid))
-			if not request.can_access_all_tenants:
+			if not authz.has_resource_access(ResourceId.ACCESS_ALL_TENANTS):
 				tenants.intersection_update(my_tenants)
 			response[cid] = list(tenants)
 
 		return asab.web.rest.json_response(request, response)
 
 
-	@access_control()
+	@asab.web.tenant.allow_no_tenant
 	async def propose_tenant_name(self, request):
 		"""
 		Propose name for a new tenant.
@@ -293,8 +309,8 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.BULK_ASSIGN_TENANTS)
-	@access_control(ResourceId.SUPERUSER)
-	# TODO: For single tenant bulks, require only ResourceId.TENANT_ASSIGN
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
 	async def bulk_assign_tenants(self, request, *, json_data):
 		"""
 		Grant tenant access and/or assign roles to a list of credentials
@@ -369,8 +385,8 @@ class TenantHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.BULK_UNASSIGN_TENANTS)
-	@access_control(ResourceId.SUPERUSER)
-	# TODO: For single tenant bulks, require only ResourceId.TENANT_ASSIGN
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
 	async def bulk_unassign_tenants(self, request, *, json_data):
 		"""
 		Revoke tenant access and/or unassign roles from a list of credentials
