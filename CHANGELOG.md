@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha17
 - v25.05-alpha16
 - v25.05-alpha15
 - v25.05-alpha14
@@ -21,6 +22,7 @@
 - v25.05-alpha1
 
 ### Fix
+- Fix email template parameters (#456, v25.05-alpha17)
 - Handle FIDO MDS ClientConnectionError (#438, v25.05-alpha1)
 
 ### Features
