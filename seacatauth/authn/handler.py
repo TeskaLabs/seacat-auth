@@ -413,7 +413,7 @@ class AuthenticationHandler(object):
 
 		target_cid = json_data["credentials_id"]
 		authz = asab.contextvars.Authz.get()
-		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type == "root":
+		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type in {"root", "m2m"}:
 			impersonator_root_session = authz.Session
 		else:
 			impersonator_root_session = await self.SessionService.get(authz.Session.Session.ParentSessionId)
@@ -482,7 +482,7 @@ class AuthenticationHandler(object):
 		request_data = await request.post()
 		target_cid = request_data["credentials_id"]
 		authz = asab.contextvars.Authz.get()
-		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type == "root":
+		if authz.Session.Session.ParentSessionId is None and authz.Session.Session.Type in {"root", "m2m"}:
 			impersonator_root_session = authz.Session
 		else:
 			impersonator_root_session = await self.SessionService.get(authz.Session.Session.ParentSessionId)
