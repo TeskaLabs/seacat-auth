@@ -497,7 +497,7 @@ class AuthorizeHandler(object):
 			# Validate the anonymous credentials
 			anonymous_cid = client_dict.get("anonymous_cid")
 			try:
-				await self.CredentialsService.get(anonymous_cid)
+				await self.CredentialsService.get_cached(anonymous_cid)
 			except KeyError:
 				L.error("Credentials for anonymous access not found.", struct_data={
 					"cid": anonymous_cid, "client_id": client_id})
