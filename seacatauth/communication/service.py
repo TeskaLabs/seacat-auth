@@ -162,7 +162,13 @@ class CommunicationService(asab.Service):
 		locale = locale or self.DefaultLocale
 
 		try:
-			await provider.build_and_send_message(credentials, template_id, locale, **kwargs)
+			await provider.build_and_send_message(
+				credentials,
+				template_id,
+				locale,
+				public_url=self.App.PublicUrl,
+				**kwargs
+			)
 		except Exception as e:
 			L.error("Failed to deliver message ({}): {}".format(e.__class__.__name__, e))
 			raise exceptions.MessageDeliveryError(
