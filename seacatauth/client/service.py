@@ -219,11 +219,17 @@ class ClientService(asab.Service):
 				session_expiration = asab.utils.convert_to_seconds(session_expiration)
 			upsertor.set("session_expiration", session_expiration)
 
+		default_max_age = kwargs.get("default_max_age")
+		if default_max_age:
+			if isinstance(default_max_age, str):
+				default_max_age = asab.utils.convert_to_seconds(default_max_age)
+			upsertor.set("default_max_age", default_max_age)
+
 		# Optional client metadata
 		for k in {
-			"client_name", "client_uri", "logout_uri", "cookie_domain", "custom_data", "login_uri",
-			"authorize_anonymous_users", "authorize_uri", "cookie_webhook_uri", "cookie_entry_uri",
-			"anonymous_cid"
+			"client_name", "client_uri", "logout_uri",
+			"cookie_domain", "custom_data", "login_uri", "authorize_anonymous_users", "authorize_uri",
+			"cookie_webhook_uri", "cookie_entry_uri", "anonymous_cid",
 		}:
 			v = kwargs.get(k)
 			if v is not None and not (isinstance(v, str) and len(v) == 0):
@@ -288,12 +294,13 @@ class ClientService(asab.Service):
 			if v is None or (isinstance(v, str) and len(v) == 0):
 				upsertor.unset(k)
 			else:
-				if k == "session_expiration" and isinstance(v, str):
+				if k in {"default_max_age", "session_expiration"} and isinstance(v, str):
 					try:
 						v = asab.utils.convert_to_seconds(v)
 					except ValueError as e:
 						raise asab.exceptions.ValidationError(
 							"{!r} must be either a number or a duration string.".format(k)) from e
+
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
