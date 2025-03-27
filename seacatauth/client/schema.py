@@ -125,7 +125,14 @@ CLIENT_METADATA_SCHEMA = {
 		"enum": TOKEN_ENDPOINT_AUTH_METHODS
 	},
 	# "token_endpoint_auth_signing_alg": {},
-	# "default_max_age": {},
+	"default_max_age": {
+		"oneOf": [{"type": "string"}, {"type": "number"}],
+		"description":
+			"Default Maximum Authentication Age. "
+			"Specifies that the End-User MUST be actively authenticated if the End-User was authenticated longer "
+			"ago than the specified number of seconds. "
+			"The value can be either the number of seconds or a time-unit string such as '4 h' or '3 d'."
+	},
 	# "require_auth_time": {},
 	# "default_acr_values": {},
 	# "initiate_login_uri": {},
