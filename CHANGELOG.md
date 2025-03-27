@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha18
 - v25.05-alpha17
 - v25.05-alpha16
 - v25.05-alpha15
@@ -22,6 +23,8 @@
 - v25.05-alpha1
 
 ### Fix
+- Fix access check for creating a global role (#457, v25.05-alpha18)
+- Fix access check for creating a tenant (#457, v25.05-alpha18)
 - Fix email template parameters (#456, v25.05-alpha17)
 - Handle FIDO MDS ClientConnectionError (#438, v25.05-alpha1)
 

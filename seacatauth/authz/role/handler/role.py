@@ -142,6 +142,7 @@ class RoleHandler(object):
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
 	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
 	async def create_global_role(self, request, *, json_data):
 		"""
 		Create a new global role

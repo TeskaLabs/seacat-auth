@@ -7,6 +7,7 @@ import asab.utils
 import asab.contextvars
 
 from .. import exceptions
+from ..api import local_authz
 from ..models.const import ResourceId
 from .random_name import propose_name
 from . import schema
@@ -164,20 +165,26 @@ class TenantHandler(object):
 		if asab.utils.string_to_boolean(request.query.get("assign_me", "false")):
 			# Give the user access to the tenant
 			role_service = self.App.get_service("seacatauth.RoleService")
-			try:
-				await self.TenantService.assign_tenant(authz.CredentialsId, tenant_id)
-			except Exception as e:
-				L.error(
-					"Error assigning tenant: {}".format(e),
-					exc_info=True,
-					struct_data={"cid": authz.CredentialsId, "tenant": tenant_id}
-				)
+			with local_authz(
+				"seacatauth.TenantService",
+				tenant=tenant_id,
+				resources=[ResourceId.TENANT_ASSIGN, ResourceId.ROLE_ASSIGN],
+			):
+				with asab.contextvars.tenant_context(tenant_id):
+					try:
+						await self.TenantService.assign_tenant(authz.CredentialsId, tenant_id)
+					except Exception as e:
+						L.error(
+							"Error assigning tenant: {}".format(e),
+							exc_info=True,
+							struct_data={"cid": authz.CredentialsId, "tenant": tenant_id}
+						)
 
-			# Assign the admin role to the user
-			try:
-				await role_service.assign_tenant_admin_role(authz.CredentialsId, tenant_id)
-			except exceptions.RoleNotFoundError:
-				L.debug("Tenant admin role not available.")
+					# Assign the admin role to the user
+					try:
+						await role_service.assign_tenant_admin_role(authz.CredentialsId, tenant_id)
+					except exceptions.RoleNotFoundError:
+						L.debug("Tenant admin role not available.")
 
 		return asab.web.rest.json_response(
 			request, data={"id": tenant_id})
