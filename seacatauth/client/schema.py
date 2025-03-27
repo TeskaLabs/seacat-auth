@@ -36,32 +36,39 @@ CLIENT_METADATA_SCHEMA = {
 	"preferred_client_id": {
 		"type": "string",
 		"pattern": "^[-_a-zA-Z0-9]{4,64}$",
-		"description": "(Non-canonical) Preferred client ID."},
+		"description": "(Non-canonical) Preferred client ID."
+	},
 	"client_name": {  # Can have language tags (e.g. "client_name#cs")
 		"type": "string",
-		"description": "Name of the Client to be presented to the End-User."},
+		"description": "Name of the Client to be presented to the End-User."
+	},
 	"client_uri": {  # Can have language tags
 		"type": "string",
-		"description": "URL of the home page of the Client."},
+		"description": "URL of the home page of the Client."
+	},
 	"cookie_domain": {  # NON-CANONICAL
 		"type": "string",
 		"pattern": "^[a-z0-9\\.-]{1,61}\\.[a-z]{2,}$|^$",
 		"description":
-			"Domain of the client cookie. Defaults to the application's global cookie domain."},
+			"Domain of the client cookie. Defaults to the application's global cookie domain."
+	},
 	"cookie_webhook_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description":
 			"Webhook URI for setting additional custom cookies at the cookie entrypoint. "
 			"It must be a back-channel URI and it must accept a JSON PUT request and "
-			"respond with a JSON object of cookies to set."},
+			"respond with a JSON object of cookies to set."
+	},
 	"cookie_entry_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description":
-			"Public URI of the client's cookie entrypoint."},
+			"Public URI of the client's cookie entrypoint."
+	},
 	"redirect_uris": {
 		"type": "array",
 		"description": "Array of Redirection URI values used by the Client.",
-		"items": {"type": "string"}},
+		"items": {"type": "string"}
+	},
 	#  "contacts": {},
 	# "custom_data": {  # NON-CANONICAL
 	# 	"type": "object", "description": "(Non-canonical) Additional client data."},
@@ -70,7 +77,8 @@ CLIENT_METADATA_SCHEMA = {
 	"application_type": {
 		"type": "string",
 		"description": "Kind of the application. The default, if omitted, is `web`.",
-		"enum": APPLICATION_TYPES},
+		"enum": APPLICATION_TYPES
+	},
 	"response_types": {
 		"type": "array",
 		"description":
@@ -79,7 +87,9 @@ CLIENT_METADATA_SCHEMA = {
 			"If omitted, the default is that the Client will use only the `code` Response Type.",
 		"items": {
 			"type": "string",
-			"enum": RESPONSE_TYPES}},
+			"enum": RESPONSE_TYPES
+		}
+	},
 	"grant_types": {
 		"type": "array",
 		"description":
@@ -88,7 +98,9 @@ CLIENT_METADATA_SCHEMA = {
 			"If omitted, the default is that the Client will use only the `authorization_code` Grant Type.",
 		"items": {
 			"type": "string",
-			"enum": GRANT_TYPES}},
+			"enum": GRANT_TYPES
+		}
+	},
 	# "logo_uri": {},  # Can have language tags
 	# "policy_uri": {},  # Can have language tags
 	# "tos_uri": {},  # Can have language tags
@@ -110,7 +122,8 @@ CLIENT_METADATA_SCHEMA = {
 		"description":
 			"Requested Client Authentication method for the Token Endpoint. "
 			"If omitted, the default is `none`.",
-		"enum": TOKEN_ENDPOINT_AUTH_METHODS},
+		"enum": TOKEN_ENDPOINT_AUTH_METHODS
+	},
 	# "token_endpoint_auth_signing_alg": {},
 	# "default_max_age": {},
 	# "require_auth_time": {},
@@ -122,32 +135,39 @@ CLIENT_METADATA_SCHEMA = {
 		"description":
 			"Code Challenge Method (PKCE) that the Client will be required to use at the Authorize Endpoint. "
 			"The default, if omitted, is `none`.",
-		"enum": ["none", "plain", "S256"]},
+		"enum": ["none", "plain", "S256"]
+	},
 	"authorize_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description":
-			"URL of OAuth authorize endpoint. Useful when logging in from different than the default domain."},
+			"URL of OAuth authorize endpoint. Useful when logging in from different than the default domain."
+	},
 	"login_uri": {  # NON-CANONICAL
 		"type": "string",
-		"description": "URL of preferred login page."},
+		"description": "URL of preferred login page."
+	},
 	"authorize_anonymous_users": {  # NON-CANONICAL
 		"type": "boolean",
-		"description": "Allow authorize requests with anonymous users."},
+		"description": "Allow authorize requests with anonymous users."
+	},
 	"anonymous_cid": {  # NON-CANONICAL
 		"type": "string",
-		"description": "ID of credentials that is used for authenticating anonymous sessions."},
+		"description": "ID of credentials that is used for authenticating anonymous sessions."
+	},
 	"session_expiration": {  # NON-CANONICAL
 		"oneOf": [{"type": "string"}, {"type": "number"}],
 		"description":
 			"Client session expiration. The value can be either the number of seconds "
-			"or a time-unit string such as '4 h' or '3 d'."},
+			"or a time-unit string such as '4 h' or '3 d'."
+	},
 	"redirect_uri_validation_method": {  # NON-CANONICAL
 		"type": "string",
 		"description":
 			"Specifies the method how the redirect URI used in authorization requests is validated. "
 			"The default value is 'full_match', in which the requested redirect URI must fully match "
 			"one of the registered URIs.",
-		"enum": REDIRECT_URI_VALIDATION_METHODS},
+		"enum": REDIRECT_URI_VALIDATION_METHODS
+	},
 }
 
 REGISTER_CLIENT = {
@@ -176,7 +196,8 @@ CLIENT_TEMPLATES = {
 		"application_type": "web",
 		"token_endpoint_auth_method": "none",
 		"grant_types": ["authorization_code"],
-		"response_types": ["code"]},
+		"response_types": ["code"]
+	},
 	# "Public mobile application": {
 	# 	"application_type": "native",
 	# 	"token_endpoint_auth_method": "none",
