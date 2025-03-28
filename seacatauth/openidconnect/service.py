@@ -593,7 +593,7 @@ class OpenIdConnectService(asab.Service):
 			return await self.SessionService.get(token_data["sid"])
 
 
-	async def get_session_by_access_token(self, token_value: str):
+	async def get_session_by_access_token(self, token_value: str) -> Session:
 		"""
 		Retrieve session by its access token.
 		"""
