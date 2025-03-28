@@ -1,3 +1,4 @@
+import datetime
 import urllib
 import logging
 import aiohttp.web
@@ -82,6 +83,29 @@ class TokenIntrospectionHandler(object):
 		except exceptions.SessionNotFoundError:
 			L.log(asab.LOG_NOTICE, "Access token matched no session.")
 			return None
+
+		# Validate client if requested
+		client = {}
+		client_id = request.query.get("client_id")
+		if client_id is not None:
+			try:
+				client = await self.CredentialsService.get_client(client_id)
+			except KeyError:
+				L.log(asab.LOG_NOTICE, "Client not found.")
+				return None
+
+			if session.OAuth2.ClientId != client_id:
+				L.log(asab.LOG_NOTICE, "Client mismatch.")
+				return None
+
+		# Validate authentication time if requested
+		max_age = request.query.get("max_age") or client.get("default_max_age")
+		if max_age is not None:
+			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
+			if authn_age > max_age:
+				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.")
+				return None
+
 		return session
 
 
