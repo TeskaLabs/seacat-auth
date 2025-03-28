@@ -1,3 +1,4 @@
+import datetime
 import logging
 import urllib
 import urllib.parse
@@ -277,6 +278,7 @@ class AuthorizeHandler(object):
 		state: str = None,
 		nonce: str = None,
 		prompt: str = None,
+		max_age: float = None,
 		code_challenge: str = None,
 		code_challenge_method: str = None,
 		**kwargs
@@ -369,9 +371,15 @@ class AuthorizeHandler(object):
 					struct_data={"reason": "anonymous_access_not_allowed"})
 			granted_scope.add("anonymous")
 
+		max_age = max_age or client_dict.get("default_max_age")
+
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
-			if prompt == "login":
+			authn_age = (datetime.datetime.now(datetime.UTC) - root_session.Authentication.AuthnTime).total_seconds()
+			if (
+				prompt == "login"
+				or (max_age is not None and authn_age > max_age)
+			):
 				# Delete current session and redirect to login
 				await self.SessionService.delete(root_session.SessionId)
 				L.log(asab.LOG_NOTICE, "Login prompt requested by client", struct_data={"client_id": client_id})
