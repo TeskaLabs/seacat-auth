@@ -16,10 +16,8 @@ doc staging:
     - chmod 600 ~/.ssh/id_rsa
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     - mkdir /output
-    - cd docs/en
-    - mkdocs build --site-dir /output
-    - cd docs/cs
-    - mkdocs build --site-dir /output/cs
+    - (cd docs/en && mkdocs build --site-dir /output)
+    - (cd docs/cs && mkdocs build --site-dir /output/cs)
     - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$STAGING_DIR"
   only:
     - main
@@ -39,10 +37,8 @@ doc production:
     - chmod 600 ~/.ssh/id_rsa
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     - mkdir /output
-    - cd docs/en
-    - mkdocs build --site-dir /output
-    - cd docs/cs
-    - mkdocs build --site-dir /output/cs
+    - (cd docs/en && mkdocs build --site-dir /output)
+    - (cd docs/cs && mkdocs build --site-dir /output/cs)
     - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$PRODUCTION_DIR"
   only:
     - production

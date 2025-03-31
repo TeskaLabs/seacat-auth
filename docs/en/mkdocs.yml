@@ -74,6 +74,14 @@ extra:
       link: mailto:info@teskalabs.com
       name: info@teskalabs.com
 
+  alternate:
+    - name: English
+      link: /seacat-auth/
+      lang: en
+    - name: Česky
+      link: /seacat-auth/cs/
+      lang: cs
+
 plugins:
   - glightbox
   - search
