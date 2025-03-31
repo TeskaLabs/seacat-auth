@@ -41,6 +41,7 @@ SeaCat Auth includes an intuitve, complete UI.
 ![SeaCat Auth account settings](./images/seacat-auth-ui-account.png#only-light)
 ![SeaCat Auth account settings](./images/seacat-auth-ui-account-dark.png#only-dark)
 
-## Made with ❤️ by TeskaLabs
 
-SeaCat Auth is a product of [TeskaLabs](https://www.teskalabs.com).  
+!!! quote "Made with :octicons-heart-fill-24:{ .heart } by TeskaLabs"
+
+    SeaCat Auth is a product of [TeskaLabs](https://www.teskalabs.com).  
