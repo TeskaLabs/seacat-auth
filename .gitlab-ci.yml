@@ -1,8 +1,8 @@
 stages:
-  - deploy
+  - Documentation
 
-deploy staging:
-  stage: deploy
+doc staging:
+  stage: Documentation
   tags:
     - docker
   image: 
@@ -21,8 +21,8 @@ deploy staging:
   only:
     - main
 
-deploy production:
-  stage: deploy
+doc production:
+  stage: Documentation
   tags:
     - docker
   image: 
