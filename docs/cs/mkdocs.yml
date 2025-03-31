@@ -1,6 +1,7 @@
 site_name: "TeskaLabs SeaCat Auth"
 theme:
   name: 'material'
+  language: cs
 
   font:
     text: Verdana
