@@ -41,6 +41,6 @@ SeaCat Auth zahrnuje intuitivní, kompletní uživatelské rozhraní.
 ![Nastavení účtu SeaCat Auth](./images/seacat-auth-ui-account.png#only-light)
 ![Nastavení účtu SeaCat Auth](./images/seacat-auth-ui-account-dark.png#only-dark)
 
-## Vyrobeno s ❤️ od TeskaLabs
+!!! quote "Vyrobeno s :octicons-heart-fill-24:{ .heart } v TeskaLabs"
 
-SeaCat Auth je produktem [TeskaLabs](https://www.teskalabs.com).
+    SeaCat Auth je produktem [TeskaLabs](https://www.teskalabs.com).
