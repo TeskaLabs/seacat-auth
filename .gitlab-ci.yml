@@ -15,8 +15,9 @@ doc staging:
     - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - cd docs/en
     - mkdir /output
-    - (cd docs/en/docs && mkdocs build --site-dir /output)
+    - mkdocs build --site-dir /output
     - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$STAGING_DIR"
   only:
     - main
@@ -35,9 +36,9 @@ doc production:
     - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    - cd docs/en/docs
+    - cd docs/en
     - mkdir /output
-    - (cd docs/en/docs && mkdocs build --site-dir /output)
+    - mkdocs build --site-dir /output
     - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$PRODUCTION_DIR"
   only:
     - production
