@@ -1,0 +1,155 @@
+site_name: "TeskaLabs SeaCat Auth"
+theme:
+  name: 'material'
+  language: en
+
+  font:
+    text: Verdana
+
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: yellow
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.tabs
+    - navigation.footer
+    - navigation.indexes
+    - navigation.top
+    - content.code.annotate
+    - content.code.copy
+
+  logo: images/teskalabs-logo.svg
+
+  favicon: images/teskalabs.png
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+     emoji_index: !!python/name:material.extensions.emoji.twemoji
+     emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      title: Page contents
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/TeskaLabs
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/company/teskalabs
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/teskalabs
+    - icon: fontawesome/solid/paper-plane
+      link: mailto:info@teskalabs.com
+      name: info@teskalabs.com
+
+  alternate:
+    - name: English
+      link: /seacat-auth/
+      lang: en
+    - name: Česky
+      link: /seacat-auth/cs/
+      lang: cs
+
+plugins:
+  - glightbox
+  - search
+  - awesome-pages
+  - open-in-new-tab
+  - print-site:
+      add_to_navigation: true
+
+nav:
+  - About:
+    - index.md
+    - reference/features.md
+
+
+  - Administration guide:
+    - admin/index.md
+  
+    - Access control:
+      - access/index.md
+      - access/key-terms.md
+      - access/credentials.md
+      - access/tenants.md
+      - access/resources.md      
+      - access/roles.md
+      - access/clients.md
+      - access/sessions.md
+
+    - Installation:
+      - installation/quick-start.md
+      - installation/provisioning.md
+
+    - Configuration:
+      - config/basic-configuration.md
+      - Credentials:
+        - config/credentials/index.md
+        - config/credentials/credentials-policy.md
+        - config/credentials/providers.md
+      - Authentication and login:
+        - config/external-login.md
+      - config/notifications-configuration.md
+
+    - Integrating apps:
+      - integrations/index.md
+      - integrations/oauth2-introspect.md
+      - Connecting other apps:
+        - integrations/cookies.md
+        - integrations/elk.md     
+        - integrations/the-hive.md
+        - integrations/grafana.md
+  
+    - Development:
+      - REST API:
+        - development/rest-api.md
+        - development/postman.md
+      - development/oauth2.md
+  
+  - User guide:
+      - user/index.md
+      - user/login.md
+      - user/account-details.md
+      - user/change-password.md
+      - user/otp.md
+      - user/hardware-keys.md
+
+  - Reference:
+      - reference/architecture.md
+      - reference/components.md
+      - reference/resources.md
+      - reference/clients.md
+      - reference/session.md

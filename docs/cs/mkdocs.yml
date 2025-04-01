@@ -1,6 +1,7 @@
 site_name: "TeskaLabs SeaCat Auth"
 theme:
   name: 'material'
+  language: cs
 
   font:
     text: Verdana
@@ -21,7 +22,11 @@ theme:
 
   features:
     - navigation.tabs
+    - navigation.footer
     - navigation.indexes
+    - navigation.top
+    - content.code.annotate
+    - content.code.copy
 
   logo: images/teskalabs-logo.svg
 
@@ -31,16 +36,32 @@ extra_css:
   - stylesheets/extra.css
 
 markdown_extensions:
+  - attr_list
+  - md_in_html
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+     emoji_index: !!python/name:material.extensions.emoji.twemoji
+     emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - toc:
-      permalink: True
-      separator: "-"
-  - attr_list
+      title: Page contents
+      permalink: true
 
 extra:
   social:
@@ -54,21 +75,32 @@ extra:
       link: mailto:info@teskalabs.com
       name: info@teskalabs.com
 
+  alternate:
+    - name: English
+      link: /seacat-auth/
+      lang: en
+    - name: Česky
+      link: /seacat-auth/cs/
+      lang: cs
+
 plugins:
-  - search
   - glightbox
+  - search
+  - awesome-pages
   - open-in-new-tab
+  - print-site:
+      add_to_navigation: true
 
 nav:
-  - About:
+  - Úvod:
     - index.md
     - reference/features.md
 
 
-  - Administration guide:
+  - Administrační manuál:
     - admin/index.md
   
-    - Access control:
+    - Řízení přístupů:
       - access/index.md
       - access/key-terms.md
       - access/credentials.md
@@ -78,36 +110,36 @@ nav:
       - access/clients.md
       - access/sessions.md
 
-    - Installation:
+    - Instalace:
       - installation/quick-start.md
       - installation/provisioning.md
 
-    - Configuration:
+    - Konfigurace:
       - config/basic-configuration.md
       - Credentials:
         - config/credentials/index.md
         - config/credentials/credentials-policy.md
         - config/credentials/providers.md
-      - Authentication and login:
+      - Authentizace a login:
         - config/external-login.md
       - config/notifications-configuration.md
 
-    - Integrating apps:
+    - Integrace:
       - integrations/index.md
       - integrations/oauth2-introspect.md
-      - Connecting other apps:
+      - Integrace s jinými aplikacemi:
         - integrations/cookies.md
         - integrations/elk.md     
         - integrations/the-hive.md
         - integrations/grafana.md
   
-    - Development:
+    - Pro vývojáře:
       - REST API:
         - development/rest-api.md
         - development/postman.md
       - development/oauth2.md
   
-  - User guide:
+  - Uživatelská příručka:
       - user/index.md
       - user/login.md
       - user/account-details.md

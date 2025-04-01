@@ -1,8 +1,8 @@
 stages:
-  - deploy
+  - Documentation
 
-deploy staging:
-  stage: deploy
+doc staging:
+  stage: Documentation
   tags:
     - docker
   image: 
@@ -10,19 +10,20 @@ deploy staging:
     entrypoint: [""]
   script:
     - apk update && apk add openssh-client rsync
-    - pip3 install mkdocs-glightbox mkdocs-open-in-new-tab
+    - pip3 install mkdocs-print-site-plugin mkdocs-awesome-pages-plugin mkdocs-glightbox mkdocs-open-in-new-tab
     - mkdir -p ~/.ssh
     - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     - mkdir /output
-    - mkdocs build --site-dir /output
+    - (cd docs/en && mkdocs build --site-dir /output)
+    - (cd docs/cs && mkdocs build --site-dir /output/cs)
     - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$STAGING_DIR"
   only:
     - main
 
-deploy production:
-  stage: deploy
+doc production:
+  stage: Documentation
   tags:
     - docker
   image: 
@@ -30,13 +31,14 @@ deploy production:
     entrypoint: [""]
   script:
     - apk update && apk add openssh-client rsync
-    - pip3 install mkdocs-glightbox mkdocs-open-in-new-tab
+    - pip3 install mkdocs-print-site-plugin mkdocs-awesome-pages-plugin mkdocs-glightbox mkdocs-open-in-new-tab
     - mkdir -p ~/.ssh
     - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     - mkdir /output
-    - mkdocs build --site-dir /output
+    - (cd docs/en && mkdocs build --site-dir /output)
+    - (cd docs/cs && mkdocs build --site-dir /output/cs)
     - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$PRODUCTION_DIR"
   only:
     - production
