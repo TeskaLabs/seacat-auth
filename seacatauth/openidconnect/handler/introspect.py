@@ -7,6 +7,7 @@ import asab.contextvars
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
+import asab.utils
 
 from ... import exceptions
 from ...generic import nginx_introspection, get_bearer_token_value, get_access_token_value_from_websocket
@@ -102,7 +103,7 @@ class TokenIntrospectionHandler(object):
 		# Validate authentication time if requested
 		max_age = client.get("default_max_age") or None
 		if "max_age" in request.query:
-			max_age = float(request.query["max_age"])
+			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
 		if max_age is not None:
 			if not session.Authentication.AuthnTime:
 				L.error("Session has no authentication age.", struct_data={"sid": session.SessionId})
