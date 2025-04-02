@@ -30,6 +30,7 @@ class TokenIntrospectionHandler(object):
 		self.OpenIdConnectService = oidc_svc
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
+		self.ClientService = app.get_service("seacatauth.ClientService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
@@ -89,7 +90,7 @@ class TokenIntrospectionHandler(object):
 		client_id = request.query.get("client_id")
 		if client_id is not None:
 			try:
-				client = await self.CredentialsService.get_client(client_id)
+				client = await self.ClientService.get(client_id)
 			except KeyError:
 				L.log(asab.LOG_NOTICE, "Client not found.")
 				return None
