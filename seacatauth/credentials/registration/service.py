@@ -5,8 +5,11 @@ import secrets
 import asab
 import asab.storage.exceptions
 import asab.exceptions
+import asab.contextvars
 
 from ... import AuditLogger
+from ...api import local_authz
+from ...models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
@@ -280,16 +283,44 @@ class RegistrationService(asab.Service):
 		reg_roles = await self.RoleService.get_roles_by_credentials(
 			reg_credential_id, reg_tenants)
 		for tenant in reg_tenants:
-			try:
-				await self.TenantService.assign_tenant(credentials_id, tenant)
-			except asab.exceptions.Conflict:
-				L.log(asab.LOG_NOTICE, "Tenant already assigned.", struct_data={"cid": credentials_id, "t": tenant})
+			with local_authz(
+				"seacatauth.RegistrationService",
+				resources=[ResourceId.TENANT_ASSIGN, ResourceId.ROLE_ASSIGN],
+				tenant=tenant
+			):
+				with asab.contextvars.tenant_context(tenant):
+					try:
+						await self.TenantService.assign_tenant(credentials_id, tenant)
+					except asab.exceptions.Conflict:
+						L.log(
+							asab.LOG_NOTICE,
+							"Tenant already assigned.",
+							struct_data={"cid": credentials_id, "t": tenant}
+						)
+
 		for role in reg_roles:
-			try:
-				await self.RoleService.assign_role(credentials_id, role, verify_role=False)
-			except asab.exceptions.Conflict:
-				L.log(asab.LOG_NOTICE, "Role already assigned.", struct_data={"cid": credentials_id, "r": role})
-		await self.CredentialsService.delete_credentials(reg_credential_id)
+			tenant_id, role_name = self.RoleService.parse_role_id(role)
+			with local_authz(
+				"seacatauth.RegistrationService",
+				resources=[ResourceId.ROLE_ASSIGN],
+				tenant=tenant_id
+			):
+				with asab.contextvars.tenant_context(tenant_id):
+					try:
+						await self.RoleService.assign_role(credentials_id, role, verify_role=False)
+					except asab.exceptions.Conflict:
+						L.log(
+							asab.LOG_NOTICE,
+							"Role already assigned.",
+							struct_data={"cid": credentials_id, "r": role}
+						)
+
+		with local_authz(
+			"seacatauth.RegistrationService",
+			resources=[ResourceId.SUPERUSER],
+			tenant=None
+		):
+			await self.CredentialsService.delete_credentials(reg_credential_id)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Invitation accepted by an existing user", struct_data={
 			"cid": credentials_id,

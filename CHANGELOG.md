@@ -3,6 +3,7 @@
 ## v25.05
 
 ### Pre-releases
+- v25.05-alpha19
 - v25.05-alpha18
 - v25.05-alpha17
 - v25.05-alpha16
@@ -23,6 +24,7 @@
 - v25.05-alpha1
 
 ### Fix
+- Fix authorization in accepting an invitation as an existing user (#460, v25.05-alpha19)
 - Fix access check for creating a global role (#457, v25.05-alpha18)
 - Fix access check for creating a tenant (#457, v25.05-alpha18)
 - Fix email template parameters (#456, v25.05-alpha17)
