@@ -100,8 +100,14 @@ class TokenIntrospectionHandler(object):
 				return None
 
 		# Validate authentication time if requested
-		max_age = request.query.get("max_age") or client.get("default_max_age")
+		max_age = client.get("default_max_age") or None
+		if "max_age" in request.query:
+			max_age = float(request.query["max_age"])
 		if max_age is not None:
+			if not session.Authentication.AuthnTime:
+				L.error("Session has no authentication age.", struct_data={"sid": session.SessionId})
+				return None
+
 			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
 			if authn_age > max_age:
 				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.")
