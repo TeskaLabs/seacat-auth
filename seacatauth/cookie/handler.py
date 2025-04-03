@@ -1,3 +1,4 @@
+import datetime
 import logging
 import uuid
 import aiohttp
@@ -534,6 +535,8 @@ class CookieHandler(object):
 		"""
 		Locate session by request cookie
 		"""
+		client_svc = self.App.get_service("seacatauth.ClientService")
+
 		try:
 			session = await self.CookieService.get_session_by_request_cookie(request, client_id)
 		except exceptions.NoCookieError:
@@ -542,6 +545,42 @@ class CookieHandler(object):
 		except exceptions.SessionNotFoundError:
 			L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
 			return None
+
+		# Validate client
+		client = {}
+		if client_id is not None:
+			try:
+				client = await client_svc.get(client_id)
+			except KeyError:
+				L.error("Client not found.", struct_data={"client_id": client_id})
+				return None
+
+			if session.OAuth2.ClientId != client_id:
+				L.error("Client mismatch.", struct_data={
+					"sid": session.SessionId,
+					"request_client_id": client_id,
+					"session_client_id": session.OAuth2.ClientId
+				})
+				return None
+
+		# Validate authentication time if requested
+		max_age = client.get("default_max_age") or None
+		if "max_age" in request.query:
+			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
+		if max_age is not None:
+			if not session.Authentication.AuthnTime:
+				L.error("Session has no authentication age.", struct_data={"sid": session.SessionId})
+				return None
+
+			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
+			if authn_age > max_age:
+				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.", struct_data={
+					"sid": session.SessionId,
+					"client_id": client_id,
+					"max_authn_age": max_age,
+					"authn_age": authn_age,
+				})
+				return None
 
 		return session
 

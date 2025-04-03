@@ -757,6 +757,10 @@ class SessionService(asab.Service):
 			)
 		]
 
+		session_builders.append([
+			(Session.FN.Authentication.AuthnTime, root_session.Authentication.AuthnTime),
+		])
+
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			session_builders.append(
 				await external_login_session_builder(external_login_service, root_session.Credentials.Id))
