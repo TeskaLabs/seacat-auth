@@ -89,7 +89,6 @@ class CookieHandler(object):
 		self.SessionService = session_svc
 		self.CredentialsService = credentials_svc
 		self.RBACService = app.get_service("seacatauth.RBACService")
-		self.ClientService = app.get_service("seacatauth.ClientService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/nginx/introspect/cookie", self.nginx)
@@ -536,6 +535,8 @@ class CookieHandler(object):
 		"""
 		Locate session by request cookie
 		"""
+		client_svc = self.App.get_service("seacatauth.ClientService")
+
 		try:
 			session = await self.CookieService.get_session_by_request_cookie(request, client_id)
 		except exceptions.NoCookieError:
@@ -549,13 +550,17 @@ class CookieHandler(object):
 		client = {}
 		if client_id is not None:
 			try:
-				client = await self.ClientService.get(client_id)
+				client = await client_svc.get(client_id)
 			except KeyError:
-				L.log(asab.LOG_NOTICE, "Client not found.")
+				L.error("Client not found.", struct_data={"client_id": client_id})
 				return None
 
 			if session.OAuth2.ClientId != client_id:
-				L.log(asab.LOG_NOTICE, "Client mismatch.")
+				L.error("Client mismatch.", struct_data={
+					"sid": session.SessionId,
+					"request_client_id": client_id,
+					"session_client_id": session.OAuth2.ClientId
+				})
 				return None
 
 		# Validate authentication time if requested
@@ -569,7 +574,12 @@ class CookieHandler(object):
 
 			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
 			if authn_age > max_age:
-				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.")
+				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.", struct_data={
+					"sid": session.SessionId,
+					"client_id": client_id,
+					"max_age": max_age,
+					"authn_age": authn_age,
+				})
 				return None
 
 		return session

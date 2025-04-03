@@ -93,11 +93,15 @@ class TokenIntrospectionHandler(object):
 			try:
 				client = await self.ClientService.get(client_id)
 			except KeyError:
-				L.log(asab.LOG_NOTICE, "Client not found.")
+				L.error("Client not found.", struct_data={"client_id": client_id})
 				return None
 
 			if session.OAuth2.ClientId != client_id:
-				L.log(asab.LOG_NOTICE, "Client mismatch.")
+				L.error("Client mismatch.", struct_data={
+					"sid": session.SessionId,
+					"request_client_id": client_id,
+					"session_client_id": session.OAuth2.ClientId
+				})
 				return None
 
 		# Validate authentication time if requested
@@ -111,7 +115,12 @@ class TokenIntrospectionHandler(object):
 
 			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
 			if authn_age > max_age:
-				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.")
+				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.", struct_data={
+					"sid": session.SessionId,
+					"client_id": client_id,
+					"max_age": max_age,
+					"authn_age": authn_age,
+				})
 				return None
 
 		return session
