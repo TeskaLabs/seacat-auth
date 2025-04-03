@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v25.13
+
+### Pre-releases
+- v25.13-alpha1
+
+### Features
+- Implement max_age authorization parameter (#458, v25.13-alpha1)
+
+---
+
+
 ## v25.05
 
 ### Pre-releases
