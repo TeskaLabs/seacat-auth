@@ -5,6 +5,7 @@ import urllib.parse
 import aiohttp
 import aiohttp.web
 import asab
+import asab.utils
 import asab.contextvars
 import asab.web.rest
 import asab.web.auth
@@ -371,7 +372,7 @@ class AuthorizeHandler(object):
 					struct_data={"reason": "anonymous_access_not_allowed"})
 			granted_scope.add("anonymous")
 
-		max_age = (max_age and float(max_age)) or client_dict.get("default_max_age")
+		max_age = (max_age and asab.utils.convert_to_seconds(max_age)) or client_dict.get("default_max_age")
 
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
