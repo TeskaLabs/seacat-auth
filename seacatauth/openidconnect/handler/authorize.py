@@ -394,9 +394,11 @@ class AuthorizeHandler(object):
 			elif max_age is not None and authn_age > max_age:
 				# Log the user out and redirect to login
 				await self.SessionService.delete(root_session.SessionId)
-				L.log(asab.LOG_NOTICE, "Session age exceeds requested max_age.", struct_data={
+				L.log(asab.LOG_NOTICE, "Authentication age exceeds requested max_age.", struct_data={
+					"sid": root_session.SessionId,
 					"client_id": client_id,
-					"max_age": max_age,
+					"authn_age": authn_age,
+					"max_authn_age": max_age,
 				})
 				return await self.reply_with_redirect_to_login(
 					scope=requested_scope,

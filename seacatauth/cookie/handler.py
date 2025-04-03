@@ -577,7 +577,7 @@ class CookieHandler(object):
 				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.", struct_data={
 					"sid": session.SessionId,
 					"client_id": client_id,
-					"max_age": max_age,
+					"max_authn_age": max_age,
 					"authn_age": authn_age,
 				})
 				return None
