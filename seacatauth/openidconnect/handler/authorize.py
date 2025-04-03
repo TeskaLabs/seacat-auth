@@ -378,8 +378,12 @@ class AuthorizeHandler(object):
 			authn_age = (datetime.datetime.now(datetime.UTC) - root_session.Authentication.AuthnTime).total_seconds()
 			if prompt == "login":
 				# Log the user out and redirect to login
+				L.log(asab.LOG_NOTICE, "Login prompt requested by client.", struct_data={
+					"sid": root_session.SessionId,
+					"client_id": client_id,
+				})
 				await self.SessionService.delete(root_session.SessionId)
-				L.log(asab.LOG_NOTICE, "Login prompt requested by client.", struct_data={"client_id": client_id})
+
 				return await self.reply_with_redirect_to_login(
 					scope=requested_scope,
 					client_id=client_id,
@@ -393,13 +397,14 @@ class AuthorizeHandler(object):
 
 			elif max_age is not None and authn_age > max_age:
 				# Log the user out and redirect to login
-				await self.SessionService.delete(root_session.SessionId)
 				L.log(asab.LOG_NOTICE, "Authentication age exceeds requested max_age.", struct_data={
 					"sid": root_session.SessionId,
 					"client_id": client_id,
 					"authn_age": authn_age,
 					"max_authn_age": max_age,
 				})
+				await self.SessionService.delete(root_session.SessionId)
+
 				return await self.reply_with_redirect_to_login(
 					scope=requested_scope,
 					client_id=client_id,
@@ -414,7 +419,8 @@ class AuthorizeHandler(object):
 			elif prompt == "select_account":
 				# Redirect to login without logging out
 				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client.", struct_data={
-					"client_id": client_id
+					"sid": root_session.SessionId,
+					"client_id": client_id,
 				})
 				return await self.reply_with_redirect_to_login(
 					scope=requested_scope,
