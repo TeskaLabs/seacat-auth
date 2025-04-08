@@ -12,7 +12,7 @@ import pymongo
 import pymongo.errors
 
 from .abc import EditableCredentialsProviderABC
-from ... import generic
+from ... import generic, exceptions
 from ...events import EventTypes
 
 
@@ -134,33 +134,32 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		for field, value in credentials.items():
 			u.set(field, value)
 
-		credentials_id = await u.execute(event_type=EventTypes.CREDENTIALS_CREATED)
+		mongodb_id = await u.execute(event_type=EventTypes.CREDENTIALS_CREATED)
+		credentials_id = self._format_credentials_id(mongodb_id)
 
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
 		})
-
-		return "{}{}".format(self.Prefix, credentials_id)
+		return credentials_id
 
 
 	async def update(self, credentials_id, update: dict) -> typing.Optional[str]:
-		if not credentials_id.startswith(self.Prefix):
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
+		try:
+			mongodb_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		updated_fields = list(update.keys())
 
 		# Fetch the credentials from Mongo
-		credentials = await self.MongoDBStorageService.get(
-			self.CredentialsCollection,
-			bson.ObjectId(credentials_id[len(self.Prefix):])
-		)
+		credentials = await self.MongoDBStorageService.get(self.CredentialsCollection, mongodb_id)
 
 		# Prepare the update
 		u = self.MongoDBStorageService.upsertor(
 			self.CredentialsCollection,
-			credentials['_id'],
-			version=credentials['_v']
+			credentials["_id"],
+			version=credentials["_v"]
 		)
 
 		# Update password
@@ -190,14 +189,15 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			else:
 				raise asab.exceptions.Conflict()
 
+		return credentials_id
+
 
 	async def delete(self, credentials_id) -> typing.Optional[str]:
 		# TODO: Soft-delete by change of the `_id`
-		await self.MongoDBStorageService.delete(
-			self.CredentialsCollection,
-			bson.ObjectId(credentials_id[len(self.Prefix):])
-		)
-		return "OK"
+		# Verify that credentials exists
+		await self.get(credentials_id)
+		await self.MongoDBStorageService.delete(self.CredentialsCollection, self._format_object_id(credentials_id))
+		return credentials_id
 
 
 	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> typing.Optional[str]:
@@ -221,7 +221,8 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 		if obj is None:
 			return None
 
-		return "{}{}".format(self.Prefix, obj["_id"])
+		return self._format_credentials_id(obj["_id"])
+
 
 	async def get_by(self, key: str, value, include=None) -> typing.Optional[dict]:
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
@@ -232,27 +233,24 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
-		if not credentials_id.startswith(self.Prefix):
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
-
-		# Fetch the credentials from a Mongo
 		try:
-			return self._normalize_credentials(
-				await self.MongoDBStorageService.get(
-					self.CredentialsCollection,
-					bson.ObjectId(credentials_id[len(self.Prefix):])
-				),
-				include
-			)
-		except bson.errors.InvalidId:
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
+			mongodb_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		try:
+			db_obj = await self.MongoDBStorageService.get(self.CredentialsCollection, bson.ObjectId(mongodb_id))
+		except KeyError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		return self._normalize_credentials(db_obj, include)
 
 
 	def build_filter(self, filtr):
 		if filtr is None:
 			return {}
 		else:
-			return {'$expr': {'$gt': [{'$indexOfCP': [{'$toLower': '$username'}, filtr.lower()]}, -1]}}
+			return {"$expr": {"$gt": [{"$indexOfCP": [{"$toLower": "$username"}, filtr.lower()]}, -1]}}
 
 
 	async def count(self, filtr: str = None) -> int:
@@ -293,17 +291,17 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 	def _normalize_credentials(self, db_obj, include=None):
 		obj = {
-			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj['_id']),
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
+			"_id": self._format_credentials_id(db_obj["_id"]),
+			"_type": self.Type,
+			"_provider_id": self.ProviderID,
 		}
 		if include is None:
 			include = frozenset()
 		for key in db_obj.keys():
-			if key.startswith('__') and key not in include:
+			if key.startswith("__") and key not in include:
 				#  Don't expose private fields
 				continue
-			if key in ('_id', '_type', '_provider_id'):
+			if key in ("_id", "_type", "_provider_id"):
 				continue
 			obj[key] = db_obj[key]
 
@@ -314,65 +312,42 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	async def get_login_descriptors(self, credentials_id):
-		if not credentials_id.startswith(self.Prefix):
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
-
-		# Fetch the credentials from a Mongo
-		dbcred = await self.MongoDBStorageService.get(
-			self.CredentialsCollection,
-			bson.ObjectId(credentials_id[len(self.Prefix):])
-		)
+		dbcred = await self.get(credentials_id, include={"__password"})
 
 		default_factors = []
 
 		# TODO: Improve the method of building descriptors
-		if '__password' in dbcred:
-			default_factors.append({'id': 'password', 'type': 'password'})
-
-
-		# TODO: Finish OTP deactivation
-		# if '__totp' in dbcred:
-		# 	default_factors.append({'id': 'totp', 'type': 'totp'})
-
-		# Example of the next factor
-		# if 'yubikey_otp_public_id' in dbcred:
-		# 	default_factors.append({'id': 'yubikey', 'type': 'yubikey'})
+		if "__password" in dbcred:
+			default_factors.append({"id": "password", "type": "password"})
 
 		# Ensure that there is at least one factor
 		if len(default_factors) == 0:
-			default_factors.append({'id': 'password', 'type': 'password'})
+			default_factors.append({"id": "password", "type": "password"})
 
 		default_descriptor = {
-			'id': 'default',
-			'label': 'Use recommended login.',
-			'factors': default_factors,
+			"id": "default",
+			"label": "Use recommended login.",
+			"factors": default_factors,
 		}
 
 		descriptors = [default_descriptor]
 
 		# Alternatives
 		# TODO: Finish SMS login backend
-		if 'phone' in dbcred:
+		if "phone" in dbcred:
 			descriptors.append({
-				'id': 'smslogin',
-				'label': 'Login by SMS.',
-				'hideLoginButton': True,
-				'factors': [{'id': 'smslogin', 'type': 'smslogin'}]
+				"id": "smslogin",
+				"label": "Login by SMS.",
+				"hideLoginButton": True,
+				"factors": [{"id": "smslogin", "type": "smslogin"}]
 			})
 
 		return descriptors
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		if not credentials_id.startswith(self.Prefix):
-			return False
-
-		# Fetch the credentials from Mongo
 		try:
-			dbcred = await self.MongoDBStorageService.get(
-				self.CredentialsCollection,
-				bson.ObjectId(credentials_id[len(self.Prefix):])
-			)
+			dbcred = await self.get(credentials_id, include={"__password"})
 		except KeyError:
 			# Should not occur if login prologue happened correctly
 			L.error("Authentication failed: Credentials not found.", struct_data={"cid": credentials_id})
@@ -403,4 +378,19 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 
 
 	def _create_credential_id(self, username) -> bson.ObjectId:
-		return bson.ObjectId(hashlib.sha224(username.encode('utf-8')).digest()[:12])
+		return bson.ObjectId(hashlib.sha224(username.encode("utf-8")).digest()[:12])
+
+
+	def _format_object_id(self, credentials_id: str) -> bson.ObjectId:
+		"""
+		Remove provider prefix from credentials ID and convert to BSON object ID.
+		"""
+		if not credentials_id.startswith(self.Prefix):
+			raise ValueError("Credentials ID does not start with {!r} prefix.".format(self.Prefix))
+
+		try:
+			mongodb_id = bson.ObjectId(credentials_id[len(self.Prefix):])
+		except bson.errors.InvalidId:
+			raise ValueError("Invalid credentials ID: {}".format(credentials_id))
+
+		return mongodb_id
