@@ -117,7 +117,7 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 		Remove provider prefix from credentials ID.
 		"""
 		if not credentials_id.startswith(self.Prefix):
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
+			raise ValueError("Credentials ID does not start with {!r} prefix.".format(self.Prefix))
 		return credentials_id[len(self.Prefix):]
 
 
