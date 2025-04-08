@@ -279,8 +279,7 @@ class CredentialsHandler(object):
 				# No tenant in common
 				return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 
-		_, provider_id, _ = credentials_id.split(':', 2)
-		provider = self.CredentialsService.CredentialProviders[provider_id]
+		provider = self.CredentialsService.get_provider(credentials_id)
 
 		try:
 			credentials = await provider.get(request.match_info["credentials_id"])
