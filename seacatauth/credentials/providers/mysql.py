@@ -6,7 +6,7 @@ import pymysql
 import re
 
 from .abc import CredentialsProviderABC, EditableCredentialsProviderABC
-from ... import generic
+from ... import generic, exceptions
 
 
 L = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 	}
 
 	def __init__(self, app, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+		super().__init__(app, provider_id, config_section_name)
 		self.ConnectionParams = {
 			"host": self.Config.get("host"),
 			"port": self.Config.getint("port"),
@@ -76,7 +76,7 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 				result = await cursor.fetchone()
 		if result is None:
 			return None
-		return "{}{}".format(self.Prefix, result[self.IdField])
+		return self._format_credentials_id(result[self.IdField])
 
 
 	async def get_by(self, key: str, value) -> typing.Optional[dict]:
@@ -84,7 +84,11 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 
 
 	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
-		mysql_id = credentials_id[len(self.Prefix):]
+		try:
+			mysql_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
 				await cursor.execute(self.GetQuery, {"_id": mysql_id})
@@ -154,9 +158,6 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		if not credentials_id.startswith(self.Prefix):
-			return False
-
 		# Fetch the credentials from Mongo
 		try:
 			dbcred = await self.get(credentials_id, include=[self.PasswordField])
@@ -182,9 +183,9 @@ class MySQLCredentialsProvider(CredentialsProviderABC):
 
 	def _nomalize_credentials(self, db_obj, include=None):
 		normalized = {
-			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj[self.IdField]),
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
+			"_id": self._format_credentials_id(db_obj[self.IdField]),
+			"_type": self.Type,
+			"_provider_id": self.ProviderID,
 		}
 
 		for field in frozenset(["username", "email", "phone"]):
@@ -254,8 +255,8 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 			except pymysql.err.IntegrityError as e:
 				raise ValueError("Cannot create credentials: {}".format(e)) from e
 
-		credentials_id = "{}{}".format(self.Prefix, obj_id.get("LAST_INSERT_ID()"))
-		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+		credentials_id = self._format_credentials_id(obj_id.get("LAST_INSERT_ID()"))
+		L.log(asab.LOG_NOTICE, "Credentials created.", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
 		})
@@ -263,7 +264,11 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 
 
 	async def update(self, credentials_id, update: dict) -> typing.Optional[str]:
-		mysql_id = credentials_id[len(self.Prefix):]
+		try:
+			mysql_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
 		updated_fields = list(update.keys())
 
 		current_credentials = await self.get(credentials_id, include=[self.PasswordField])
@@ -285,7 +290,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 		value = update.pop("enforce_factors", None)
 		if value is not None:
 			# TODO: Implement factor enforcement
-			L.warning("MySQL: Cannot set field 'enforce_factors'")
+			L.warning("MySQL: Cannot set field 'enforce_factors'.")
 
 		new_credentials[self.IdField] = mysql_id
 
@@ -300,7 +305,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 			except pymysql.err.IntegrityError as e:
 				raise ValueError("Cannot update credentials: {}".format(e)) from e
 
-		L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+		L.log(asab.LOG_NOTICE, "Credentials updated.", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id,
 			"fields": updated_fields
@@ -308,7 +313,11 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 
 
 	async def delete(self, credentials_id) -> typing.Optional[str]:
-		mysql_id = credentials_id[len(self.Prefix):]
+		try:
+			mysql_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
 		async with aiomysql.connect(**self.ConnectionParams) as connection:
 			async with connection.cursor(aiomysql.DictCursor) as cursor:
 				await cursor.execute(self.DeleteQuery, {"_id": mysql_id})
@@ -317,7 +326,7 @@ class EditableMySQLCredentialsProvider(EditableCredentialsProviderABC, MySQLCred
 			except pymysql.err.IntegrityError as e:
 				raise ValueError("Cannot delete credentials: {}".format(e)) from e
 
-		L.log(asab.LOG_NOTICE, "Credentials deleted", struct_data={
+		L.log(asab.LOG_NOTICE, "Credentials deleted.", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
 		})

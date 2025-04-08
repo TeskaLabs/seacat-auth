@@ -4,8 +4,9 @@ import hashlib
 import logging
 import typing
 import asab
+
 from .abc import EditableCredentialsProviderABC
-from ... import generic
+from ... import generic, exceptions
 
 
 L = logging.getLogger(__name__)
@@ -13,11 +14,11 @@ L = logging.getLogger(__name__)
 
 class DictCredentialsService(asab.Service):
 
-	def __init__(self, app, service_name='seacatauth.credentials.dict'):
+	def __init__(self, app, service_name="seacatauth.credentials.dict"):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return DictCredentialsProvider(provider_id, config_section_name)
+		return DictCredentialsProvider(self.App, provider_id, config_section_name)
 
 
 class DictCredentialsProvider(EditableCredentialsProviderABC):
@@ -27,38 +28,24 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		"phone"
 	]
 
-	def __init__(self, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, app, provider_id, config_section_name):
+		super().__init__(app, provider_id, config_section_name)
 		# TODO: Load creation features from config
 
 		self.Dictionary = {}
 
-	# def get_info(self) -> dict:
-	# 	info = super().get_info()
-	# 	info["registration"] = [
-	# 		{'type': 'email'},
-	# 		{'type': 'password'}
-	# 	]
-	# 	info["creation"] = [
-	# 		{'type': 'email'},
-	# 		{'type': 'password'}
-	# 	]
-	# 	info["update"] = [
-	# 		{"type": field} for field in self.EditableFields
-	# 	]
-	# 	return info
 
 	async def create(self, credentials: dict) -> typing.Optional[str]:
 		username = credentials.get("username") or credentials.get("email") or credentials.get("phone")
 		if username is None:
 			raise ValueError("Cannot determine user name")
 
-		credentials_id = hashlib.sha224(username.encode("utf-8")).hexdigest()
-		if credentials_id in self.Dictionary:
+		obj_id = hashlib.sha224(username.encode("utf-8")).hexdigest()
+		if obj_id in self.Dictionary:
 			raise ValueError("Already exists.")
 
 		credentials_object = {
-			"_id": credentials_id,
+			"_id": obj_id,
 			"_v": 1,
 			"_c": datetime.datetime.now(datetime.timezone.utc),
 			"_m": datetime.datetime.now(datetime.timezone.utc),
@@ -72,17 +59,19 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		if "password" in credentials:
 			credentials_object["__password"] = generic.bcrypt_hash(credentials["password"])
 
-		self.Dictionary[credentials_id] = credentials_object
-		return "{}:{}:{}".format(self.Type, self.ProviderID, credentials_id)
+		self.Dictionary[obj_id] = credentials_object
+		return self._format_credentials_id(obj_id)
+
 
 	async def update(self, credentials_id, update: dict) -> typing.Optional[str]:
-		prefix = "{}:{}:".format(self.Type, self.ProviderID)
-		if not credentials_id.startswith(prefix):
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
+		try:
+			obj_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
-		credentials = self.Dictionary.get(credentials_id[len(prefix):])
+		credentials = self.Dictionary.get(obj_id)
 		if credentials is None:
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		# Update the password
 		if "password" in update:
@@ -95,55 +84,67 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		credentials["_v"] += 1
 		credentials["_m"] = datetime.datetime.now(datetime.timezone.utc)
 
+		return credentials_id
+
 
 	async def delete(self, credentials_id) -> typing.Optional[str]:
-		prefix = "{}:{}:".format(self.Type, self.ProviderID)
-		self.Dictionary.pop(credentials_id[len(prefix):])
-		return "OK"
+		try:
+			obj_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		self.Dictionary.pop(obj_id)
+		return credentials_id
+
 
 	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> str:
 		# TODO: Implement ident_fields support
 		# Fast match based on the username
-		credentials_id = hashlib.sha224(ident.encode('utf-8')).hexdigest()
-		if credentials_id in self.Dictionary:
-			return "{}:{}:{}".format(self.Type, self.ProviderID, credentials_id)
+		obj_id = hashlib.sha224(ident.encode("utf-8")).hexdigest()
+		if obj_id in self.Dictionary:
+			return self._format_credentials_id(obj_id)
 
 		# Full scan to find matches based on email or phone
 		for credentials in self.Dictionary.values():
-			username = credentials['username']
-			if ident == credentials.get('email', 0):
+			username = credentials["username"]
+			if ident == credentials.get("email", 0):
 				pass
-			elif ident == credentials.get('phone', 0):
+			elif ident == credentials.get("phone", 0):
 				pass
 			else:
 				continue
 
-			credentials_id = hashlib.sha224(username.encode('utf-8')).hexdigest()
-			return "{}:{}:{}".format(self.Type, self.ProviderID, credentials_id)
+			obj_id = hashlib.sha224(username.encode("utf-8")).hexdigest()
+			return self._format_credentials_id(obj_id)
 
 		return None
 
+
 	async def get(self, credentials_id, include=None) -> dict:
-		prefix = "{}:{}:".format(self.Type, self.ProviderID)
-		if not credentials_id.startswith(prefix):
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
-		credentials = self.Dictionary.get(credentials_id[len(prefix):])
+		try:
+			obj_id = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		credentials = self.Dictionary.get(obj_id)
 		if credentials is None:
-			raise KeyError("Credentials '{}' not found".format(credentials_id))
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		# TODO: Allow to include __totp and other fields from `include`
 		result = self._normalize_credentials(credentials)
 
 		return result
 
+
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		prefix = "{}:{}:".format(self.Type, self.ProviderID)
-		if not credentials_id.startswith(prefix):
+		try:
+			obj_id = self._format_object_id(credentials_id)
+		except ValueError:
 			return False
 
 		password = credentials["password"]
 
-		credentials_db = self.Dictionary.get(credentials_id[len(prefix):])
+		credentials_db = self.Dictionary.get(obj_id)
 		if credentials_db is None:
 			return False
 
@@ -151,6 +152,7 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 			return True
 
 		return False
+
 
 	async def count(self, filtr=None) -> int:
 		if filtr is None:
@@ -163,9 +165,11 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 
 		return functools.reduce(counter, self.Dictionary.values(), 0)
 
+
 	async def search(self, filter: dict = None, **kwargs) -> list:
 		# TODO: Implement filtering and pagination
 		return []
+
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
 		for i, credentials in enumerate(self.Dictionary.values()):
@@ -177,9 +181,10 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 				continue
 			yield self._normalize_credentials(credentials)
 
+
 	def _normalize_credentials(self, db_obj):
 		obj = {
-			"_id": "{}:{}:{}".format(self.Type, self.ProviderID, db_obj["_id"]),
+			"_id": self._format_credentials_id(db_obj["_id"]),
 			"_type": self.Type,
 			"_provider_id": self.ProviderID,
 		}
@@ -191,12 +196,13 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 			obj[k] = v
 		return obj
 
+
 	async def get_login_descriptors(self, credentials_id):
 		return [{
-			'id': 'default',
-			'label': 'Use recommended login.',
-			'factors': [{
-				'id': 'password',
-				'type': 'password'
+			"id": "default",
+			"label": "Use recommended login.",
+			"factors": [{
+				"id": "password",
+				"type": "password"
 			}],
 		}]

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v25.13
+
+### Pre-releases
+- v25.13-alpha1
+
+### Refactoring
+- Common method for converting credentials ID to inner database ID (#461, v25.13-alpha1)
+
+---
+
+
 ## v25.05
 
 ### Pre-releases

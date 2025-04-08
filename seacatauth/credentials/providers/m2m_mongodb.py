@@ -46,10 +46,12 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		"ident_fields": "username"
 	}
 
+
 	def __init__(self, app, provider_id, config_section_name):
 		super().__init__(app, provider_id, config_section_name)
 		self.RegistrationEnabled = False
 		self.RegistrationFeatures = None
+
 
 	async def initialize(self):
 		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
@@ -64,6 +66,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		except Exception as e:
 			L.warning("{}; fix it and restart the app".format(e))
 
+
 	async def create(self, credentials: dict) -> typing.Optional[str]:
 		value = credentials.get("username")
 		if value is not None and len(value) > 0:
@@ -76,14 +79,15 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		u.set("username", credentials["username"])
 		u.set("__password", generic.argon2_hash(credentials["password"]))
 
-		credentials_id = await u.execute(event_type=EventTypes.M2M_CREDENTIALS_CREATED)
+		obj_id = await u.execute(event_type=EventTypes.M2M_CREDENTIALS_CREATED)
+		credentials_id = self._format_credentials_id(obj_id)
 
 		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
 		})
 
-		return "{}{}".format(self.Prefix, credentials_id)
+		return credentials_id
 
 
 	async def get_login_descriptors(self, credentials_id):
