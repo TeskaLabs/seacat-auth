@@ -40,18 +40,20 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 		}
 
 
-	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> str:
+	async def locate(self, ident: str, ident_fields: dict = None, login_dict: dict = None) -> typing.Optional[str]:
 		"""
 		Locate credentials based on the vague 'ident', which could be the username, password, phone number etc.
 		Return credentials_id or return None if not found.
 		"""
 		return None
 
+
 	async def get_by(self, key: str, value) -> typing.Optional[dict]:
 		"""
 		Get credentials by an indexed key
 		"""
 		return None
+
 
 	async def get_login_descriptors(self, credentials_id) -> list:
 		"""
@@ -62,11 +64,11 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 
 	@abc.abstractmethod
 	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
-		raise NotImplementedError('in {}'.format(self.Type))
+		raise NotImplementedError()
 
 
 	@abc.abstractmethod
-	async def count(self, filtr: str = None) -> int:
+	async def count(self, filtr: str = None) -> typing.Optional[int]:
 		"""
 		Non-authoritative count of the credentials managed by the provider.
 		It is used for indicative information on the UI.
@@ -79,6 +81,7 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 	@abc.abstractmethod
 	async def search(self, filter: dict = None, **kwargs) -> list:
 		return []
+
 
 	async def iterate(self, offset: int = 0, limit: int = -1, filtr: str = None):
 		for item in []:
@@ -101,6 +104,21 @@ class CredentialsProviderABC(asab.Configurable, abc.ABC):
 			L.warning("Unknown password hash function: {}".format(hash[:4]))
 			return False
 
+
+	def _format_credentials_id(self, obj_id: str) -> str:
+		"""
+		Add provider prefix to database object ID.
+		"""
+		return "{}{}".format(self.Prefix, obj_id)
+
+
+	def _format_object_id(self, credentials_id: str) -> str:
+		"""
+		Remove provider prefix from credentials ID.
+		"""
+		if not credentials_id.startswith(self.Prefix):
+			raise KeyError("Credentials '{}' not found".format(credentials_id))
+		return credentials_id[len(self.Prefix):]
 
 
 class EditableCredentialsProviderABC(CredentialsProviderABC):
