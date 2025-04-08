@@ -228,7 +228,8 @@ class CredentialsHandler(object):
 			except KeyError:
 				failed_ids.append(cred_id)
 				continue
-			ident = cred_obj.get("username") \
+			ident = cred_obj.get("label") \
+				or cred_obj.get("username") \
 				or cred_obj.get("email") \
 				or cred_obj.get("phone") \
 				or cred_id
