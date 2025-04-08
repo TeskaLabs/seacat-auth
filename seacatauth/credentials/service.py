@@ -122,7 +122,7 @@ class CredentialsService(asab.Service):
 
 
 	def _register_client_credentials_provider(self, providers: list):
-		from .providers.client_mongodb import ClientCredentialsService
+		from .providers.client import ClientCredentialsService
 		service = ClientCredentialsService(self.App)
 		provider = service.create_provider()
 		providers.append((provider.Order, provider))
