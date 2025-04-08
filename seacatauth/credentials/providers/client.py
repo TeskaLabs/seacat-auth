@@ -25,7 +25,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 	This allows for assigning tenants and roles to clients.
 	"""
 
-	Type = "client"
+	Type = "seacatauth"
 	ConfigDefaults = {
 		"order": "100",
 	}
