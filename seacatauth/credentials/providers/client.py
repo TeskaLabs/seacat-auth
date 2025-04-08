@@ -70,9 +70,9 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 	async def iterate(self, offset: int = 0, limit: int = None, filtr: str = None):
 		client_service = self.App.get_service("seacatauth.ClientService")
 		async for credentials in client_service.iterate(
-			page = offset // limit if limit else 0,
-			limit = limit,
-			query_filter = filtr
+			page=offset // limit if limit else 0,
+			limit=limit,
+			query_filter=filtr
 		):
 			yield self._normalize_credentials(credentials)
 
