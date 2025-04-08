@@ -18,7 +18,7 @@ class DictCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return DictCredentialsProvider(provider_id, config_section_name)
+		return DictCredentialsProvider(self.App, provider_id, config_section_name)
 
 
 class DictCredentialsProvider(EditableCredentialsProviderABC):
@@ -28,8 +28,8 @@ class DictCredentialsProvider(EditableCredentialsProviderABC):
 		"phone"
 	]
 
-	def __init__(self, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, app, provider_id, config_section_name):
+		super().__init__(app, provider_id, config_section_name)
 		# TODO: Load creation features from config
 
 		self.Dictionary = {}

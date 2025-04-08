@@ -37,7 +37,7 @@ class LDAPCredentialsService(asab.Service):
 
 	def create_provider(self, provider_id, config_section_name):
 		proactor_svc = self.App.get_service("asab.ProactorService")
-		return LDAPCredentialsProvider(provider_id, config_section_name, proactor_svc)
+		return LDAPCredentialsProvider(self.App, provider_id, config_section_name, proactor_svc)
 
 
 class LDAPCredentialsProvider(CredentialsProviderABC):
@@ -72,8 +72,8 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 	}
 
 
-	def __init__(self, provider_id, config_section_name, proactor_svc):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, app, provider_id, config_section_name, proactor_svc):
+		super().__init__(app, provider_id, config_section_name)
 
 		# This provider is heavilly using proactor design pattern to allow
 		# synchronous library (python-ldap) to be used from asynchronous code

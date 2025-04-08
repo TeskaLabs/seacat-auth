@@ -44,7 +44,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 	}
 
 	def __init__(self, app, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+		super().__init__(app, provider_id, config_section_name)
 
 		self.ConnectionParams = {
 			"host": self.Config.get("mongodb_uri"),

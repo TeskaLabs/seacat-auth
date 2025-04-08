@@ -15,7 +15,7 @@ class ElasticSearchCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return ElasticSearchCredentialsProvider(provider_id, config_section_name)
+		return ElasticSearchCredentialsProvider(self.App, provider_id, config_section_name)
 
 
 class ElasticSearchCredentialsProvider(CredentialsProviderABC):
@@ -29,8 +29,8 @@ class ElasticSearchCredentialsProvider(CredentialsProviderABC):
 	}
 
 
-	def __init__(self, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, app, provider_id, config_section_name):
+		super().__init__(app, provider_id, config_section_name)
 		self.BaseUrl = self.Config["url"]
 		self.BasicAuth = aiohttp.BasicAuth(self.Config["username"], self.Config["password"])
 

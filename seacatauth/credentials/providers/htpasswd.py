@@ -17,7 +17,7 @@ class HTPasswdCredentialsService(asab.Service):
 		super().__init__(app, service_name)
 
 	def create_provider(self, provider_id, config_section_name):
-		return HTPasswdCredentialsProvider(provider_id, config_section_name)
+		return HTPasswdCredentialsProvider(self.App, provider_id, config_section_name)
 
 
 class HTPasswdCredentialsProvider(CredentialsProviderABC):
@@ -28,8 +28,8 @@ class HTPasswdCredentialsProvider(CredentialsProviderABC):
 		"path": "htpasswd",
 	}
 
-	def __init__(self, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, app, provider_id, config_section_name):
+		super().__init__(app, provider_id, config_section_name)
 		self._Path = self.Config["path"]
 		self._Dict = {}
 		self._MTime = 0
