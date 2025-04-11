@@ -8,6 +8,7 @@ import motor.motor_asyncio
 import bson.json_util
 
 from .abc import CredentialsProviderABC
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ class XMongoDBCredentialsService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.credentials.xmongodb"):
 		super().__init__(app, service_name)
+
 
 	def create_provider(self, provider_id, config_section_name):
 		if asab.Config.getboolean(config_section_name, "editable", fallback=False):
@@ -42,7 +44,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 	}
 
 	def __init__(self, app, provider_id, config_section_name):
-		super().__init__(provider_id, config_section_name)
+		super().__init__(app, provider_id, config_section_name)
 
 		self.ConnectionParams = {
 			"host": self.Config.get("mongodb_uri"),
@@ -90,7 +92,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 			break
 		if result is None:
 			return None
-		return "{}{}".format(self.Prefix, result[self.IdField])
+		return self._format_credentials_id(result[self.IdField])
 
 
 	async def get_by(self, key: str, value) -> typing.Optional[dict]:
@@ -98,7 +100,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 
 
 	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
-		mongodb_id = credentials_id[len(self.Prefix):]
+		mongodb_id = self._format_object_id(credentials_id)
 		query = self._prepare_query(self.GetQuery, {self.IdField: mongodb_id})
 		cursor = self.Collection.aggregate(query)
 		result = None
@@ -106,9 +108,8 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 			result = obj
 			break
 		if result is None:
-			raise KeyError(credentials_id)
-		result = self._nomalize_credentials(result, include)
-		return result
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+		return self._nomalize_credentials(result, include)
 
 
 	async def count(self, filtr: str = None) -> typing.Optional[int]:
@@ -146,9 +147,6 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		if not credentials_id.startswith(self.Prefix):
-			return False
-
 		# Fetch the credentials from Mongo
 		try:
 			dbcred = await self.get(credentials_id, include=[self.PasswordField])
@@ -181,9 +179,9 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 
 	def _nomalize_credentials(self, db_obj, include=None):
 		normalized = {
-			'_id': "{}:{}:{}".format(self.Type, self.ProviderID, db_obj.pop(self.IdField)),
-			'_type': self.Type,
-			'_provider_id': self.ProviderID,
+			"_id": self._format_credentials_id(db_obj.pop(self.IdField)),
+			"_type": self.Type,
+			"_provider_id": self.ProviderID,
 		}
 
 		for field in frozenset(["_v", "_c", "_m"]):

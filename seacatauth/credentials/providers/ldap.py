@@ -1,3 +1,4 @@
+import binascii
 import logging
 import base64
 import datetime
@@ -13,6 +14,7 @@ import asab.proactor
 import asab.config
 
 from .abc import CredentialsProviderABC
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class LDAPCredentialsService(asab.Service):
 
 	def create_provider(self, provider_id, config_section_name):
 		proactor_svc = self.App.get_service("asab.ProactorService")
-		return LDAPCredentialsProvider(provider_id, config_section_name, proactor_svc)
+		return LDAPCredentialsProvider(self.App, provider_id, config_section_name, proactor_svc)
 
 
 class LDAPCredentialsProvider(CredentialsProviderABC):
@@ -70,8 +72,8 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 	}
 
 
-	def __init__(self, provider_id, config_section_name, proactor_svc):
-		super().__init__(provider_id, config_section_name)
+	def __init__(self, app, provider_id, config_section_name, proactor_svc):
+		super().__init__(app, provider_id, config_section_name)
 
 		# This provider is heavilly using proactor design pattern to allow
 		# synchronous library (python-ldap) to be used from asynchronous code
@@ -91,20 +93,26 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			self.IdentFields.append(self.Config["attrusername"])
 
 
-	async def get(self, credentials_id: str, include: typing.Optional[typing.Iterable[str]] = None) -> typing.Optional[dict]:
-		if not credentials_id.startswith(self.Prefix):
-			raise KeyError("Credentials {!r} not found".format(credentials_id))
-		cn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
+	async def get(
+		self,
+		credentials_id: str,
+		include: typing.Optional[typing.Iterable[str]] = None
+	) -> typing.Optional[dict]:
+		try:
+			cn = self._format_object_id(credentials_id)
+		except ValueError:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
 		try:
 			return await self.ProactorService.execute(self._get_worker, cn)
 		except KeyError as e:
-			raise KeyError("Credentials not found: {!r}".format(credentials_id)) from e
+			raise exceptions.CredentialsNotFoundError(credentials_id) from e
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
-			return None
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 		except ldap.INVALID_CREDENTIALS:
 			L.error("Invalid LDAP credentials.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
-			return None
+			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 
 	async def search(self, filter: dict = None, sort: dict = None, page: int = 0, limit: int = 0, **kwargs) -> list:
@@ -158,10 +166,14 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 
 
 	async def authenticate(self, credentials_id: str, credentials: dict) -> bool:
-		dn = base64.urlsafe_b64decode(credentials_id[len(self.Prefix):]).decode("utf-8")
+		try:
+			cn = self._format_object_id(credentials_id)
+		except ValueError:
+			return False
+
 		password = credentials.get("password")
 		try:
-			return await self.ProactorService.execute(self._authenticate_worker, dn, password)
+			return await self.ProactorService.execute(self._authenticate_worker, cn, password)
 		except ldap.SERVER_DOWN:
 			L.warning("LDAP server is down.", struct_data={"provider_id": self.ProviderID, "uri": self.LdapUri})
 			return False
@@ -378,8 +390,30 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		return ret
 
 
-	def _format_credentials_id(self, dn: str) -> str:
-		return self.Prefix + base64.urlsafe_b64encode(dn.encode("utf-8")).decode("ascii")
+	def _format_credentials_id(self, obj_id: str) -> str:
+		"""
+		Encode CN and add provider prefix.
+		"""
+		return "{}{}".format(
+			self.Prefix,
+			base64.urlsafe_b64encode(obj_id.encode("utf-8")).decode("ascii")
+		)
+
+
+	def _format_object_id(self, credentials_id: str) -> str:
+		"""
+		Remove provider prefix and decode CN.
+		"""
+		if not credentials_id.startswith(self.Prefix):
+			raise ValueError("Credentials ID does not start with {!r} prefix.".format(self.Prefix))
+
+		encoded = credentials_id[len(self.Prefix):]
+		try:
+			cn = base64.urlsafe_b64decode(encoded).decode("utf-8")
+		except (binascii.Error, UnicodeDecodeError):
+			raise ValueError("Credentials ID is corrupt.")
+
+		return cn
 
 
 	def _build_search_filter(self, filtr: typing.Optional[str] = None) -> str:
