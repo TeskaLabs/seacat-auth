@@ -175,7 +175,13 @@ class AuthenticationHandler(object):
 		)
 
 		request_data = login_session.decrypt(await request.read())
-		L.debug("Processing login attempt", struct_data={"payload": request_data, "lsid": login_session.Id})
+		L.debug("Processing login attempt.", struct_data={
+			"payload": {
+				k: (bool(v) if k == "password" else v)
+				for k, v in request_data.items()
+			},
+			"lsid": login_session.Id,
+		})
 
 		request_data["request_headers"] = request.headers
 

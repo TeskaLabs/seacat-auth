@@ -3,10 +3,12 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha3
 - v25.13-alpha2
 - v25.13-alpha1
 
 ### Features
+- Implement max_age authorization parameter (#458, v25.13-alpha3)
 - Client credentials provider (#462, v25.13-alpha2)
 
 ### Refactoring
