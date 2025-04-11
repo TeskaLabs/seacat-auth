@@ -16,17 +16,17 @@ L = logging.getLogger(__name__)
 
 
 LOGIN_DESCRIPTOR_FAKE = [{
-	'id': 'default',
-	'label': 'Use recommended login.',
-	'factors': [{
-		'id': 'password',
-		'type': 'password'
+	"id": "default",
+	"label": "Use recommended login.",
+	"factors": [{
+		"id": "password",
+		"type": "password"
 	}],
 }]
 
 
 class CredentialsService(asab.Service):
-	def __init__(self, app, service_name='seacatauth.CredentialsService', tenant_service=None):
+	def __init__(self, app, service_name="seacatauth.CredentialsService", tenant_service=None):
 		super().__init__(app, service_name)
 		self.CredentialProviders: typing.Dict[str, CredentialsProviderABC] = collections.OrderedDict()
 		self.LoginDescriptorFake = LOGIN_DESCRIPTOR_FAKE
@@ -77,14 +77,16 @@ class CredentialsService(asab.Service):
 			provider = service.create_provider(provider_name, section)
 			providers.append((provider.Order, provider))
 
+		self._register_client_credentials_provider(providers)
+
 		# Sort providers by their configured order
 		providers.sort(key=lambda item: item[0])
 		for order, provider in providers:
 			self.register_provider(provider)
 
 		# Metrics
-		self.MetricsService = app.get_service('asab.MetricsService')
-		self.TaskService = app.get_service('asab.TaskService')
+		self.MetricsService = app.get_service("asab.MetricsService")
+		self.TaskService = app.get_service("asab.TaskService")
 		self.Providers = providers
 		self.CredentialsGauge = self.MetricsService.create_gauge(
 			"credentials",
@@ -117,6 +119,13 @@ class CredentialsService(asab.Service):
 				modifier = None
 			ident_fields[field_name] = modifier
 		return ident_fields
+
+
+	def _register_client_credentials_provider(self, providers: list):
+		from .providers.client import ClientCredentialsService
+		service = ClientCredentialsService(self.App)
+		provider = service.create_provider()
+		providers.append((provider.Order, provider))
 
 
 	def register_provider(self, credentials_provider):
@@ -262,29 +271,29 @@ class CredentialsService(asab.Service):
 
 	def get_provider(self, credentials_id):
 		try:
-			provider_type, provider_id, credentials_subid = credentials_id.split(':', 3)
+			provider_type, provider_id, credentials_subid = credentials_id.split(":", 3)
 		except ValueError:
 			raise KeyError("Provider not found because credentials_id format is incorrect.")
 		provider = self.CredentialProviders.get(provider_id)
 		if provider is None:
 			raise KeyError("Provider not found")
 		if provider.Type != provider_type:
-			raise KeyError("Provider type doesn't match '{}' != '{}'".format(provider.Type, provider_type))
+			raise KeyError("Provider type doesn't match {!r} != {!r}".format(provider.Type, provider_type))
 		return provider
 
 
 	async def detail(self, credentials_id) -> dict:
-		'''
+		"""
 		Find detail of credentials for a credentials_id.
-		'''
+		"""
 		# TODO: this is obsoleted and should be replaced by get() method
 		return await self.get(credentials_id)
 
 
 	async def get(self, credentials_id, include=None) -> dict:
-		'''
+		"""
 		Find detail of credentials for a credentials_id.
-		'''
+		"""
 		try:
 			provider = self.get_provider(credentials_id)
 			return await provider.get(credentials_id, include=include)
@@ -301,14 +310,14 @@ class CredentialsService(asab.Service):
 
 
 	async def register_credentials(self, register_info: dict):
-		'''
+		"""
 		This is an anonymous user request to register (create) new credentials
-		'''
+		"""
 
 		# Locate provider
 		provider = None
 		for p in self.CredentialProviders.values():
-			if not p.Config.getboolean('register'):
+			if not p.Config.getboolean("register"):
 				continue
 			provider = p
 			if provider is not None:
@@ -324,9 +333,9 @@ class CredentialsService(asab.Service):
 	async def get_login_descriptors(self, credentials_id) -> list:
 		# NOTE: this method is not used anywhere in SCA at the moment
 		# TODO: refactor this into get_login_preferences
-		'''
+		"""
 		Find detail of credentials for a credentials_id.
-		'''
+		"""
 		if credentials_id == "":
 			return self.LoginDescriptorFake
 		provider = self.get_provider(credentials_id)
