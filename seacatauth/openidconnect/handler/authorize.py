@@ -1,9 +1,11 @@
+import datetime
 import logging
 import urllib
 import urllib.parse
 import aiohttp
 import aiohttp.web
 import asab
+import asab.utils
 import asab.contextvars
 import asab.web.rest
 import asab.web.auth
@@ -277,6 +279,7 @@ class AuthorizeHandler(object):
 		state: str = None,
 		nonce: str = None,
 		prompt: str = None,
+		max_age: str = None,
 		code_challenge: str = None,
 		code_challenge_method: str = None,
 		**kwargs
@@ -369,12 +372,19 @@ class AuthorizeHandler(object):
 					struct_data={"reason": "anonymous_access_not_allowed"})
 			granted_scope.add("anonymous")
 
+		max_age = (max_age and asab.utils.convert_to_seconds(max_age)) or client_dict.get("default_max_age")
+
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
+			authn_age = (datetime.datetime.now(datetime.UTC) - root_session.Authentication.AuthnTime).total_seconds()
 			if prompt == "login":
-				# Delete current session and redirect to login
+				# Log the user out and redirect to login
+				L.log(asab.LOG_NOTICE, "Login prompt requested by client.", struct_data={
+					"sid": root_session.SessionId,
+					"client_id": client_id,
+				})
 				await self.SessionService.delete(root_session.SessionId)
-				L.log(asab.LOG_NOTICE, "Login prompt requested by client", struct_data={"client_id": client_id})
+
 				return await self.reply_with_redirect_to_login(
 					scope=requested_scope,
 					client_id=client_id,
@@ -383,11 +393,36 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
-					**kwargs)
+					**kwargs
+				)
+
+			elif max_age is not None and authn_age > max_age:
+				# Log the user out and redirect to login
+				L.log(asab.LOG_NOTICE, "Authentication age exceeds requested max_age.", struct_data={
+					"sid": root_session.SessionId,
+					"client_id": client_id,
+					"authn_age": authn_age,
+					"max_authn_age": max_age,
+				})
+				await self.SessionService.delete(root_session.SessionId)
+
+				return await self.reply_with_redirect_to_login(
+					scope=requested_scope,
+					client_id=client_id,
+					redirect_uri=redirect_uri,
+					state=state,
+					nonce=nonce,
+					code_challenge=code_challenge,
+					code_challenge_method=code_challenge_method,
+					**kwargs
+				)
+
 			elif prompt == "select_account":
-				# Redirect to login without deleting current session
-				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client", struct_data={
-					"client_id": client_id})
+				# Redirect to login without logging out
+				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client.", struct_data={
+					"sid": root_session.SessionId,
+					"client_id": client_id,
+				})
 				return await self.reply_with_redirect_to_login(
 					scope=requested_scope,
 					client_id=client_id,
@@ -396,7 +431,8 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
-					**kwargs)
+					**kwargs
+				)
 
 		elif allow_anonymous:
 			# Create anonymous session or redirect to login if requested
