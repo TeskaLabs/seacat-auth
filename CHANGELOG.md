@@ -3,7 +3,11 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha2
 - v25.13-alpha1
+
+### Features
+- Client credentials provider (#462, v25.13-alpha2)
 
 ### Refactoring
 - Common method for converting credentials ID to inner database ID (#461, v25.13-alpha1)

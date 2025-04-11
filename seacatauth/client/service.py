@@ -126,7 +126,7 @@ class ClientService(asab.Service):
 			yield self._normalize_client(client)
 
 
-	async def count(self, query_filter: dict = None):
+	async def count(self, query_filter: str = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
