@@ -1,36 +1,8 @@
+from ..models.const import OAuth2
+
+
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 # TODO: Supported OAuth/OIDC param values should be managed by the OpenIdConnect module, not Client.
-GRANT_TYPES = [
-	"authorization_code",
-	# "implicit",
-	# "refresh_token"
-]
-
-RESPONSE_TYPES = [
-	"code",
-	# "id_token",
-	# "token"
-]
-
-APPLICATION_TYPES = [
-	"web",
-	# "native"
-]
-
-TOKEN_ENDPOINT_AUTH_METHODS = [
-	"none",
-	"client_secret_basic",
-	"client_secret_post",
-	# "client_secret_jwt",
-	# "private_key_jwt"
-]
-
-REDIRECT_URI_VALIDATION_METHODS = [
-	"full_match",
-	"prefix_match",
-	"none",
-]
-
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
 	"preferred_client_id": {
@@ -77,7 +49,7 @@ CLIENT_METADATA_SCHEMA = {
 	"application_type": {
 		"type": "string",
 		"description": "Kind of the application. The default, if omitted, is `web`.",
-		"enum": APPLICATION_TYPES
+		"enum": [str(v) for v in OAuth2.ApplicationType]
 	},
 	"response_types": {
 		"type": "array",
@@ -87,7 +59,7 @@ CLIENT_METADATA_SCHEMA = {
 			"If omitted, the default is that the Client will use only the `code` Response Type.",
 		"items": {
 			"type": "string",
-			"enum": RESPONSE_TYPES
+			"enum": [str(v) for v in OAuth2.ResponseType]
 		}
 	},
 	"grant_types": {
@@ -98,7 +70,7 @@ CLIENT_METADATA_SCHEMA = {
 			"If omitted, the default is that the Client will use only the `authorization_code` Grant Type.",
 		"items": {
 			"type": "string",
-			"enum": GRANT_TYPES
+			"enum": [str(v) for v in OAuth2.GrantType]
 		}
 	},
 	# "logo_uri": {},  # Can have language tags
@@ -122,7 +94,7 @@ CLIENT_METADATA_SCHEMA = {
 		"description":
 			"Requested Client Authentication method for the Token Endpoint. "
 			"If omitted, the default is `none`.",
-		"enum": TOKEN_ENDPOINT_AUTH_METHODS
+		"enum": [str(v) for v in OAuth2.TokenEndpointAuthMethod]
 	},
 	# "token_endpoint_auth_signing_alg": {},
 	"default_max_age": {
@@ -173,7 +145,7 @@ CLIENT_METADATA_SCHEMA = {
 			"Specifies the method how the redirect URI used in authorization requests is validated. "
 			"The default value is 'full_match', in which the requested redirect URI must fully match "
 			"one of the registered URIs.",
-		"enum": REDIRECT_URI_VALIDATION_METHODS
+		"enum": [str(v) for v in OAuth2.RedirectUriValidationMethod]
 	},
 }
 
