@@ -147,6 +147,10 @@ CLIENT_METADATA_SCHEMA = {
 			"one of the registered URIs.",
 		"enum": [str(v) for v in OAuth2.RedirectUriValidationMethod]
 	},
+	"seacatauth_credentials": {  # NON-CANONICAL
+		"type": "boolean",
+		"description": "Whether to create client credentials for this client and enable access control.",
+	},
 }
 
 REGISTER_CLIENT = {

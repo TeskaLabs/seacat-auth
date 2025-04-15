@@ -1,5 +1,4 @@
 import logging
-import re
 import typing
 import asab.storage.exceptions
 
@@ -51,18 +50,21 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		except KeyError:
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 
-		return self._normalize_credentials(client)
+		if client.get("seacatauth_credentials", False) is False:
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		return self._normalize_credentials(client, include)
 
 
 	async def count(self, filtr: str = None) -> int:
 		client_service = self.App.get_service("seacatauth.ClientService")
-		return await client_service.count(query_filter=filtr)
+		return await client_service.count(query_filter=self._build_filter(filtr))
 
 
 	async def search(self, filter: str = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
 		client_service = self.App.get_service("seacatauth.ClientService")
 		data = []
-		async for client in client_service.iterate(page, limit, filter):
+		async for client in client_service.iterate(page, limit, self._build_filter(filter)):
 			data.append(self._normalize_credentials(client))
 		return data
 
@@ -72,25 +74,30 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		async for credentials in client_service.iterate(
 			page=offset // limit if limit else 0,
 			limit=limit,
-			query_filter=filtr
+			query_filter=self._build_filter(filtr),
 		):
 			yield self._normalize_credentials(credentials)
 
 
 	def _build_filter(self, id_filter: str) -> dict:
+		client_service = self.App.get_service("seacatauth.ClientService")
 		if id_filter:
-			return {
-				"_id": re.compile("^{}".format(re.escape(id_filter)))
-			}
+			return {"$and": [
+				{"seacatauth_credentials": True},
+				client_service.build_filter(filter),
+			]}
 		else:
-			return {}
+			return {"seacatauth_credentials": True}
 
 
 	def _normalize_credentials(self, db_obj, include=None) -> dict:
 		return {
 			"_id": self._format_credentials_id(db_obj["_id"]),
 			"_type": self.Type,
-			"_provider_id": self.ProviderID,
+			"_c": db_obj["_c"],
+			"_m": db_obj["_m"],
+			"_v": db_obj["_v"],
 			"client_id": db_obj["_id"],
 			"label": db_obj["client_name"] or db_obj["_id"],
+			"username": db_obj["_id"],  # TODO: Temporary fallback for the UI
 		}

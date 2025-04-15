@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha5
 - v25.13-alpha4
 - v25.13-alpha3
 - v25.13-alpha2
@@ -12,6 +13,7 @@
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
 
 ### Features
+- Only clients with `seacatauth_credentials: True` have credentials API (#467, v25.13-alpha5)
 - Implement max_age authorization parameter (#458, v25.13-alpha3)
 - Client credentials provider (#462, v25.13-alpha2)
 

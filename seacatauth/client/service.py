@@ -98,7 +98,7 @@ class ClientService(asab.Service):
 		)
 
 
-	def build_filter(self, match_string):
+	def build_filter(self, match_string: str) -> dict:
 		return {"$or": [
 			{"_id": re.compile("^{}".format(re.escape(match_string)))},
 			{"client_name": re.compile(re.escape(match_string), re.IGNORECASE)},
@@ -109,14 +109,14 @@ class ClientService(asab.Service):
 		self,
 		page: int = 0,
 		limit: int = None,
-		query_filter: str = None,
+		query_filter: typing.Optional[str | typing.Dict] = None,
 		sort_by: typing.Optional[typing.List[tuple]] = None
 	):
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
 			query_filter = {}
-		else:
+		elif isinstance(query_filter, str):
 			query_filter = self.build_filter(query_filter)
 		cursor = collection.find(query_filter)
 
@@ -140,11 +140,11 @@ class ClientService(asab.Service):
 			yield self._normalize_client(client)
 
 
-	async def count(self, query_filter: str = None):
+	async def count(self, query_filter: typing.Optional[str | typing.Dict] = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
-		else:
+		elif isinstance(query_filter, str):
 			query_filter = self.build_filter(query_filter)
 		return await collection.count_documents(query_filter)
 
