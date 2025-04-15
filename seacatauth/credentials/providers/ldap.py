@@ -64,6 +64,10 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		# "hard"   - Same as "demand"
 		"tls_require_cert": "never",
 
+		# Path to client certificate and key files in PEM format
+		"tls_certfile": "",
+		"tls_keyfile": "",
+
 		"tls_protocol_min": "",
 		"tls_protocol_max": "",
 		"tls_cipher_suite": "",
@@ -457,11 +461,11 @@ def _prepare_attributes(config: typing.Mapping) -> list:
 def _enable_tls(ldap_client, config: typing.Mapping):
 	tls_cafile = config["tls_cafile"]
 
-	# Add certificate authority
+	# Add server certificate authority
 	if len(tls_cafile) > 0:
 		ldap_client.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
 
-	# Set cert policy
+	# Set server certificate policy
 	if config["tls_require_cert"] == "never":
 		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
 	elif config["tls_require_cert"] == "demand":
@@ -475,6 +479,15 @@ def _enable_tls(ldap_client, config: typing.Mapping):
 			config["tls_require_cert"]
 		))
 		ldap_client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
+
+	# Add client certificate and key
+	tls_keyfile = config["tls_keyfile"]
+	tls_certfile = config["tls_certfile"]
+	if (tls_certfile == "") != (tls_keyfile == ""):
+		raise ValueError("'tls_keyfile' and 'tls_certfile' must be both set or both empty.")
+	if tls_certfile != "":
+		ldap_client.set_option(ldap.OPT_X_TLS_KEYFILE, tls_keyfile)
+		ldap_client.set_option(ldap.OPT_X_TLS_CERTFILE, tls_certfile)
 
 	# Misc TLS options
 	tls_protocol_min = config["tls_protocol_min"]
