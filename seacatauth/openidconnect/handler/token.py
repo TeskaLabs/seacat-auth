@@ -16,6 +16,7 @@ from ..utils import TokenRequestErrorResponseCode
 from ... import exceptions, AuditLogger
 from ... import generic
 from . import schema
+from ...models import const
 
 
 L = logging.getLogger(__name__)
@@ -95,9 +96,9 @@ class TokenHandler(object):
 
 		# 3.1.3.2.  Token Request Validation
 		grant_type = form_data.get("grant_type")
-		if grant_type == "authorization_code":
+		if grant_type == const.OAuth2.GrantType.AUTHORIZATION_CODE:
 			return await self._authorization_code_grant(request, from_ip)
-		elif grant_type == "refresh_token":
+		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
 			return await self._refresh_token_grant(request, from_ip)
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
@@ -125,7 +126,7 @@ class TokenHandler(object):
 				"Token request denied: Invalid or expired authorization code.",
 				struct_data={
 					"from_ip": from_ip,
-					"grant_type": "authorization_code",
+					"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
 				}
@@ -138,7 +139,7 @@ class TokenHandler(object):
 				"Token request denied: Code challenge failed.",
 				struct_data={
 					"from_ip": from_ip,
-					"grant_type": "authorization_code",
+					"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
 				}
@@ -148,7 +149,7 @@ class TokenHandler(object):
 		except exceptions.ClientAuthenticationError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client ({}).".format(e), struct_data={
 				"from_ip": from_ip,
-				"grant_type": "authorization_code",
+				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 				"client_id": e.ClientID,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
@@ -157,7 +158,7 @@ class TokenHandler(object):
 		except exceptions.URLValidationError:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Redirect URI mismatch.", struct_data={
 				"from_ip": from_ip,
-				"grant_type": "authorization_code",
+				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 				"client_id": client_id,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
@@ -171,7 +172,7 @@ class TokenHandler(object):
 			"cid": session.Credentials.Id,
 			"sid": session.Id,
 			"client_id": session.OAuth2.ClientId,
-			"grant_type": "authorization_code",
+			"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 			"from_ip": from_ip
 		})
 
@@ -214,7 +215,7 @@ class TokenHandler(object):
 				"Token request denied: Invalid or expired refresh token.",
 				struct_data={
 					"from_ip": from_ip,
-					"grant_type": "refresh_token",
+					"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 					"client_id": client_id,
 				}
 			)
@@ -223,7 +224,7 @@ class TokenHandler(object):
 		except exceptions.ClientAuthenticationError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client.", struct_data={
 				"from_ip": from_ip,
-				"grant_type": "refresh_token",
+				"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 				"client_id": e.ClientID,
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
@@ -239,7 +240,7 @@ class TokenHandler(object):
 			"cid": session.Credentials.Id,
 			"sid": session.Id,
 			"client_id": session.OAuth2.ClientId,
-			"grant_type": "refresh_token",
+			"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 			"from_ip": from_ip,
 		})
 

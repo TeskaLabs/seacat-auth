@@ -14,10 +14,24 @@ import asab.utils
 from .. import exceptions
 from .. import generic
 from ..events import EventTypes
+from ..models.const import OAuth2
 from . import schema
 
 
 L = logging.getLogger(__name__)
+
+
+CLIENT_DEFAULTS = {
+	# TODO: According to spec the default should be "CLIENT_SECRET_BASIC".
+	"token_endpoint_auth_method": OAuth2.TokenEndpointAuthMethod.NONE,
+	"response_types": [OAuth2.ResponseType.CODE],
+	"grant_types": [OAuth2.GrantType.AUTHORIZATION_CODE],
+	"application_type": OAuth2.ApplicationType.WEB,
+	"redirect_uri_validation_method": OAuth2.RedirectUriValidationMethod.FULL_MATCH,
+	"code_challenge_method": OAuth2.CodeChallengeMethod.NONE,
+}
+
+TIME_ATTRIBUTES = {"default_max_age", "session_expiration"}
 
 
 class ClientService(asab.Service):
@@ -135,54 +149,37 @@ class ClientService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def get(self, client_id: str):
+	async def get(self, client_id: str, normalize: bool = True):
 		"""
 		Get client metadata
-
-		@param client_id:
-		@return:
 		"""
 		# Try to get client from cache
 		client = self._get_from_cache(client_id)
 		if client:
-			return client
+			if normalize:
+				return self._normalize_client(client)
+			else:
+				return client
 
 		# Get from the database
 		client = await self.StorageService.get(self.ClientCollection, client_id)
-		client = self._normalize_client(client)
-
 		self._store_in_cache(client_id, client)
 
-		return client
+		if normalize:
+			return self._normalize_client(client)
+		else:
+			return client
 
 
 	async def register(
 		self, *,
-		redirect_uris: list,
 		_custom_client_id: str = None,
 		**kwargs
 	):
 		"""
 		Register a new OpenID Connect client
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientRegistration
-
-		:param redirect_uris: Array of Redirection URI values used by the Client.
-		:type redirect_uris: list
-		:param _custom_client_id: NON-CANONICAL. Request a specific ID for the client.
-		:type _custom_client_id: str
-		:return: Dict containing the issued client_id and client_secret.
 		"""
-		response_types = kwargs.get("response_types", {"code"})
-		for v in response_types:
-			assert v in schema.RESPONSE_TYPES
-
-		grant_types = kwargs.get("grant_types", {"authorization_code"})
-		for v in grant_types:
-			assert v in schema.GRANT_TYPES
-
-		application_type = kwargs.get("application_type", "web")
-		assert application_type in schema.APPLICATION_TYPES
-
 		if _custom_client_id is not None:
 			client_id = _custom_client_id
 			L.warning("Creating a client with custom ID.", struct_data={"client_id": client_id})
@@ -190,53 +187,25 @@ class ClientService(asab.Service):
 			client_id = secrets.token_urlsafe(self.ClientIdLength)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
 
-		# TODO: The default should be "client_secret_basic".
-		token_endpoint_auth_method = kwargs.get("token_endpoint_auth_method", "none")
-		assert token_endpoint_auth_method in schema.TOKEN_ENDPOINT_AUTH_METHODS
-		upsertor.set("token_endpoint_auth_method", token_endpoint_auth_method)
+		client_metadata = {**CLIENT_DEFAULTS, **kwargs}
+		self._check_redirect_uris(**client_metadata)
+		self._check_grant_types(**client_metadata)
 
-		self._check_redirect_uris(redirect_uris, application_type, grant_types)
-		upsertor.set("redirect_uris", list(redirect_uris))
-
-		self._check_grant_types(grant_types, response_types)
-		upsertor.set("grant_types", list(grant_types))
-		upsertor.set("response_types", list(response_types))
-
-		upsertor.set("application_type", application_type)
-
-		# Register allowed PKCE Code Challenge Methods
-		code_challenge_method = kwargs.get("code_challenge_method", "none")
-		self.OIDCService.PKCE.validate_code_challenge_method_registration(code_challenge_method)
-		upsertor.set("code_challenge_method", code_challenge_method)
-
-		redirect_uri_validation_method = kwargs.get("redirect_uri_validation_method", "full_match")
-		assert redirect_uri_validation_method in schema.REDIRECT_URI_VALIDATION_METHODS
-		upsertor.set("redirect_uri_validation_method", redirect_uri_validation_method)
-
-		session_expiration = kwargs.get("session_expiration")
-		if session_expiration is not None:
-			if isinstance(session_expiration, str):
-				session_expiration = asab.utils.convert_to_seconds(session_expiration)
-			upsertor.set("session_expiration", session_expiration)
-
-		default_max_age = kwargs.get("default_max_age")
-		if default_max_age:
-			if isinstance(default_max_age, str):
-				default_max_age = asab.utils.convert_to_seconds(default_max_age)
-			upsertor.set("default_max_age", default_max_age)
-
-		# Optional client metadata
-		for k in {
-			"client_name", "client_uri", "logout_uri",
-			"cookie_domain", "custom_data", "login_uri", "authorize_anonymous_users", "authorize_uri",
-			"cookie_webhook_uri", "cookie_entry_uri", "anonymous_cid",
-		}:
-			v = kwargs.get(k)
-			if v is not None and not (isinstance(v, str) and len(v) == 0):
-				upsertor.set(k, v)
+		for k in schema.CLIENT_METADATA_SCHEMA:
+			v = client_metadata.get(k)
+			if v is None or (isinstance(v, str) and len(v) == 0):
+				continue
+			if k in TIME_ATTRIBUTES:
+				try:
+					v = asab.utils.convert_to_seconds(v)
+				except ValueError as e:
+					raise asab.exceptions.ValidationError(
+						"{!r} must be either a number or a duration string.".format(k)) from e
+			upsertor.set(k, v)
 
 		try:
 			await upsertor.execute(event_type=EventTypes.CLIENT_REGISTERED)
+
 		except asab.storage.exceptions.DuplicateError:
 			raise asab.exceptions.Conflict(key="client_id", value=client_id)
 
@@ -266,42 +235,38 @@ class ClientService(asab.Service):
 
 
 	async def update(self, client_id: str, **kwargs):
-		client = await self.get(client_id)
+		client = await self.get(client_id, normalize=False)
 		assert_client_is_editable(client)
-		client_update = {}
-		for k, v in kwargs.items():
-			if k not in schema.CLIENT_METADATA_SCHEMA:
-				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
-			client_update[k] = v
+		client_update = {
+			k: v
+			for k, v in client.items()
+			if (
+				k in schema.CLIENT_METADATA_SCHEMA
+				and not k.startswith("_")
+			)
+		}
+		client_update.update(kwargs)
 
-		self._check_redirect_uris(
-			redirect_uris=client_update.get("redirect_uris", client["redirect_uris"]),
-			application_type=client_update.get("application_type", client["application_type"]),
-			grant_types=client_update.get("grant_types", client["grant_types"]),
-			client_uri=client_update.get("client_uri", client.get("client_uri")))
-
-		self._check_grant_types(
-			grant_types=client_update.get("grant_types", client["grant_types"]),
-			response_types=client_update.get("response_types", client["response_types"]))
+		self._check_redirect_uris(**client_update)
+		self._check_grant_types(**client_update)
 
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
-		# Register allowed PKCE Code Challenge Methods
-		if "code_challenge_method" in kwargs:
-			self.OIDCService.PKCE.validate_code_challenge_method_registration(kwargs["code_challenge_method"])
-
 		for k, v in client_update.items():
-			if v is None or (isinstance(v, str) and len(v) == 0):
-				upsertor.unset(k)
-			else:
-				if k in {"default_max_age", "session_expiration"} and isinstance(v, str):
-					try:
-						v = asab.utils.convert_to_seconds(v)
-					except ValueError as e:
-						raise asab.exceptions.ValidationError(
-							"{!r} must be either a number or a duration string.".format(k)) from e
+			if k not in schema.CLIENT_METADATA_SCHEMA:
+				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
 
-				upsertor.set(k, v)
+			if v is None or (isinstance(v, str) and len(v) == 0):
+				upsertor.unset(k,)
+				continue
+
+			if k in TIME_ATTRIBUTES:
+				try:
+					v = asab.utils.convert_to_seconds(v)
+				except ValueError as e:
+					raise asab.exceptions.ValidationError(
+						"{!r} must be either a number or a duration string.".format(k)) from e
+			upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
 		self._delete_from_cache(client_id)
@@ -385,7 +350,10 @@ class ClientService(asab.Service):
 		client_dict = await self.get(client_id)
 
 		# Check if used authentication method matches the pre-configured one
-		expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+		expected_auth_method = client_dict.get(
+			"token_endpoint_auth_method",
+			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
+		)
 		if auth_method != expected_auth_method:
 			raise exceptions.ClientAuthenticationError(
 				"Unexpected authentication method (expected {!r}, got {!r}).".format(
@@ -440,7 +408,12 @@ class ClientService(asab.Service):
 		return post_data.get("client_id"), post_data.get("client_secret")
 
 
-	def _check_grant_types(self, grant_types, response_types):
+	def _check_grant_types(
+		self,
+		grant_types,
+		response_types,
+		**kwargs
+	):
 		# https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 		# The following table lists the correspondence between response_type values that the Client will use
 		# and grant_type values that MUST be included in the registered grant_types list:
@@ -450,7 +423,7 @@ class ClientService(asab.Service):
 		# 	code id_token: authorization_code, implicit
 		# 	code token: authorization_code, implicit
 		# 	code token id_token: authorization_code, implicit
-		if "code" in response_types and "authorization_code" not in grant_types:
+		if OAuth2.ResponseType.CODE in response_types and OAuth2.GrantType.AUTHORIZATION_CODE not in grant_types:
 			raise asab.exceptions.ValidationError(
 				"Response type 'code' requires 'authorization_code' to be included in grant types")
 		if "id_token" in response_types and "implicit" not in grant_types:
@@ -462,7 +435,13 @@ class ClientService(asab.Service):
 
 
 	def _check_redirect_uris(
-		self, redirect_uris: list, application_type: str, grant_types: list, client_uri: str = None):
+		self,
+		redirect_uris: list,
+		application_type: str,
+		grant_types: list,
+		client_uri: str = None,
+		**kwargs
+	):
 		"""
 		Check if the redirect URIs can be registered for the given application type
 
@@ -555,6 +534,7 @@ class ClientService(asab.Service):
 
 
 	def _normalize_client(self, client: dict):
+		client = {**client}  # Do not modify the original client
 		client["client_id"] = client["_id"]
 		if client.get("managed_by"):
 			client["read_only"] = True
@@ -591,13 +571,14 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 
 
 def is_client_confidential(client: dict):
-	token_endpoint_auth_method = client.get("token_endpoint_auth_method", "none")
-	if token_endpoint_auth_method == "none":
-		return False
-	elif token_endpoint_auth_method in {"client_secret_basic", "client_secret_post"}:
-		return True
-	else:
+	token_endpoint_auth_method = client.get("token_endpoint_auth_method", OAuth2.TokenEndpointAuthMethod.NONE)
+	if token_endpoint_auth_method not in OAuth2.TokenEndpointAuthMethod:
 		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
+
+	if token_endpoint_auth_method == OAuth2.TokenEndpointAuthMethod.NONE:
+		return False
+	else:
+		return True
 
 
 def assert_client_is_editable(client: dict):
@@ -605,3 +586,34 @@ def assert_client_is_editable(client: dict):
 		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
 		raise exceptions.NotEditableError("Client is not editable.")
 	return True
+
+
+def _validate_client_attributes(client_dict: dict):
+	"""
+	Validate client attributes.
+	"""
+	for k, v in client_dict.items():
+		if k not in schema.CLIENT_METADATA_SCHEMA:
+			raise asab.exceptions.ValidationError("Unexpected attribute: {!r}".format(k))
+
+		if k == "grant_types":
+			for grant_type in v:
+				if grant_type not in OAuth2.GrantType:
+					raise asab.exceptions.ValidationError("Invalid grant_type: {!r}".format(grant_type))
+
+		elif k == "response_types":
+			for response_type in v:
+				if response_type not in OAuth2.ResponseType:
+					raise asab.exceptions.ValidationError("Invalid response_type: {!r}".format(response_type))
+
+		elif k == "application_type":
+			if v not in OAuth2.ApplicationType:
+				raise asab.exceptions.ValidationError("Invalid application_type: {!r}".format(v))
+
+		elif k == "token_endpoint_auth_method":
+			if v not in OAuth2.TokenEndpointAuthMethod:
+				raise asab.exceptions.ValidationError("Invalid token_endpoint_auth_method: {!r}".format(v))
+
+		elif k == "redirect_uri_validation_method":
+			if v not in OAuth2.RedirectUriValidationMethod:
+				raise asab.exceptions.ValidationError("Invalid redirect_uri_validation_method: {!r}".format(v))

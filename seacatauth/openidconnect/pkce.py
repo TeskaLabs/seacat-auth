@@ -4,6 +4,8 @@ import re
 import logging
 import asab.exceptions
 
+from ..models.const import OAuth2
+
 
 L = logging.getLogger(__name__)
 
@@ -36,7 +38,6 @@ class PKCE:
 	"""
 
 	CodeVerifierPattern = re.compile("^[A-Za-z0-9._~-]{43,128}$")
-	SupportedCodeChallengeMethods = frozenset(["none", "plain", "S256"])  # TODO: Configurable
 	DefaultCodeChallengeMethod = "plain"
 
 	@classmethod
@@ -44,7 +45,7 @@ class PKCE:
 		"""
 		Validate whether (any) client can register the requested methods
 		"""
-		if code_challenge_method not in cls.SupportedCodeChallengeMethods:
+		if code_challenge_method not in OAuth2.CodeChallengeMethod:
 			raise asab.exceptions.ValidationError(
 				"Unsupported Code Challenge Method: {!r}.".format(code_challenge_method))
 

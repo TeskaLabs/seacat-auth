@@ -4,6 +4,7 @@ import asab.web.auth
 import asab.web.tenant
 
 from .. import OpenIdConnectService
+from ...models.const import OAuth2
 
 
 L = logging.getLogger(__name__)
@@ -54,11 +55,11 @@ class DiscoveryHandler(object):
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenPath.lstrip("/")),
 			# TODO: The algorithm RS256 MUST be included.
 			#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
-			"id_token_signing_alg_values_supported": ["ES256"],
+			"id_token_signing_alg_values_supported": list(OAuth2.IdTokenSigningAlg),
 			"jwks_uri": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.JwksPath.lstrip("/")),
-			"response_types_supported": ["code"],
-			"subject_types_supported": ["public"],
+			"response_types_supported": list(OAuth2.ResponseType),
+			"subject_types_supported": list(OAuth2.SubjectType),
 
 			# RECOMMENDED
 			"userinfo_endpoint": "{}{}".format(
@@ -78,15 +79,15 @@ class DiscoveryHandler(object):
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.EndSessionPath),
 			"revocation_endpoint": "{}{}".format(
 				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.TokenRevokePath),
-			"grant_types_supported": ["authorization_code"],
-			"token_endpoint_auth_methods_supported": ["none"],
-			"prompt_values_supported": ["none", "login", "select_account"],
-			"claim_types_supported": ["normal"],
+			"grant_types_supported": list(OAuth2.GrantType),
+			"token_endpoint_auth_methods_supported": list(OAuth2.TokenEndpointAuthMethod),
+			"prompt_values_supported": list(OAuth2.Prompt),
+			"claim_types_supported": list(OAuth2.ClaimType),
 			"service_documentation": "https://docs.teskalabs.com/seacat-auth",
 			"ui_locales_supported": ["en-US", "cs-CZ"],
 
 			# PKCE
-			"code_challenge_methods_supported": ["plain", "S256"],
+			"code_challenge_methods_supported": list(OAuth2.CodeChallengeMethod),
 		}
 
 		return asab.web.rest.json_response(request, data)
