@@ -11,6 +11,7 @@ import asab.exceptions
 
 from .. import exceptions, AuditLogger
 from .. import generic
+from ..models.const import OAuth2
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
 
@@ -389,7 +390,7 @@ class CookieHandler(object):
 				request, {"error": TokenRequestErrorResponseCode.InvalidClient}, status=400)
 
 		grant_type = parameters.get("grant_type")
-		if grant_type != "authorization_code":
+		if grant_type != OAuth2.GrantType.AUTHORIZATION_CODE:
 			AuditLogger.log(
 				asab.LOG_NOTICE,
 				"Cookie request denied: Unsupported grant type",
