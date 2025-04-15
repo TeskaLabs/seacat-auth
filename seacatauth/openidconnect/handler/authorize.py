@@ -18,6 +18,7 @@ from ... import exceptions
 from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
 from ...last_activity import EventCode
+from ...models import const
 
 
 L = logging.getLogger(__name__)
@@ -266,7 +267,7 @@ class AuthorizeHandler(object):
 		self._validate_request_parameters(request_parameters)
 
 		# Authentication Code Flow
-		assert request_parameters["response_type"] == "code"
+		assert request_parameters["response_type"] == const.OAuth2.ResponseType.CODE
 		return await self.authorization_code_flow(request, **request_parameters)
 
 
@@ -294,16 +295,28 @@ class AuthorizeHandler(object):
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			client_dict = await self._validate_client_options(client_id, redirect_uri, response_type="code")
+			client_dict = await self._validate_client_options(
+				client_id,
+				redirect_uri,
+				response_type=const.OAuth2.ResponseType.CODE
+			)
 		except OAuthAuthorizeError as e:
 			e.State = state
 			e.RedirectUri = redirect_uri
 			raise e
 		except exceptions.ClientNotFoundError as e:
-			L.log(asab.LOG_NOTICE, "Client not found.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			L.log(
+				asab.LOG_NOTICE,
+				"Client not found.",
+				struct_data={"client_id": client_id, "redirect_uri": redirect_uri}
+			)
 			raise ClientIdError(client_id) from e
 		except exceptions.InvalidRedirectURI as e:
-			L.log(asab.LOG_NOTICE, "Invalid redirect URI.", struct_data={"client_id": client_id, "redirect_uri": redirect_uri})
+			L.log(
+				asab.LOG_NOTICE,
+				"Invalid redirect URI.",
+				struct_data={"client_id": client_id, "redirect_uri": redirect_uri}
+			)
 			raise RedirectUriError(redirect_uri, client_id) from e
 
 		# Extract request source
@@ -329,7 +342,8 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.InvalidRequest, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "code_challenge_error"})
+					struct_data={"reason": "code_challenge_error"}
+				)
 			except InvalidCodeChallengeError as e:
 				L.error("Invalid code challenge request: {}".format(e), struct_data={
 					"client_id": client_id, "method": code_challenge_method, "challenge": code_challenge})
@@ -337,7 +351,8 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.InvalidRequest, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "code_challenge_error"})
+					struct_data={"reason": "code_challenge_error"}
+				)
 		elif auth_token_type == "cookie" and code_challenge is not None:
 			L.error("Code challenge not supported for cookie authorization.", struct_data={
 				"client_id": client_id})
@@ -345,7 +360,8 @@ class AuthorizeHandler(object):
 				AuthErrorResponseCode.InvalidRequest, client_id,
 				redirect_uri=redirect_uri,
 				state=state,
-				struct_data={"reason": "code_challenge_error"})
+				struct_data={"reason": "code_challenge_error"}
+			)
 
 		# Only root sessions can be used to authorize client sessions
 		try:
@@ -377,7 +393,7 @@ class AuthorizeHandler(object):
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
 			authn_age = (datetime.datetime.now(datetime.UTC) - root_session.Authentication.AuthnTime).total_seconds()
-			if prompt == "login":
+			if prompt == const.OAuth2.Prompt.LOGIN:
 				# Log the user out and redirect to login
 				L.log(asab.LOG_NOTICE, "Login prompt requested by client.", struct_data={
 					"sid": root_session.SessionId,
@@ -417,7 +433,7 @@ class AuthorizeHandler(object):
 					**kwargs
 				)
 
-			elif prompt == "select_account":
+			elif prompt == const.OAuth2.Prompt.SELECT_ACCOUNT:
 				# Redirect to login without logging out
 				L.log(asab.LOG_NOTICE, "Account selection prompt requested by client.", struct_data={
 					"sid": root_session.SessionId,
@@ -436,7 +452,7 @@ class AuthorizeHandler(object):
 
 		elif allow_anonymous:
 			# Create anonymous session or redirect to login if requested
-			if prompt == "login" or prompt == "select_account":
+			if prompt in {const.OAuth2.Prompt.LOGIN, const.OAuth2.Prompt.SELECT_ACCOUNT}:
 				L.log(asab.LOG_NOTICE, "Account selection or login prompt requested by client", struct_data={
 					"client_id": client_id})
 				return await self.reply_with_redirect_to_login(
@@ -447,15 +463,17 @@ class AuthorizeHandler(object):
 					nonce=nonce,
 					code_challenge=code_challenge,
 					code_challenge_method=code_challenge_method,
-					**kwargs)
+					**kwargs
+				)
 
 		else:  # NOT authenticated and NOT allowing anonymous access
 			# Redirect to login unless prompt=none requested
-			if prompt == "none":
+			if prompt == const.OAuth2.Prompt.NONE:
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.LoginRequired, client_id,
 					redirect_uri=redirect_uri,
-					state=state)
+					state=state
+				)
 			L.log(asab.LOG_NOTICE, "Login required", struct_data={
 				"client_id": client_id})
 			return await self.reply_with_redirect_to_login(
@@ -466,7 +484,8 @@ class AuthorizeHandler(object):
 				nonce=nonce,
 				code_challenge=code_challenge,
 				code_challenge_method=code_challenge_method,
-				**kwargs)
+				**kwargs
+			)
 
 		# Here the request must be authenticated or anonymous access must be allowed
 		assert authenticated or allow_anonymous
@@ -483,7 +502,7 @@ class AuthorizeHandler(object):
 					"missing_factors": " ".join(factors_to_setup), "cid": root_session.Credentials.Id})
 				return await self.reply_with_factor_setup_redirect(
 					missing_factors=factors_to_setup,
-					response_type="code",
+					response_type=const.OAuth2.ResponseType.CODE,
 					scope=requested_scope,
 					client_id=client_id,
 					redirect_uri=redirect_uri,
@@ -552,7 +571,8 @@ class AuthorizeHandler(object):
 					AuthErrorResponseCode.AccessDenied, client_id,
 					redirect_uri=redirect_uri,
 					state=state,
-					struct_data={"reason": "credentials_not_found"})
+					struct_data={"reason": "credentials_not_found"}
+				)
 
 			# Get credentials' assigned tenants and resources
 			authz = await build_credentials_authz(
@@ -616,7 +636,8 @@ class AuthorizeHandler(object):
 			new_session, requested_scope, redirect_uri, state,
 			code_challenge=code_challenge,
 			code_challenge_method=code_challenge_method,
-			from_info=from_info)
+			from_info=from_info
+		)
 
 	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
 		"""
@@ -628,7 +649,8 @@ class AuthorizeHandler(object):
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_dict["_id"],
 				redirect_uri=redirect_uri,
-				struct_data={"reason": "cookie_entry_uri_not_configured"})
+				struct_data={"reason": "cookie_entry_uri_not_configured"}
+			)
 		else:
 			# TODO: More clever formatting (what if the cookie_entry_uri already has a query)
 			return "{}?{}".format(
@@ -636,7 +658,9 @@ class AuthorizeHandler(object):
 				urllib.parse.urlencode([
 					("client_id", client_dict["_id"]),  # TODO: Remove, this should be a client responsibility
 					("grant_type", "authorization_code"),  # TODO: Remove, this should be a client responsibility
-					("redirect_uri", redirect_uri)]))
+					("redirect_uri", redirect_uri)],
+				)
+			)
 
 
 	async def _validate_client_options(self, client_id, redirect_uri, response_type):
@@ -676,7 +700,8 @@ class AuthorizeHandler(object):
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidScope, client_id,
 					error_description="Scope cannot contain 'openid' and 'cookie' at the same time.",
-					struct_data={"scope": scope})
+					struct_data={"scope": scope}
+				)
 			return "openid"
 
 		elif "cookie" in scope:
@@ -687,7 +712,8 @@ class AuthorizeHandler(object):
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidScope, client_id,
 				error_description="Scope must contain 'openid' or 'cookie'.",
-				struct_data={"scope": scope})
+				struct_data={"scope": scope}
+			)
 
 	async def _get_factors_to_setup(self, session):
 		factors_to_setup = []
@@ -963,7 +989,8 @@ class AuthorizeHandler(object):
 				redirect_uri=request_parameters.get("redirect_uri"),
 				error_description="Missing or empty parameter {!r}.".format("client_id"),
 				state=state,
-				struct_data={"reason": "missing_query_parameter"})
+				struct_data={"reason": "missing_query_parameter"}
+			)
 
 		# NOTE: "redirect_uri" is required only by OIDC, not generic OAuth
 		redirect_uri = request_parameters.get("redirect_uri") or None
@@ -974,7 +1001,8 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				error_description="Missing or empty parameter {!r}.".format("redirect_uri"),
 				state=state,
-				struct_data={"reason": "missing_query_parameter"})
+				struct_data={"reason": "missing_query_parameter"}
+			)
 
 		response_type = request_parameters.get("response_type") or None
 		if response_type is None:
@@ -985,13 +1013,15 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				error_description="Missing or empty parameter {!r}.".format("response_type"),
 				state=state,
-				struct_data={"reason": "missing_query_parameter"})
-		elif response_type != "code":
+				struct_data={"reason": "missing_query_parameter"}
+			)
+		elif response_type not in const.OAuth2.ResponseType:
 			L.error("Unsupported response type.", struct_data=request_parameters)
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.UnsupportedResponseType, client_id,
 				redirect_uri=redirect_uri,
-				state=state)
+				state=state
+			)
 
 		# NOTE: "scope" is required only by OIDC, not generic OAuth
 		scope = request_parameters.get("scope") or None
@@ -1002,16 +1032,18 @@ class AuthorizeHandler(object):
 				redirect_uri=redirect_uri,
 				error_description="Missing or empty parameter {!r}.".format("scope"),
 				state=state,
-				struct_data={"reason": "missing_query_parameter"})
+				struct_data={"reason": "missing_query_parameter"}
+			)
 
 		prompt = request_parameters.get("prompt") or None
 		if prompt is not None:
 			# TODO: Prompt can be a list of multiple values (e.g. "prompt=select_account,consent")
-			if prompt not in frozenset(["none", "login", "select_account"]):
+			if prompt not in const.OAuth2.Prompt:
 				L.error("Unsupported prompt.", struct_data={"prompt": prompt})
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidRequest, client_id,
 					error_description="Invalid prompt value: {}".format(prompt),
 					redirect_uri=redirect_uri,
-					state=state)
+					state=state
+				)
 			L.info("Prompt {!r} requested.".format(prompt))
