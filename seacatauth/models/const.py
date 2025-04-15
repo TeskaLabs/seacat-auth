@@ -42,7 +42,7 @@ class OAuth2:
 
 	class GrantType(enum.StrEnum):
 		AUTHORIZATION_CODE = "authorization_code"
-		CLIENT_CREDENTIALS = "client_credentials"
+		# CLIENT_CREDENTIALS = "client_credentials"
 		# IMPLICIT = "implicit"
 		REFRESH_TOKEN = "refresh_token"
 
@@ -68,3 +68,26 @@ class OAuth2:
 		NONE = "none"
 		PLAIN = "plain"
 		S256 = "S256"
+
+
+	class IdTokenSigningAlg(enum.StrEnum):
+		ES256 = "ES256"
+
+
+	class SubjectType(enum.StrEnum):
+		PUBLIC = "public"
+		# pairwise = "pairwise"
+
+
+	class Prompt(enum.StrEnum):
+		NONE = "none"
+		LOGIN = "login"
+		SELECT_ACCOUNT = "select_account"
+		# CONSENT = "consent"
+		# CREATE = "create"
+
+
+	class ClaimType(enum.StrEnum):
+		NORMAL = "normal"
+		# aggregated = "aggregated"
+		# distributed = "distributed"
