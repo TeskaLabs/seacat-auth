@@ -657,7 +657,7 @@ class AuthorizeHandler(object):
 				cookie_entry_uri,
 				urllib.parse.urlencode([
 					("client_id", client_dict["_id"]),  # TODO: Remove, this should be a client responsibility
-					("grant_type", "authorization_code"),  # TODO: Remove, this should be a client responsibility
+					("grant_type", const.OAuth2.GrantType.AUTHORIZATION_CODE),  # TODO: Remove, this should be a client responsibility
 					("redirect_uri", redirect_uri)],
 				)
 			)

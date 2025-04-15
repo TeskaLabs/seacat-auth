@@ -172,10 +172,10 @@ UPDATE_CLIENT = {
 
 CLIENT_TEMPLATES = {
 	"Public web application": {
-		"application_type": "web",
-		"token_endpoint_auth_method": "none",
-		"grant_types": ["authorization_code"],
-		"response_types": ["code"]
+		"application_type": OAuth2.ApplicationType.WEB,
+		"token_endpoint_auth_method": OAuth2.TokenEndpointAuthMethod.NONE,
+		"grant_types": [OAuth2.GrantType.AUTHORIZATION_CODE],
+		"response_types": [OAuth2.ResponseType.CODE],
 	},
 	# "Public mobile application": {
 	# 	"application_type": "native",

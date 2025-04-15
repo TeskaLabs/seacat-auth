@@ -350,7 +350,10 @@ class ClientService(asab.Service):
 		client_dict = await self.get(client_id)
 
 		# Check if used authentication method matches the pre-configured one
-		expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
+		expected_auth_method = client_dict.get(
+			"token_endpoint_auth_method",
+			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
+		)
 		if auth_method != expected_auth_method:
 			raise exceptions.ClientAuthenticationError(
 				"Unexpected authentication method (expected {!r}, got {!r}).".format(
@@ -420,7 +423,7 @@ class ClientService(asab.Service):
 		# 	code id_token: authorization_code, implicit
 		# 	code token: authorization_code, implicit
 		# 	code token id_token: authorization_code, implicit
-		if "code" in response_types and "authorization_code" not in grant_types:
+		if OAuth2.ResponseType.CODE in response_types and OAuth2.GrantType.AUTHORIZATION_CODE not in grant_types:
 			raise asab.exceptions.ValidationError(
 				"Response type 'code' requires 'authorization_code' to be included in grant types")
 		if "id_token" in response_types and "implicit" not in grant_types:
@@ -568,13 +571,14 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 
 
 def is_client_confidential(client: dict):
-	token_endpoint_auth_method = client.get("token_endpoint_auth_method", "none")
-	if token_endpoint_auth_method == "none":
-		return False
-	elif token_endpoint_auth_method in {"client_secret_basic", "client_secret_post"}:
-		return True
-	else:
+	token_endpoint_auth_method = client.get("token_endpoint_auth_method", OAuth2.TokenEndpointAuthMethod.NONE)
+	if not token_endpoint_auth_method in OAuth2.TokenEndpointAuthMethod:
 		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
+
+	if token_endpoint_auth_method == OAuth2.TokenEndpointAuthMethod.NONE:
+		return False
+	else:
+		return True
 
 
 def assert_client_is_editable(client: dict):
