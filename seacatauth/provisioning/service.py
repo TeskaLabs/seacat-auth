@@ -160,7 +160,7 @@ class ProvisioningService(asab.Service):
 		update = {
 			k: v
 			for k, v in CLIENT_TEMPLATES["Public web application"].items()
-			if client is None or client.get(k) != v}
+		}
 
 		# Check if the client has the correct redirect URI
 		if client is None:
