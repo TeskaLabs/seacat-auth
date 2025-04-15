@@ -572,7 +572,7 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 
 def is_client_confidential(client: dict):
 	token_endpoint_auth_method = client.get("token_endpoint_auth_method", OAuth2.TokenEndpointAuthMethod.NONE)
-	if not token_endpoint_auth_method in OAuth2.TokenEndpointAuthMethod:
+	if token_endpoint_auth_method not in OAuth2.TokenEndpointAuthMethod:
 		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
 
 	if token_endpoint_auth_method == OAuth2.TokenEndpointAuthMethod.NONE:
