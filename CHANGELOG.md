@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha4
 - v25.13-alpha3
 - v25.13-alpha2
 - v25.13-alpha1
@@ -12,6 +13,7 @@
 - Client credentials provider (#462, v25.13-alpha2)
 
 ### Refactoring
+- Define and use OAuth2 constants (#465, v25.13-alpha4)
 - Common method for converting credentials ID to inner database ID (#461, v25.13-alpha1)
 
 ---
