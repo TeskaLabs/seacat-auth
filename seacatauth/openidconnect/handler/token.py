@@ -12,10 +12,12 @@ import asab.web.rest.json
 import asab.exceptions
 
 from .. import pkce
+from ..service import AccessToken
 from ..utils import TokenRequestErrorResponseCode
 from ... import exceptions, AuditLogger
 from ... import generic
 from . import schema
+from ...authz import build_credentials_authz
 from ...models import const
 
 
@@ -100,6 +102,8 @@ class TokenHandler(object):
 			return await self._authorization_code_grant(request, from_ip)
 		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
 			return await self._refresh_token_grant(request, from_ip)
+		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
+			return await self._client_credentials_grant(request, from_ip)
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
 				"from_ip": from_ip,
@@ -248,6 +252,74 @@ class TokenHandler(object):
 		scope = form_data.get("scope")
 
 		response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
+
+		headers = {
+			"Cache-Control": "no-store",
+			"Pragma": "no-cache",
+		}
+
+		return asab.web.rest.json_response(request, response_payload, headers=headers)
+
+
+	async def _client_credentials_grant(self, request, from_ip):
+		form_data = await request.post()
+		scope = form_data.get("scope").split(" ")
+		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
+			request, expected_client_id=None)
+
+		try:
+			tokens = await self.OpenIdConnectService.issue_tokens_for_client_credentials(
+				client_id=client_id,
+				scope=scope,
+			)
+
+		except exceptions.CredentialsNotFoundError:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Token request denied: Client does not have Seacat Auth credentials enabled.",
+				struct_data={
+					"from_ip": from_ip,
+					"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+					"client_id": client_id,
+				}
+			)
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
+
+		except exceptions.NoTenantsError:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client has no tenants.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+				"client_id": client_id,
+				"scope": " ".join(scope),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidScope)
+
+		except exceptions.AccessDeniedError:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized tenant access.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+				"client_id": client_id,
+				"scope": " ".join(scope),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidScope)
+
+		# Token request successful
+		session = tokens["session"]
+		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.SessionId,
+			"client_id": client_id,
+			"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+			"from_ip": from_ip,
+		})
+
+		response_payload = {
+			"token_type": "Bearer",
+			"scope": " ".join(session.OAuth2.Scope),
+			"access_token": tokens["access_token"],
+			"id_token": tokens["id_token"],
+			"expires_in": int((session.Session.Expiration - datetime.datetime.now(datetime.UTC)).total_seconds()),
+		}
 
 		headers = {
 			"Cache-Control": "no-store",

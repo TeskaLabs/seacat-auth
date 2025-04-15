@@ -7,16 +7,18 @@ import typing
 import asab
 import asab.web.rest
 import asab.exceptions
+import asab.contextvars
 import aiohttp.web
 import urllib.parse
 import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from .utils import TokenRequestErrorResponseCode
 from ..models.const import ResourceId
 from ..generic import update_url_query_params
-from ..models import Session
-from .. import exceptions
+from ..models import Session, const
+from .. import exceptions, AuditLogger, generic
 from . import pkce
 from ..authz import build_credentials_authz
 
@@ -211,7 +213,7 @@ class OpenIdConnectService(asab.Service):
 		redirect_uri=None,
 		tenants=None,
 		requested_expiration=None
-	):
+	) -> Session:
 		session_builders = await self.SessionService.build_client_session(
 			root_session,
 			client_id,
@@ -671,3 +673,96 @@ class OpenIdConnectService(asab.Service):
 		"""
 		token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
 		await self.TokenService.delete(token_bytes)
+
+
+	async def issue_tokens_for_client_credentials(
+		self,
+		client_id: str,
+		scope: list,
+		expires_in: float = AccessToken.Expiration
+	):
+		"""
+		Issue a new access token for a client using the Client Credentials flow.
+		"""
+		request = asab.contextvars.Request.get()
+		from_ip = generic.get_request_access_ips(request)
+
+		# Verify that the client has Seacat Auth credentials enabled
+		cred_provider = self.CredentialsService.Providers.get("seacatauth")
+		try:
+			credentials_id = await cred_provider.get_by_client_id(client_id)
+		except exceptions.CredentialsNotFoundError:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Token request denied: Client does not have Seacat Auth credentials enabled.",
+				struct_data={
+					"from_ip": from_ip,
+					"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+					"client_id": client_id,
+				}
+			)
+			raise exceptions.OAuth2TokenRequestError(
+				TokenRequestErrorResponseCode.InvalidClient
+			)
+
+		# Authorize access to tenants requested in scope
+		global_authz = await build_credentials_authz(
+			self.TenantService, self.RoleService, credentials_id)
+		has_access_to_all_tenants = self.RBACService.can_access_all_tenants(global_authz)
+		try:
+			authorized_tenant = await self.get_accessible_tenant_from_scope(
+				scope, credentials_id, has_access_to_all_tenants)
+
+		except exceptions.NoTenantsError:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client has no tenants.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+				"client_id": client_id,
+				"scope": " ".join(scope),
+			})
+			raise exceptions.OAuth2TokenRequestError(
+				TokenRequestErrorResponseCode.InvalidScope
+			)
+
+		except exceptions.AccessDeniedError:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized tenant access.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+				"client_id": client_id,
+				"scope": " ".join(scope),
+			})
+			raise exceptions.OAuth2TokenRequestError(
+				TokenRequestErrorResponseCode.InvalidScope
+			)
+
+		# Tenant authorization is okay
+		# TODO: Customizable resource authorization
+
+		# Create session
+		session = await self.create_oidc_session(
+			root_session=None,
+			client_id=client_id,
+			scope=scope,
+			tenants=[authorized_tenant] if authorized_tenant else None,
+			requested_expiration=expires_in,
+		)
+
+		# Everything is okay: Request granted
+		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
+			"cid": credentials_id,
+			"sid": session.SessionId,
+			"client_id": client_id,
+			"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+			"from_ip": from_ip,
+		})
+
+		# Generate new tokens
+		new_access_token = await self.create_access_token(
+			session, expires_at=session.Session.Expiration)
+		new_id_token = await self.issue_id_token(session, session.Session.Expiration)
+
+		return {
+			"access_token": new_access_token,
+			"id_token": new_id_token,
+			"session": session,
+		}
