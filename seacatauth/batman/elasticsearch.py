@@ -111,6 +111,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Tenant.unassigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
+		self.App.PubSub.subscribe("Credentials.updated!", self._on_authz_change)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 		self.App.PubSub.subscribe("Application.tick/10!", self._retry_sync)
 
@@ -134,7 +135,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _retry_sync(self, event_name):
-		if not self.RetrySyncAll or datetime.datetime.now(datetime.UTC) < self.RetrySyncAll:
+		if (self.RetrySyncAll is None) or (datetime.datetime.now(datetime.UTC) < self.RetrySyncAll):
 			return
 		self.RetrySyncAll = None
 		await self.full_sync()
@@ -320,7 +321,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
-			L.info("Cannot create user: No username", struct_data={"cid": cred["_id"]})
+			L.debug("Cannot create user: No username", struct_data={"cid": cred["_id"]})
 			return
 
 		if username in self.IgnoreUsernames:
