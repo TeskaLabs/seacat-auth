@@ -61,6 +61,7 @@ class GrafanaIntegration(asab.config.Configurable):
 		batman_svc.App.PubSub.subscribe("Role.assigned!", self._on_authz_change)
 		batman_svc.App.PubSub.subscribe("Role.unassigned!", self._on_authz_change)
 		batman_svc.App.PubSub.subscribe("Role.updated!", self._on_authz_change)
+		batman_svc.App.PubSub.subscribe("Credentials.updated!", self._on_authz_change)
 
 	async def _on_housekeeping(self, event_name):
 		await self.sync_all()
