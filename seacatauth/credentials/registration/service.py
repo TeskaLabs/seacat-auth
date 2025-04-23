@@ -267,6 +267,8 @@ class RegistrationService(asab.Service):
 			"cid": credentials["_id"],
 		})
 
+		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials["_id"])
+
 
 	async def complete_registration_with_existing_credentials(self, registration_code: str, credentials_id: str):
 		"""
