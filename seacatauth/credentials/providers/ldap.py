@@ -486,7 +486,7 @@ def _enable_tls(ldap_client, config: typing.Mapping):
 		ldap_client.set_option(ldap.OPT_X_TLS_KEYFILE, tls_keyfile)
 
 	tls_certfile = config["tls_certfile"]
-	if tls_certfile != "":		
+	if tls_certfile != "":
 		ldap_client.set_option(ldap.OPT_X_TLS_CERTFILE, tls_certfile)
 
 	# Misc TLS options
