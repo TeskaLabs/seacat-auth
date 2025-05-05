@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.16-alpha
 - v25.13-alpha6
 - v25.13-alpha5
 - v25.13-alpha4
@@ -12,6 +13,9 @@
 
 ### Breaking changes
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
+
+### Fix
+- Update Batman after successful credentials registration (#472, v25.16-alpha)
 
 ### Features
 - Support for `tls_certfile` and `tls_keyfile` in LDAP credentials provider (#468, v25.13-alpha6)
