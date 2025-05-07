@@ -7,6 +7,7 @@ import asab.web.rest
 
 from .. import exceptions, AuditLogger
 from ..last_activity import EventCode
+from ..models import Session
 from .utils import AuthOperation
 from .providers import create_provider, GenericOAuth2Login
 from .storage import ExternalLoginStateStorage, ExternalLoginAccountStorage
@@ -148,7 +149,7 @@ class ExternalLoginService(asab.Service):
 
 	async def finalize_login_with_external_account(
 		self,
-		session_context,
+		session_context: Session,
 		state: str,
 		from_ip: typing.Optional[list] = None,
 		**authorization_data: dict
@@ -243,7 +244,7 @@ class ExternalLoginService(asab.Service):
 
 	async def finalize_signup_with_external_account(
 		self,
-		session_context,
+		session_context: Session,
 		state: str,
 		from_ip: typing.Optional[list] = None,
 		**authorization_data: dict
@@ -316,7 +317,7 @@ class ExternalLoginService(asab.Service):
 
 	async def finalize_pairing_external_account(
 		self,
-		session_context,
+		session_context: Session,
 		state: str,
 		**authorization_data: dict
 	) -> str:

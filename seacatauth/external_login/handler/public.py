@@ -72,7 +72,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.noauth
+	@asab.web.auth.noauth  # Uses cookie authentication, expects logged-out user
 	async def login_with_external_account(self, request):
 		"""
 		Initialize login with external account.
@@ -97,7 +97,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.noauth
+	@asab.web.auth.noauth  # Uses cookie authentication, expects logged-out user
 	async def sign_up_with_external_account(self, request):
 		"""
 		Initialize sign up with external account.
@@ -123,7 +123,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.noauth
+	@asab.web.auth.noauth  # Uses cookie authentication, expects logged-out user
 	async def external_auth_callback(self, request):
 		"""
 		Finalize external account login, sign-up or pairing.
