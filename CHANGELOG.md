@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha7
 - v25.16-alpha
 - v25.13-alpha6
 - v25.13-alpha5
@@ -15,6 +16,7 @@
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
 
 ### Fix
+- Respond with HTTP 200 when new user is created but the password reset email fails (#477, v25.13-alpha7)
 - Update Batman after successful credentials registration (#472, v25.16-alpha)
 
 ### Features

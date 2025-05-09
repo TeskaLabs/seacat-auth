@@ -363,7 +363,7 @@ class CredentialsHandler(object):
 				password_reset_response["result"] = "ERROR"
 				password_reset_response["tech_err"] = "Failed to send password reset link."
 				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data, status=400)
+				return asab.web.rest.json_response(request, response_data)
 
 			password_reset_response["result"] = "OK"
 			response_data["password_reset"] = password_reset_response
