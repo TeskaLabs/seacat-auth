@@ -42,7 +42,7 @@ class OAuth2:
 
 	class GrantType(enum.StrEnum):
 		AUTHORIZATION_CODE = "authorization_code"
-		# CLIENT_CREDENTIALS = "client_credentials"
+		CLIENT_CREDENTIALS = "client_credentials"
 		# IMPLICIT = "implicit"
 		REFRESH_TOKEN = "refresh_token"
 
