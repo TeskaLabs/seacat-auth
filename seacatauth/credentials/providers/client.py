@@ -39,21 +39,12 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 
 
 	async def get(self, credentials_id, include=None) -> typing.Optional[dict]:
-		client_service = self.App.get_service("seacatauth.ClientService")
 		try:
 			client_id = self._format_object_id(credentials_id)
 		except ValueError:
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 
-		try:
-			client = await client_service.get(client_id)
-		except KeyError:
-			raise exceptions.CredentialsNotFoundError(credentials_id)
-
-		if client.get("seacatauth_credentials", False) is False:
-			raise exceptions.CredentialsNotFoundError(credentials_id)
-
-		return self._normalize_credentials(client, include)
+		return await self.get_by_client_id(client_id, include=include)
 
 
 	async def count(self, filtr: str = None) -> int:
@@ -77,6 +68,21 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 			query_filter=self._build_filter(filtr),
 		):
 			yield self._normalize_credentials(credentials)
+
+
+	async def get_by_client_id(self, client_id: str, include=None) -> dict:
+		client_service = self.App.get_service("seacatauth.ClientService")
+		credentials_id = self._format_credentials_id(client_id)
+		try:
+			client = await client_service.get(client_id)
+		except KeyError as e:
+			raise exceptions.CredentialsNotFoundError(credentials_id) from e
+
+		if client.get("seacatauth_credentials", False) is False:
+			L.error("Client does not have SeaCat Auth credentials enabled.", struct_data={"client_id": client_id})
+			raise exceptions.CredentialsNotFoundError(credentials_id)
+
+		return self._normalize_credentials(client, include)
 
 
 	def _build_filter(self, id_filter: str) -> dict:

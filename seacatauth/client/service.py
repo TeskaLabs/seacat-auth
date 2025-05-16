@@ -378,6 +378,67 @@ class ClientService(asab.Service):
 		return client_id
 
 
+	async def issue_tokens(
+		self,
+		client_id: str,
+		scope: str,
+		expires_in: str | float,
+		**kwargs
+	) -> dict:
+		"""
+		Issue a new token (API key) for a client
+
+		Args:
+			client_id: Client ID
+			scope: Token scope
+			expires_in: Token expiration time in seconds or a string representing a duration
+
+		Returns:
+			Dictionary with access_token, id_token, expires_at and scope
+		"""
+		try:
+			expires_in = asab.utils.convert_to_seconds(expires_in)
+		except ValueError as e:
+			raise asab.exceptions.ValidationError(
+				"'expires_in' must be either a number or a duration string.") from e
+
+		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+		tokens = await oidc_service.issue_tokens_for_client_credentials(
+			client_id=client_id,
+			scope=scope,
+			expires_in=expires_in,
+		)
+		session = tokens["session"]
+
+		token_response = {
+			"access_token": tokens["access_token"],
+			"id_token": tokens["id_token"],
+			"expires_at": session.Session.Expiration,
+			"scope": session.OAuth2.Scope,
+		}
+		return token_response
+
+
+	async def revoke_tokens(self, client_id: str, session_id: str):
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.CredentialsService")
+		session = await session_service.get(session_id)
+		assert session.Credentials.Id == credentials["_id"]
+		await session_service.delete(session_id)
+
+
+	async def revoke_all_tokens(self, client_id: str):
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.CredentialsService")
+		await session_service.delete_sessions_by_credentials_id(credentials["_id"])
+
+
+	async def _get_seacatauth_credentials(self, client_id: str):
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		cred_provider = credentials_service.Providers.get("seacatauth")
+		return await cred_provider.get_by_client_id(client_id)
+
+
 	def _get_credentials_from_authorization_header(
 		self, request
 	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:

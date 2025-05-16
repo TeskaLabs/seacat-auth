@@ -32,6 +32,9 @@ class ClientHandler(object):
 		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/client/{client_id}", self.update)
 		web_app.router.add_delete("/client/{client_id}", self.delete)
+		web_app.router.add_post("/client/{client_id}/token", self.issue_tokens)
+		web_app.router.add_delete("/client/{client_id}/token/{session_id}", self.revoke_tokens)
+		web_app.router.add_delete("/client/{client_id}/token", self.revoke_all_tokens)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -186,6 +189,47 @@ class ClientHandler(object):
 			request,
 			data={"result": "OK"},
 		)
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	@asab.web.rest.json_schema_handler(schema.ISSUE_TOKENS)
+	async def issue_tokens(self, request, *, json_data):
+		"""
+		Issue a new token (API key) for a client
+		"""
+		client_id = request.match_info["client_id"]
+		# TODO: Error handling
+		token_response = await self.ClientService.issue_tokens(client_id, **json_data)
+		return asab.web.rest.json_response(
+			request,
+			data=token_response,
+		)
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def revoke_tokens(self, request):
+		"""
+		Issue a new token (API key) for a client
+		"""
+		client_id = request.match_info["client_id"]
+		session_id = request.match_info["session_id"]
+		# TODO: Error handling
+		await self.ClientService.revoke_tokens(client_id, session_id)
+		return asab.web.rest.json_response(request, {"result": "OK"})
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def revoke_all_tokens(self, request):
+		"""
+		Issue a new token (API key) for a client
+		"""
+		client_id = request.match_info["client_id"]
+		# TODO: Error handling
+		await self.ClientService.revoke_all_tokens(client_id)
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	def _rest_normalize(self, client: dict):
