@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha9
 - v25.13-alpha8
 - v25.13-alpha7
 - v25.16-alpha
@@ -22,6 +23,7 @@
 - Update Batman after successful credentials registration (#472, v25.16-alpha)
 
 ### Features
+- Make ES role monitoring_user available via resource elasticsearch:monitoring (#478, v25.13-alpha9)
 - Support for `tls_certfile` and `tls_keyfile` in LDAP credentials provider (#468, v25.13-alpha6)
 - Only clients with `seacatauth_credentials: True` have credentials API (#467, v25.13-alpha5)
 - Implement max_age authorization parameter (#458, v25.13-alpha3)
