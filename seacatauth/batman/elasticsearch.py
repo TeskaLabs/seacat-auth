@@ -46,6 +46,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		# IDs of Elasticsearch resources
 		"elasticsearch_superuser_resource_id": ResourceId.SUPERUSER,  # Superuser access to the entire Elasticsearch cluster
+
+		"elasticsearch_monitoring_resource_id": "elasticsearch:monitoring"
 	}
 
 
@@ -83,6 +85,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		self.TenantIndices = re.split(r"\s+", self.Config.get("tenant_indices"))
 		self.ElasticsearchSuperuserResourceId = self.Config.get("elasticsearch_superuser_resource_id")
+		self.MonitoringResourceId = self.Config.get("elasticsearch_monitoring_resource_id")
 
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
@@ -279,7 +282,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			self.ElasticsearchSuperuserResourceId:
 				"Grants full access to cluster management and data indices. This role also grants direct read-only "
 				"access to restricted indices like .security. A user with the superuser role can impersonate "
-				"any other user in the system."
+				"any other user in the system.",
+			self.MonitoringResourceId:
+				"Grants access to Elasticsearch Stack monitoring via Elasticsearch role 'monitoring_user'.",
 		}
 		if self.Kibana.is_enabled():
 			resources.update(self.Kibana.get_kibana_resources())
@@ -353,9 +358,12 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		for tenant_id, authorized_resources in authz.items():
 			if tenant_id == "*":
 				# Seacat superuser is mapped to Elasticsearch "superuser" role
-				if ResourceId.SUPERUSER in authorized_resources:
+				if self.ElasticsearchSuperuserResourceId in authorized_resources:
 					elk_roles.add("superuser")
 				continue
+
+			if self.MonitoringResourceId in authorized_resources:
+				elk_roles.add("monitoring_user")
 			elk_roles.add(get_index_access_role_name(tenant_id, "read"))
 
 		# Add roles with Kibana space privileges
