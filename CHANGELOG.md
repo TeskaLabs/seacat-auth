@@ -3,6 +3,10 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha8
+- v25.13-alpha7
+- v25.16-alpha
+- v25.13-alpha6
 - v25.13-alpha5
 - v25.13-alpha4
 - v25.13-alpha3
@@ -12,7 +16,13 @@
 ### Breaking changes
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
 
+### Fix
+- Fix external login attribute error (#476, v25.13-alpha8)
+- Respond with HTTP 200 when new user is created but the password reset email fails (#477, v25.13-alpha7)
+- Update Batman after successful credentials registration (#472, v25.16-alpha)
+
 ### Features
+- Support for `tls_certfile` and `tls_keyfile` in LDAP credentials provider (#468, v25.13-alpha6)
 - Only clients with `seacatauth_credentials: True` have credentials API (#467, v25.13-alpha5)
 - Implement max_age authorization parameter (#458, v25.13-alpha3)
 - Client credentials provider (#462, v25.13-alpha2)

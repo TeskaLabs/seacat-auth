@@ -87,7 +87,7 @@ class CommunicationService(asab.Service):
 
 
 	async def password_reset(self, *, credentials, reset_url, new_user=False):
-		template_id = "new_user_password" if new_user else "password_reset"
+		template_id = "welcome_password_reset" if new_user else "password_reset"
 		success = []
 		channels = ["email", "sms"]
 		for channel in channels:
