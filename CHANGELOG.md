@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha12
 - v25.13-alpha11
 - ~~v25.13-alpha10~~
 - v25.13-alpha9
@@ -20,6 +21,7 @@
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
 
 ### Fix
+- Fix attribute error in webauthn error log (#481, v25.13-alpha12)
 - Fix Dockerfile with venv (#480, v25.13-alpha11)
 - Fix external login attribute error (#476, v25.13-alpha8)
 - Respond with HTTP 200 when new user is created but the password reset email fails (#477, v25.13-alpha7)
