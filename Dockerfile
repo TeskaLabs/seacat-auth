@@ -1,4 +1,4 @@
-FROM alpine:3.18 AS stage1
+FROM alpine:3.21 AS stage1
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
@@ -49,7 +49,7 @@ RUN apk add --no-cache  \
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
-RUN cat /usr/lib/python3.11/site-packages/asab/__version__.py
+RUN cat /usr/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -60,14 +60,14 @@ COPY ./.git /app/seacat-auth/.git
 RUN asab-manifest.py ./MANIFEST.json
 
 
-FROM alpine:3.18
+FROM alpine:3.21
 
 RUN apk add --no-cache \
   python3 \
   openssl \
   openldap
 
-COPY --from=stage1 /usr/lib/python3.11/site-packages /usr/lib/python3.11/site-packages
+COPY --from=stage1 /usr/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
