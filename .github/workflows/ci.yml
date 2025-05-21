@@ -58,7 +58,7 @@ jobs:
         pip install bson
         pip install pymongo
         pip install bcrypt
-        pip install argon2
+        pip install argon2-cffi
         pip install jwcrypto
         pip install "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
     
