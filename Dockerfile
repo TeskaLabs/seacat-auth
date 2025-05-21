@@ -27,6 +27,8 @@ RUN apk add --no-cache  \
     openldap-dev \
     rust \
     cargo \
+&& python3 -m venv /venv \
+&& . /venv/bin/activate \
 && pip3 install --upgrade pip \
 && pip3 install --no-cache-dir \
     aiohttp \
@@ -49,7 +51,7 @@ RUN apk add --no-cache  \
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
-RUN cat /usr/lib/python3.12/site-packages/asab/__version__.py
+RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -57,7 +59,7 @@ WORKDIR /app/seacat-auth
 # Create MANIFEST.json in the working directory
 # The manifest script requires git to be installed
 COPY ./.git /app/seacat-auth/.git
-RUN asab-manifest.py ./MANIFEST.json
+RUN /venv/bin/asab-manifest.py ./MANIFEST.json
 
 
 FROM alpine:3.21
@@ -67,7 +69,8 @@ RUN apk add --no-cache \
   openssl \
   openldap
 
-COPY --from=stage1 /usr/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
+COPY --from=stage1 /venv /venv
+ENV PATH="/venv/bin:$PATH"
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
