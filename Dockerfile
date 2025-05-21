@@ -1,4 +1,5 @@
-FROM alpine:3.21 AS stage1
+# ---- Build stage ----
+FROM alpine:3.21 AS builder
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
@@ -27,8 +28,9 @@ RUN apk add --no-cache  \
     openldap-dev \
     rust \
     cargo \
-&& pip3 install --upgrade pip \
-&& pip3 install --no-cache-dir \
+&& python3 -m venv /venv \
+&& /venv/bin/pip3 install --upgrade pip \
+&& /venv/bin/pip3 install --no-cache-dir \
     aiohttp \
     aiosmtplib \
     motor \
@@ -49,7 +51,7 @@ RUN apk add --no-cache  \
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
-RUN cat /usr/lib/python3.12/site-packages/asab/__version__.py
+RUN /venv/bin/python -c "import asab; print(asab.__version__)"
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -57,9 +59,10 @@ WORKDIR /app/seacat-auth
 # Create MANIFEST.json in the working directory
 # The manifest script requires git to be installed
 COPY ./.git /app/seacat-auth/.git
-RUN asab-manifest.py ./MANIFEST.json
+RUN /venv/bin/asab-manifest.py ./MANIFEST.json
 
 
+# ---- Runtime stage ----
 FROM alpine:3.21
 
 RUN apk add --no-cache \
@@ -67,12 +70,13 @@ RUN apk add --no-cache \
   openssl \
   openldap
 
-COPY --from=stage1 /usr/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
+COPY --from=builder /venv /venv
+ENV PATH="/venv/bin:$PATH"
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
 COPY ./CHANGELOG.md          /app/seacat-auth/CHANGELOG.md
-COPY --from=stage1 /app/seacat-auth/MANIFEST.json /app/seacat-auth/MANIFEST.json
+COPY --from=builder /app/seacat-auth/MANIFEST.json /app/seacat-auth/MANIFEST.json
 
 COPY ./etc/message_templates /app/seacat-auth/etc/message_templates
 
