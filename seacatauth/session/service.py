@@ -183,7 +183,7 @@ class SessionService(asab.Service):
 		self,
 		session_type: str,
 		parent_session_id: bson.ObjectId = None,
-		expiration: float = None,
+		expiration: float | datetime.datetime = None,
 		session_builders: list = None
 	):
 		upsertor = self.StorageService.upsertor(self.SessionCollection)
@@ -196,15 +196,19 @@ class SessionService(asab.Service):
 		if parent_session_id is not None:
 			upsertor.set(Session.FN.Session.ParentSessionId, parent_session_id)
 
-		# Set up expiration variables
-		if expiration is not None:
-			expiration = datetime.timedelta(seconds=expiration)
-			if expiration > self.MaximumAge:
-				# TODO: Cut the expiration or raise error
-				L.warning("Session expiration exceeds maximum session age.")
-		else:
+		if expiration is None:
 			expiration = self.Expiration
-		expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+			expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+		elif isinstance(expiration, datetime.datetime):
+			expires = expiration
+			expiration = expires - datetime.datetime.now(datetime.timezone.utc)
+		else:
+			expiration = datetime.timedelta(seconds=expiration)
+			expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+
+		if expiration > self.MaximumAge:
+			# TODO: Cut the expiration or raise error
+			L.warning("Session expiration exceeds maximum session age.")
 		max_expiration = datetime.datetime.now(datetime.timezone.utc) + self.MaximumAge
 		if self.TouchExtensionSeconds is not None:
 			touch_extension_seconds = self.TouchExtensionSeconds

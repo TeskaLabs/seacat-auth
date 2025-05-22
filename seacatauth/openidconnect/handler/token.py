@@ -102,7 +102,7 @@ class TokenHandler(object):
 			return await self._authorization_code_grant(request, from_ip)
 		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
 			return await self._refresh_token_grant(request, from_ip)
-		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
+		elif grant_type == const.OAuth2.GrantType.CLIENT_CREDENTIALS:
 			return await self._client_credentials_grant(request, from_ip)
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
@@ -263,12 +263,24 @@ class TokenHandler(object):
 
 	async def _client_credentials_grant(self, request, from_ip):
 		form_data = await request.post()
-		scope = form_data.get("scope").split(" ")
+		if not "scope" in form_data:
+			AuditLogger.log(
+				asab.LOG_NOTICE,
+				"Token request denied: Missing scope parameter.",
+				struct_data={
+					"from_ip": from_ip,
+					"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
+					"client_id": form_data.get("client_id"),
+				}
+			)
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
+
+		scope = form_data["scope"].split(" ")
 		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
 			request, expected_client_id=None)
 
 		try:
-			tokens = await self.OpenIdConnectService.issue_tokens_for_client_credentials(
+			tokens = await self.OpenIdConnectService.issue_token_for_client_credentials(
 				client_id=client_id,
 				scope=scope,
 			)
@@ -317,7 +329,6 @@ class TokenHandler(object):
 			"token_type": "Bearer",
 			"scope": " ".join(session.OAuth2.Scope),
 			"access_token": tokens["access_token"],
-			"id_token": tokens["id_token"],
 			"expires_in": int((session.Session.Expiration - datetime.datetime.now(datetime.UTC)).total_seconds()),
 		}
 

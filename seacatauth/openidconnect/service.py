@@ -14,13 +14,16 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from .utils import TokenRequestErrorResponseCode
 from ..models.const import ResourceId
 from ..generic import update_url_query_params
 from ..models import Session, const
 from .. import exceptions, AuditLogger, generic
 from . import pkce
 from ..authz import build_credentials_authz
+from ..session.builders import (
+	credentials_session_builder,
+	authz_session_builder,
+)
 
 
 L = logging.getLogger(__name__)
@@ -675,22 +678,27 @@ class OpenIdConnectService(asab.Service):
 		await self.TokenService.delete(token_bytes)
 
 
-	async def issue_tokens_for_client_credentials(
+	async def issue_token_for_client_credentials(
 		self,
 		client_id: str,
 		scope: list,
-		expires_in: float = AccessToken.Expiration
+		expires_at: typing.Optional[datetime.datetime] = None,
 	):
 		"""
 		Issue a new access token for a client using the Client Credentials flow.
 		"""
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		tenant_service = self.App.get_service("seacatauth.TenantService")
+		role_service = self.App.get_service("seacatauth.RoleService")
+
 		request = asab.contextvars.Request.get()
 		from_ip = generic.get_request_access_ips(request)
 
 		# Verify that the client has Seacat Auth credentials enabled
-		cred_provider = self.CredentialsService.Providers.get("seacatauth")
+		cred_provider = self.CredentialsService.CredentialProviders.get("client")
 		try:
-			credentials_id = await cred_provider.get_by_client_id(client_id)
+			credentials = await cred_provider.get_by_client_id(client_id)
+			credentials_id = credentials["_id"]
 		except exceptions.CredentialsNotFoundError:
 			AuditLogger.log(
 				asab.LOG_NOTICE,
@@ -701,8 +709,9 @@ class OpenIdConnectService(asab.Service):
 					"client_id": client_id,
 				}
 			)
-			raise exceptions.OAuth2TokenRequestError(
-				TokenRequestErrorResponseCode.InvalidClient
+			raise exceptions.OAuth2InvalidClient(
+				"Client does not have seacat_credentials enabled.",
+				error_description="Client credentials flow is not allowed for this client.",
 			)
 
 		# Authorize access to tenants requested in scope
@@ -720,8 +729,9 @@ class OpenIdConnectService(asab.Service):
 				"client_id": client_id,
 				"scope": " ".join(scope),
 			})
-			raise exceptions.OAuth2TokenRequestError(
-				TokenRequestErrorResponseCode.InvalidScope
+			raise exceptions.OAuth2InvalidScope(
+				"Client has no tenants.",
+				error_description="Unauthorized tenant access.",
 			)
 
 		except exceptions.AccessDeniedError:
@@ -731,20 +741,33 @@ class OpenIdConnectService(asab.Service):
 				"client_id": client_id,
 				"scope": " ".join(scope),
 			})
-			raise exceptions.OAuth2TokenRequestError(
-				TokenRequestErrorResponseCode.InvalidScope
+			raise exceptions.OAuth2InvalidScope(
+				"Client does not have access to requested tenant.",
+				error_description="Unauthorized tenant access.",
 			)
 
-		# Tenant authorization is okay
-		# TODO: Customizable resource authorization
+		authn_time = datetime.datetime.now(datetime.timezone.utc)
 
 		# Create session
-		session = await self.create_oidc_session(
-			root_session=None,
-			client_id=client_id,
-			scope=scope,
-			tenants=[authorized_tenant] if authorized_tenant else None,
-			requested_expiration=expires_in,
+		session_builders = [
+			await credentials_session_builder(credentials_service, credentials_id, scope),
+			await authz_session_builder(
+				tenant_service=tenant_service,
+				role_service=role_service,
+				credentials_id=credentials_id,
+				tenants=[authorized_tenant],
+			),
+			[
+				(Session.FN.Authentication.AuthnTime, authn_time),
+				(Session.FN.OAuth2.ClientId, client_id),
+				(Session.FN.OAuth2.Scope, scope),
+			],
+		]
+		session = await self.SessionService.create_session(
+			session_type="openidconnect",
+			parent_session_id=None,
+			expiration=expires_at,
+			session_builders=session_builders,
 		)
 
 		# Everything is okay: Request granted
@@ -756,13 +779,11 @@ class OpenIdConnectService(asab.Service):
 			"from_ip": from_ip,
 		})
 
-		# Generate new tokens
+		# Generate new token
 		new_access_token = await self.create_access_token(
 			session, expires_at=session.Session.Expiration)
-		new_id_token = await self.issue_id_token(session, session.Session.Expiration)
 
 		return {
 			"access_token": new_access_token,
-			"id_token": new_id_token,
 			"session": session,
 		}
