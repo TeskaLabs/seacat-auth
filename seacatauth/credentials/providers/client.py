@@ -103,6 +103,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 			"_c": db_obj["_c"],
 			"_m": db_obj["_m"],
 			"_v": db_obj["_v"],
+			"_provider_id": self.ProviderID,
 			"client_id": db_obj["_id"],
 			"label": db_obj["client_name"] or db_obj["_id"],
 			"username": db_obj["_id"],  # TODO: Temporary fallback for the UI
