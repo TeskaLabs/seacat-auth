@@ -378,7 +378,7 @@ class ClientService(asab.Service):
 		return client_id
 
 
-	async def issue_tokens(
+	async def issue_token(
 		self,
 		client_id: str,
 		scope: list,
@@ -386,7 +386,7 @@ class ClientService(asab.Service):
 		**kwargs
 	) -> dict:
 		"""
-		Issue a new token set (API key) for a client
+		Issue a new access token (API key) for a client
 
 		Args:
 			client_id: Client ID
@@ -394,7 +394,7 @@ class ClientService(asab.Service):
 			expires_at: Token expiration datetime
 
 		Returns:
-			Dictionary with access_token, id_token, expires_at and scope
+			Dictionary with access_token, session_id, expires_at and scope
 		"""
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
 		tokens = await oidc_service.issue_tokens_for_client_credentials(
@@ -406,18 +406,19 @@ class ClientService(asab.Service):
 
 		token_response = {
 			"access_token": tokens["access_token"],
-			"id_token": tokens["id_token"],
+			"session_id": session.Session.Id,
 			"expires_at": session.Session.Expiration,
 			"scope": session.OAuth2.Scope,
 		}
 		return token_response
 
 
-	async def revoke_tokens(self, client_id: str, session_id: str):
+	async def revoke_token(self, client_id: str, session_id: str):
 		credentials = await self._get_seacatauth_credentials(client_id)
 		session_service = self.App.get_service("seacatauth.CredentialsService")
 		session = await session_service.get(session_id)
 		assert session.Credentials.Id == credentials["_id"]
+		assert session.OAuth2.ClientId == client_id
 		await session_service.delete(session_id)
 
 

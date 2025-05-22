@@ -196,7 +196,7 @@ class ClientHandler(object):
 	@asab.web.rest.json_schema_handler(schema.ISSUE_TOKENS)
 	async def issue_tokens(self, request, *, json_data):
 		"""
-		Issue a new set of access token and ID token for a client
+		Issue a new access token (API key) for a client
 		"""
 		client_id = request.match_info["client_id"]
 
@@ -206,7 +206,7 @@ class ClientHandler(object):
 			expires_at = None
 
 		# TODO: Error handling
-		token_response = await self.ClientService.issue_tokens(
+		token_response = await self.ClientService.issue_token(
 			client_id,
 			expires_at=expires_at,
 			scope=json_data.get("scope"),
@@ -219,14 +219,14 @@ class ClientHandler(object):
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
-	async def revoke_tokens(self, request):
+	async def revoke_token(self, request):
 		"""
-		Revoke client token by it's session_id
+		Revoke client access token (API key) by its session_id
 		"""
 		client_id = request.match_info["client_id"]
 		session_id = request.match_info["session_id"]
 		# TODO: Error handling
-		await self.ClientService.revoke_tokens(client_id, session_id)
+		await self.ClientService.revoke_token(client_id, session_id)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
