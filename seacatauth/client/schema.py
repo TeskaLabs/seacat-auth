@@ -189,14 +189,18 @@ CLIENT_TEMPLATES = {
 	"Custom": {},
 }
 
-ISSUE_TOKENS = {
+ISSUE_TOKEN = {
 	"type": "object",
 	"additionalProperties": False,
 	"required": ["scope"],
 	"properties": {
 		"scope": {
 			"type": "array",
-			"description": "Token authorization scopes separated by spaces.",
+			"description": "Token authorization scopes separated by spaces",
+		},
+		"label": {
+			"type": "string",
+			"description": "Token name",
 		},
 		"expiration": {
 			"oneOf": [{"type": "string"}, {"type": "number"}],

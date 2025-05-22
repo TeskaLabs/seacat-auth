@@ -683,6 +683,7 @@ class OpenIdConnectService(asab.Service):
 		client_id: str,
 		scope: list,
 		expires_at: typing.Optional[datetime.datetime] = None,
+		label: typing.Optional[str] = None,
 	):
 		"""
 		Issue a new access token for a client using the Client Credentials flow.
@@ -758,6 +759,7 @@ class OpenIdConnectService(asab.Service):
 				tenants=[authorized_tenant],
 			),
 			[
+				(Session.FN.Session.Label, label),
 				(Session.FN.Authentication.AuthnTime, authn_time),
 				(Session.FN.OAuth2.ClientId, client_id),
 				(Session.FN.OAuth2.Scope, scope),

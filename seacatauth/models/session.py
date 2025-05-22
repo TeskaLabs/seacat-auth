@@ -25,6 +25,7 @@ class SessionData:
 	MaxExpiration: datetime.datetime
 	ExpirationExtension: int
 	TrackId: typing.Optional[bytes]
+	Label: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -105,6 +106,7 @@ class Session:
 			Expiration = "s_exp"
 			MaxExpiration = "s_expm"
 			ExpirationExtension = "s_expe"
+			Label = "s_l"
 
 		class Credentials:
 			_prefix = "c"
@@ -344,6 +346,7 @@ class Session:
 			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
 			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),
 			TrackId=session_dict.pop(cls.FN.Session.TrackId, None),
+			Label=session_dict.pop(cls.FN.Session.Label, None),
 		)
 
 	@classmethod
@@ -479,6 +482,10 @@ def rest_get(session_dict):
 	impersonator_sid = session_dict.get(Session.FN.Authentication.ImpersonatorSessionId)
 	if impersonator_sid is not None:
 		data["impersonator_sid"] = impersonator_sid
+
+	label = session_dict.get(Session.FN.Session.Label)
+	if label is not None:
+		data["label"] = label
 
 	return data
 
