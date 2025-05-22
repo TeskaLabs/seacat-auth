@@ -188,3 +188,26 @@ CLIENT_TEMPLATES = {
 	# 	"response_types": ["code"]},
 	"Custom": {},
 }
+
+ISSUE_TOKEN = {
+	"type": "object",
+	"additionalProperties": False,
+	"required": ["scope"],
+	"properties": {
+		"scope": {
+			"type": "array",
+			"description": "Token authorization scopes separated by spaces",
+		},
+		"label": {
+			"type": "string",
+			"description": "Token name",
+		},
+		"expiration": {
+			"oneOf": [{"type": "string"}, {"type": "number"}],
+			"description":
+				"Token expiration time. The value can be either the number of seconds, "
+				"a time-unit duration string such as '4 h' or '3 d' "
+				"or an ISO 8601 datetime such as '2030-05-08' or '2030-05-08T23:41:54.000Z'.",
+		},
+	}
+}

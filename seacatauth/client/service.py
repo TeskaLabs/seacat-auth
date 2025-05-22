@@ -14,6 +14,7 @@ import asab.utils
 from .. import exceptions
 from .. import generic
 from ..events import EventTypes
+from ..models import Session
 from ..models.const import OAuth2
 from . import schema
 
@@ -376,6 +377,72 @@ class ClientService(asab.Service):
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
 		return client_id
+
+
+	async def issue_token(
+		self,
+		client_id: str,
+		scope: list,
+		expires_at: typing.Optional[datetime.datetime] = None,
+		label: typing.Optional[str] = None,
+		**kwargs
+	) -> dict:
+		"""
+		Issue a new access token (API key) for a client
+
+		Args:
+			client_id: Client ID
+			scope: Token scope
+			expires_at: Token expiration datetime
+
+		Returns:
+			Dictionary with access_token, session_id, expires_at and scope
+		"""
+		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+		tokens = await oidc_service.issue_token_for_client_credentials(
+			client_id=client_id,
+			scope=scope,
+			expires_at=expires_at,
+			label=label,
+		)
+		session = tokens["session"]
+
+		token_response = {
+			"access_token": tokens["access_token"],
+			"session_id": session.Session.Id,
+			"expires_at": session.Session.Expiration,
+			"scope": session.OAuth2.Scope,
+		}
+		return token_response
+
+
+	async def list_tokens(self, client_id: str):
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.SessionService")
+		return await session_service.list(query_filter={
+			Session.FN.Credentials.Id: credentials["_id"]
+		})
+
+
+	async def revoke_token(self, client_id: str, session_id: str):
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.SessionService")
+		session = await session_service.get(session_id)
+		assert session.Credentials.Id == credentials["_id"]
+		assert session.OAuth2.ClientId == client_id
+		await session_service.delete(session_id)
+
+
+	async def revoke_all_tokens(self, client_id: str):
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.SessionService")
+		await session_service.delete_sessions_by_credentials_id(credentials["_id"])
+
+
+	async def _get_seacatauth_credentials(self, client_id: str):
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		cred_provider = credentials_service.CredentialProviders.get("client")
+		return await cred_provider.get_by_client_id(client_id)
 
 
 	def _get_credentials_from_authorization_header(
