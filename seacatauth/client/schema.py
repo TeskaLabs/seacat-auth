@@ -195,14 +195,15 @@ ISSUE_TOKENS = {
 	"required": ["scope"],
 	"properties": {
 		"scope": {
-			"type": "string",
+			"type": "array",
 			"description": "Token authorization scopes separated by spaces.",
 		},
-		"expires_in": {
+		"expiration": {
 			"oneOf": [{"type": "string"}, {"type": "number"}],
 			"description":
-				"Token expiration time. The value can be either the number of seconds "
-				"or a time-unit string such as '4 h' or '3 d'."
+				"Token expiration time. The value can be either the number of seconds, "
+				"a time-unit duration string such as '4 h' or '3 d' "
+				"or an ISO 8601 datetime such as '2030-05-08' or '2030-05-08T23:41:54.000Z'.",
 		},
 	}
 }

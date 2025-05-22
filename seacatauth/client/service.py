@@ -381,32 +381,26 @@ class ClientService(asab.Service):
 	async def issue_tokens(
 		self,
 		client_id: str,
-		scope: str,
-		expires_in: str | float,
+		scope: list,
+		expires_at: typing.Optional[datetime.datetime] = None,
 		**kwargs
 	) -> dict:
 		"""
-		Issue a new token (API key) for a client
+		Issue a new token set (API key) for a client
 
 		Args:
 			client_id: Client ID
 			scope: Token scope
-			expires_in: Token expiration time in seconds or a string representing a duration
+			expires_at: Token expiration datetime
 
 		Returns:
 			Dictionary with access_token, id_token, expires_at and scope
 		"""
-		try:
-			expires_in = asab.utils.convert_to_seconds(expires_in)
-		except ValueError as e:
-			raise asab.exceptions.ValidationError(
-				"'expires_in' must be either a number or a duration string.") from e
-
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
 		tokens = await oidc_service.issue_tokens_for_client_credentials(
 			client_id=client_id,
 			scope=scope,
-			expires_in=expires_in,
+			expires_at=expires_at,
 		)
 		session = tokens["session"]
 
