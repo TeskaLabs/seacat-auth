@@ -32,8 +32,8 @@ class ClientHandler(object):
 		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/client/{client_id}", self.update)
 		web_app.router.add_delete("/client/{client_id}", self.delete)
-		web_app.router.add_post("/client/{client_id}/token", self.issue_tokens)
-		web_app.router.add_delete("/client/{client_id}/token/{session_id}", self.revoke_tokens)
+		web_app.router.add_post("/client/{client_id}/token", self.issue_token)
+		web_app.router.add_delete("/client/{client_id}/token/{session_id}", self.revoke_token)
 		web_app.router.add_delete("/client/{client_id}/token", self.revoke_all_tokens)
 
 
@@ -194,7 +194,7 @@ class ClientHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
 	@asab.web.rest.json_schema_handler(schema.ISSUE_TOKENS)
-	async def issue_tokens(self, request, *, json_data):
+	async def issue_token(self, request, *, json_data):
 		"""
 		Issue a new access token (API key) for a client
 		"""

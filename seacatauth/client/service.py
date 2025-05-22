@@ -397,7 +397,7 @@ class ClientService(asab.Service):
 			Dictionary with access_token, session_id, expires_at and scope
 		"""
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
-		tokens = await oidc_service.issue_tokens_for_client_credentials(
+		tokens = await oidc_service.issue_token_for_client_credentials(
 			client_id=client_id,
 			scope=scope,
 			expires_at=expires_at,
