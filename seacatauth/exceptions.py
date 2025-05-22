@@ -307,3 +307,37 @@ class CredentialsRegistrationError(SeacatAuthError):
 	):
 		self.Credentials: typing.Optional[str] = credentials
 		super().__init__(message, *args)
+
+
+class OAuth2Error(SeacatAuthError):
+	"""
+	OAuth2 request error
+	"""
+	def __init__(self, error_type: str, *args, error_description: str | None = None, **kwargs):
+		self.ErrorType = error_type  # Included in response
+		self.ErrorDescription = error_description  # Included in response
+		super().__init__(*args)
+
+
+class OAuth2InvalidRequest(OAuth2Error):
+	"""
+	Invalid OAuth2 token or authorization request
+	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__("invalid_request", *args, **kwargs)
+
+
+class OAuth2InvalidScope(OAuth2Error):
+	"""
+	Invalid OAuth2 scope
+	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__("invalid_scope", *args, **kwargs)
+
+
+class OAuth2InvalidClient(OAuth2Error):
+	"""
+	Invalid OAuth2 client
+	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__("invalid_client", *args, **kwargs)
