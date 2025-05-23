@@ -488,19 +488,3 @@ def rest_get(session_dict):
 		data["label"] = label
 
 	return data
-
-
-# TODO: Use ASAB Authorization, this is a temporary solution.
-def build_system_session(session_service, session_id):
-	session = Session({
-		Session.FN.SessionId: session_id,
-		Session.FN.Version: 0,
-		Session.FN.CreatedAt: datetime.datetime.now(datetime.UTC),
-		Session.FN.ModifiedAt: None,
-		Session.FN.Session.Type: "SYSTEM",
-		Session.FN.Session.Expiration: datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30),
-		Session.FN.Authorization.Authz: {"*": [ResourceId.SUPERUSER]},
-		Session.FN.Credentials.Id: "SYSTEM",
-	})
-	AuditLogger.log(asab.LOG_NOTICE, "Created new system session.", struct_data={"session_id": session.SessionId})
-	return session
