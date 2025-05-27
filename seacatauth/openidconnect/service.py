@@ -695,7 +695,7 @@ class OpenIdConnectService(asab.Service):
 		tenant_service = self.App.get_service("seacatauth.TenantService")
 		role_service = self.App.get_service("seacatauth.RoleService")
 
-		if expiration is not None:
+		if expiration is None:
 			expiration = self.ClientCredentialsGrantExpiration
 
 		request = asab.contextvars.Request.get()
