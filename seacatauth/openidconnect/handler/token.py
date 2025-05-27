@@ -12,12 +12,10 @@ import asab.web.rest.json
 import asab.exceptions
 
 from .. import pkce
-from ..service import AccessToken
 from ..utils import TokenRequestErrorResponseCode
 from ... import exceptions, AuditLogger
 from ... import generic
 from . import schema
-from ...authz import build_credentials_authz
 from ...models import const
 
 
@@ -263,7 +261,7 @@ class TokenHandler(object):
 
 	async def _client_credentials_grant(self, request, from_ip):
 		form_data = await request.post()
-		if not "scope" in form_data:
+		if "scope" not in form_data:
 			AuditLogger.log(
 				asab.LOG_NOTICE,
 				"Token request denied: Missing scope parameter.",

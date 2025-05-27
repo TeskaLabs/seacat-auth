@@ -203,7 +203,7 @@ class ClientHandler(object):
 		"""
 		client_id = request.match_info["client_id"]
 
-		if "expiration"	in json_data:
+		if "expiration" in json_data:
 			expires_at = generic.datetime_from_relative_or_absolute_timestring(json_data["expiration"])
 		else:
 			expires_at = None
