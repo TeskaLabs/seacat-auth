@@ -99,6 +99,9 @@ class OpenIdConnectService(asab.Service):
 			# This is a dev-only option
 			L.warning("Redirect URI validation in OpenID Authorize requests is disabled.")
 
+		self.ClientCredentialsGrantExpiration = datetime.timedelta(seconds=asab.Config.getseconds(
+			"openidconnect", "client_credentials_grant_expiration"))
+
 		# TODO: Derive the private key
 		self.PrivateKey = app.PrivateKey
 
@@ -682,7 +685,7 @@ class OpenIdConnectService(asab.Service):
 		self,
 		client_id: str,
 		scope: list,
-		expires_at: typing.Optional[datetime.datetime] = None,
+		expiration: typing.Optional[datetime.datetime | datetime.timedelta] = None,
 		label: typing.Optional[str] = None,
 	):
 		"""
@@ -691,6 +694,9 @@ class OpenIdConnectService(asab.Service):
 		credentials_service = self.App.get_service("seacatauth.CredentialsService")
 		tenant_service = self.App.get_service("seacatauth.TenantService")
 		role_service = self.App.get_service("seacatauth.RoleService")
+
+		if expiration is not None:
+			expiration = self.ClientCredentialsGrantExpiration
 
 		request = asab.contextvars.Request.get()
 		from_ip = generic.get_request_access_ips(request)
@@ -768,7 +774,7 @@ class OpenIdConnectService(asab.Service):
 		session = await self.SessionService.create_session(
 			session_type="openidconnect",
 			parent_session_id=None,
-			expiration=expires_at,
+			expiration=expiration,
 			session_builders=session_builders,
 		)
 

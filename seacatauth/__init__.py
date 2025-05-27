@@ -49,6 +49,7 @@ asab.Config.add_defaults({
 		"access_token_expiration": "4 h",
 		"refresh_token_length": "36",
 		"refresh_token_expiration": "3 d",
+		"client_credentials_grant_expiration": "10 m",
 	},
 
 	"seacatauth:client": {

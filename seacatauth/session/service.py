@@ -202,9 +202,13 @@ class SessionService(asab.Service):
 		elif isinstance(expiration, datetime.datetime):
 			expires = expiration
 			expiration = expires - datetime.datetime.now(datetime.timezone.utc)
-		else:
+		elif isinstance(expiration, datetime.timedelta):
+			expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+		elif isinstance(expiration, (int, float)):
 			expiration = datetime.timedelta(seconds=expiration)
 			expires = datetime.datetime.now(datetime.timezone.utc) + expiration
+		else:
+			raise ValueError("Invalid expiration type: {}".format(type(expiration)))
 
 		if expiration > self.MaximumAge:
 			# TODO: Cut the expiration or raise error
