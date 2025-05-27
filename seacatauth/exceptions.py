@@ -87,9 +87,13 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Credentials not found
 	"""
-	def __init__(self, credentials_id, *args):
+	def __init__(self, credentials_id: typing.Optional[str] = None, *args):
 		self.CredentialsId = credentials_id
-		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
+		message = (
+			"Credentials {!r} not found".format(self.CredentialsId) if credentials_id is not None
+			else "Credentials not found"
+		)
+		super().__init__(message, *args)
 
 
 class NotEditableError(SeacatAuthError):

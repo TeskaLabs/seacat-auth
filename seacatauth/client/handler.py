@@ -208,13 +208,31 @@ class ClientHandler(object):
 		else:
 			expires_at = None
 
-		# TODO: Error handling
-		token_response = await self.ClientService.issue_token(
-			client_id,
-			expires_at=expires_at,
-			tenant=json_data.get("tenant"),
-			label=json_data.get("label"),
-		)
+		try:
+			token_response = await self.ClientService.issue_token(
+				client_id,
+				expires_at=expires_at,
+				tenant=json_data.get("tenant"),
+				label=json_data.get("label"),
+			)
+		except exceptions.TenantAccessDeniedError:
+			return asab.web.rest.json_response(
+				request,
+				status=403,
+				data={"result": "ERROR", "tech_err": "Tenant access denied."}
+			)
+		except exceptions.ClientNotFoundError:
+			return asab.web.rest.json_response(
+				request,
+				status=404,
+				data={"result": "ERROR", "tech_err": "Client not found."}
+			)
+		except exceptions.OAuth2InvalidClient:
+			return asab.web.rest.json_response(
+				request,
+				status=404,
+				data={"result": "ERROR", "tech_err": "Client does not have SeaCat Auth credentials."}
+			)
 		return asab.web.rest.json_response(
 			request,
 			data=token_response,
@@ -244,8 +262,18 @@ class ClientHandler(object):
 		"""
 		client_id = request.match_info["client_id"]
 		token_id = request.match_info["token_id"]
-		# TODO: Error handling
-		await self.ClientService.revoke_token(client_id, token_id)
+		try:
+			await self.ClientService.revoke_token(client_id, token_id)
+		except (
+			exceptions.ClientNotFoundError,
+			exceptions.CredentialsNotFoundError,
+			exceptions.SessionNotFoundError
+		):
+			return asab.web.rest.json_response(
+				request,
+				status=404,
+				data={"result": "ERROR", "tech_err": "Token not found."}
+			)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
@@ -256,8 +284,14 @@ class ClientHandler(object):
 		Revoke all tokens for a client
 		"""
 		client_id = request.match_info["client_id"]
-		# TODO: Error handling
-		await self.ClientService.revoke_all_tokens(client_id)
+		try:
+			await self.ClientService.revoke_all_tokens(client_id)
+		except exceptions.ClientNotFoundError:
+			return asab.web.rest.json_response(
+				request,
+				status=404,
+				data={"result": "ERROR", "tech_err": "Client not found."}
+			)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 

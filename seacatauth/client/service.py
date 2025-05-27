@@ -403,12 +403,19 @@ class ClientService(asab.Service):
 		if tenant is not None:
 			scope.append("tenant:{}".format(tenant))
 
-		tokens = await oidc_service.issue_token_for_client_credentials(
-			client_id=client_id,
-			scope=scope,
-			expiration=expires_at,
-			label=label,
-		)
+		# Ensure client exists
+		await self.get(client_id)
+
+		try:
+			tokens = await oidc_service.issue_token_for_client_credentials(
+				client_id=client_id,
+				scope=scope,
+				expiration=expires_at,
+				label=label,
+			)
+		except exceptions.OAuth2InvalidScope:
+			raise exceptions.TenantAccessDeniedError(tenant)
+
 		session = tokens["session"]
 
 		token_response = {
@@ -427,17 +434,19 @@ class ClientService(asab.Service):
 		"""
 		credentials = await self._get_seacatauth_credentials(client_id)
 		session_service = self.App.get_service("seacatauth.SessionService")
-		return [
-			{
-				"_id": s["_id"],
-				"label": s.get("label"),
-				"exp": s.get("expiration"),
-				"resources": s.get("resources"),
+		tokens = []
+		for session in (await session_service.list(query_filter={
+			Session.FN.Credentials.Id: credentials["_id"]
+		}))["data"]:
+			token = {
+				"_id": session["_id"],
+				"exp": session["expiration"],
+				"resources": session["resources"],
 			}
-			for s in (await session_service.list(query_filter={
-				Session.FN.Credentials.Id: credentials["_id"]
-			}))["data"]
-		]
+			if "label" in session:
+				token["label"] = session["label"]
+			tokens.append(token)
+		return tokens
 
 
 	async def revoke_token(self, client_id: str, session_id: str):
