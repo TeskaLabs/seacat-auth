@@ -762,7 +762,7 @@ class OpenIdConnectService(asab.Service):
 				tenant_service=tenant_service,
 				role_service=role_service,
 				credentials_id=credentials_id,
-				tenants=[authorized_tenant],
+				tenants=[authorized_tenant] if authorized_tenant else None,
 			),
 			[
 				(Session.FN.Session.Label, label),

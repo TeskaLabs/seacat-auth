@@ -192,11 +192,10 @@ CLIENT_TEMPLATES = {
 ISSUE_TOKEN = {
 	"type": "object",
 	"additionalProperties": False,
-	"required": ["scope"],
 	"properties": {
-		"scope": {
-			"type": "array",
-			"description": "Token authorization scopes separated by spaces",
+		"tenant": {
+			"type": "string",
+			"description": "Tenant to access. If not specified, the token is tenantless.",
 		},
 		"label": {
 			"type": "string",

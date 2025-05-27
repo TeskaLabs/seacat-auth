@@ -212,7 +212,7 @@ class ClientHandler(object):
 		token_response = await self.ClientService.issue_token(
 			client_id,
 			expires_at=expires_at,
-			scope=json_data.get("scope"),
+			tenant=json_data.get("tenant"),
 			label=json_data.get("label"),
 		)
 		return asab.web.rest.json_response(

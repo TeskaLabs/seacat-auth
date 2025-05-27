@@ -382,7 +382,7 @@ class ClientService(asab.Service):
 	async def issue_token(
 		self,
 		client_id: str,
-		scope: list,
+		tenant: str,
 		expires_at: typing.Optional[datetime.datetime] = None,
 		label: typing.Optional[str] = None,
 		**kwargs
@@ -392,17 +392,21 @@ class ClientService(asab.Service):
 
 		Args:
 			client_id: Client ID
-			scope: Token scope
+			tenant: Tenant scope
 			expires_at: Token expiration datetime
 
 		Returns:
-			Dictionary with token id, value, expiration and scope
+			Dictionary with token id, value, expiration and resources
 		"""
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+		scope = []
+		if tenant is not None:
+			scope.append("tenant:{}".format(tenant))
+
 		tokens = await oidc_service.issue_token_for_client_credentials(
 			client_id=client_id,
 			scope=scope,
-			expires_at=expires_at,
+			expiration=expires_at,
 			label=label,
 		)
 		session = tokens["session"]
@@ -412,7 +416,7 @@ class ClientService(asab.Service):
 			"token": tokens["access_token"],
 			"label": session.Session.Label,
 			"exp": session.Session.Expiration,
-			"scope": session.OAuth2.Scope,
+			"resources": session.Authorization.Authz,
 		}
 		return token_response
 
@@ -428,7 +432,7 @@ class ClientService(asab.Service):
 				"_id": s["_id"],
 				"label": s.get("label"),
 				"exp": s.get("expiration"),
-				"scope": s.get("scope"),
+				"resources": s.get("resources"),
 			}
 			for s in (await session_service.list(query_filter={
 				Session.FN.Credentials.Id: credentials["_id"]
