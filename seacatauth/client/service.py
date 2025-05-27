@@ -388,7 +388,7 @@ class ClientService(asab.Service):
 		**kwargs
 	) -> dict:
 		"""
-		Issue a new access token (API key) for a client
+		Issue a new access token for a client (=create a session)
 
 		Args:
 			client_id: Client ID
@@ -396,7 +396,7 @@ class ClientService(asab.Service):
 			expires_at: Token expiration datetime
 
 		Returns:
-			Dictionary with access_token, session_id, expires_at and scope
+			Dictionary with token id, value, expiration and scope
 		"""
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
 		tokens = await oidc_service.issue_token_for_client_credentials(
@@ -408,23 +408,38 @@ class ClientService(asab.Service):
 		session = tokens["session"]
 
 		token_response = {
-			"access_token": tokens["access_token"],
-			"session_id": session.Session.Id,
-			"expires_at": session.Session.Expiration,
+			"_id": session.Session.Id,
+			"token": tokens["access_token"],
+			"label": session.Session.Label,
+			"exp": session.Session.Expiration,
 			"scope": session.OAuth2.Scope,
 		}
 		return token_response
 
 
 	async def list_tokens(self, client_id: str):
+		"""
+		List client tokens (sessions)
+		"""
 		credentials = await self._get_seacatauth_credentials(client_id)
 		session_service = self.App.get_service("seacatauth.SessionService")
-		return await session_service.list(query_filter={
-			Session.FN.Credentials.Id: credentials["_id"]
-		})
+		return [
+			{
+				"_id": s["_id"],
+				"label": s.get("label"),
+				"exp": s.get("expiration"),
+				"scope": s.get("scope"),
+			}
+			for s in (await session_service.list(query_filter={
+				Session.FN.Credentials.Id: credentials["_id"]
+			}))["data"]
+		]
 
 
 	async def revoke_token(self, client_id: str, session_id: str):
+		"""
+		Revoke client token by its ID. This is essentially just deleting a session.
+		"""
 		credentials = await self._get_seacatauth_credentials(client_id)
 		session_service = self.App.get_service("seacatauth.SessionService")
 		session = await session_service.get(session_id)

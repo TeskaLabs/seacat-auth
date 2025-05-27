@@ -32,9 +32,11 @@ class ClientHandler(object):
 		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
 		web_app.router.add_put("/client/{client_id}", self.update)
 		web_app.router.add_delete("/client/{client_id}", self.delete)
+
+		# Client tokens
 		web_app.router.add_post("/client/{client_id}/token", self.issue_token)
 		web_app.router.add_get("/client/{client_id}/token", self.list_tokens)
-		web_app.router.add_delete("/client/{client_id}/token/{session_id}", self.revoke_token)
+		web_app.router.add_delete("/client/{client_id}/token/{token_id}", self.revoke_token)
 		web_app.router.add_delete("/client/{client_id}/token", self.revoke_all_tokens)
 
 
@@ -238,12 +240,12 @@ class ClientHandler(object):
 	@asab.web.auth.require_superuser
 	async def revoke_token(self, request):
 		"""
-		Revoke client access token (API key) by its session_id
+		Revoke client access token (API key) by its ID
 		"""
 		client_id = request.match_info["client_id"]
-		session_id = request.match_info["session_id"]
+		token_id = request.match_info["token_id"]
 		# TODO: Error handling
-		await self.ClientService.revoke_token(client_id, session_id)
+		await self.ClientService.revoke_token(client_id, token_id)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
