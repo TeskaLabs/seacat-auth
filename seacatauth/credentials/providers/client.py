@@ -79,7 +79,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 			raise exceptions.CredentialsNotFoundError(credentials_id) from e
 
 		if client.get("seacatauth_credentials", False) is False:
-			L.error("Client does not have SeaCat Auth credentials enabled.", struct_data={"client_id": client_id})
+			L.debug("Client does not have SeaCat Auth credentials enabled.", struct_data={"client_id": client_id})
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		return self._normalize_credentials(client, include)

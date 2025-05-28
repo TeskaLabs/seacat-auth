@@ -317,9 +317,21 @@ class OAuth2Error(SeacatAuthError):
 	"""
 	OAuth2 request error
 	"""
-	def __init__(self, error_type: str, *args, error_description: str | None = None, **kwargs):
+	def __init__(
+		self,
+		error_type: str,
+		*args,
+		error_description: typing.Optional[str] = None,
+		client_id: typing.Optional[str] = None,
+		scope: typing.Optional[str | list] = None,
+		redirect_uri: typing.Optional[str] = None,
+		**kwargs
+	):
 		self.ErrorType = error_type  # Included in response
 		self.ErrorDescription = error_description  # Included in response
+		self.ClientId = client_id
+		self.Scope = scope
+		self.RedirectUri = redirect_uri
 		super().__init__(*args)
 
 

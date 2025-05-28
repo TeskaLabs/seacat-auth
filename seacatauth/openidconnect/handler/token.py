@@ -114,13 +114,32 @@ class TokenHandler(object):
 		try:
 			return await token_request
 		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: {}".format(e), struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client authentication error.".format(e), struct_data={
 				"from_ip": from_ip,
 				"grant_type": grant_type,
 				"client_id": e.ClientID,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.UnauthorizedClient)
+
+		except exceptions.OAuth2InvalidClient as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid client.".format(e), struct_data={
+				"from_ip": from_ip,
+				"grant_type": grant_type,
+				"client_id": e.ClientId,
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
+
+		except exceptions.OAuth2InvalidScope as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid scope.".format(e), struct_data={
+				"from_ip": from_ip,
+				"grant_type": grant_type,
+				"client_id": e.ClientId,
+				"scope": e.Scope,
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidScope)
 
 
 	async def _authorization_code_grant(self, request, from_ip):

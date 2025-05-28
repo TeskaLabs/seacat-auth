@@ -332,16 +332,18 @@ class ClientService(asab.Service):
 			client_id, client_secret = basic_auth
 			# If client_id_post is also present, it must match the one in the Authorization header
 			if client_id_post and client_id_post != client_id:
-				raise exceptions.ClientAuthenticationError(
-					"Different client ID in Authorization header ({!r}) and in request body ({!r}).".format(
-						client_id, client_id_post),
-					client_id=client_id,
-				)
+				L.error("Different client ID in Authorization header and in request body.", struct_data={
+					"client_id_basic": client_id,
+					"client_id_post": client_id_post,
+				})
+				raise exceptions.ClientAuthenticationError("Client ID mismatch.", client_id=client_id)
 			if client_secret_post is not None:
-				raise exceptions.ClientAuthenticationError(
+				L.error(
 					"Using client_secret_basic and client_secret_post at the same time is not allowed.",
-					client_id=client_id,
+					struct_data={"client_id": client_id}
 				)
+				raise exceptions.ClientAuthenticationError(
+					"Ambiguous client authentication method.", client_id=client_id)
 
 		elif client_id_post:
 			client_id = client_id_post
@@ -354,12 +356,14 @@ class ClientService(asab.Service):
 				client_secret = None
 
 		else:
-			raise exceptions.ClientAuthenticationError(
-				"No client ID found in request.",
-				client_id=None,
-			)
+			L.error("No client ID in request.")
+			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
 		if expected_client_id and client_id != expected_client_id:
+			L.error("Unexpected client ID.", struct_data={
+				"received_client_id": client_id,
+				"expected_client_id": expected_client_id,
+			})
 			raise exceptions.ClientAuthenticationError(
 				"Client IDs do not match (expected {!r}).".format(expected_client_id),
 				client_id=client_id,
@@ -373,6 +377,10 @@ class ClientService(asab.Service):
 			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
 		)
 		if auth_method != expected_auth_method:
+			L.error("Unexpected client authentication method.", struct_data={
+				"received_auth_method": auth_method,
+				"expected_auth_method": expected_auth_method,
+			})
 			raise exceptions.ClientAuthenticationError(
 				"Unexpected authentication method (expected {!r}, got {!r}).".format(
 					expected_auth_method, auth_method),
@@ -386,11 +394,13 @@ class ClientService(asab.Service):
 		# Check secret expiration
 		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
 		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
+			L.error("Expired client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=expected_client_id)
 
 		# Verify client secret
 		client_secret_hash = client_dict.get("__client_secret", None)
 		if not generic.argon2_verify(client_secret_hash, client_secret):
+			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
 		return client_id

@@ -707,18 +707,15 @@ class OpenIdConnectService(asab.Service):
 			credentials = await cred_provider.get_by_client_id(client_id)
 			credentials_id = credentials["_id"]
 		except exceptions.CredentialsNotFoundError:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
-				"Token request denied: Client does not have Seacat Auth credentials enabled.",
-				struct_data={
-					"from_ip": from_ip,
-					"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
-					"client_id": client_id,
-				}
+			L.error(
+				"Client does not have Seacat Auth credentials enabled.",
+				struct_data={"client_id": client_id},
 			)
 			raise exceptions.OAuth2InvalidClient(
-				"Client does not have seacat_credentials enabled.",
+				"Client does not have seacatauth_credentials enabled.",
 				error_description="Client credentials flow is not allowed for this client.",
+				client_id=client_id,
+				scope=scope,
 			)
 
 		# Authorize access to tenants requested in scope
@@ -730,27 +727,19 @@ class OpenIdConnectService(asab.Service):
 				scope, credentials_id, has_access_to_all_tenants)
 
 		except exceptions.NoTenantsError:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client has no tenants.", struct_data={
-				"from_ip": from_ip,
-				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
-				"client_id": client_id,
-				"scope": " ".join(scope),
-			})
 			raise exceptions.OAuth2InvalidScope(
 				"Client has no tenants.",
 				error_description="Unauthorized tenant access.",
+				client_id=client_id,
+				scope=scope,
 			)
 
 		except exceptions.AccessDeniedError:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized tenant access.", struct_data={
-				"from_ip": from_ip,
-				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
-				"client_id": client_id,
-				"scope": " ".join(scope),
-			})
 			raise exceptions.OAuth2InvalidScope(
 				"Client does not have access to requested tenant.",
 				error_description="Unauthorized tenant access.",
+				client_id=client_id,
+				scope=scope,
 			)
 
 		authn_time = datetime.datetime.now(datetime.timezone.utc)
