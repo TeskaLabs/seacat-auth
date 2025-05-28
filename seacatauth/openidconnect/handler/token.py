@@ -97,11 +97,11 @@ class TokenHandler(object):
 		# 3.1.3.2.  Token Request Validation
 		grant_type = form_data.get("grant_type")
 		if grant_type == const.OAuth2.GrantType.AUTHORIZATION_CODE:
-			return await self._authorization_code_grant(request, from_ip)
+			token_request = self._authorization_code_grant(request, from_ip)
 		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
-			return await self._refresh_token_grant(request, from_ip)
+			token_request = self._refresh_token_grant(request, from_ip)
 		elif grant_type == const.OAuth2.GrantType.CLIENT_CREDENTIALS:
-			return await self._client_credentials_grant(request, from_ip)
+			token_request = self._client_credentials_grant(request, from_ip)
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
 				"from_ip": from_ip,
@@ -110,6 +110,17 @@ class TokenHandler(object):
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.UnsupportedGrantType)
+
+		try:
+			return await token_request
+		except exceptions.ClientAuthenticationError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: {}".format(e), struct_data={
+				"from_ip": from_ip,
+				"grant_type": grant_type,
+				"client_id": e.ClientID,
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.UnauthorizedClient)
 
 
 	async def _authorization_code_grant(self, request, from_ip):
@@ -148,17 +159,17 @@ class TokenHandler(object):
 			)
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
 
-		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client ({}).".format(e), struct_data={
-				"from_ip": from_ip,
-				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
-				"client_id": e.ClientID,
-				"redirect_uri": form_data.get("redirect_uri"),
-			})
-			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
-
 		except exceptions.URLValidationError:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Redirect URI mismatch.", struct_data={
+				"from_ip": from_ip,
+				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
+				"client_id": client_id,
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
+
+		except asab.exceptions.ValidationError:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid request.", struct_data={
 				"from_ip": from_ip,
 				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 				"client_id": client_id,

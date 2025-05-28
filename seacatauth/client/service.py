@@ -323,24 +323,41 @@ class ClientService(asab.Service):
 		Returns:
 			Authenticated client ID
 		"""
-		# Extract client ID and secret from request authorization header or post data
-		client_id, client_secret = self._get_credentials_from_authorization_header(request)
-		if client_id and client_secret:
-			auth_method = "client_secret_basic"
-		else:
-			client_id, client_secret = await self._get_credentials_from_post_data(request)
-			if not client_id:
+		basic_auth = self._get_credentials_from_authorization_header(request)
+		client_id_post, client_secret_post = await self._get_credentials_from_post_data(request)
+
+		# Determine the authentication method
+		if basic_auth:
+			auth_method = OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
+			client_id, client_secret = basic_auth
+			# If client_id_post is also present, it must match the one in the Authorization header
+			if client_id_post and client_id_post != client_id:
 				raise exceptions.ClientAuthenticationError(
-					"No client ID found in request.",
-					client_id=None,
+					"Different client ID in Authorization header ({!r}) and in request body ({!r}).".format(
+						client_id, client_id_post),
+					client_id=client_id,
 				)
-			if client_secret:
-				auth_method = "client_secret_post"
+			if client_secret_post is not None:
+				raise exceptions.ClientAuthenticationError(
+					"Using client_secret_basic and client_secret_post at the same time is not allowed.",
+					client_id=client_id,
+				)
+
+		elif client_id_post:
+			client_id = client_id_post
+			if client_secret_post:
+				auth_method = OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_POST
+				client_secret = client_secret_post
 			else:
 				# Public client - Secret not used
-				auth_method = "none"
+				auth_method = OAuth2.TokenEndpointAuthMethod.NONE
+				client_secret = None
 
-		assert client_id is not None
+		else:
+			raise exceptions.ClientAuthenticationError(
+				"No client ID found in request.",
+				client_id=None,
+			)
 
 		if expected_client_id and client_id != expected_client_id:
 			raise exceptions.ClientAuthenticationError(
@@ -475,24 +492,24 @@ class ClientService(asab.Service):
 
 	def _get_credentials_from_authorization_header(
 		self, request
-	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+	) -> typing.Optional[typing.Tuple[str, str]]:
 		auth_header = request.headers.get("Authorization")
 		if not auth_header:
-			return None, None
+			return None
 		try:
 			token_type, auth_token = auth_header.split(" ")
 		except ValueError:
-			return None, None
+			return None
 		if token_type != "Basic":
-			return None, None
+			return None
 		try:
 			auth_token_decoded = base64.urlsafe_b64decode(auth_token.encode("ascii")).decode("ascii")
 		except (binascii.Error, UnicodeDecodeError):
-			return None, None
+			return None
 		try:
 			client_id, client_secret = auth_token_decoded.split(":")
 		except ValueError:
-			return None, None
+			return None
 		return client_id, client_secret
 
 
