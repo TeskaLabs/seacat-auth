@@ -201,7 +201,7 @@ ISSUE_TOKEN = {
 			"type": "string",
 			"description": "Token name",
 		},
-		"expiration": {
+		"exp": {
 			"oneOf": [{"type": "string"}, {"type": "number"}],
 			"description":
 				"Token expiration time. The value can be either the number of seconds, "
