@@ -125,7 +125,7 @@ class TokenHandler(object):
 		try:
 			return await process_token_request
 		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized client.".format(e), struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized client.", struct_data={
 				"from_ip": from_ip,
 				"grant_type": grant_type,
 				"client_id": e.ClientID,
@@ -133,7 +133,7 @@ class TokenHandler(object):
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.UnauthorizedClient)
 		except exceptions.OAuth2InvalidClient as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid client.".format(e), struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid client.", struct_data={
 				"from_ip": from_ip,
 				"grant_type": grant_type,
 				"client_id": e.ClientId,
@@ -141,7 +141,7 @@ class TokenHandler(object):
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
 		except exceptions.OAuth2InvalidScope as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid scope.".format(e), struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid scope.", struct_data={
 				"from_ip": from_ip,
 				"grant_type": grant_type,
 				"client_id": e.ClientId,

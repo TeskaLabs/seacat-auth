@@ -380,7 +380,7 @@ class ClientService(asab.Service):
 		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
 		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
 			L.error("Expired client secret.", struct_data={"client_id": client_id})
-			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=expected_client_id)
+			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=client_id)
 
 		# Verify client secret
 		client_secret_hash = client_dict.get("__client_secret", None)
