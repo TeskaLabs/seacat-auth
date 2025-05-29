@@ -94,14 +94,25 @@ class TokenHandler(object):
 		form_data = await request.post()
 		from_ip = generic.get_request_access_ips(request)
 
-		# 3.1.3.2.  Token Request Validation
+		# Authenticate the client
+		try:
+			client = await self.OpenIdConnectService.ClientService.authenticate_client_request(request)
+		except exceptions.ClientAuthenticationError as e:
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client authentication failed.", struct_data={
+				"from_ip": from_ip,
+				"client_id": e.ClientID,
+				"redirect_uri": form_data.get("redirect_uri"),
+			})
+			return self.token_error_response(request, TokenRequestErrorResponseCode.UnauthorizedClient)
+
+		# Choose flow based on grant_type
 		grant_type = form_data.get("grant_type")
 		if grant_type == const.OAuth2.GrantType.AUTHORIZATION_CODE:
-			token_request = self._authorization_code_grant(request, from_ip)
+			process_token_request = self._authorization_code_grant(request, client, from_ip)
 		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
-			token_request = self._refresh_token_grant(request, from_ip)
+			process_token_request = self._refresh_token_grant(request, client, from_ip)
 		elif grant_type == const.OAuth2.GrantType.CLIENT_CREDENTIALS:
-			token_request = self._client_credentials_grant(request, from_ip)
+			process_token_request = self._client_credentials_grant(request, client, from_ip)
 		else:
 			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
 				"from_ip": from_ip,
@@ -112,9 +123,10 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.UnsupportedGrantType)
 
 		try:
-			return await token_request
+			return await process_token_request
+
 		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client authentication error.".format(e), struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client authentication failed.".format(e), struct_data={
 				"from_ip": from_ip,
 				"grant_type": grant_type,
 				"client_id": e.ClientID,
@@ -142,11 +154,15 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidScope)
 
 
-	async def _authorization_code_grant(self, request, from_ip):
-		form_data = await request.post()
+	async def _authorization_code_grant(
+		self,
+		request: aiohttp.web.Request,
+		client: dict,
+		from_ip: list
+	) -> aiohttp.web.Response:
 
-		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
-			request, expected_client_id=None)
+		form_data = await request.post()
+		client_id = client["_id"]
 
 		# Get session by code
 		try:
@@ -196,6 +212,10 @@ class TokenHandler(object):
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
 
+		if client_id != session.OAuth2.ClientId:
+			raise exceptions.ClientAuthenticationError(
+				"Client ID in token request does not match the one used in authorization request.")
+
 		# Establish and propagate track ID
 		session = await self.set_track_id(request, session, from_ip)
 
@@ -231,11 +251,15 @@ class TokenHandler(object):
 		return asab.web.rest.json_response(request, response_payload, headers=headers)
 
 
-	async def _refresh_token_grant(self, request, from_ip):
-		form_data = await request.post()
+	async def _refresh_token_grant(
+		self,
+		request: aiohttp.web.Request,
+		client: dict,
+		from_ip: list
+	) -> aiohttp.web.Response:
 
-		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
-			request, expected_client_id=None)
+		form_data = await request.post()
+		client_id = client["_id"]
 
 		# Get session by refresh token
 		try:
@@ -264,6 +288,10 @@ class TokenHandler(object):
 		# Refresh is not supported for algorithmic sessions (yet)
 		assert not session.is_algorithmic()
 
+		if client_id != session.OAuth2.ClientId:
+			raise exceptions.ClientAuthenticationError(
+				"Client ID in token request does not match the one used in authorization request.")
+
 		# Delete the used refresh token and the current access token
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
@@ -289,8 +317,16 @@ class TokenHandler(object):
 		return asab.web.rest.json_response(request, response_payload, headers=headers)
 
 
-	async def _client_credentials_grant(self, request, from_ip):
+	async def _client_credentials_grant(
+		self,
+		request: aiohttp.web.Request,
+		client: dict,
+		from_ip: list
+	) -> aiohttp.web.Response:
+
 		form_data = await request.post()
+		client_id = client["_id"]
+
 		if "scope" not in form_data:
 			AuditLogger.log(
 				asab.LOG_NOTICE,
@@ -304,8 +340,6 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
 
 		scope = form_data["scope"].split(" ")
-		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
-			request, expected_client_id=None)
 
 		try:
 			tokens = await self.OpenIdConnectService.issue_token_for_client_credentials(
@@ -419,15 +453,6 @@ class TokenHandler(object):
 
 		# TODO: If possible, verify that the Authorization Code has not been previously used.
 
-		# Verify client credentials if required
-		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
-			request, expected_client_id=session.OAuth2.ClientId)
-
-		# Ensure the Authorization Code was issued to the authenticated Client
-		if client_id != session.OAuth2.ClientId:
-			raise exceptions.ClientAuthenticationError(
-				"Client ID in token request does not match the one used in authorization request.")
-
 		if self.ValidateRedirectUri:
 			# Ensure that the redirect_uri parameter value is identical to the redirect_uri parameter value
 			# that was included in the initial Authorization Request.
@@ -455,15 +480,6 @@ class TokenHandler(object):
 		session = await self.OpenIdConnectService.get_session_by_refresh_token(refresh_token)
 
 		# TODO: If possible, verify that the Refresh Token has not been previously used.
-
-		# Verify client credentials if required
-		client_id = await self.OpenIdConnectService.ClientService.authenticate_client_request(
-			request, expected_client_id=session.OAuth2.ClientId)
-
-		# Ensure the Authorization Code was issued to the authenticated Client
-		if client_id != session.OAuth2.ClientId:
-			raise exceptions.ClientAuthenticationError(
-				"Client ID in token request does not match the one used in authorization request.")
 
 		return session
 

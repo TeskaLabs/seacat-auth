@@ -308,20 +308,15 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client_request(
-		self,
-		request,
-		expected_client_id: typing.Optional[str] = None
-	) -> str:
+	async def authenticate_client_request(self, request) -> dict:
 		"""
 		Verify client ID and secret.
 
 		Args:
 			request: aiohttp.web.Request
-			expected_client_id: Expected client ID
 
 		Returns:
-			Authenticated client ID
+			Authenticated client dictionary
 		"""
 		basic_auth = self._get_credentials_from_authorization_header(request)
 		client_id_post, client_secret_post = await self._get_credentials_from_post_data(request)
@@ -359,16 +354,6 @@ class ClientService(asab.Service):
 			L.error("No client ID in request.")
 			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
-		if expected_client_id and client_id != expected_client_id:
-			L.error("Unexpected client ID.", struct_data={
-				"received_client_id": client_id,
-				"expected_client_id": expected_client_id,
-			})
-			raise exceptions.ClientAuthenticationError(
-				"Client IDs do not match (expected {!r}).".format(expected_client_id),
-				client_id=client_id,
-			)
-
 		client_dict = await self.get(client_id)
 
 		# Check if used authentication method matches the pre-configured one
@@ -389,7 +374,7 @@ class ClientService(asab.Service):
 
 		if auth_method == "none":
 			# Public client - no secret verification required
-			return client_id
+			return client_dict
 
 		# Check secret expiration
 		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
@@ -403,7 +388,7 @@ class ClientService(asab.Service):
 			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
-		return client_id
+		return client_dict
 
 
 	async def issue_token(
