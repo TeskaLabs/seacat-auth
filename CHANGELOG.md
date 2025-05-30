@@ -28,6 +28,8 @@
 - Update Batman after successful credentials registration (#472, v25.16-alpha)
 
 ### Features
+- API key support (#469, v25.13-alpha13)
+- OAuth 2.0 Client credentials flow (#469, v25.13-alpha13)
 - Upgrade python to 3.12 and alpine to 3.21 (#479, v25.13-alpha10)
 - Make ES role monitoring_user available via resource elasticsearch:monitoring (#478, v25.13-alpha9)
 - Support for `tls_certfile` and `tls_keyfile` in LDAP credentials provider (#468, v25.13-alpha6)

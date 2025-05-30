@@ -3,10 +3,7 @@ import logging
 import base64
 import datetime
 import typing
-import asab
 
-from ..models.const import ResourceId
-from .. import AuditLogger
 from ..authz.rbac.service import RBACService
 
 
@@ -25,6 +22,7 @@ class SessionData:
 	MaxExpiration: datetime.datetime
 	ExpirationExtension: int
 	TrackId: typing.Optional[bytes]
+	Label: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -105,6 +103,7 @@ class Session:
 			Expiration = "s_exp"
 			MaxExpiration = "s_expm"
 			ExpirationExtension = "s_expe"
+			Label = "s_l"
 
 		class Credentials:
 			_prefix = "c"
@@ -344,6 +343,7 @@ class Session:
 			MaxExpiration=session_dict.pop(cls.FN.Session.MaxExpiration, None),
 			ExpirationExtension=session_dict.pop(cls.FN.Session.ExpirationExtension, None),
 			TrackId=session_dict.pop(cls.FN.Session.TrackId, None),
+			Label=session_dict.pop(cls.FN.Session.Label, None),
 		)
 
 	@classmethod
@@ -480,20 +480,8 @@ def rest_get(session_dict):
 	if impersonator_sid is not None:
 		data["impersonator_sid"] = impersonator_sid
 
+	label = session_dict.get(Session.FN.Session.Label)
+	if label is not None:
+		data["label"] = label
+
 	return data
-
-
-# TODO: Use ASAB Authorization, this is a temporary solution.
-def build_system_session(session_service, session_id):
-	session = Session({
-		Session.FN.SessionId: session_id,
-		Session.FN.Version: 0,
-		Session.FN.CreatedAt: datetime.datetime.now(datetime.UTC),
-		Session.FN.ModifiedAt: None,
-		Session.FN.Session.Type: "SYSTEM",
-		Session.FN.Session.Expiration: datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=30),
-		Session.FN.Authorization.Authz: {"*": [ResourceId.SUPERUSER]},
-		Session.FN.Credentials.Id: "SYSTEM",
-	})
-	AuditLogger.log(asab.LOG_NOTICE, "Created new system session.", struct_data={"session_id": session.SessionId})
-	return session

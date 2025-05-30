@@ -87,9 +87,13 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 	"""
 	Credentials not found
 	"""
-	def __init__(self, credentials_id, *args):
+	def __init__(self, credentials_id: typing.Optional[str] = None, *args):
 		self.CredentialsId = credentials_id
-		super().__init__("Credentials {!r} not found".format(self.CredentialsId), *args)
+		message = (
+			"Credentials {!r} not found".format(self.CredentialsId) if credentials_id is not None
+			else "Credentials not found"
+		)
+		super().__init__(message, *args)
 
 
 class NotEditableError(SeacatAuthError):
@@ -307,3 +311,49 @@ class CredentialsRegistrationError(SeacatAuthError):
 	):
 		self.Credentials: typing.Optional[str] = credentials
 		super().__init__(message, *args)
+
+
+class OAuth2Error(SeacatAuthError):
+	"""
+	OAuth2 request error
+	"""
+	def __init__(
+		self,
+		error_type: str,
+		*args,
+		error_description: typing.Optional[str] = None,
+		client_id: typing.Optional[str] = None,
+		scope: typing.Optional[str | list] = None,
+		redirect_uri: typing.Optional[str] = None,
+		**kwargs
+	):
+		self.ErrorType = error_type  # Included in response
+		self.ErrorDescription = error_description  # Included in response
+		self.ClientId = client_id
+		self.Scope = scope
+		self.RedirectUri = redirect_uri
+		super().__init__(*args)
+
+
+class OAuth2InvalidRequest(OAuth2Error):
+	"""
+	Invalid OAuth2 token or authorization request
+	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__("invalid_request", *args, **kwargs)
+
+
+class OAuth2InvalidScope(OAuth2Error):
+	"""
+	Invalid OAuth2 scope
+	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__("invalid_scope", *args, **kwargs)
+
+
+class OAuth2InvalidClient(OAuth2Error):
+	"""
+	Invalid OAuth2 client
+	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__("invalid_client", *args, **kwargs)
