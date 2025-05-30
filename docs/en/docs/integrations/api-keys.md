@@ -1,57 +1,107 @@
 ---
-title: API keys
+title: API Keys Management
 ---
 
-# API keys
+# API Keys Management Guide
 
-- API keys are long-lived tokens, **manually** requested and managed by **the admin (superuser)**. For app-managed short-lived tokens, see [OAuth 2.0 client credentials flow](./oauth-client-credentials.md).
-- The admin can issue new API keys, list existing ones and revoke them.
+This guide explains how to manage **API keys** in the authentication server. API keys are long-lived tokens issued and controlled manually by administrators with superuser privileges.
 
-## Pre-requisites
-- This API requires **superuser** privileges.
-- The target client must:
-    - have `seacatauth_credentials` enabled.
-- Use the _Update client_ API to update client attributes:
-```
+> For short-lived tokens managed by applications, refer to the [OAuth 2.0 Client Credentials Flow](./oauth-client-credentials.md).
+
+---
+
+## Overview
+
+- API keys are **long-lived access tokens** used to authenticate API requests.
+- Only **admins (superusers)** can create, list, and revoke API keys.
+- API keys grant access to specific tenants and roles, allowing fine-grained permission control.
+
+---
+
+## Prerequisites
+
+To manage API keys, ensure the following:
+
+- You have **superuser** privileges.
+- There is a registered Client with the attribute `seacatauth_credentials` enabled.
+- To enable this attribute on an existing client, use the _Update Client_ API:
+
+```http
 PUT /client/{client_id}
-{"seacatauth_credentials": true}
-```
-- Set the access privileges of the client credentials (with ID `seacatauth:client:$CLIENT_ID`) by assigning them tenants and roles.
+Content-Type: application/json
 
+{
+  "seacatauth_credentials": true
+}
+````
 
-## Issue a new API key
-- `POST /client/{client_id}/token`
-- JSON body parameters:
-    - `exp` (optional): The expiration time or ISO timestamp of the token, e.g. `180d` for 180 days from now, or `2030-01-01` for that exact date.
-    - `tenant` (optional): The tenant to which the token will grant access. If not specified, the token is tenantless.
-    - `label` (optional): Label for the API key, useful for identification.
+* Enabling `seacatauth_credentials` creates a credentials object identified by:
+  `seacatauth:client:$CLIENT_ID`
 
-Example:
-```
+* You can control the privileges of API keys by assigning tenants and roles to this credentials object.
+
+---
+
+## Creating a New API Key
+
+To issue a new API key, send a POST request to:
+
+```http
 POST /client/{client_id}/token
-{"expiration": "365d", "tenant": "acme-corp", "label": "API key for my monitoring application"}
+Content-Type: application/json
 ```
 
-Successful response contains:
-- Access token value `token` (used as a Bearer token for API access), 
-- token identifier `_id` (used for managing and invalidating the token),
-- token expiration timestamp `exp` in ISO format, and
-- token `resources` object.
+### Request body parameters (all optional):
 
-## Use the API key
-The received access token value is used exactly the same way as any other OAuth 2.0 Access Token is used, i.e. in the HTTP Authorization header with the `Bearer` keyword.
+| Parameter | Description                                                                                           | Example                    |
+| --------- | ----------------------------------------------------------------------------------------------------- | -------------------------- |
+| `exp`     | Expiration time of the API key. Can be a duration (e.g., `180d`) or an exact ISO date (`2030-01-01`). | `"365d"` or `"2030-01-01"` |
+| `tenant`  | Tenant the API key grants access to. If omitted, the token is tenantless.                             | `"acme-corp"`              |
+| `label`   | A descriptive label for easier identification of the API key.                                         | `"Monitoring app key"`     |
+
+### Example:
+
+```json
+{
+  "exp": "365d",
+  "tenant": "acme-corp",
+  "label": "API key for my monitoring application"
+}
+```
+
+### Successful response includes:
+
+* `token` — The API key value (use as Bearer token for API calls).
+* `_id` — Token identifier (used for managing and revoking the key).
+* `exp` — Token expiration timestamp in ISO format.
+* `resources` — Access scope granted by the token.
+
+---
+
+## Using the API Key
+
+Use the API key value as a Bearer token in the HTTP Authorization header for your API requests:
 
 ```bash
-curl -X GET "http://localhost/api/items" -H "Authorization: Bearer ${API_KEY}`
+curl -X GET "http://localhost/api/items" -H "Authorization: Bearer ${API_KEY}"
 ```
 
-## Revoke API key
-Use the received token ID to invalidate the token.
-```
+---
+
+## Revoking an API Key
+
+To revoke a specific API key, use its token ID in the DELETE request:
+
+```http
 DELETE /client/{client_id}/token/{token_id}
 ```
 
-## Revoke all API keys
-```
+---
+
+## Revoking All API Keys for a Client
+
+To revoke **all** API keys issued to a client:
+
+```http
 DELETE /client/{client_id}/token
 ```
