@@ -33,7 +33,7 @@ Content-Type: application/json
 {
   "seacatauth_credentials": true
 }
-````
+```
 
 * Enabling `seacatauth_credentials` creates a credentials object identified by:
   `seacatauth:client:$CLIENT_ID`
