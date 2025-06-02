@@ -127,6 +127,8 @@ nav:
     - Integrating apps:
       - integrations/index.md
       - integrations/oauth2-introspect.md
+      - integrations/api-keys.md
+      - integrations/oauth-client-credentials.md
       - Connecting other apps:
         - integrations/cookies.md
         - integrations/elk.md     

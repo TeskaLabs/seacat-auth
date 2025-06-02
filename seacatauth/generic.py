@@ -1,3 +1,4 @@
+import datetime
 import random
 import logging
 import re
@@ -332,6 +333,22 @@ def argon2_verify(hash: bytes | str, secret: bytes | str) -> bool:
 		return argon2.PasswordHasher().verify(hash, secret)
 	except argon2.exceptions.VerifyMismatchError:
 		return False
+
+
+def datetime_from_relative_or_absolute_timestring(value: str) -> datetime.datetime:
+	"""
+	Convert ISO 8601 string or duration string to UTC datetime.
+	"""
+	try:
+		# Number of seconds or number with a time unit
+		seconds = asab.utils.convert_to_seconds(value)
+		return datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=seconds)
+	except ValueError:
+		try:
+			# Datetime in ISO 8601 format
+			return datetime.datetime.fromisoformat(value).astimezone(datetime.UTC)
+		except ValueError:
+			raise ValueError("Invalid expiration value: {!r}".format(value))
 
 
 def generate_ergonomic_token(length: int):
