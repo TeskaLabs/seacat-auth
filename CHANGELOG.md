@@ -3,6 +3,8 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha14
+- v25.13-alpha13
 - v25.13-alpha12
 - v25.13-alpha11
 - ~~v25.13-alpha10~~
@@ -28,6 +30,7 @@
 - Update Batman after successful credentials registration (#472, v25.16-alpha)
 
 ### Features
+- Make `global_only` a true resource attribute (#483, v25.13-alpha14)
 - API key support (#469, v25.13-alpha13)
 - OAuth 2.0 Client credentials flow (#469, v25.13-alpha13)
 - Upgrade python to 3.12 and alpine to 3.21 (#479, v25.13-alpha10)
