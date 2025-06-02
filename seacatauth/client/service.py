@@ -14,6 +14,7 @@ import asab.utils
 from .. import exceptions
 from .. import generic
 from ..events import EventTypes
+from ..models import Session
 from ..models.const import OAuth2
 from . import schema
 
@@ -307,45 +308,51 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client_request(
-		self,
-		request,
-		expected_client_id: typing.Optional[str] = None
-	) -> str:
+	async def authenticate_client_request(self, request) -> dict:
 		"""
 		Verify client ID and secret.
 
 		Args:
 			request: aiohttp.web.Request
-			expected_client_id: Expected client ID
 
 		Returns:
-			Authenticated client ID
+			Authenticated client dictionary
 		"""
-		# Extract client ID and secret from request authorization header or post data
-		client_id, client_secret = self._get_credentials_from_authorization_header(request)
-		if client_id and client_secret:
-			auth_method = "client_secret_basic"
-		else:
-			client_id, client_secret = await self._get_credentials_from_post_data(request)
-			if not client_id:
-				raise exceptions.ClientAuthenticationError(
-					"No client ID found in request.",
-					client_id=None,
+		basic_auth = self._get_credentials_from_authorization_header(request)
+		client_id_post, client_secret_post = await self._get_credentials_from_post_data(request)
+
+		# Determine the authentication method
+		if basic_auth:
+			auth_method = OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
+			client_id, client_secret = basic_auth
+			# If client_id_post is also present, it must match the one in the Authorization header
+			if client_id_post and client_id_post != client_id:
+				L.error("Different client ID in Authorization header and in request body.", struct_data={
+					"client_id_basic": client_id,
+					"client_id_post": client_id_post,
+				})
+				raise exceptions.ClientAuthenticationError("Client ID mismatch.", client_id=client_id)
+			if client_secret_post is not None:
+				L.error(
+					"Using client_secret_basic and client_secret_post at the same time is not allowed.",
+					struct_data={"client_id": client_id}
 				)
-			if client_secret:
-				auth_method = "client_secret_post"
+				raise exceptions.ClientAuthenticationError(
+					"Ambiguous client authentication method.", client_id=client_id)
+
+		elif client_id_post:
+			client_id = client_id_post
+			if client_secret_post:
+				auth_method = OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_POST
+				client_secret = client_secret_post
 			else:
 				# Public client - Secret not used
-				auth_method = "none"
+				auth_method = OAuth2.TokenEndpointAuthMethod.NONE
+				client_secret = None
 
-		assert client_id is not None
-
-		if expected_client_id and client_id != expected_client_id:
-			raise exceptions.ClientAuthenticationError(
-				"Client IDs do not match (expected {!r}).".format(expected_client_id),
-				client_id=client_id,
-			)
+		else:
+			L.error("No client ID in request.")
+			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
 		client_dict = await self.get(client_id)
 
@@ -355,6 +362,10 @@ class ClientService(asab.Service):
 			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
 		)
 		if auth_method != expected_auth_method:
+			L.error("Unexpected client authentication method.", struct_data={
+				"received_auth_method": auth_method,
+				"expected_auth_method": expected_auth_method,
+			})
 			raise exceptions.ClientAuthenticationError(
 				"Unexpected authentication method (expected {!r}, got {!r}).".format(
 					expected_auth_method, auth_method),
@@ -363,41 +374,137 @@ class ClientService(asab.Service):
 
 		if auth_method == "none":
 			# Public client - no secret verification required
-			return client_id
+			return client_dict
 
 		# Check secret expiration
 		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
 		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
-			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=expected_client_id)
+			L.error("Expired client secret.", struct_data={"client_id": client_id})
+			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=client_id)
 
 		# Verify client secret
 		client_secret_hash = client_dict.get("__client_secret", None)
 		if not generic.argon2_verify(client_secret_hash, client_secret):
+			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
-		return client_id
+		return client_dict
+
+
+	async def issue_token(
+		self,
+		client_id: str,
+		tenant: str,
+		expires_at: typing.Optional[datetime.datetime] = None,
+		label: typing.Optional[str] = None,
+		**kwargs
+	) -> dict:
+		"""
+		Issue a new access token for a client (=create a session)
+
+		Args:
+			client_id: Client ID
+			tenant: Tenant scope
+			expires_at: Token expiration datetime
+
+		Returns:
+			Dictionary with token id, value, expiration and resources
+		"""
+		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
+		scope = []
+		if tenant is not None:
+			scope.append("tenant:{}".format(tenant))
+
+		# Ensure client exists
+		await self.get(client_id)
+
+		try:
+			tokens = await oidc_service.issue_token_for_client_credentials(
+				client_id=client_id,
+				scope=scope,
+				expiration=expires_at,
+				label=label,
+			)
+		except exceptions.OAuth2InvalidScope:
+			raise exceptions.TenantAccessDeniedError(tenant)
+
+		session = tokens["session"]
+
+		token_response = {
+			"_id": session.Session.Id,
+			"token": tokens["access_token"],
+			"label": session.Session.Label,
+			"exp": session.Session.Expiration,
+			"resources": session.Authorization.Authz,
+		}
+		return token_response
+
+
+	async def list_tokens(self, client_id: str):
+		"""
+		List client tokens (sessions)
+		"""
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.SessionService")
+		tokens = []
+		for session in (await session_service.list(query_filter={
+			Session.FN.Credentials.Id: credentials["_id"]
+		}))["data"]:
+			token = {
+				"_id": session["_id"],
+				"exp": session["expiration"],
+				"resources": session["resources"],
+			}
+			if "label" in session:
+				token["label"] = session["label"]
+			tokens.append(token)
+		return tokens
+
+
+	async def revoke_token(self, client_id: str, session_id: str):
+		"""
+		Revoke client token by its ID. This is essentially just deleting a session.
+		"""
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.SessionService")
+		session = await session_service.get(session_id)
+		assert session.Credentials.Id == credentials["_id"]
+		assert session.OAuth2.ClientId == client_id
+		await session_service.delete(session_id)
+
+
+	async def revoke_all_tokens(self, client_id: str):
+		credentials = await self._get_seacatauth_credentials(client_id)
+		session_service = self.App.get_service("seacatauth.SessionService")
+		await session_service.delete_sessions_by_credentials_id(credentials["_id"])
+
+
+	async def _get_seacatauth_credentials(self, client_id: str):
+		credentials_service = self.App.get_service("seacatauth.CredentialsService")
+		cred_provider = credentials_service.CredentialProviders.get("client")
+		return await cred_provider.get_by_client_id(client_id)
 
 
 	def _get_credentials_from_authorization_header(
 		self, request
-	) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+	) -> typing.Optional[typing.Tuple[str, str]]:
 		auth_header = request.headers.get("Authorization")
 		if not auth_header:
-			return None, None
+			return None
 		try:
 			token_type, auth_token = auth_header.split(" ")
 		except ValueError:
-			return None, None
+			return None
 		if token_type != "Basic":
-			return None, None
+			return None
 		try:
 			auth_token_decoded = base64.urlsafe_b64decode(auth_token.encode("ascii")).decode("ascii")
 		except (binascii.Error, UnicodeDecodeError):
-			return None, None
+			return None
 		try:
 			client_id, client_secret = auth_token_decoded.split(":")
 		except ValueError:
-			return None, None
+			return None
 		return client_id, client_secret
 
 
