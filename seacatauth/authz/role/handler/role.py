@@ -169,7 +169,14 @@ class RoleHandler(object):
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
-		return await self._update_role(request, role_id, json_data)
+		try:
+			return await self._update_role(request, role_id, json_data)
+		except asab.exceptions.ValidationError as e:
+			return asab.web.rest.json_response(
+				request,
+				{"result": "ERROR", "tech_err": str(e)},
+				status=400,
+			)
 
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
@@ -180,7 +187,14 @@ class RoleHandler(object):
 		Edit global role description and resources
 		"""
 		role_id = "*/{}".format(request.match_info["role_name"])
-		return await self._update_role(request, role_id, json_data)
+		try:
+			return await self._update_role(request, role_id, json_data)
+		except asab.exceptions.ValidationError as e:
+			return asab.web.rest.json_response(
+				request,
+				{"result": "ERROR", "tech_err": str(e)},
+				status=400,
+			)
 
 
 	@asab.web.auth.require(ResourceId.ROLE_EDIT)

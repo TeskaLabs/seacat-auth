@@ -10,7 +10,6 @@ import asab.exceptions
 from ... import exceptions
 from ...models.const import ResourceId
 from . import schema
-from .service import GLOBAL_ONLY_RESOURCES
 
 
 L = logging.getLogger(__name__)
@@ -99,9 +98,7 @@ class ResourceHandler(object):
 				pass
 
 		if "globalonly" in exclude:
-			if "_id" not in query_filter:
-				query_filter["_id"] = {}
-			query_filter["_id"]["$nin"] = list(GLOBAL_ONLY_RESOURCES)
+			query_filter["global_only"]["ne"] = True
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
@@ -140,7 +137,7 @@ class ResourceHandler(object):
 		if undelete:
 			await self.ResourceService.undelete(resource_id)
 		else:
-			await self.ResourceService.create(resource_id, json_data.get("description"))
+			await self.ResourceService.create(resource_id, **json_data)
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
