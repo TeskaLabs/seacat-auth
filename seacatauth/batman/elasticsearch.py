@@ -10,6 +10,7 @@ import random
 import asab.config
 import asab.tls
 
+from .. import exceptions
 from ..models.const import ResourceId
 from ..authz import build_credentials_authz
 
@@ -165,15 +166,31 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
-		try:
-			if credentials_id:
-				await self.sync_credentials(credentials_id)
-			else:
+		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
+		if not credentials_id:
+			# No specific credentials ID provided, sync all credentials
+			try:
 				await self.sync_all_credentials()
+			except aiohttp.client_exceptions.ClientConnectionError as e:
+				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+			return
+
+		# Sync only the specified credentials
+		try:
+			credentials = await cred_svc.get(credentials_id)
+		except exceptions.CredentialsNotFoundError:
+			# The authz update probably happened on deleted credentials
+			return
+
+		try:
+			async with self._elasticsearch_session() as session:
+				await self.sync_credentials(session, credentials)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
+
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
@@ -325,22 +342,10 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
 		async with self._elasticsearch_session() as session:
 			async for cred in self.CredentialsService.iterate():
-				await self._sync_credentials(session, cred)
+				await self.sync_credentials(session, cred)
 
 
-	async def sync_credentials(self, credentials_id: str):
-		"""
-		Create or update ElasticSearch user from Seacat Auth credentials, synchronize their roles and tenant access.
-		@param credentials_id:
-		@return:
-		"""
-		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
-		credentials = await cred_svc.get(credentials_id)
-		async with self._elasticsearch_session() as session:
-			await self._sync_credentials(session, credentials)
-
-
-	async def _sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
+	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
