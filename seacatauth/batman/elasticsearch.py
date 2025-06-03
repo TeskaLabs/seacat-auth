@@ -243,7 +243,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 					if v != index_settings.get(k):
 						break
 				else:
-					L.debug("ElasticSearch role up to date.", struct_data={"role": role_name})
 					return
 
 		# Add access to elasticsearch indices
@@ -279,26 +278,48 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		Create Seacat Auth resources that are mapped to ElasticSearch and Kibana roles
 		"""
 		resources = {
-			self.ElasticsearchSuperuserResourceId:
-				"Grants full access to cluster management and data indices. This role also grants direct read-only "
-				"access to restricted indices like .security. A user with the superuser role can impersonate "
-				"any other user in the system.",
-			self.MonitoringResourceId:
-				"Grants access to Elasticsearch Stack monitoring via Elasticsearch role 'monitoring_user'.",
+			self.ElasticsearchSuperuserResourceId: {
+				"description":
+					"Grants full access to cluster management and data indices. This role also grants direct read-only "
+					"access to restricted indices like .security. A user with the superuser role can impersonate "
+					"any other user in the system.",
+				"global_only": True,
+			},
+			self.MonitoringResourceId: {
+				"description":
+					"Grants access to Elasticsearch Stack monitoring via Elasticsearch role 'monitoring_user'.",
+				"global_only": True,
+			},
 		}
 		if self.Kibana.is_enabled():
 			resources.update(self.Kibana.get_kibana_resources())
 
 		# Initialize resources that are not initialized yet
-		for resource_id, description in resources.items():
+		for resource_id, resource_config in resources.items():
+			if resource_id in ResourceId:
+				# Skip resources that are already managed by Seacat Auth
+				continue
+
 			try:
-				await self.ResourceService.get(resource_id)
+				resource_db = await self.ResourceService.get(resource_id)
 			except KeyError:
 				await self.ResourceService.create(
 					resource_id,
-					description=description,
+					**resource_config,
 					is_managed_by_seacat_auth=True,
 				)
+				continue
+
+			# Resource exists, check if it needs to be updated
+			for k, v in resource_config.items():
+				if resource_db.get(k) != v:
+					await self.ResourceService._update(
+						resource_db,
+						**resource_config,
+						is_managed_by_seacat_auth=True,
+					)
+					break
+
 
 	async def sync_all_credentials(self):
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
@@ -459,13 +480,18 @@ class KibanaUtils(asab.config.Configurable):
 
 	def get_kibana_resources(self):
 		return {
-			self.ReadResourceId:
-				"Read-only access to tenant space in Kibana",
-			self.AllResourceId:
-				"Read-write access to tenant space in Kibana",
-			self.AdminResourceId:
-				"Access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
-				"role in ElasticSearch documentation.",
+			self.ReadResourceId: {
+				"description": "Read-only access to tenant space in Kibana",
+			},
+			self.AllResourceId: {
+				"description": "Read-write access to tenant space in Kibana",
+			},
+			self.AdminResourceId: {
+				"description":
+					"Access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
+					"role in ElasticSearch documentation.",
+				"global_only": True,
+			},
 		}
 
 
@@ -561,8 +587,6 @@ class KibanaUtils(asab.config.Configurable):
 
 		if not space_update:
 			# No changes
-			L.debug("Kibana space metadata up to date.", struct_data={
-				"space_id": space_id, "tenant_id": tenant_id})
 			return
 
 		elif existing_space:
@@ -646,7 +670,6 @@ class KibanaUtils(asab.config.Configurable):
 					if v != space_settings.get(k):
 						break
 				else:
-					L.debug("ElasticSearch role space privileges up to date.", struct_data={"role": role_name})
 					return
 
 		# Update space privileges of the role
