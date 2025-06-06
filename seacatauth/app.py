@@ -129,9 +129,10 @@ class SeaCatAuthApplication(asab.Application):
 		self.BatmanService = BatmanService(self)
 		self.BatmanHandler = BatmanHandler(self, self.BatmanService)
 
-		from .authn.webauthn import WebAuthnService, WebAuthnHandler
+		from .authn.webauthn import WebAuthnService, WebAuthnAdminHandler, WebAuthnAccountHandler
 		self.WebAuthnService = WebAuthnService(self)
-		self.WebAuthnHandler = WebAuthnHandler(self, self.WebAuthnService)
+		self.WebAuthnAdminHandler = WebAuthnAdminHandler(self, self.WebAuthnService)
+		self.WebAuthnAccountHandler = WebAuthnAccountHandler(self, self.WebAuthnService)
 
 		# Init Login service
 		# depends on: ResourceService, TenantService, RoleService, CredentialService, BatmanService
