@@ -2,18 +2,19 @@ import base64
 import logging
 import aiohttp.web
 import asab.web
+import asab.web.auth
 import asab.web.rest
 import asab.web.tenant
 import asab.contextvars
 
-from ... import exceptions
-from . import schema
+from seacatauth import exceptions
+from seacatauth.authn.webauthn import schema
 
 
 L = logging.getLogger(__name__)
 
 
-class WebAuthnHandler(object):
+class WebAuthnAdminHandler(object):
 	"""
 	Manage FIDO2 Web Authentication
 
@@ -26,49 +27,20 @@ class WebAuthnHandler(object):
 		self.WebAuthnService = webauthn_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/account/webauthn/register-options", self.get_registration_options)
-		web_app.router.add_put("/account/webauthn/register", self.register_credential)
-		web_app.router.add_delete("/account/webauthn/{wacid}", self.remove_credential)
-		web_app.router.add_put("/account/webauthn/{wacid}", self.update_credential)
-		web_app.router.add_get("/account/webauthn", self.list_credentials)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/webauthn", self.admin_list_credentials)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/webauthn/{wacid}", self.admin_update_credential)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/webauthn/{wacid}", self.admin_remove_credential)
 
 
+	@asab.web.auth.require_superuser
 	@asab.web.tenant.allow_no_tenant
-	async def get_registration_options(self, request):
+	async def admin_list_credentials(self, request):
 		"""
-		Get WebAuthn registration options
+		List target user's registered WebAuthn credentials
 		"""
-		authz = asab.contextvars.Authz.get()
-		try:
-			options = await self.WebAuthnService.get_registration_options(authz.Session)
-		except exceptions.AccessDeniedError:
-			return asab.web.rest.json_response(request, data={"status": "FAILED"}, status=400)
-		return aiohttp.web.Response(body=options, content_type="application/json")
-
-
-
-	@asab.web.rest.json_schema_handler(schema.REGISTER_WEBAUTHN_CREDENTIAL)
-	@asab.web.tenant.allow_no_tenant
-	async def register_credential(self, request, *, json_data):
-		"""
-		Register a new WebAuthn credential for the current user
-		"""
-		authz = asab.contextvars.Authz.get()
-		response = await self.WebAuthnService.register_credential(authz.Session, public_key_credential=json_data)
-		return asab.web.rest.json_response(
-			request, response,
-			status=200 if response["result"] == "OK" else 400
-		)
-
-
-	@asab.web.tenant.allow_no_tenant
-	async def list_credentials(self, request):
-		"""
-		List current user's registered WebAuthn credentials
-		"""
-		authz = asab.contextvars.Authz.get()
+		credentials_id = request.match_info["credentials_id"]
 		wa_credentials = []
-		for credential in await self.WebAuthnService.list_webauthn_credentials(authz.CredentialsId):
+		for credential in await self.WebAuthnService.list_webauthn_credentials(credentials_id):
 			wa_credential = {
 				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
 				"name": credential["name"],
@@ -85,13 +57,14 @@ class WebAuthnHandler(object):
 			"count": len(wa_credentials),
 		})
 
+	@asab.web.auth.require_superuser
 	@asab.web.rest.json_schema_handler(schema.UPDATE_WEBAUTHN_CREDENTIAL)
 	@asab.web.tenant.allow_no_tenant
-	async def update_credential(self, request, *, json_data):
+	async def admin_update_credential(self, request, *, json_data):
 		"""
 		Update current user's registered WebAuthn credential's metadata
 		"""
-		authz = asab.contextvars.Authz.get()
+		credentials_id = request.match_info["credentials_id"]
 		try:
 			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
 		except ValueError:
@@ -101,35 +74,36 @@ class WebAuthnHandler(object):
 			await self.WebAuthnService.update_webauthn_credential(
 				wacid,
 				name=json_data["name"],
-				credentials_id=authz.CredentialsId
+				credentials_id=credentials_id
 			)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
 				"wacid": wacid,
-				"cid": authz.CredentialsId,
+				"cid": credentials_id,
 			})
 		return asab.web.rest.json_response(
 			request, {"result": "OK"}
 		)
 
 
+	@asab.web.auth.require_superuser
 	@asab.web.tenant.allow_no_tenant
-	async def remove_credential(self, request):
+	async def admin_remove_credential(self, request):
 		"""
 		Remove current user's registered WebAuthn credential
 		"""
-		authz = asab.contextvars.Authz.get()
+		credentials_id = request.match_info["credentials_id"]
 		try:
 			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
 		except ValueError:
 			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
 
 		try:
-			await self.WebAuthnService.delete_webauthn_credential(wacid, authz.CredentialsId)
+			await self.WebAuthnService.delete_webauthn_credential(wacid, credentials_id)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
 				"wacid": wacid,
-				"cid": authz.CredentialsId,
+				"cid": credentials_id,
 			})
 
 		return asab.web.rest.json_response(
