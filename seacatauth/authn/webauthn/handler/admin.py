@@ -50,7 +50,6 @@ class WebAuthnAdminHandler(object):
 			wa_credentials.append(wa_credential)
 
 		return asab.web.rest.json_response(request, {
-			"result": "OK",
 			"data": wa_credentials,
 			"count": len(wa_credentials),
 		})
