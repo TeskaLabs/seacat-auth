@@ -28,6 +28,7 @@ class OTPHandler(object):
 		web_app.router.add_get("/account/totp", self.prepare_totp_if_not_active)
 		web_app.router.add_put("/account/totp", self.activate_totp)
 		web_app.router.add_delete("/account/totp", self.deactivate_totp)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/totp", self.admin_get_totp_status)
 		web_app.router.add_delete("/admin/credentials/{credentials_id}/totp", self.admin_deactivate_totp)
 
 		# DEPRECATED
@@ -90,6 +91,19 @@ class OTPHandler(object):
 			return asab.web.rest.json_response(request, {"result": "FAILED"}, status=400)
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
+
+
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def admin_get_totp_status(self, request):
+		"""
+		See if target credentials have TOTP activated
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		if await self.OTPService.has_activated_totp(credentials_id):
+			return asab.web.rest.json_response(request, {"active": True})
+		else:
+			return asab.web.rest.json_response(request, {"active": False})
 
 
 	@asab.web.auth.require_superuser
