@@ -204,14 +204,30 @@ class WebAuthnService(asab.Service):
 			metadata = await coll.find_one(aaguid)
 		return metadata
 
-	async def get_webauthn_credential(self, webauthn_credential_id):
+
+	async def get_webauthn_credential(self, credentials_id: str, webauthn_credential_id, rest_normalize: bool = True):
+		"""
+		Get WebAuthn credential detail by its ID and Seacat Auth credentials ID
+		"""
+		wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
+		if credentials_id != wa_credential["cid"]:
+			raise KeyError("WebAuthn credential not found", {
+				"wacid": webauthn_credential_id,
+				"cid": credentials_id
+			})
+		if rest_normalize:
+			wa_credential = self.rest_normalize_credential(wa_credential)
+		return wa_credential
+
+
+	async def _get_webauthn_credential(self, webauthn_credential_id):
 		"""
 		Get WebAuthn credential detail by its ID
 		"""
 		return await self.StorageService.get(self.WebAuthnCredentialCollection, webauthn_credential_id)
 
 
-	async def list_webauthn_credentials(self, credentials_id: str):
+	async def list_webauthn_credentials(self, credentials_id: str, rest_normalize: bool = True):
 		"""
 		Get all WebAuthn credentials associated with specific SCA credentials
 		"""
@@ -226,10 +242,24 @@ class WebAuthnService(asab.Service):
 		cursor.sort("_c", -1)
 
 		wa_credentials = []
-		async for resource_dict in cursor:
-			wa_credentials.append(resource_dict)
+		async for wa_credential in cursor:
+			if rest_normalize:
+				wa_credential = self.rest_normalize_credential(wa_credential)
+			wa_credentials.append(wa_credential)
 
 		return wa_credentials
+
+
+	def rest_normalize_credential(self, wa_credential: dict):
+		normalized = {
+			"id": base64.urlsafe_b64encode(wa_credential["_id"]).decode("ascii").rstrip("="),
+			"name": wa_credential["name"],
+			"sign_count": wa_credential["sc"],
+			"created": wa_credential["_c"],
+		}
+		if "ll" in wa_credential:
+			normalized["last_login"] = wa_credential["ll"]
+		return normalized
 
 
 	async def update_webauthn_credential(
@@ -246,7 +276,7 @@ class WebAuthnService(asab.Service):
 
 		If credentials_id is specified, ensure that it matches the database entry.
 		"""
-		wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
+		wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
 
 		if credentials_id is not None:
 			if credentials_id != wa_credential["cid"]:
@@ -284,7 +314,7 @@ class WebAuthnService(asab.Service):
 		"""
 
 		if credentials_id is not None:
-			wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
+			wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
 			if credentials_id != wa_credential["cid"]:
 				raise KeyError("WebAuthn credential not found", {
 					"wacid": webauthn_credential_id,
@@ -457,7 +487,7 @@ class WebAuthnService(asab.Service):
 
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrequestoptions
 		"""
-		wa_credentials = await self.list_webauthn_credentials(credentials_id)
+		wa_credentials = await self.list_webauthn_credentials(credentials_id, rest_normalize=False)
 		allow_credentials = [
 			webauthn.helpers.structs.PublicKeyCredentialDescriptor(
 				id=credential["_id"],
@@ -497,7 +527,7 @@ class WebAuthnService(asab.Service):
 		authentication_options = json.loads(authentication_options)
 		expected_challenge = authentication_options.get("challenge").encode("ascii")
 
-		wa_credential = await self.get_webauthn_credential(
+		wa_credential = await self._get_webauthn_credential(
 			base64.urlsafe_b64decode(public_key_credential["rawId"] + b"==")
 		)
 		public_key = wa_credential["pk"]

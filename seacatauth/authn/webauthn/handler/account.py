@@ -28,6 +28,7 @@ class WebAuthnAccountHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/account/webauthn/register-options", self.get_registration_options)
 		web_app.router.add_put("/account/webauthn/register", self.register_credential)
+		web_app.router.add_get("/account/webauthn/{wacid}", self.get_credential)
 		web_app.router.add_delete("/account/webauthn/{wacid}", self.remove_credential)
 		web_app.router.add_put("/account/webauthn/{wacid}", self.update_credential)
 		web_app.router.add_get("/account/webauthn", self.list_credentials)
@@ -67,23 +68,32 @@ class WebAuthnAccountHandler(object):
 		List current user's registered WebAuthn credentials
 		"""
 		authz = asab.contextvars.Authz.get()
-		wa_credentials = []
-		for credential in await self.WebAuthnService.list_webauthn_credentials(authz.CredentialsId):
-			wa_credential = {
-				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
-				"name": credential["name"],
-				"sign_count": credential["sc"],
-				"created": credential["_c"],
-			}
-			if "ll" in credential:
-				wa_credential["last_login"] = credential["ll"]
-			wa_credentials.append(wa_credential)
-
+		wa_credentials = await self.WebAuthnService.list_webauthn_credentials(authz.CredentialsId)
 		return asab.web.rest.json_response(request, {
-			"result": "OK",
 			"data": wa_credentials,
 			"count": len(wa_credentials),
 		})
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def get_credential(self, request):
+		"""
+		Get current user's registered WebAuthn credential's metadata
+		"""
+		authz = asab.contextvars.Authz.get()
+		try:
+			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		except ValueError:
+			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+
+		try:
+			wa_credential = await self.WebAuthnService.get_webauthn_credential(authz.CredentialsId, wacid)
+		except KeyError:
+			raise KeyError("WebAuthn credential not found", {
+				"wacid": wacid,
+				"cid": authz.CredentialsId,
+			})
+		return asab.web.rest.json_response(request, wa_credential)
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_WEBAUTHN_CREDENTIAL)
 	@asab.web.tenant.allow_no_tenant

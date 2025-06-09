@@ -26,6 +26,7 @@ class WebAuthnAdminHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/admin/credentials/{credentials_id}/webauthn", self.admin_list_credentials)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/webauthn/{wacid}", self.admin_get_credential)
 		web_app.router.add_put("/admin/credentials/{credentials_id}/webauthn/{wacid}", self.admin_update_credential)
 		web_app.router.add_delete("/admin/credentials/{credentials_id}/webauthn/{wacid}", self.admin_remove_credential)
 
@@ -53,6 +54,29 @@ class WebAuthnAdminHandler(object):
 			"data": wa_credentials,
 			"count": len(wa_credentials),
 		})
+
+
+	@asab.web.auth.require_superuser
+	@asab.web.tenant.allow_no_tenant
+	async def admin_get_credential(self, request):
+		"""
+		Update current user's registered WebAuthn credential's metadata
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		try:
+			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+		except ValueError:
+			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+
+		try:
+			wa_credential = await self.WebAuthnService.get_webauthn_credential(credentials_id, wacid)
+		except KeyError:
+			raise KeyError("WebAuthn credential not found", {
+				"wacid": wacid,
+				"cid": credentials_id,
+			})
+		return asab.web.rest.json_response(request, wa_credential)
+
 
 	@asab.web.auth.require_superuser
 	@asab.web.rest.json_schema_handler(schema.UPDATE_WEBAUTHN_CREDENTIAL)
