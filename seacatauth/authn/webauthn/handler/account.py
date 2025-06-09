@@ -6,8 +6,8 @@ import asab.web.rest
 import asab.web.tenant
 import asab.contextvars
 
-from seacatauth import exceptions
-from seacatauth.authn.webauthn import schema
+from .... import exceptions
+from .. import schema
 
 
 L = logging.getLogger(__name__)

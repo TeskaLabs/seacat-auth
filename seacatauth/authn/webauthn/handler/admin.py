@@ -1,14 +1,12 @@
 import base64
 import logging
-import aiohttp.web
 import asab.web
 import asab.web.auth
 import asab.web.rest
 import asab.web.tenant
 import asab.contextvars
 
-from seacatauth import exceptions
-from seacatauth.authn.webauthn import schema
+from .. import schema
 
 
 L = logging.getLogger(__name__)
