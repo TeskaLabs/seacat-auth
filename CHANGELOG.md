@@ -3,6 +3,7 @@
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha15
 - v25.13-alpha14
 - v25.13-alpha13
 - v25.13-alpha12
@@ -31,6 +32,7 @@
 - Update Batman after successful credentials registration (#472, v25.16-alpha)
 
 ### Features
+- Admin API for managing TOTP and WebAuthn credentials (#486, v25.13-alpha15)
 - Make `global_only` a persistent resource attribute (#483, v25.13-alpha14)
 - API key support (#469, v25.13-alpha13)
 - OAuth 2.0 Client credentials flow (#469, v25.13-alpha13)
