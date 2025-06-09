@@ -167,6 +167,11 @@ class WebAuthnService(asab.Service):
 	):
 		"""
 		Create database entry for a verified WebAuthn credential
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID to register the WebAuthn credentials to
+			verified_registration (webauthn.registration.VerifiedRegistration): Verified WebAuthn registration challenge
+			name (str): WebAuthn credential display name
 		"""
 		metadata = await self._get_authenticator_metadata(verified_registration)
 		if name is None:
@@ -205,9 +210,19 @@ class WebAuthnService(asab.Service):
 		return metadata
 
 
-	async def get_webauthn_credential(self, credentials_id: str, webauthn_credential_id, rest_normalize: bool = True):
+	async def get_webauthn_credential(
+		self,
+		credentials_id: str,
+		webauthn_credential_id: bytes,
+		rest_normalize: bool = False,
+	):
 		"""
 		Get WebAuthn credential detail by its ID and Seacat Auth credentials ID
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID
+			webauthn_credential_id (bytes): WebAuthn credentials ID
+			rest_normalize (bool): Normalize for public REST API, remove sensitive data
 		"""
 		wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
 		if credentials_id != wa_credential["cid"]:
@@ -216,20 +231,24 @@ class WebAuthnService(asab.Service):
 				"cid": credentials_id
 			})
 		if rest_normalize:
-			wa_credential = self.rest_normalize_credential(wa_credential)
+			wa_credential = rest_normalize_webauthn_credential(wa_credential)
 		return wa_credential
 
 
-	async def _get_webauthn_credential(self, webauthn_credential_id):
+	async def _get_webauthn_credential(self, webauthn_credential_id: bytes):
 		"""
 		Get WebAuthn credential detail by its ID
 		"""
 		return await self.StorageService.get(self.WebAuthnCredentialCollection, webauthn_credential_id)
 
 
-	async def list_webauthn_credentials(self, credentials_id: str, rest_normalize: bool = True):
+	async def list_webauthn_credentials(self, credentials_id: str, rest_normalize: bool = False):
 		"""
 		Get all WebAuthn credentials associated with specific SCA credentials
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID
+			rest_normalize (bool): Normalize for public REST API, remove sensitive data
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
@@ -244,27 +263,15 @@ class WebAuthnService(asab.Service):
 		wa_credentials = []
 		async for wa_credential in cursor:
 			if rest_normalize:
-				wa_credential = self.rest_normalize_credential(wa_credential)
+				wa_credential = rest_normalize_webauthn_credential(wa_credential)
 			wa_credentials.append(wa_credential)
 
 		return wa_credentials
 
 
-	def rest_normalize_credential(self, wa_credential: dict):
-		normalized = {
-			"id": base64.urlsafe_b64encode(wa_credential["_id"]).decode("ascii").rstrip("="),
-			"name": wa_credential["name"],
-			"sign_count": wa_credential["sc"],
-			"created": wa_credential["_c"],
-		}
-		if "ll" in wa_credential:
-			normalized["last_login"] = wa_credential["ll"]
-		return normalized
-
-
 	async def update_webauthn_credential(
 		self, webauthn_credential_id: bytes, *,
-		credentials_id: str = None,
+		credentials_id: str,
 		sign_count: int = None,
 		name: str = None,
 		last_login: datetime.datetime = None,
@@ -275,9 +282,17 @@ class WebAuthnService(asab.Service):
 		Only allows updating key name, last login time and sign count.
 
 		If credentials_id is specified, ensure that it matches the database entry.
+
+		Args:
+			webauthn_credential_id (bytes): WebAuthn credentials ID
+			credentials_id (str): Seacat Auth credentials ID to verify ownership
+			sign_count (int): Normalize for public REST API, remove sensitive data
+			name (str): Credential display label
+			last_login (datetime.datetime): Last login time
 		"""
 		wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
 
+		# TODO: Use api.local_authz instead of this check
 		if credentials_id is not None:
 			if credentials_id != wa_credential["cid"]:
 				raise KeyError("WebAuthn credential not found", {
@@ -311,6 +326,10 @@ class WebAuthnService(asab.Service):
 		Delete WebAuthn credential by its ID.
 
 		If credentials_id is specified, ensure that it matches the database entry.
+
+		Args:
+			webauthn_credential_id (bytes): WebAuthn credentials ID
+			credentials_id (str): Seacat Auth credentials ID to verify ownership
 		"""
 
 		if credentials_id is not None:
@@ -328,6 +347,9 @@ class WebAuthnService(asab.Service):
 	async def delete_all_webauthn_credentials(self, credentials_id: str):
 		"""
 		Delete all WebAuthn credentials associated with specific SCA credentials
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
@@ -487,7 +509,7 @@ class WebAuthnService(asab.Service):
 
 		https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrequestoptions
 		"""
-		wa_credentials = await self.list_webauthn_credentials(credentials_id, rest_normalize=False)
+		wa_credentials = await self.list_webauthn_credentials(credentials_id)
 		allow_credentials = [
 			webauthn.helpers.structs.PublicKeyCredentialDescriptor(
 				id=credential["_id"],
@@ -559,6 +581,7 @@ class WebAuthnService(asab.Service):
 			base64.urlsafe_b64decode(verified_authentication.credential_id + b"=="),
 			sign_count=verified_authentication.new_sign_count,
 			last_login=datetime.datetime.now(datetime.timezone.utc),
+			credentials_id=None,
 		)
 
 		return True
@@ -578,3 +601,15 @@ def _normalize_webauthn_credential_response(public_key_credential):
 	for field in ["clientDataJSON", "authenticatorData", "signature", "attestationObject"]:
 		if field in response:
 			response[field] = base64.urlsafe_b64decode(response[field].encode("ascii") + b"==")
+
+
+def rest_normalize_webauthn_credential(wa_credential: dict):
+	normalized = {
+		"id": base64.urlsafe_b64encode(wa_credential["_id"]).decode("ascii").rstrip("="),
+		"name": wa_credential["name"],
+		"sign_count": wa_credential["sc"],
+		"created": wa_credential["_c"],
+	}
+	if "ll" in wa_credential:
+		normalized["last_login"] = wa_credential["ll"]
+	return normalized

@@ -68,7 +68,8 @@ class WebAuthnAccountHandler(object):
 		List current user's registered WebAuthn credentials
 		"""
 		authz = asab.contextvars.Authz.get()
-		wa_credentials = await self.WebAuthnService.list_webauthn_credentials(authz.CredentialsId)
+		wa_credentials = await self.WebAuthnService.list_webauthn_credentials(
+			authz.CredentialsId, rest_normalize=True)
 		return asab.web.rest.json_response(request, {
 			"data": wa_credentials,
 			"count": len(wa_credentials),
@@ -87,7 +88,8 @@ class WebAuthnAccountHandler(object):
 			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
 
 		try:
-			wa_credential = await self.WebAuthnService.get_webauthn_credential(authz.CredentialsId, wacid)
+			wa_credential = await self.WebAuthnService.get_webauthn_credential(
+				authz.CredentialsId, wacid, rest_normalize=True)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
 				"wacid": wacid,

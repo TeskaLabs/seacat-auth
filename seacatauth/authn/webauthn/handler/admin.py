@@ -39,7 +39,7 @@ class WebAuthnAdminHandler(object):
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		wa_credentials = []
-		for credential in await self.WebAuthnService.list_webauthn_credentials(credentials_id):
+		for credential in await self.WebAuthnService.list_webauthn_credentials(credentials_id, rest_normalize=True):
 			wa_credential = {
 				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
 				"name": credential["name"],
@@ -60,7 +60,7 @@ class WebAuthnAdminHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	async def admin_get_credential(self, request):
 		"""
-		Update current user's registered WebAuthn credential's metadata
+		Get target user's WebAuthn credential's metadata
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		try:
@@ -69,7 +69,8 @@ class WebAuthnAdminHandler(object):
 			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
 
 		try:
-			wa_credential = await self.WebAuthnService.get_webauthn_credential(credentials_id, wacid)
+			wa_credential = await self.WebAuthnService.get_webauthn_credential(
+				credentials_id, wacid, rest_normalize=True)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
 				"wacid": wacid,
@@ -83,7 +84,7 @@ class WebAuthnAdminHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	async def admin_update_credential(self, request, *, json_data):
 		"""
-		Update current user's registered WebAuthn credential's metadata
+		Update target user's WebAuthn credential's metadata
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		try:
@@ -111,7 +112,7 @@ class WebAuthnAdminHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	async def admin_remove_credential(self, request):
 		"""
-		Remove current user's registered WebAuthn credential
+		Delete target user's WebAuthn credential
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		try:
