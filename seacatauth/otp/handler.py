@@ -28,8 +28,8 @@ class OTPHandler(object):
 		web_app.router.add_get("/account/totp", self.prepare_totp_if_not_active)
 		web_app.router.add_put("/account/totp", self.activate_totp)
 		web_app.router.add_delete("/account/totp", self.deactivate_totp)
-		web_app.router.add_get("/admin/credentials/{credentials_id}/totp", self.admin_get_totp_status)
-		web_app.router.add_delete("/admin/credentials/{credentials_id}/totp", self.admin_deactivate_totp)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn/totp", self.admin_get_totp_status)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/authn/totp", self.admin_deactivate_totp)
 
 		# DEPRECATED
 		# >>>

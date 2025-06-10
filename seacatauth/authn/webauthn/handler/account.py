@@ -28,9 +28,9 @@ class WebAuthnAccountHandler(object):
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/account/webauthn/register-options", self.get_registration_options)
 		web_app.router.add_put("/account/webauthn/register", self.register_credential)
-		web_app.router.add_get("/account/webauthn/{wacid}", self.get_credential)
-		web_app.router.add_delete("/account/webauthn/{wacid}", self.remove_credential)
-		web_app.router.add_put("/account/webauthn/{wacid}", self.update_credential)
+		web_app.router.add_get("/account/webauthn/{passkey_id}", self.get_credential)
+		web_app.router.add_delete("/account/webauthn/{passkey_id}", self.remove_credential)
+		web_app.router.add_put("/account/webauthn/{passkey_id}", self.update_credential)
 		web_app.router.add_get("/account/webauthn", self.list_credentials)
 
 
@@ -83,16 +83,16 @@ class WebAuthnAccountHandler(object):
 		"""
 		authz = asab.contextvars.Authz.get()
 		try:
-			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+			passkey_id = base64.urlsafe_b64decode(request.match_info["passkey_id"].encode("ascii") + b"==")
 		except ValueError:
-			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+			raise KeyError("WebAuthn credential not found", {"passkey_id": request.match_info["passkey_id"]})
 
 		try:
 			wa_credential = await self.WebAuthnService.get_webauthn_credential(
-				authz.CredentialsId, wacid, rest_normalize=True)
+				authz.CredentialsId, passkey_id, rest_normalize=True)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
-				"wacid": wacid,
+				"passkey_id": passkey_id,
 				"cid": authz.CredentialsId,
 			})
 		return asab.web.rest.json_response(request, wa_credential)
@@ -105,19 +105,19 @@ class WebAuthnAccountHandler(object):
 		"""
 		authz = asab.contextvars.Authz.get()
 		try:
-			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+			passkey_id = base64.urlsafe_b64decode(request.match_info["passkey_id"].encode("ascii") + b"==")
 		except ValueError:
-			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+			raise KeyError("WebAuthn credential not found", {"passkey_id": request.match_info["passkey_id"]})
 
 		try:
 			await self.WebAuthnService.update_webauthn_credential(
-				wacid,
+				passkey_id,
 				name=json_data["name"],
 				credentials_id=authz.CredentialsId
 			)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
-				"wacid": wacid,
+				"passkey_id": passkey_id,
 				"cid": authz.CredentialsId,
 			})
 		return asab.web.rest.json_response(
@@ -132,15 +132,15 @@ class WebAuthnAccountHandler(object):
 		"""
 		authz = asab.contextvars.Authz.get()
 		try:
-			wacid = base64.urlsafe_b64decode(request.match_info["wacid"].encode("ascii") + b"==")
+			passkey_id = base64.urlsafe_b64decode(request.match_info["passkey_id"].encode("ascii") + b"==")
 		except ValueError:
-			raise KeyError("WebAuthn credential not found", {"wacid": request.match_info["wacid"]})
+			raise KeyError("WebAuthn credential not found", {"passkey_id": request.match_info["passkey_id"]})
 
 		try:
-			await self.WebAuthnService.delete_webauthn_credential(wacid, authz.CredentialsId)
+			await self.WebAuthnService.delete_webauthn_credential(passkey_id, authz.CredentialsId)
 		except KeyError:
 			raise KeyError("WebAuthn credential not found", {
-				"wacid": wacid,
+				"passkey_id": passkey_id,
 				"cid": authz.CredentialsId,
 			})
 
