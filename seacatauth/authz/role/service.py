@@ -163,7 +163,7 @@ class RoleService(asab.Service):
 			return tenant_id
 
 
-	async def list(
+	async def list_roles(
 		self,
 		tenant_id: typing.Optional[str] = None,
 		page: int = 0,
@@ -172,12 +172,19 @@ class RoleService(asab.Service):
 		resource_filter: str = None,
 		exclude_global: bool = False,
 		exclude_propagated: bool = False,
+		assign_cid: typing.Optional[str] = None,
 	):
 		authz = asab.contextvars.Authz.get()
 		if tenant_id in {"*", None}:
 			tenant_id = None
 		else:
 			authz.require_tenant_access()
+
+		if assign_cid is not None:
+			cred_roles = set(await self.get_roles_by_credentials(
+				assign_cid, [tenant_id] if tenant_id is not None else None))
+		else:
+			cred_roles = None
 
 		views = self._prepare_views(tenant_id, exclude_global, exclude_propagated)
 		counts = [
@@ -198,6 +205,11 @@ class RoleService(asab.Service):
 				name_filter=name_filter,
 				resource_filter=resource_filter,
 			):
+				if cred_roles is not None:
+					role["assign_cid"] = {
+						"assigned": role["_id"] in cred_roles,
+						"editable": await self.can_assign_role(role["_id"], target_cid=assign_cid),
+					}
 				roles.append(role)
 
 			if limit and len(roles) >= limit:
@@ -205,10 +217,38 @@ class RoleService(asab.Service):
 
 			offset = 0
 
-		return {
+		result = {
 			"count": sum(counts),
 			"data": roles,
 		}
+		if assign_cid is not None:
+			result["assign_cid"] = assign_cid
+
+		return result
+
+
+	async def can_assign_role(self, role_id: str, target_cid: str) -> bool:
+		authz = asab.contextvars.Authz.get()
+		tenant_id, _ = self.parse_role_id(role_id)
+
+		if tenant_id is not None and not (await self.TenantService.has_tenant_assigned(target_cid, tenant_id)):
+			return False
+
+		# Superusers can assign any role, including global roles
+		if authz.has_superuser_access():
+			return True
+
+		if tenant_id is None:
+			# Global roles can be assigned by superusers only
+			return False
+
+		# Tenant roles can be assigned only if their tenant is in the current authorization context
+		if not tenant_id == asab.contextvars.Tenant.get():
+			return False
+		if not authz.has_tenant_access():
+			return False
+		return True
+
 
 
 	async def _get(self, role_id: str):
