@@ -92,7 +92,6 @@ class RoleService(asab.Service):
 
 
 	async def _ensure_preset_role(self, role_id: str, properties: dict, update: bool = True):
-		L.debug("Checking preset role.", struct_data={"role_id": role_id})
 		try:
 			existing_role = await self.get(role_id)
 		except KeyError:
