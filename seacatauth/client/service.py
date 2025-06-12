@@ -23,8 +23,7 @@ L = logging.getLogger(__name__)
 
 
 CLIENT_DEFAULTS = {
-	# TODO: According to spec the default should be "CLIENT_SECRET_BASIC".
-	"token_endpoint_auth_method": OAuth2.TokenEndpointAuthMethod.NONE,
+	"token_endpoint_auth_method": OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
 	"response_types": [OAuth2.ResponseType.CODE],
 	"grant_types": [OAuth2.GrantType.AUTHORIZATION_CODE],
 	"application_type": OAuth2.ApplicationType.WEB,
