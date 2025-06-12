@@ -10,12 +10,13 @@ import asab.storage.exceptions
 import asab.exceptions
 import pymongo
 import asab.utils
+import asab.web.auth
 
 from .. import exceptions
 from .. import generic
 from ..events import EventTypes
 from ..models import Session
-from ..models.const import OAuth2
+from ..models.const import OAuth2, ResourceId
 from . import schema
 
 
@@ -390,6 +391,7 @@ class ClientService(asab.Service):
 		return client_dict
 
 
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def issue_token(
 		self,
 		client_id: str,
@@ -409,9 +411,13 @@ class ClientService(asab.Service):
 		Returns:
 			Dictionary with token id, value, expiration and resources
 		"""
+		authz = asab.contextvars.Authz.get()
 		oidc_service = self.App.get_service("seacatauth.OpenIdConnectService")
 		scope = []
 		if tenant is not None:
+			# Verify that the agent has access to the requested tenant
+			with asab.contextvars.tenant_context(tenant):
+				authz.require_tenant_access()
 			scope.append("tenant:{}".format(tenant))
 
 		# Ensure client exists
@@ -439,6 +445,7 @@ class ClientService(asab.Service):
 		return token_response
 
 
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def list_tokens(self, client_id: str):
 		"""
 		List client tokens (sessions)
@@ -460,6 +467,7 @@ class ClientService(asab.Service):
 		return tokens
 
 
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def revoke_token(self, client_id: str, session_id: str):
 		"""
 		Revoke client token by its ID. This is essentially just deleting a session.
@@ -472,6 +480,7 @@ class ClientService(asab.Service):
 		await session_service.delete(session_id)
 
 
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def revoke_all_tokens(self, client_id: str):
 		credentials = await self._get_seacatauth_credentials(client_id)
 		session_service = self.App.get_service("seacatauth.SessionService")

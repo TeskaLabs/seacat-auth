@@ -210,8 +210,8 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
 	@asab.web.rest.json_schema_handler(schema.ISSUE_TOKEN)
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def issue_client_token(self, request, *, json_data):
 		"""
 		Issue a new access token (API key) for a client
@@ -255,7 +255,7 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def list_client_tokens(self, request):
 		"""
 		List client's active access tokens (API keys)
@@ -270,7 +270,7 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def revoke_client_token(self, request):
 		"""
 		Revoke client access token (API key) by its ID
@@ -293,7 +293,7 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
 	async def revoke_all_client_tokens(self, request):
 		"""
 		Revoke all tokens for a client

@@ -55,14 +55,14 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 	async def search(self, filter: str = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
 		client_service = self.App.get_service("seacatauth.ClientService")
 		data = []
-		async for client in client_service.iterate(page, limit, self._build_filter(filter)):
+		async for client in client_service.iterate_clients(page, limit, self._build_filter(filter)):
 			data.append(self._normalize_credentials(client))
 		return data
 
 
 	async def iterate(self, offset: int = 0, limit: int = None, filtr: str = None):
 		client_service = self.App.get_service("seacatauth.ClientService")
-		async for credentials in client_service.iterate(
+		async for credentials in client_service.iterate_clients(
 			page=offset // limit if limit else 0,
 			limit=limit,
 			query_filter=self._build_filter(filtr),
@@ -94,7 +94,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		if id_filter:
 			return {"$and": [
 				{"seacatauth_credentials": True},
-				client_service.build_filter(filter),
+				client_service.build_filter(id_filter),
 			]}
 		else:
 			return {"seacatauth_credentials": True}
