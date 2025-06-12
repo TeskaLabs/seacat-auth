@@ -82,7 +82,7 @@ class ClientHandler(object):
 		search = generic.SearchParams(request.query, sort_by_default=[("client_name", 1)])
 
 		data = []
-		async for client in self.ClientService.iterate(
+		async for client in self.ClientService.iterate_clients(
 			search.Page, search.ItemsPerPage, search.SimpleFilter, sort_by=search.SortBy
 		):
 			data.append(self._rest_normalize(client))
