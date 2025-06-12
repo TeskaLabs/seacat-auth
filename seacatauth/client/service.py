@@ -646,6 +646,10 @@ class ClientService(asab.Service):
 			client["read_only"] = True
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
+		if client.get("seacatauth_credentials") is True:
+			credentials_service = self.App.get_service("seacatauth.CredentialsService")
+			provider = credentials_service.CredentialProviders["client"]
+			client["credentials_id"] = provider._format_credentials_id(client["_id"])
 		return client
 
 

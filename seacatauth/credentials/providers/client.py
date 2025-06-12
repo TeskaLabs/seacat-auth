@@ -70,6 +70,10 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 			yield self._normalize_credentials(credentials)
 
 
+	def format_credentials_id(self, client_id: str) -> str:
+			return self._format_credentials_id(client_id)
+
+
 	async def get_by_client_id(self, client_id: str, include=None) -> dict:
 		client_service = self.App.get_service("seacatauth.ClientService")
 		credentials_id = self._format_credentials_id(client_id)
