@@ -87,7 +87,7 @@ class ClientHandler(object):
 		):
 			data.append(self._rest_normalize(client))
 
-		count = await self.ClientService.count(search.SimpleFilter)
+		count = await self.ClientService.count_clients(search.SimpleFilter)
 
 		return asab.web.rest.json_response(request, {
 			"data": data,
@@ -102,7 +102,7 @@ class ClientHandler(object):
 		Get client by client_id
 		"""
 		client_id = request.match_info["client_id"]
-		result = self._rest_normalize(await self.ClientService.get(client_id))
+		result = self._rest_normalize(await self.ClientService.get_client(client_id))
 		return asab.web.rest.json_response(request, result)
 
 
@@ -137,7 +137,7 @@ class ClientHandler(object):
 				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
 		client_id = await self.ClientService.create_client(**json_data)
-		client = await self.ClientService.get(client_id)
+		client = await self.ClientService.get_client(client_id)
 		response_data = self._rest_normalize(client)
 
 		if is_client_confidential(client):
@@ -163,7 +163,7 @@ class ClientHandler(object):
 		if "preferred_client_id" in json_data:
 			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
 		try:
-			await self.ClientService.update(client_id, **json_data)
+			await self.ClientService.update_client(client_id, **json_data)
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		return asab.web.rest.json_response(
@@ -200,7 +200,7 @@ class ClientHandler(object):
 		"""
 		client_id = request.match_info["client_id"]
 		try:
-			await self.ClientService.delete(client_id)
+			await self.ClientService.delete_client(client_id)
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		return asab.web.rest.json_response(

@@ -69,6 +69,19 @@ class OAuth2:
 		PLAIN = "plain"
 		S256 = "S256"
 
+		@classmethod
+		def is_stronger_or_equal(cls, a, b):
+			"""
+			Returns True if 'a' is stronger or equal to 'b'.
+			"""
+			if a == cls.NONE:
+				return b == cls.NONE
+			if a == cls.PLAIN:
+				return b in (cls.PLAIN, cls.S256)
+			if a == cls.S256:
+				return b in (cls.S256,)
+			return False
+
 
 	class IdTokenSigningAlg(enum.StrEnum):
 		ES256 = "ES256"

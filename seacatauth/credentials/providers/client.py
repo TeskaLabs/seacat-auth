@@ -49,7 +49,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 
 	async def count(self, filtr: str = None) -> int:
 		client_service = self.App.get_service("seacatauth.ClientService")
-		return await client_service.count(query_filter=self._build_filter(filtr))
+		return await client_service.count_clients(query_filter=self._build_filter(filtr))
 
 
 	async def search(self, filter: str = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
@@ -74,7 +74,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		client_service = self.App.get_service("seacatauth.ClientService")
 		credentials_id = self._format_credentials_id(client_id)
 		try:
-			client = await client_service.get(client_id)
+			client = await client_service.get_client(client_id)
 		except KeyError as e:
 			raise exceptions.CredentialsNotFoundError(credentials_id) from e
 

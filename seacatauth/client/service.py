@@ -105,7 +105,7 @@ class ClientService(asab.Service):
 		]}
 
 
-	async def iterate(
+	async def iterate_clients(
 		self,
 		page: int = 0,
 		limit: int = None,
@@ -140,7 +140,7 @@ class ClientService(asab.Service):
 			yield self._normalize_client(client)
 
 
-	async def count(self, query_filter: typing.Optional[str | typing.Dict] = None):
+	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None):
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
@@ -149,7 +149,7 @@ class ClientService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def get(self, client_id: str, normalize: bool = True):
+	async def get_client(self, client_id: str, normalize: bool = True):
 		"""
 		Get client metadata
 		"""
@@ -218,7 +218,7 @@ class ClientService(asab.Service):
 		Set or reset client secret
 		"""
 		# TODO: Use M2M credentials provider.
-		client = await self.get(client_id)
+		client = await self.get_client(client_id)
 		assert_client_is_editable(client)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 		client_secret, client_secret_expires_at = self._generate_client_secret()
@@ -234,8 +234,8 @@ class ClientService(asab.Service):
 		return client_secret, client_secret_expires_at
 
 
-	async def update(self, client_id: str, **kwargs):
-		client = await self.get(client_id, normalize=False)
+	async def update_client(self, client_id: str, **kwargs):
+		client = await self.get_client(client_id, normalize=False)
 		assert_client_is_editable(client)
 		client_update = {
 			k: v
@@ -276,8 +276,8 @@ class ClientService(asab.Service):
 		})
 
 
-	async def delete(self, client_id: str):
-		client = await self.get(client_id)
+	async def delete_client(self, client_id: str):
+		client = await self.get_client(client_id)
 		assert_client_is_editable(client)
 		await self.StorageService.delete(self.ClientCollection, client_id)
 		self._delete_from_cache(client_id)
@@ -353,7 +353,7 @@ class ClientService(asab.Service):
 			L.error("No client ID in request.")
 			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
-		client_dict = await self.get(client_id)
+		client_dict = await self.get_client(client_id)
 
 		# Check if used authentication method matches the pre-configured one
 		expected_auth_method = client_dict.get(
@@ -415,7 +415,7 @@ class ClientService(asab.Service):
 			scope.append("tenant:{}".format(tenant))
 
 		# Ensure client exists
-		await self.get(client_id)
+		await self.get_client(client_id)
 
 		try:
 			tokens = await oidc_service.issue_token_for_client_credentials(

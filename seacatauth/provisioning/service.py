@@ -152,7 +152,7 @@ class ProvisioningService(asab.Service):
 			)
 
 		try:
-			client = await self.ClientService.get(admin_ui_client_id)
+			client = await self.ClientService.get_client(admin_ui_client_id)
 		except KeyError:
 			client = None
 
