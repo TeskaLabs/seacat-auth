@@ -90,7 +90,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		if id_filter:
 			return {"$and": [
 				{"seacatauth_credentials": True},
-				client_service.build_filter(filter),
+				client_service.build_filter(id_filter),
 			]}
 		else:
 			return {"seacatauth_credentials": True}
