@@ -172,7 +172,7 @@ class ClientService(asab.Service):
 			return client
 
 
-	async def register(
+	async def create_client(
 		self, *,
 		_custom_client_id: str = None,
 		**kwargs

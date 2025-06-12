@@ -177,6 +177,6 @@ class ProvisioningService(asab.Service):
 		update["client_name"] = self.Config["admin_ui_client_name"]
 
 		if client is None:
-			await self.ClientService.register(_custom_client_id=admin_ui_client_id, **update)
+			await self.ClientService.create_client(_custom_client_id=admin_ui_client_id, **update)
 		elif update:
-			await self.ClientService.update(client_id=admin_ui_client_id, **update)
+			await self.ClientService.update_client(client_id=admin_ui_client_id, **update)
