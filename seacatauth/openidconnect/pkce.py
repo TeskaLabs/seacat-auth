@@ -38,7 +38,6 @@ class PKCE:
 	"""
 
 	CodeVerifierPattern = re.compile("^[A-Za-z0-9._~-]{43,128}$")
-	DefaultCodeChallengeMethod = "plain"
 
 	@classmethod
 	def validate_code_challenge_method_registration(cls, code_challenge_method: str):
@@ -55,18 +54,28 @@ class PKCE:
 		"""
 		Validate whether the client can use the requested method in authorization
 		"""
-		expected_method = client.get("code_challenge_method", "none")
+		expected_method = client.get("code_challenge_method", OAuth2.CodeChallengeMethod.NONE)
 		if requested_code_challenge_method is None:
 			# If no specific method is requested, default to the pre-configured client value
 			requested_code_challenge_method = expected_method
-		elif requested_code_challenge_method != expected_method:
+
+		# Requested method must be stronger than or equal to the expected method
+		if not OAuth2.CodeChallengeMethod.is_stronger_or_equal(requested_code_challenge_method, expected_method):
 			raise InvalidCodeChallengeMethodError(
 				client_id=client["_id"], code_challenge_method=requested_code_challenge_method)
 
-		if requested_code_challenge_method == "none" and code_challenge is not None:
-			raise InvalidCodeChallengeError(
-				"Cannot use non-empty 'code_challenge' when 'code_challenge_method' is 'none'.",
-				client_id=client["_id"])
+		if requested_code_challenge_method == "none":
+			if code_challenge is not None:
+				raise InvalidCodeChallengeError(
+					"Cannot use non-empty 'code_challenge' when 'code_challenge_method' is 'none'.",
+					client_id=client["_id"],
+				)
+		else:
+			if code_challenge is None:
+				raise InvalidCodeChallengeError(
+					"Missing 'code_challenge' when 'code_challenge_method' is not 'none'.",
+					client_id=client["_id"],
+				)
 
 		return requested_code_challenge_method
 
