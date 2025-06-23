@@ -31,7 +31,7 @@ class ClientHandler(object):
 		web_app.router.add_post("/admin/client", self.register_client)
 		web_app.router.add_put("/admin/client/{client_id}", self.update_client)
 		web_app.router.add_delete("/admin/client/{client_id}", self.delete_client)
-		web_app.router.add_post("/admin/client/{client_id}/reset_secret", self.reset_secret)
+		web_app.router.add_post("/admin/client/{client_id}/reset-secret", self.reset_secret)
 
 		# Client tokens
 		web_app.router.add_post("/admin/client/{client_id}/token", self.issue_client_token)
