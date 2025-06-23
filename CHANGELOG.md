@@ -24,6 +24,7 @@
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
 
 ### Fix
+- Fix credentials search - Client provider error (#489, v25.13-alpha15)
 - Do not sync deleted credentials with Elasticsearch/Kibana (#483, v25.13-alpha14)
 - Fix attribute error in webauthn error log (#481, v25.13-alpha12)
 - Fix Dockerfile with venv (#480, v25.13-alpha11)
