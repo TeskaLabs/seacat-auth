@@ -47,11 +47,11 @@ RUN apk add --no-cache  \
     pyyaml \
     pymongo \
     sentry-sdk \
-    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git@v25.25"
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
-RUN /venv/bin/python -c "import asab; print(asab.__version__)"
+RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
