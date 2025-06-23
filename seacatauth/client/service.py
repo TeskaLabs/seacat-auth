@@ -228,6 +228,8 @@ class ClientService(asab.Service):
 		if client_secret_expires_at is not None:
 			upsertor.set("client_secret_expires_at", client_secret_expires_at)
 
+		upsertor.set("client_secret_updated_at", datetime.datetime.now(datetime.timezone.utc))
+
 		await upsertor.execute(event_type=EventTypes.CLIENT_SECRET_RESET)
 		self._delete_from_cache(client_id)
 		L.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
