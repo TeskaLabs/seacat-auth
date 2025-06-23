@@ -33,9 +33,30 @@ class CredentialsHandler(object):
 
 		web_app = app.WebContainer.WebApp
 
+		web_app.router.add_get("/admin/credentials-provider", self.list_providers)
+		web_app.router.add_get("/admin/credentials-provider/{provider_id}", self.get_provider_info)
+
+		web_app.router.add_put("/admin/credentials-ident", self.get_idents_from_ids)
+
+		web_app.router.add_get("/admin/credentials", self.list_credentials)
+		web_app.router.add_post("/admin/credentials/{provider}", self.create_credentials)
+		web_app.router.add_get("/admin/credentials/{credentials_id}", self.get_credentials)
+		web_app.router.add_put("/admin/credentials/{credentials_id}", self.update_credentials)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}", self.delete_credentials)
+
+		web_app.router.add_get("/admin/credentials/{credentials_id}/last-login", self.get_last_login_data)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/enforce-factors", self.enforce_factors)
+
+		web_app.router.add_get("/account/credentials", self.get_my_credentials)
+		web_app.router.add_put("/account/credentials", self.update_my_credentials)
+		web_app.router.add_get("/account/credentials/provider", self.get_my_provider_info)
+		web_app.router.add_get("/account/credentials/last-login", self.get_my_last_login_data)
+
+		# BACK-COMPAT. Remove after 2025-12-31.
+		# >>>
 		web_app.router.add_get("/credentials", self.list_credentials)
 		web_app.router.add_put("/idents", self.get_idents_from_ids)
-		web_app.router.add_put("/usernames", self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
+		web_app.router.add_put("/usernames", self.get_idents_from_ids)
 		web_app.router.add_get("/locate", self.locate_credentials)
 		web_app.router.add_get("/credentials/{credentials_id}", self.get_credentials)
 		web_app.router.add_get("/last_login/{credentials_id}", self.get_last_login_data)
@@ -51,6 +72,7 @@ class CredentialsHandler(object):
 		web_app.router.add_get("/account/provider", self.get_my_provider_info)
 		web_app.router.add_put("/account/credentials", self.update_my_credentials)
 		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
+		# <<<
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -407,6 +429,30 @@ class CredentialsHandler(object):
 
 		if result["status"] != "OK":
 			return asab.web.rest.json_response(request, result, status=400)
+
+		return asab.web.rest.json_response(request, result)
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def get_my_credentials(self, request):
+		"""
+		Get the current user's own credentials
+
+		---
+		parameters:
+		-	name: last_login
+			in: query
+			description: Whether to include the last successful and failed login data
+			required: false
+			schema:
+				type: boolean
+				default: no
+		"""
+		authz = asab.contextvars.Authz.get()
+		result = await self.CredentialsService.get(authz.CredentialsId)
+
+		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
+			result["_ll"] = await self.LastActivityService.get_last_logins(authz.CredentialsId)
 
 		return asab.web.rest.json_response(request, result)
 
