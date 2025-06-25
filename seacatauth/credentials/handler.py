@@ -321,7 +321,7 @@ class CredentialsHandler(object):
 		"""
 		Create new credentials
 		"""
-		reset_password = json_data.pop("passwordlink")
+		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
