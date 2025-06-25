@@ -212,7 +212,7 @@ class CookieHandler(object):
 			L.error("No 'client_id' parameter specified in anonymous introspection query.")
 			return aiohttp.web.HTTPBadRequest()
 		try:
-			client = await client_svc.get(client_id)
+			client = await client_svc.get_client(client_id)
 		except KeyError:
 			L.error("Client not found.", struct_data={"client_id": client_id})
 			return aiohttp.web.HTTPBadRequest()
@@ -379,7 +379,7 @@ class CookieHandler(object):
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 		try:
-			client = await client_svc.get(client_id)
+			client = await client_svc.get_client(client_id)
 		except KeyError:
 			AuditLogger.log(
 				asab.LOG_NOTICE,
@@ -551,7 +551,7 @@ class CookieHandler(object):
 		client = {}
 		if client_id is not None:
 			try:
-				client = await client_svc.get(client_id)
+				client = await client_svc.get_client(client_id)
 			except KeyError:
 				L.error("Client not found.", struct_data={"client_id": client_id})
 				return None
