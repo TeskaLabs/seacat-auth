@@ -177,7 +177,7 @@ class CredentialsHandler(object):
 			schema: {"type": "boolean"}
 		"""
 		authz = asab.contextvars.Authz.get()
-		search = generic.SearchParams(request.query)
+		search = generic.SearchParams(request.query, filter_params={"role", "tenant"})
 
 		# BACK-COMPAT: Convert the old "mode" search to advanced filters
 		mode = request.query.get("m", "default")

@@ -21,13 +21,17 @@ class SearchParams:
 	"""
 	def __init__(
 		self, query: typing.Mapping, *,
-		page_default=0,
-		items_per_page_default=10,
-		simple_filter_default=None,
-		sort_by_default=None,
+		sort_params: typing.Optional[typing.List[str]] = None,
+		filter_params: typing.Optional[typing.List[str]] = None,
+		page_default: typing.Optional[int] = 0,
+		items_per_page_default: typing.Optional[int] = 10,
+		simple_filter_default: typing.Optional[str] = None,
+		sort_by_default: typing.Optional[str] = None,
 	):
 		# Set defaults
 		self.Query: typing.Mapping = query
+		self.FilterParams: typing.List[str] = filter_params or []
+		self.SortParams: typing.List[str] = sort_params or []
 		self.Page: int | None = page_default
 		self.ItemsPerPage: int | None = items_per_page_default
 		self.SimpleFilter: str | None = simple_filter_default
@@ -60,13 +64,20 @@ class SearchParams:
 			elif k == "f":
 				self.SimpleFilter = v
 
-			elif k.startswith("a"):
+			elif k.startswith("a") and k[1:] in self.FilterParams:
 				self.AdvancedFilter[k[1:]] = v
 
-			elif k.startswith("s") and v in {"a", "d"}:
+			elif k.startswith("s") and k[1:] in self.SortParams:
+				if not v in {"a", "d"}:
+					raise asab.exceptions.ValidationError(
+						"The value of `s{}` (sort order) query parameter must be either 'a' or 'd', "
+						"not {!r}".format(k[1:], v)
+					)
 				self.SortBy.append((k[1:], 1 if v == "a" else -1))
 
-			# Ignore any other parameter
+			else:
+				# Ignore any other parameter
+				L.warning("Unknown query parameter: {!r}={!r}".format(k, v))
 
 		if not self.SortBy:
 			self.SortBy = sort_by_default or []
