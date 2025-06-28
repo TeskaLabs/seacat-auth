@@ -4,12 +4,14 @@ import aiohttp
 import typing
 import asab
 import asab.web.rest
+import urllib.parse
 
 from .. import exceptions, AuditLogger
 from ..last_activity import EventCode
 from ..models import Session
 from .utils import AuthOperation
 from .providers import create_provider, GenericOAuth2Login
+from seacatauth.client.service import validate_redirect_uri
 from .storage import ExternalLoginStateStorage, ExternalLoginAccountStorage
 from .exceptions import (
 	LoginWithExternalAccountError,
@@ -65,6 +67,7 @@ class ExternalLoginService(asab.Service):
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
 		self.CookieService = app.get_service("seacatauth.CookieService")
+		self.ClientService = app.get_service("seacatauth.ClientService")
 
 		for provider in self.Providers.values():
 			await provider.initialize(app)
@@ -549,3 +552,21 @@ class ExternalLoginService(asab.Service):
 			return state["redirect_uri"]
 		# No redirect_uri was specified; redirect to default URL
 		return self.DefaultRedirectUri
+
+	def get_client_id(self, redirect_uri: str):
+		parsed = urllib.parse.urlparse(redirect_uri)._asdict()
+		parsed_dict = dict(urllib.parse.parse_qsl(parsed["query"]))
+
+		return parsed_dict.get("client_id")
+	
+	async def validate_client_id_and_redirect_uri(self, redirect_uri: str, client_id: str):		
+		try:
+			client = await self.ClientService.get(client_id)			
+		except KeyError:
+			L.error("Client not found in external login.", struct_data={"client_id": client_id})
+			return False
+		if not validate_redirect_uri(redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
+			L.error("Invalid redirect uri for external login.", struct_data={"redirect_uri": redirect_uri, "client_id": client_id})
+			return False
+		
+		return True
