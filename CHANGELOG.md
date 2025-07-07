@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## v25.26
+
+### Pre-releases
+- v25.26-alpha3
+- v25.26-alpha2
+- v25.26-alpha1
+
+### Fixes
+- Add default value for passwordlink in credentials creation (#494, v25.26-alpha2)
+- Fix ASAB version printer (#492, v25.26-alpha1)
+- Fix credentials search - Client provider error (#489, v25.26-alpha1)
+
+### Features
+- Prefix credentials API with /admin (#493, v25.26-alpha3)
+
+---
+
+
 ## v25.13
 
 ### Pre-releases
