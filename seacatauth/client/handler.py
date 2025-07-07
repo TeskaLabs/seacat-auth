@@ -25,24 +25,39 @@ class ClientHandler(object):
 		self.ClientService = client_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/client", self.list)
-		web_app.router.add_get("/client/features", self.features)
-		web_app.router.add_get("/client/{client_id}", self.get)
-		web_app.router.add_post("/client", self.register)
-		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
-		web_app.router.add_put("/client/{client_id}", self.update)
-		web_app.router.add_delete("/client/{client_id}", self.delete)
+		web_app.router.add_get("/admin/client", self.list_clients)
+		web_app.router.add_get("/admin/client/features", self.client_features)
+		web_app.router.add_get("/admin/client/{client_id}", self.get_client)
+		web_app.router.add_post("/admin/client", self.register_client)
+		web_app.router.add_put("/admin/client/{client_id}", self.update_client)
+		web_app.router.add_delete("/admin/client/{client_id}", self.delete_client)
+		web_app.router.add_post("/admin/client/{client_id}/reset-secret", self.reset_secret)
 
 		# Client tokens
-		web_app.router.add_post("/client/{client_id}/token", self.issue_token)
-		web_app.router.add_get("/client/{client_id}/token", self.list_tokens)
-		web_app.router.add_delete("/client/{client_id}/token/{token_id}", self.revoke_token)
-		web_app.router.add_delete("/client/{client_id}/token", self.revoke_all_tokens)
+		web_app.router.add_post("/admin/client/{client_id}/token", self.issue_client_token)
+		web_app.router.add_get("/admin/client/{client_id}/token", self.list_client_tokens)
+		web_app.router.add_delete("/admin/client/{client_id}/token/{token_id}", self.revoke_client_token)
+		web_app.router.add_delete("/admin/client/{client_id}/token", self.revoke_all_client_tokens)
+
+		# DEPRECATED, remove after 2026-01-01
+		# >>>
+		web_app.router.add_get("/client", self.list_clients)
+		web_app.router.add_get("/client/features", self.client_features)
+		web_app.router.add_get("/client/{client_id}", self.get_client)
+		web_app.router.add_post("/client", self.register_client)
+		web_app.router.add_put("/client/{client_id}", self.update_client)
+		web_app.router.add_delete("/client/{client_id}", self.delete_client)
+		web_app.router.add_post("/client/{client_id}/reset_secret", self.reset_secret)
+		web_app.router.add_post("/client/{client_id}/token", self.issue_client_token)
+		web_app.router.add_get("/client/{client_id}/token", self.list_client_tokens)
+		web_app.router.add_delete("/client/{client_id}/token/{token_id}", self.revoke_client_token)
+		web_app.router.add_delete("/client/{client_id}/token", self.revoke_all_client_tokens)
+		# <<<
 
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.CLIENT_ACCESS)
-	async def list(self, request):
+	async def list_clients(self, request):
 		"""
 		List registered clients
 
@@ -67,12 +82,12 @@ class ClientHandler(object):
 		search = generic.SearchParams(request.query, sort_by_default=[("client_name", 1)])
 
 		data = []
-		async for client in self.ClientService.iterate(
+		async for client in self.ClientService.iterate_clients(
 			search.Page, search.ItemsPerPage, search.SimpleFilter, sort_by=search.SortBy
 		):
 			data.append(self._rest_normalize(client))
 
-		count = await self.ClientService.count(search.SimpleFilter)
+		count = await self.ClientService.count_clients(search.SimpleFilter)
 
 		return asab.web.rest.json_response(request, {
 			"data": data,
@@ -82,18 +97,18 @@ class ClientHandler(object):
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.CLIENT_ACCESS)
-	async def get(self, request):
+	async def get_client(self, request):
 		"""
 		Get client by client_id
 		"""
 		client_id = request.match_info["client_id"]
-		result = self._rest_normalize(await self.ClientService.get(client_id))
+		result = self._rest_normalize(await self.ClientService.get_client(client_id))
 		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.CLIENT_ACCESS)
-	async def features(self, request):
+	async def client_features(self, request):
 		"""
 		Get schema of supported client metadata
 
@@ -111,7 +126,7 @@ class ClientHandler(object):
 	@asab.web.rest.json_schema_handler(schema.REGISTER_CLIENT)
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
-	async def register(self, request, *, json_data):
+	async def register_client(self, request, *, json_data):
 		"""
 		Register a new client
 
@@ -121,8 +136,8 @@ class ClientHandler(object):
 			if not self.ClientService._AllowCustomClientID:
 				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
-		client_id = await self.ClientService.register(**json_data)
-		client = await self.ClientService.get(client_id)
+		client_id = await self.ClientService.create_client(**json_data)
+		client = await self.ClientService.get_client(client_id)
 		response_data = self._rest_normalize(client)
 
 		if is_client_confidential(client):
@@ -138,7 +153,7 @@ class ClientHandler(object):
 	@asab.web.rest.json_schema_handler(schema.UPDATE_CLIENT)
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
-	async def update(self, request, *, json_data):
+	async def update_client(self, request, *, json_data):
 		"""
 		Edit an existing client
 
@@ -148,7 +163,7 @@ class ClientHandler(object):
 		if "preferred_client_id" in json_data:
 			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
 		try:
-			await self.ClientService.update(client_id, **json_data)
+			await self.ClientService.update_client(client_id, **json_data)
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		return asab.web.rest.json_response(
@@ -179,13 +194,13 @@ class ClientHandler(object):
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
-	async def delete(self, request):
+	async def delete_client(self, request):
 		"""
 		Delete a client
 		"""
 		client_id = request.match_info["client_id"]
 		try:
-			await self.ClientService.delete(client_id)
+			await self.ClientService.delete_client(client_id)
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		return asab.web.rest.json_response(
@@ -195,9 +210,9 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
 	@asab.web.rest.json_schema_handler(schema.ISSUE_TOKEN)
-	async def issue_token(self, request, *, json_data):
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
+	async def issue_client_token(self, request, *, json_data):
 		"""
 		Issue a new access token (API key) for a client
 		"""
@@ -240,8 +255,8 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
-	async def list_tokens(self, request):
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
+	async def list_client_tokens(self, request):
 		"""
 		List client's active access tokens (API keys)
 		"""
@@ -255,8 +270,8 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
-	async def revoke_token(self, request):
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
+	async def revoke_client_token(self, request):
 		"""
 		Revoke client access token (API key) by its ID
 		"""
@@ -278,8 +293,8 @@ class ClientHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
-	async def revoke_all_tokens(self, request):
+	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
+	async def revoke_all_client_tokens(self, request):
 		"""
 		Revoke all tokens for a client
 		"""
