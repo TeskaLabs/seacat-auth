@@ -1,8 +1,41 @@
 # CHANGELOG
 
+## v25.26
+
+### Pre-releases
+- v25.26-alpha4
+- v25.26-alpha3
+- v25.26-alpha2
+- v25.26-alpha1
+
+### Fixes
+- Add default value for passwordlink in credentials creation (#494, v25.26-alpha2)
+- Fix ASAB version printer (#492, v25.26-alpha1)
+- Fix credentials search - Client provider error (#489, v25.26-alpha1)
+
+### Features
+- New resource ID `seacat:client:apikey:manage` for client API key management (#488, v25.26-alpha4)
+- Prefix client API with /admin (#488, v25.26-alpha4)
+- Prefix credentials API with /admin (#493, v25.26-alpha3)
+
+---
+
+
 ## v25.13
 
 ### Pre-releases
+- v25.13-alpha15
+- v25.13-alpha14
+- v25.13-alpha13
+- v25.13-alpha12
+- v25.13-alpha11
+- ~~v25.13-alpha10~~
+- v25.13-alpha9
+- v25.13-alpha8
+- v25.13-alpha7
+- v25.16-alpha
+- v25.13-alpha6
+- v25.13-alpha5
 - v25.13-alpha4
 - v25.13-alpha3
 - v25.13-alpha2
@@ -11,7 +44,23 @@
 ### Breaking changes
 - Dropped Python 3.10 support (#465, v25.13-alpha4)
 
+### Fix
+- Do not sync deleted credentials with Elasticsearch/Kibana (#483, v25.13-alpha14)
+- Fix attribute error in webauthn error log (#481, v25.13-alpha12)
+- Fix Dockerfile with venv (#480, v25.13-alpha11)
+- Fix external login attribute error (#476, v25.13-alpha8)
+- Respond with HTTP 200 when new user is created but the password reset email fails (#477, v25.13-alpha7)
+- Update Batman after successful credentials registration (#472, v25.16-alpha)
+
 ### Features
+- Admin API for managing TOTP and WebAuthn credentials (#486, v25.13-alpha15)
+- Make `global_only` a persistent resource attribute (#483, v25.13-alpha14)
+- API key support (#469, v25.13-alpha13)
+- OAuth 2.0 Client credentials flow (#469, v25.13-alpha13)
+- Upgrade python to 3.12 and alpine to 3.21 (#479, v25.13-alpha10)
+- Make ES role monitoring_user available via resource elasticsearch:monitoring (#478, v25.13-alpha9)
+- Support for `tls_certfile` and `tls_keyfile` in LDAP credentials provider (#468, v25.13-alpha6)
+- Only clients with `seacatauth_credentials: True` have credentials API (#467, v25.13-alpha5)
 - Implement max_age authorization parameter (#458, v25.13-alpha3)
 - Client credentials provider (#462, v25.13-alpha2)
 

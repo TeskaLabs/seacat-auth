@@ -25,6 +25,7 @@ class ResourceId(enum.StrEnum):
 
 	CLIENT_ACCESS = "seacat:client:access"
 	CLIENT_EDIT = "seacat:client:edit"
+	CLIENT_APIKEY_MANAGE = "seacat:client:apikey:manage"
 
 	SESSION_ACCESS = "seacat:session:access"
 	SESSION_TERMINATE = "seacat:session:terminate"
@@ -42,7 +43,7 @@ class OAuth2:
 
 	class GrantType(enum.StrEnum):
 		AUTHORIZATION_CODE = "authorization_code"
-		# CLIENT_CREDENTIALS = "client_credentials"
+		CLIENT_CREDENTIALS = "client_credentials"
 		# IMPLICIT = "implicit"
 		REFRESH_TOKEN = "refresh_token"
 
@@ -68,6 +69,19 @@ class OAuth2:
 		NONE = "none"
 		PLAIN = "plain"
 		S256 = "S256"
+
+		@classmethod
+		def is_stronger_or_equal(cls, a, b):
+			"""
+			Returns True if 'a' is stronger or equal to 'b'.
+			"""
+			if a == cls.NONE:
+				return b == cls.NONE
+			if a == cls.PLAIN:
+				return b in (cls.PLAIN, cls.S256)
+			if a == cls.S256:
+				return b in (cls.S256,)
+			return False
 
 
 	class IdTokenSigningAlg(enum.StrEnum):

@@ -49,6 +49,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.noauth  # Uses cookie authentication
 	async def pair_external_account(self, request):
 		"""
 		Initialize pairing an external account with the current user's credentials.
@@ -71,7 +72,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.noauth
+	@asab.web.auth.noauth  # Uses cookie authentication, expects logged-out user
 	async def login_with_external_account(self, request):
 		"""
 		Initialize login with external account.
@@ -96,7 +97,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.noauth
+	@asab.web.auth.noauth  # Uses cookie authentication, expects logged-out user
 	async def sign_up_with_external_account(self, request):
 		"""
 		Initialize sign up with external account.
@@ -122,7 +123,7 @@ class ExternalLoginPublicHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.noauth
+	@asab.web.auth.noauth  # Uses cookie authentication, expects logged-out user
 	async def external_auth_callback(self, request):
 		"""
 		Finalize external account login, sign-up or pairing.
@@ -181,7 +182,7 @@ class ExternalLoginPublicHandler(object):
 		access_ips = generic.get_request_access_ips(request)
 		try:
 			operation, new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
-				session_context=sso_session.Session, from_ip=access_ips, **authorization_data)
+				session_context=sso_session, from_ip=access_ips, **authorization_data)
 		except LoginWithExternalAccountError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed.", struct_data={
 				"ext_provider_type": e.ProviderType,

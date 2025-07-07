@@ -92,7 +92,6 @@ class RoleService(asab.Service):
 
 
 	async def _ensure_preset_role(self, role_id: str, properties: dict, update: bool = True):
-		L.debug("Checking preset role.", struct_data={"role_id": role_id})
 		try:
 			existing_role = await self.get(role_id)
 		except KeyError:
@@ -274,7 +273,7 @@ class RoleService(asab.Service):
 					# Tenant and propagated roles cannot access global-only resources
 					resources = [
 						resource_id for resource_id in source_role.get("resources")
-						if not self.ResourceService.is_global_only_resource(resource_id)
+						if not await self.ResourceService.is_global_only_resource(resource_id)
 					]
 				else:
 					resources = source_role.get("resources")
@@ -428,7 +427,7 @@ class RoleService(asab.Service):
 
 			if (
 				(tenant_id is not None or propagated is True)
-				and self.ResourceService.is_global_only_resource(resource_id)
+				and await self.ResourceService.is_global_only_resource(resource_id)
 			):
 				# Global-only resources cannot be assigned to tenant roles or globally defined tenant roles
 				message = "Cannot assign global-only resources to tenant roles or to propagated global roles."

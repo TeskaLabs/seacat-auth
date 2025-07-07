@@ -10,6 +10,7 @@ import random
 import asab.config
 import asab.tls
 
+from .. import exceptions
 from ..models.const import ResourceId
 from ..authz import build_credentials_authz
 
@@ -46,6 +47,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		# IDs of Elasticsearch resources
 		"elasticsearch_superuser_resource_id": ResourceId.SUPERUSER,  # Superuser access to the entire Elasticsearch cluster
+
+		"elasticsearch_monitoring_resource_id": "elasticsearch:monitoring"
 	}
 
 
@@ -83,6 +86,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		self.TenantIndices = re.split(r"\s+", self.Config.get("tenant_indices"))
 		self.ElasticsearchSuperuserResourceId = self.Config.get("elasticsearch_superuser_resource_id")
+		self.MonitoringResourceId = self.Config.get("elasticsearch_monitoring_resource_id")
 
 		self.SeacatUserFlagRole = self.Config.get("seacat_user_flag")
 		self.IgnoreUsernames = self._prepare_ignored_usernames()
@@ -108,6 +112,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Tenant.unassigned!", self._on_authz_change)
 		self.App.PubSub.subscribe("Tenant.created!", self._on_tenant_created)
 		self.App.PubSub.subscribe("Tenant.updated!", self._on_tenant_updated)
+		self.App.PubSub.subscribe("Credentials.updated!", self._on_authz_change)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 		self.App.PubSub.subscribe("Application.tick/10!", self._retry_sync)
 
@@ -131,7 +136,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _retry_sync(self, event_name):
-		if not self.RetrySyncAll or datetime.datetime.now(datetime.UTC) < self.RetrySyncAll:
+		if (self.RetrySyncAll is None) or (datetime.datetime.now(datetime.UTC) < self.RetrySyncAll):
 			return
 		self.RetrySyncAll = None
 		await self.full_sync()
@@ -161,15 +166,31 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
-		try:
-			if credentials_id:
-				await self.sync_credentials(credentials_id)
-			else:
+		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
+		if not credentials_id:
+			# No specific credentials ID provided, sync all credentials
+			try:
 				await self.sync_all_credentials()
+			except aiohttp.client_exceptions.ClientConnectionError as e:
+				L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
+				self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+			return
+
+		# Sync only the specified credentials
+		try:
+			credentials = await cred_svc.get(credentials_id)
+		except exceptions.CredentialsNotFoundError:
+			# The authz update probably happened on deleted credentials
+			return
+
+		try:
+			async with self._elasticsearch_session() as session:
+				await self.sync_credentials(session, credentials)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
 			return
+
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
@@ -239,7 +260,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 					if v != index_settings.get(k):
 						break
 				else:
-					L.debug("ElasticSearch role up to date.", struct_data={"role": role_name})
 					return
 
 		# Add access to elasticsearch indices
@@ -275,49 +295,61 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		Create Seacat Auth resources that are mapped to ElasticSearch and Kibana roles
 		"""
 		resources = {
-			self.ElasticsearchSuperuserResourceId:
-				"Grants full access to cluster management and data indices. This role also grants direct read-only "
-				"access to restricted indices like .security. A user with the superuser role can impersonate "
-				"any other user in the system."
+			self.ElasticsearchSuperuserResourceId: {
+				"description":
+					"Grants full access to cluster management and data indices. This role also grants direct read-only "
+					"access to restricted indices like .security. A user with the superuser role can impersonate "
+					"any other user in the system.",
+				"global_only": True,
+			},
+			self.MonitoringResourceId: {
+				"description":
+					"Grants access to Elasticsearch Stack monitoring via Elasticsearch role 'monitoring_user'.",
+				"global_only": True,
+			},
 		}
 		if self.Kibana.is_enabled():
 			resources.update(self.Kibana.get_kibana_resources())
 
 		# Initialize resources that are not initialized yet
-		for resource_id, description in resources.items():
+		for resource_id, resource_config in resources.items():
+			if resource_id in ResourceId:
+				# Skip resources that are already managed by Seacat Auth
+				continue
+
 			try:
-				await self.ResourceService.get(resource_id)
+				resource_db = await self.ResourceService.get(resource_id)
 			except KeyError:
 				await self.ResourceService.create(
 					resource_id,
-					description=description,
+					**resource_config,
 					is_managed_by_seacat_auth=True,
 				)
+				continue
+
+			# Resource exists, check if it needs to be updated
+			for k, v in resource_config.items():
+				if resource_db.get(k) != v:
+					await self.ResourceService._update(
+						resource_db,
+						**resource_config,
+						is_managed_by_seacat_auth=True,
+					)
+					break
+
 
 	async def sync_all_credentials(self):
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
 		async with self._elasticsearch_session() as session:
 			async for cred in self.CredentialsService.iterate():
-				await self._sync_credentials(session, cred)
+				await self.sync_credentials(session, cred)
 
 
-	async def sync_credentials(self, credentials_id: str):
-		"""
-		Create or update ElasticSearch user from Seacat Auth credentials, synchronize their roles and tenant access.
-		@param credentials_id:
-		@return:
-		"""
-		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
-		credentials = await cred_svc.get(credentials_id)
-		async with self._elasticsearch_session() as session:
-			await self._sync_credentials(session, credentials)
-
-
-	async def _sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
+	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
-			L.info("Cannot create user: No username", struct_data={"cid": cred["_id"]})
+			L.debug("Cannot create user: No username", struct_data={"cid": cred["_id"]})
 			return
 
 		if username in self.IgnoreUsernames:
@@ -352,9 +384,12 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		for tenant_id, authorized_resources in authz.items():
 			if tenant_id == "*":
 				# Seacat superuser is mapped to Elasticsearch "superuser" role
-				if ResourceId.SUPERUSER in authorized_resources:
+				if self.ElasticsearchSuperuserResourceId in authorized_resources:
 					elk_roles.add("superuser")
 				continue
+
+			if self.MonitoringResourceId in authorized_resources:
+				elk_roles.add("monitoring_user")
 			elk_roles.add(get_index_access_role_name(tenant_id, "read"))
 
 		# Add roles with Kibana space privileges
@@ -450,13 +485,18 @@ class KibanaUtils(asab.config.Configurable):
 
 	def get_kibana_resources(self):
 		return {
-			self.ReadResourceId:
-				"Read-only access to tenant space in Kibana",
-			self.AllResourceId:
-				"Read-write access to tenant space in Kibana",
-			self.AdminResourceId:
-				"Access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
-				"role in ElasticSearch documentation.",
+			self.ReadResourceId: {
+				"description": "Read-only access to tenant space in Kibana",
+			},
+			self.AllResourceId: {
+				"description": "Read-write access to tenant space in Kibana",
+			},
+			self.AdminResourceId: {
+				"description":
+					"Access to all features in Kibana across all spaces. For more information, see 'kibana_admin' "
+					"role in ElasticSearch documentation.",
+				"global_only": True,
+			},
 		}
 
 
@@ -552,8 +592,6 @@ class KibanaUtils(asab.config.Configurable):
 
 		if not space_update:
 			# No changes
-			L.debug("Kibana space metadata up to date.", struct_data={
-				"space_id": space_id, "tenant_id": tenant_id})
 			return
 
 		elif existing_space:
@@ -637,7 +675,6 @@ class KibanaUtils(asab.config.Configurable):
 					if v != space_settings.get(k):
 						break
 				else:
-					L.debug("ElasticSearch role space privileges up to date.", struct_data={"role": role_name})
 					return
 
 		# Update space privileges of the role

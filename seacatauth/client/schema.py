@@ -8,7 +8,7 @@ CLIENT_METADATA_SCHEMA = {
 	"preferred_client_id": {
 		"type": "string",
 		"pattern": "^[-_a-zA-Z0-9]{4,64}$",
-		"description": "(Non-canonical) Preferred client ID."
+		"description": "Preferred client ID. If not specified, a random ID will be generated.",
 	},
 	"client_name": {  # Can have language tags (e.g. "client_name#cs")
 		"type": "string",
@@ -93,7 +93,7 @@ CLIENT_METADATA_SCHEMA = {
 		"type": "string",
 		"description":
 			"Requested Client Authentication method for the Token Endpoint. "
-			"If omitted, the default is `none`.",
+			"If omitted, the default is `client_secret_basic`.",
 		"enum": [str(v) for v in OAuth2.TokenEndpointAuthMethod]
 	},
 	# "token_endpoint_auth_signing_alg": {},
@@ -147,6 +147,10 @@ CLIENT_METADATA_SCHEMA = {
 			"one of the registered URIs.",
 		"enum": [str(v) for v in OAuth2.RedirectUriValidationMethod]
 	},
+	"seacatauth_credentials": {  # NON-CANONICAL
+		"type": "boolean",
+		"description": "Whether to create client credentials for this client and enable access control.",
+	},
 }
 
 REGISTER_CLIENT = {
@@ -183,4 +187,26 @@ CLIENT_TEMPLATES = {
 	# 	"grant_types": ["authorization_code"],
 	# 	"response_types": ["code"]},
 	"Custom": {},
+}
+
+ISSUE_TOKEN = {
+	"type": "object",
+	"additionalProperties": False,
+	"properties": {
+		"tenant": {
+			"type": "string",
+			"description": "Tenant to access. If not specified, the token is tenantless.",
+		},
+		"label": {
+			"type": "string",
+			"description": "Token name",
+		},
+		"exp": {
+			"oneOf": [{"type": "string"}, {"type": "number"}],
+			"description":
+				"Token expiration time. The value can be either the number of seconds, "
+				"a time-unit duration string such as '4 h' or '3 d' "
+				"or an ISO 8601 datetime such as '2030-05-08' or '2030-05-08T23:41:54.000Z'.",
+		},
+	}
 }

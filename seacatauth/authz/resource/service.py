@@ -16,12 +16,15 @@ L = logging.getLogger(__name__)
 SEACAT_AUTH_RESOURCES = {
 	ResourceId.SUPERUSER: {
 		"description": "Grants superuser access, including the access to all tenants.",
+		"global_only": True,
 	},
 	ResourceId.IMPERSONATE: {
 		"description": "Open a session as a different user.",
+		"global_only": True,
 	},
 	ResourceId.ACCESS_ALL_TENANTS: {
 		"description": "Grants access to all tenants.",
+		"global_only": True,
 	},
 	ResourceId.CREDENTIALS_ACCESS: {
 		"description": "List credentials and view credentials details.",
@@ -31,27 +34,38 @@ SEACAT_AUTH_RESOURCES = {
 	},
 	ResourceId.SESSION_ACCESS: {
 		"description": "List sessions and view session details.",
+		"global_only": True,
 	},
 	ResourceId.SESSION_TERMINATE: {
 		"description": "Terminate sessions.",
+		"global_only": True,
 	},
 	ResourceId.RESOURCE_ACCESS: {
 		"description": "List resources and view resource details.",
+		"global_only": True,
 	},
 	ResourceId.RESOURCE_EDIT: {
 		"description": "Edit and delete resources.",
+		"global_only": True,
 	},
 	ResourceId.CLIENT_ACCESS: {
 		"description": "List clients and view client details.",
+		"global_only": True,
 	},
 	ResourceId.CLIENT_EDIT: {
 		"description": "Edit and delete clients.",
+		"global_only": True,
+	},
+	ResourceId.CLIENT_APIKEY_MANAGE: {
+		"description": "View, issue and revoke client API keys.",
+		"global_only": True,
 	},
 	ResourceId.TENANT_ACCESS: {
 		"description": "List tenants, view tenant detail and see tenant members.",
 	},
 	ResourceId.TENANT_CREATE: {
 		"description": "Create new tenants.",
+		"global_only": True,
 	},
 	ResourceId.TENANT_EDIT: {
 		"description": "Edit tenant data.",
@@ -74,18 +88,6 @@ SEACAT_AUTH_RESOURCES = {
 		"description": "Assign and unassign tenant roles.",
 	},
 }
-GLOBAL_ONLY_RESOURCES = frozenset({
-	ResourceId.SUPERUSER,
-	ResourceId.IMPERSONATE,
-	ResourceId.ACCESS_ALL_TENANTS,
-	ResourceId.SESSION_ACCESS,
-	ResourceId.SESSION_TERMINATE,
-	ResourceId.RESOURCE_ACCESS,
-	ResourceId.RESOURCE_EDIT,
-	ResourceId.CLIENT_ACCESS,
-	ResourceId.CLIENT_EDIT,
-	ResourceId.TENANT_CREATE,
-})
 
 
 class ResourceService(asab.Service):
@@ -106,9 +108,9 @@ class ResourceService(asab.Service):
 			await self._ensure_builtin_resources()
 
 
-	@staticmethod
-	def is_global_only_resource(resource_id):
-		return resource_id in GLOBAL_ONLY_RESOURCES
+	async def is_global_only_resource(self, resource_id):
+		resource = await self.get(resource_id)
+		return resource.get("global_only", False)
 
 
 	async def _ensure_builtin_resources(self):
@@ -117,20 +119,16 @@ class ResourceService(asab.Service):
 		Update their descriptions if they are outdated.
 		"""
 		for resource_id, resource_config in SEACAT_AUTH_RESOURCES.items():
-			description = resource_config.get("description")
-
-			L.debug("Checking for built-in resource {!r}".format(resource_id))
 			try:
 				db_resource = await self.get(resource_id)
 			except KeyError:
-				await self.create(resource_id, description, is_managed_by_seacat_auth=True)
+				await self.create(resource_id, **resource_config, is_managed_by_seacat_auth=True)
 				continue
 
-			if (
-				(db_resource.get("managed_by") != "seacat-auth")
-				or (description is not None and db_resource.get("description") != description)
-			):
-				await self._update(db_resource, description, is_managed_by_seacat_auth=True)
+			for k, v in resource_config.items():
+				if db_resource.get(k) != v:
+					await self._update(db_resource, **resource_config, is_managed_by_seacat_auth=True)
+					continue
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter: dict = None):
@@ -164,7 +162,13 @@ class ResourceService(asab.Service):
 		return self.normalize_resource(resource)
 
 
-	async def create(self, resource_id: str, description: str = None, is_managed_by_seacat_auth=False):
+	async def create(
+		self,
+		resource_id: str,
+		description: str = None,
+		global_only: bool = None,
+		is_managed_by_seacat_auth: bool = False
+	):
 		if self.ResourceIdRegex.match(resource_id) is None:
 			raise asab.exceptions.ValidationError(
 				"Resource ID must consist only of characters 'a-z0-9.:_-', "
@@ -174,6 +178,9 @@ class ResourceService(asab.Service):
 
 		if description is not None:
 			upsertor.set("description", description)
+
+		if global_only is True:
+			upsertor.set("global_only", True)
 
 		if is_managed_by_seacat_auth:
 			upsertor.set("managed_by", "seacat-auth")
@@ -196,17 +203,33 @@ class ResourceService(asab.Service):
 		await self._update(resource, description)
 
 
-	async def _update(self, resource: dict, description: str, is_managed_by_seacat_auth=False):
+	async def _update(
+		self,
+		resource: dict,
+		description: str = None,
+		global_only: bool = None,
+		is_managed_by_seacat_auth: bool = False
+	):
 		upsertor = self.StorageService.upsertor(
 			self.ResourceCollection,
 			obj_id=resource["_id"],
 			version=resource["_v"])
 
-		assert description is not None
-		if description == "":
+		if description is None:
+			pass
+		elif description == "":
 			upsertor.unset("description")
 		else:
 			upsertor.set("description", description)
+
+		if global_only is None:
+			pass
+		elif global_only is False:
+			upsertor.unset("global_only")
+		elif global_only is True:
+			upsertor.set("global_only", True)
+		else:
+			raise ValueError("global_only must be a boolean value.")
 
 		if is_managed_by_seacat_auth:
 			upsertor.set("managed_by", "seacat-auth")
@@ -299,8 +322,6 @@ class ResourceService(asab.Service):
 	def normalize_resource(self, resource: dict):
 		if resource["_id"] in SEACAT_AUTH_RESOURCES or resource.get("managed_by"):
 			resource["read_only"] = True
-		if self.is_global_only_resource(resource["_id"]):
-			resource["global_only"] = True
 		return resource
 
 

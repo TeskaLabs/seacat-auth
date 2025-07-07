@@ -167,6 +167,11 @@ class WebAuthnService(asab.Service):
 	):
 		"""
 		Create database entry for a verified WebAuthn credential
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID to register the WebAuthn credentials to
+			verified_registration (webauthn.registration.VerifiedRegistration): Verified WebAuthn registration challenge
+			name (str): WebAuthn credential display name
 		"""
 		metadata = await self._get_authenticator_metadata(verified_registration)
 		if name is None:
@@ -191,8 +196,8 @@ class WebAuthnService(asab.Service):
 		upsertor.set("rpid", self.RelyingPartyId)
 		upsertor.set("name", name)
 
-		wacid = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential created", struct_data={"wacid": wacid.hex()})
+		passkey_id = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
+		L.log(asab.LOG_NOTICE, "WebAuthn credential created.", struct_data={"passkey_id": passkey_id.hex()})
 
 	async def _get_authenticator_metadata(self, verified_registration):
 		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
@@ -204,16 +209,46 @@ class WebAuthnService(asab.Service):
 			metadata = await coll.find_one(aaguid)
 		return metadata
 
-	async def get_webauthn_credential(self, webauthn_credential_id):
+
+	async def get_webauthn_credential(
+		self,
+		credentials_id: str,
+		webauthn_credential_id: bytes,
+		rest_normalize: bool = False,
+	):
+		"""
+		Get WebAuthn credential detail by its ID and Seacat Auth credentials ID
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID
+			webauthn_credential_id (bytes): WebAuthn credentials ID
+			rest_normalize (bool): Normalize for public REST API, remove sensitive data
+		"""
+		wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
+		if credentials_id != wa_credential["cid"]:
+			raise KeyError("WebAuthn credential not found", {
+				"passkey_id": webauthn_credential_id,
+				"cid": credentials_id
+			})
+		if rest_normalize:
+			wa_credential = rest_normalize_webauthn_credential(wa_credential)
+		return wa_credential
+
+
+	async def _get_webauthn_credential(self, webauthn_credential_id: bytes):
 		"""
 		Get WebAuthn credential detail by its ID
 		"""
 		return await self.StorageService.get(self.WebAuthnCredentialCollection, webauthn_credential_id)
 
 
-	async def list_webauthn_credentials(self, credentials_id: str):
+	async def list_webauthn_credentials(self, credentials_id: str, rest_normalize: bool = False):
 		"""
 		Get all WebAuthn credentials associated with specific SCA credentials
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID
+			rest_normalize (bool): Normalize for public REST API, remove sensitive data
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
@@ -226,15 +261,17 @@ class WebAuthnService(asab.Service):
 		cursor.sort("_c", -1)
 
 		wa_credentials = []
-		async for resource_dict in cursor:
-			wa_credentials.append(resource_dict)
+		async for wa_credential in cursor:
+			if rest_normalize:
+				wa_credential = rest_normalize_webauthn_credential(wa_credential)
+			wa_credentials.append(wa_credential)
 
 		return wa_credentials
 
 
 	async def update_webauthn_credential(
 		self, webauthn_credential_id: bytes, *,
-		credentials_id: str = None,
+		credentials_id: str,
 		sign_count: int = None,
 		name: str = None,
 		last_login: datetime.datetime = None,
@@ -245,13 +282,21 @@ class WebAuthnService(asab.Service):
 		Only allows updating key name, last login time and sign count.
 
 		If credentials_id is specified, ensure that it matches the database entry.
-		"""
-		wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
 
+		Args:
+			webauthn_credential_id (bytes): WebAuthn credentials ID
+			credentials_id (str): Seacat Auth credentials ID to verify ownership
+			sign_count (int): Normalize for public REST API, remove sensitive data
+			name (str): Credential display label
+			last_login (datetime.datetime): Last login time
+		"""
+		wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
+
+		# TODO: Use api.local_authz instead of this check
 		if credentials_id is not None:
 			if credentials_id != wa_credential["cid"]:
 				raise KeyError("WebAuthn credential not found", {
-					"wacid": webauthn_credential_id,
+					"passkey_id": webauthn_credential_id,
 					"cid": credentials_id
 				})
 
@@ -271,8 +316,8 @@ class WebAuthnService(asab.Service):
 			upsertor.set("ll", last_login)
 
 		await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_UPDATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential updated", struct_data={
-			"wacid": webauthn_credential_id.hex(),
+		L.log(asab.LOG_NOTICE, "WebAuthn credential updated.", struct_data={
+			"passkey_id": webauthn_credential_id.hex(),
 		})
 
 
@@ -281,29 +326,36 @@ class WebAuthnService(asab.Service):
 		Delete WebAuthn credential by its ID.
 
 		If credentials_id is specified, ensure that it matches the database entry.
+
+		Args:
+			webauthn_credential_id (bytes): WebAuthn credentials ID
+			credentials_id (str): Seacat Auth credentials ID to verify ownership
 		"""
 
 		if credentials_id is not None:
-			wa_credential = await self.get_webauthn_credential(webauthn_credential_id)
+			wa_credential = await self._get_webauthn_credential(webauthn_credential_id)
 			if credentials_id != wa_credential["cid"]:
 				raise KeyError("WebAuthn credential not found", {
-					"wacid": webauthn_credential_id,
+					"passkey_id": webauthn_credential_id,
 					"cid": credentials_id
 				})
 
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted", struct_data={"wacid": webauthn_credential_id.hex()})
+		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted.", struct_data={"passkey_id": webauthn_credential_id.hex()})
 
 
 	async def delete_all_webauthn_credentials(self, credentials_id: str):
 		"""
 		Delete all WebAuthn credentials associated with specific SCA credentials
+
+		Args:
+			credentials_id (str): Seacat Auth credentials ID
 		"""
 		collection = self.StorageService.Database[self.WebAuthnCredentialCollection]
 
 		query_filter = {"cid": credentials_id}
 		result = await collection.delete_many(query_filter)
-		L.log(asab.LOG_NOTICE, "WebAuthn credentials deleted", struct_data={
+		L.log(asab.LOG_NOTICE, "WebAuthn credentials deleted.", struct_data={
 			"cid": credentials_id,
 			"count": result.deleted_count
 		})
@@ -329,7 +381,7 @@ class WebAuthnService(asab.Service):
 		upsertor.set("ch", challenge)
 
 		await upsertor.execute(event_type=EventTypes.WEBAUTHN_REG_CHALLENGE_CREATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn challenge created", struct_data={"sid": session_id})
+		L.log(asab.LOG_NOTICE, "WebAuthn challenge created.", struct_data={"sid": session_id})
 
 		return challenge
 
@@ -348,7 +400,7 @@ class WebAuthnService(asab.Service):
 		Delete existing WebAuthn registration challenge for the current session
 		"""
 		await self.StorageService.delete(self.WebAuthnRegistrationChallengeCollection, session_id)
-		L.info("WebAuthn challenge deleted", struct_data={
+		L.info("WebAuthn challenge deleted.", struct_data={
 			"sid": session_id
 		})
 
@@ -497,16 +549,16 @@ class WebAuthnService(asab.Service):
 		authentication_options = json.loads(authentication_options)
 		expected_challenge = authentication_options.get("challenge").encode("ascii")
 
-		wa_credential = await self.get_webauthn_credential(
+		wa_credential = await self._get_webauthn_credential(
 			base64.urlsafe_b64decode(public_key_credential["rawId"] + b"==")
 		)
 		public_key = wa_credential["pk"]
 		sign_count = wa_credential["sc"]
 
 		if credentials_id != wa_credential["cid"]:
-			L.error("WebAuthn login failed: Credentials ID does not match", struct_data={
+			L.error("WebAuthn login failed: Credentials ID does not match.", struct_data={
 				"cid": credentials_id,
-				"wacid": wa_credential["_id"],
+				"passkey_id": wa_credential["_id"],
 			})
 			return False
 
@@ -521,7 +573,7 @@ class WebAuthnService(asab.Service):
 				require_user_verification=False,
 			)
 		except Exception as e:
-			L.warning("WebAuthn login failed with {}: {}".format(type(e).__name__, str(e)))
+			L.warning("WebAuthn login failed with {}: {}.".format(type(e).__name__, str(e)))
 			return False
 
 		# Update sign count in storage
@@ -529,6 +581,7 @@ class WebAuthnService(asab.Service):
 			base64.urlsafe_b64decode(verified_authentication.credential_id + b"=="),
 			sign_count=verified_authentication.new_sign_count,
 			last_login=datetime.datetime.now(datetime.timezone.utc),
+			credentials_id=None,
 		)
 
 		return True
@@ -548,3 +601,15 @@ def _normalize_webauthn_credential_response(public_key_credential):
 	for field in ["clientDataJSON", "authenticatorData", "signature", "attestationObject"]:
 		if field in response:
 			response[field] = base64.urlsafe_b64decode(response[field].encode("ascii") + b"==")
+
+
+def rest_normalize_webauthn_credential(wa_credential: dict):
+	normalized = {
+		"id": base64.urlsafe_b64encode(wa_credential["_id"]).decode("ascii").rstrip("="),
+		"name": wa_credential["name"],
+		"sign_count": wa_credential["sc"],
+		"created": wa_credential["_c"],
+	}
+	if "ll" in wa_credential:
+		normalized["last_login"] = wa_credential["ll"]
+	return normalized
