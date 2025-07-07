@@ -56,6 +56,10 @@ SEACAT_AUTH_RESOURCES = {
 		"description": "Edit and delete clients.",
 		"global_only": True,
 	},
+	ResourceId.CLIENT_APIKEY_MANAGE: {
+		"description": "View, issue and revoke client API keys.",
+		"global_only": True,
+	},
 	ResourceId.TENANT_ACCESS: {
 		"description": "List tenants, view tenant detail and see tenant members.",
 	},

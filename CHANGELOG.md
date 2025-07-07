@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha4
 - v25.26-alpha3
 - v25.26-alpha2
 - v25.26-alpha1
@@ -13,6 +14,8 @@
 - Fix credentials search - Client provider error (#489, v25.26-alpha1)
 
 ### Features
+- New resource ID `seacat:client:apikey:manage` for client API key management (#488, v25.26-alpha4)
+- Prefix client API with /admin (#488, v25.26-alpha4)
 - Prefix credentials API with /admin (#493, v25.26-alpha3)
 
 ---
