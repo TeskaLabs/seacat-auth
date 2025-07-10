@@ -17,6 +17,7 @@ class _OAuth2Config:
 	def __init__(self, client_dict: dict):
 		# OAuth 2.0 / OpenID Connect attributes
 		self.ClientId: str = client_dict.get("client_id")
+		self.ClientIdIssuedAt: str = client_dict.get("_c")
 		self.ClientName: str = client_dict.get("client_name")
 		self.ClientUri: str = client_dict.get("client_uri")
 		self.RedirectUris: list = client_dict.get("redirect_uris")
@@ -81,8 +82,12 @@ class _OAuth2Config:
 
 
 	def rest_get(self) -> dict:
+		"""
+		Returns a dictionary representation of the OAuth client metadata in accordance with RFC 7591.
+		"""
 		oauth_dict = {
 			"client_id": self.ClientId,
+			"client_id_issued_at": self.ClientIdIssuedAt,
 			"client_name": self.ClientName,
 			"client_uri": self.ClientUri,
 			"redirect_uris": self.RedirectUris,
@@ -93,6 +98,7 @@ class _OAuth2Config:
 			"code_challenge_method": self.CodeChallengeMethod,
 			"default_max_age": self.DefaultMaxAge,
 			"redirect_uri_validation_method": self.RedirectUriValidationMethod,
+			"cookie_name": self.CookieName,
 			"cookie_domain": self.CookieDomain,
 			"cookie_webhook_uri": self.CookieWebhookUri,
 			"cookie_entry_uri": self.CookieEntryUri,
@@ -108,7 +114,7 @@ class _OAuth2Config:
 		if self.ClientSecretExpiresAt is not None:
 			oauth_dict["client_secret_expires_at"] = self.ClientSecretExpiresAt
 
-		return oauth_dict
+		return {k: v for k, v in oauth_dict.items() if v is not None}
 
 
 class Client:
@@ -150,4 +156,5 @@ class Client:
 		}
 		if self.OAuth2 is not None:
 			client_dict["oauth"] = self.OAuth2.rest_get()
-		return client_dict
+
+		return {k: v for k, v in client_dict.items() if v is not None}
