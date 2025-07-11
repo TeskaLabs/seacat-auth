@@ -16,8 +16,8 @@ class _OAuth2Config:
 
 	def __init__(self, client_dict: dict):
 		# OAuth 2.0 / OpenID Connect attributes
-		self.ClientId: str = client_dict.get("client_id")
-		self.ClientIdIssuedAt: str = client_dict.get("_c")
+		self.ClientId: str = client_dict["_id"]
+		self.ClientIdIssuedAt: str = client_dict["_c"]
 		self.ClientName: str = client_dict.get("client_name")
 		self.ClientUri: str = client_dict.get("client_uri")
 		self.RedirectUris: list = client_dict.get("redirect_uris")
@@ -125,10 +125,11 @@ class Client:
 		self.Version: int = self._Dict["_v"]
 		self.CreatedAt: datetime.datetime = self._Dict["_c"]
 		self.ModifiedAt: datetime.datetime = self._Dict["_m"]
+		self.ManagedBy: typing.Optional[str] = self._Dict.get("managed_by")
 
 		self.Label: str = self._Dict.get("client_name", self.Id)
 		self.SeacatAuthCredentialsEnabled: bool = self._Dict.get("seacatauth_credentials")
-		self.SeacatAuthCredentialsId: typing.Optional[str] = self._Dict.get("seacatauth_credentials_id")
+		self.SeacatAuthCredentialsId: typing.Optional[str] = self._Dict.get("credentials_id")
 
 		self.OAuth2: typing.Optional[_OAuth2Config] = _OAuth2Config.deserialize(self._Dict)
 
@@ -144,6 +145,14 @@ class Client:
 		return self._Dict[key]
 
 
+	def __iter__(self):
+		return iter(self._Dict)
+
+
+	def get(self, key: str, default=None):
+		return self._Dict.get(key, default)
+
+
 	def rest_get(self) -> dict:
 		client_dict = {
 			"_id": self.Id,
@@ -152,9 +161,18 @@ class Client:
 			"_m": self.ModifiedAt,
 			"label": self.Label,
 			"seacatauth_credentials": self.SeacatAuthCredentialsEnabled,
-			"seacatauth_credentials_id": self.SeacatAuthCredentialsId,
+			"credentials_id": self.SeacatAuthCredentialsId,
+			"read_only": not self.is_editable(),
+			"managed_by": self.ManagedBy,
 		}
 		if self.OAuth2 is not None:
 			client_dict["oauth"] = self.OAuth2.rest_get()
 
 		return {k: v for k, v in client_dict.items() if v is not None}
+
+
+	def is_editable(self) -> bool:
+		"""
+		Returns True if the client is editable, i.e. it is not managed by an external service.
+		"""
+		return self.ManagedBy is None
