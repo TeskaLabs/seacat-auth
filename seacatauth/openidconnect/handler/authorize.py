@@ -668,7 +668,7 @@ class AuthorizeHandler(object):
 		Verify that the requested authorization options comply with the client's configuration and permissions.
 		"""
 		try:
-			client_dict = await self.OpenIdConnectService.ClientService.get_client(client_id)
+			client_dict = await self.OpenIdConnectService.ClientService.get_oauth_client(client_id)
 		except KeyError as e:
 			raise exceptions.ClientNotFoundError(client_id) from e
 
@@ -803,7 +803,7 @@ class AuthorizeHandler(object):
 		Pass on the query parameters.
 		"""
 		# Get client collection
-		client_dict = await self.OpenIdConnectService.ClientService.get_client(client_id)
+		client_dict = await self.OpenIdConnectService.ClientService.get_oauth_client(client_id)
 
 		# Build redirect uri
 		callback_uri = self.OpenIdConnectService.build_authorize_uri(
@@ -850,7 +850,7 @@ class AuthorizeHandler(object):
 		))
 
 		# Gather params which will be passed to the oidc/authorize request called after the OTP setup
-		client_dict = await self.OpenIdConnectService.ClientService.get_client(client_id)
+		client_dict = await self.OpenIdConnectService.ClientService.get_oauth_client(client_id)
 		callback_uri = self.OpenIdConnectService.build_authorize_uri(
 			client_dict=client_dict,
 			client_id=client_id,

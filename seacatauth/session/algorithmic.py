@@ -123,7 +123,7 @@ class AlgorithmicSessionProvider:
 			raise exceptions.SessionNotFoundError("Expired algorithmic session token.") from e
 
 		data_dict = json.loads(token.claims)
-		client_dict = await self.ClientService.get_client(data_dict["azp"])
+		client_dict = await self.ClientService.get_oauth_client(data_dict["azp"])
 		try:
 			session = await self._build_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),

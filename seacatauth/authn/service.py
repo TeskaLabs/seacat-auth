@@ -451,7 +451,7 @@ class AuthenticationService(asab.Service):
 		"""
 		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
-		client_dict = await client_svc.get_client(client_id)
+		client_dict = await client_svc.get_oauth_client(client_id)
 
 		# Remove "prompt" and "acr_values" from callback
 		prompt = authorization_query.pop("prompt", None)

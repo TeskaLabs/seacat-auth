@@ -169,6 +169,17 @@ class ClientService(asab.Service):
 			return Client(self._normalize_client(client))
 
 
+	async def get_oauth_client(self, client_id: str):
+		"""
+		Get client metadata
+		"""
+		client = await self.get_client(client_id)
+		if client.OAuth2 is None:
+			L.error("Client is not an OAuth2 client.", struct_data={"client_id": client_id})
+			raise exceptions.ClientNotFoundError(client_id)
+		return client
+
+
 	async def create_client(
 		self, *,
 		preferred_client_id: str = None,
