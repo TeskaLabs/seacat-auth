@@ -3,13 +3,8 @@ from ..models.const import OAuth2
 
 # https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
 # TODO: Supported OAuth/OIDC param values should be managed by the OpenIdConnect module, not Client.
-CLIENT_METADATA_SCHEMA = {
+OAUTH_CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
-	"preferred_client_id": {
-		"type": "string",
-		"pattern": "^[-_a-zA-Z0-9]{4,64}$",
-		"description": "Preferred client ID. If not specified, a random ID will be generated.",
-	},
 	"client_name": {  # Can have language tags (e.g. "client_name#cs")
 		"type": "string",
 		"description": "Name of the Client to be presented to the End-User."
@@ -42,10 +37,6 @@ CLIENT_METADATA_SCHEMA = {
 		"items": {"type": "string"}
 	},
 	#  "contacts": {},
-	# "custom_data": {  # NON-CANONICAL
-	# 	"type": "object", "description": "(Non-canonical) Additional client data."},
-	# "logout_uri": {  # NON-CANONICAL
-	# 	"type": "string", "description": "(Non-canonical) URI that will be called on session logout."},
 	"application_type": {
 		"type": "string",
 		"description": "Kind of the application. The default, if omitted, is `web`.",
@@ -147,31 +138,57 @@ CLIENT_METADATA_SCHEMA = {
 			"one of the registered URIs.",
 		"enum": [str(v) for v in OAuth2.RedirectUriValidationMethod]
 	},
-	"seacatauth_credentials": {  # NON-CANONICAL
-		"type": "boolean",
-		"description": "Whether to create client credentials for this client and enable access control.",
-	},
 }
 
 REGISTER_CLIENT = {
 	"type": "object",
-	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
-	"properties": CLIENT_METADATA_SCHEMA,
-	# "patternProperties": {
-	#   # Language-specific metadata with RFC 5646 language tags
-	# 	"^client_name#[-a-zA-Z0-9]+$": {"type": "string"},
-	# 	"^logo_uri#[-a-zA-Z0-9]+$": {"type": "string"},
-	# 	"^client_uri#[-a-zA-Z0-9]+$": {"type": "string"},
-	# 	"^policy_uri#[-a-zA-Z0-9]+$": {"type": "string"},
-	# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
-	# }
+	"properties": {
+		"preferred_client_id": {
+			"type": "string",
+			"pattern": "^[-_a-zA-Z0-9]{4,64}$",
+			"description": "Preferred client ID. If not specified, a random ID will be generated.",
+		},
+		"oauth": {
+			"type": ["object", "null"],
+			"properties": OAUTH_CLIENT_METADATA_SCHEMA,
+			# "patternProperties": {
+			#   # Language-specific metadata with RFC 5646 language tags
+			# 	"^client_name#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^logo_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^client_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^policy_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# }
+		},
+		"seacatauth_credentials": {
+			"type": "boolean",
+			"description": "Whether to create client credentials for this client and enable access control.",
+		},
+	},
 }
 
 UPDATE_CLIENT = {
 	"type": "object",
 	"additionalProperties": False,
-	"properties": CLIENT_METADATA_SCHEMA
+	"properties": {
+		"oauth": {
+			"type": ["object", "null"],
+			"properties": OAUTH_CLIENT_METADATA_SCHEMA,
+			# "patternProperties": {
+			#   # Language-specific metadata with RFC 5646 language tags
+			# 	"^client_name#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^logo_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^client_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^policy_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# 	"^tos_uri#[-a-zA-Z0-9]+$": {"type": "string"},
+			# }
+		},
+		"seacatauth_credentials": {
+			"type": "boolean",
+			"description": "Whether to create client credentials for this client and enable access control.",
+		},
+	},
 }
 
 CLIENT_TEMPLATES = {
