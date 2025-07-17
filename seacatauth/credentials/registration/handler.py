@@ -37,7 +37,7 @@ class RegistrationHandler(object):
 		self.TenantService = app.get_service("seacatauth.TenantService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_post("/{tenant}/invite", self.admin_create_invitation)
+		web_app.router.add_post("/admin/{tenant}/invite", self.admin_create_invitation)
 		web_app.router.add_post("/invite/{credentials_id}", self.resend_invitation)
 		web_app.router.add_post("/account/{tenant}/invite", self.public_create_invitation)
 		web_app.router.add_post("/public/register", self.request_self_invitation)
