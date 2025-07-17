@@ -49,7 +49,7 @@ class SeaCatAuthApplication(asab.Application):
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 
 		import asab.web.tenant
-		self.AsabTenantService = asab.web.tenant.TenantService(self)
+		self.AsabTenantService = asab.web.tenant.TenantService(self, strict=False)
 		self.AsabTenantService.install(self.WebContainer)
 		self.AsabTenantService.install(self.PublicWebContainer)
 
