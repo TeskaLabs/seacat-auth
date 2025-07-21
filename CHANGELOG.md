@@ -3,10 +3,15 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha5
 - v25.26-alpha4
 - v25.26-alpha3
 - v25.26-alpha2
 - v25.26-alpha1
+
+### Breaking changes
+- Admin tenant invitation path changed to `/admin/tenant/{tenant}/invite`.
+  Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
 - Add default value for passwordlink in credentials creation (#494, v25.26-alpha2)
@@ -17,6 +22,9 @@
 - New resource ID `seacat:client:apikey:manage` for client API key management (#488, v25.26-alpha4)
 - Prefix client API with /admin (#488, v25.26-alpha4)
 - Prefix credentials API with /admin (#493, v25.26-alpha3)
+
+### Refactoring
+- Adapt to ASAB tenant mode (#501, v25.26-alpha5)
 
 ---
 
