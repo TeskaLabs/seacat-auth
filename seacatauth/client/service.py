@@ -377,14 +377,22 @@ class ClientService(asab.Service):
 
 		client_dict = await self.get(client_id)
 
+		# HOTFIX: Do not check the authentication method because of Grafana.
 		# Check if used authentication method matches the pre-configured one
-		expected_auth_method = client_dict.get("token_endpoint_auth_method", "client_secret_basic")
-		if auth_method != expected_auth_method:
-			raise exceptions.ClientAuthenticationError(
-				"Unexpected authentication method (expected {!r}, got {!r}).".format(
-					expected_auth_method, auth_method),
-				client_id=client_id,
-			)
+		# expected_auth_method = client_dict.get(
+		# 	"token_endpoint_auth_method",
+		# 	OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
+		# )
+		# if auth_method != expected_auth_method:
+		# 	L.error("Unexpected client authentication method.", struct_data={
+		# 		"received_auth_method": auth_method,
+		# 		"expected_auth_method": expected_auth_method,
+		# 	})
+		# 	raise exceptions.ClientAuthenticationError(
+		# 		"Unexpected authentication method (expected {!r}, got {!r}).".format(
+		# 			expected_auth_method, auth_method),
+		# 		client_id=client_id,
+		# 	)
 
 		if auth_method == "none":
 			# Public client - no secret verification required
