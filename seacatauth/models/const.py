@@ -66,6 +66,7 @@ class OAuth2:
 
 
 	class CodeChallengeMethod(enum.StrEnum):
+		# The methods must be ordered from the weakest to the strongest
 		NONE = "none"
 		PLAIN = "plain"
 		S256 = "S256"
@@ -75,13 +76,12 @@ class OAuth2:
 			"""
 			Returns True if 'a' is stronger or equal to 'b'.
 			"""
-			if a == cls.NONE:
-				return b == cls.NONE
-			if a == cls.PLAIN:
-				return b in (cls.PLAIN, cls.S256)
-			if a == cls.S256:
-				return b in (cls.NONE, cls.PLAIN, cls.S256)
-			return False
+			for method in cls:
+				# Whatever method encountered first is the weaker one
+				if method == b:
+					return True
+				if method == a:
+					return False
 
 
 	class IdTokenSigningAlg(enum.StrEnum):
