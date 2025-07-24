@@ -80,7 +80,7 @@ class OAuth2:
 			if a == cls.PLAIN:
 				return b in (cls.PLAIN, cls.S256)
 			if a == cls.S256:
-				return b in (cls.S256,)
+				return b in (cls.NONE, cls.PLAIN, cls.S256)
 			return False
 
 
