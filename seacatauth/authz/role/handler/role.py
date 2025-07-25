@@ -64,8 +64,13 @@ class RoleHandler(object):
 			description: Show only roles that contain the specified resource
 			schema:
 				type: string
+		-	name: assign_cid
+			in: query
+			description: Include info about what roles are assigned and can be assigned to this credentials ID.
+			schema:
+				type: string
 		"""
-		return await self._list(request, tenant_id=None)
+		return await self._list_roles(request, tenant_id=None)
 
 
 	async def list_roles(self, request):
@@ -96,9 +101,14 @@ class RoleHandler(object):
 				type: string
 				enum:
 				- true
+		-	name: assign_cid
+			in: query
+			description: Include info about what roles are assigned and can be assigned to this credentials ID.
+			schema:
+				type: string
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
-		return await self._list(request, tenant_id=tenant_id)
+		return await self._list_roles(request, tenant_id=tenant_id)
 
 
 	async def get_role(self, request):
@@ -217,14 +227,15 @@ class RoleHandler(object):
 		return await self._delete_role(request, role_id)
 
 
-	async def _list(self, request, tenant_id):
+	async def _list_roles(self, request, tenant_id):
 		search = generic.SearchParams(request.query)
-		result = await self.RoleService.list(
+		result = await self.RoleService.list_roles(
 			tenant_id=tenant_id,
 			page=search.Page,
 			limit=search.ItemsPerPage,
 			name_filter=search.SimpleFilter,
 			resource_filter=search.get("resource"),
+			assign_cid=search.get("assign_cid"),
 		)
 		return asab.web.rest.json_response(request, result)
 
