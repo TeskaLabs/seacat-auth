@@ -350,6 +350,9 @@ class ClientService(asab.Service):
 		Returns:
 			Authenticated client ID
 		"""
+		L.debug("Authenticating client request.", struct_data={
+			"headers": request.headers, "body": await request.text(), "query": request.query})
+
 		# Extract client ID and secret from request authorization header or post data
 		client_id, client_secret = self._get_credentials_from_authorization_header(request)
 		if client_id and client_secret:
