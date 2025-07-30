@@ -116,16 +116,20 @@ class SearchParams:
 
 
 def get_bearer_token_value(request):
-	bearer_prefix = "Bearer "
-	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
-	if auth_header is None:
-		L.info("Request has no Authorization header")
-		return None
-	if auth_header.startswith(bearer_prefix):
-		return auth_header[len(bearer_prefix):]
+	token_type, token_value = get_token_from_authorization_header(request)
+	if token_type == "Bearer":
+		return token_value
 
 	L.info("No Bearer token in Authorization header")
 	return None
+
+
+def get_token_from_authorization_header(request):
+	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
+	if auth_header is None:
+		L.info("Request has no Authorization header")
+		return None, None
+	return auth_header.split(" ", 1)
 
 
 def get_access_token_value_from_websocket(request):
