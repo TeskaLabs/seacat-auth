@@ -8,6 +8,7 @@ import asab.exceptions
 import asab.utils
 import asab.web.auth
 import asab.contextvars
+import bson
 
 from .. import exceptions
 from ..models import Session
@@ -52,29 +53,14 @@ class ApiKeyService(asab.Service):
 				**(query_filter or {})
 			}
 		):
-			api_key = {
-				"_id": session.Session.Id,
-				"exp": session.Session.Expiration,
-				"resources": session.Authorization.Authz,
-			}
-			if session.Session.Label:
-				api_key["label"] = session.Session.Label
-			data.append(api_key)
+			data.append(_normalize_api_key(session))
 		return data
 
 
 	@asab.web.auth.require(ResourceId.APIKEY_ACCESS)
 	async def get_api_key(self, key_id: str):
 		session = await self.SessionService.get(session_id=key_id)
-		api_key = {
-			"_id": session.Session.Id,
-			"exp": session.Session.Expiration,
-			"resources": session.Authorization.Authz,
-			"label": session.Session.Label,
-		}
-		if session.Session.Label:
-			api_key["label"] = session.Session.Label
-		return api_key
+		return _normalize_api_key(session)
 
 
 	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
@@ -93,11 +79,14 @@ class ApiKeyService(asab.Service):
 					authz_obj.require_resource_access(*resources)
 
 		# Create session
+		session_id = bson.ObjectId()
+		credentials_id = "seacatauth:apikey:{}".format(session_id)
 		session = await self.SessionService.create_session(
+			session_id=session_id,
 			session_type="apikey",
 			expiration=expires_at,
 			session_builders=[[
-				(Session.FN.Credentials.Id, "seacatauth:apikey"),
+				(Session.FN.Credentials.Id, credentials_id),
 				(Session.FN.Session.Label, label),
 				(Session.FN.Authorization.Authz, authz),
 			]]
@@ -138,31 +127,41 @@ class ApiKeyService(asab.Service):
 
 
 	async def get_session_by_api_key(self, token_value: str) -> Session:
-		if "." in token_value:
-			# If there is ".", the value is not pure base64. It must be a JWT of an algorithmic session.
-			return await self.SessionService.Algorithmic.deserialize(token_value)
-
 		try:
 			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		except binascii.Error as e:
-			L.error("Corrupt access token format: Base64 decoding failed.", struct_data={
+			L.error("Corrupt API key format: Base64 decoding failed.", struct_data={
 				"token_value": token_value})
-			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
+			raise exceptions.SessionNotFoundError("Corrupt API key format") from e
 		except UnicodeEncodeError as e:
-			L.error("Corrupt access token format: ASCII decoding failed.", struct_data={
+			L.error("Corrupt API key format: ASCII decoding failed.", struct_data={
 				"token_value": token_value})
-			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
+			raise exceptions.SessionNotFoundError("Corrupt API key format") from e
 
 		try:
 			token_data = await self.TokenService.get(token_bytes, token_type="apikey")
 		except KeyError:
-			raise exceptions.SessionNotFoundError("Invalid or expired access token")
+			raise exceptions.SessionNotFoundError("Invalid or expired API key")
+
 		try:
 			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
-			L.error("Integrity error: Access token points to a nonexistent session.", struct_data={
+			L.error("Integrity error: API key points to a nonexistent session.", struct_data={
 				"sid": token_data["sid"]})
 			await self.TokenService.delete(token_bytes)
-			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
+			raise exceptions.SessionNotFoundError("API key points to a nonexistent session")
 
 		return session
+
+
+def _normalize_api_key(session: Session) -> dict:
+	api_key = {
+		"_id": session.Session.Id,
+		"_c": session.Session.CreatedAt,
+		"cid": session.Credentials.Id,
+		"exp": session.Session.Expiration,
+		"resources": session.Authorization.Authz,
+	}
+	if session.Session.Label:
+		api_key["label"] = session.Session.Label
+	return api_key

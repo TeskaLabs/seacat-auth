@@ -24,11 +24,11 @@ class ApiKeyHandler(object):
 		self.ApiKeyService = api_key_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/admin/api-key", self.list_api_keys)
-		web_app.router.add_post("/admin/api-key", self.create_api_key)
-		web_app.router.add_get("/admin/api-key/{key_id}", self.get_api_key)
-		web_app.router.add_put("/admin/api-key/{key_id}", self.update_api_key)
-		web_app.router.add_delete("/admin/api-key/{key_id}", self.delete_api_key)
+		web_app.router.add_get("/admin/apikey", self.list_api_keys)
+		web_app.router.add_post("/admin/apikey", self.create_api_key)
+		web_app.router.add_get("/admin/apikey/{key_id}", self.get_api_key)
+		web_app.router.add_put("/admin/apikey/{key_id}", self.update_api_key)
+		web_app.router.add_delete("/admin/apikey/{key_id}", self.delete_api_key)
 
 
 	@asab.web.tenant.allow_no_tenant

@@ -184,9 +184,12 @@ class SessionService(asab.Service):
 		session_type: str,
 		parent_session_id: bson.ObjectId = None,
 		expiration: float | datetime.datetime = None,
-		session_builders: list = None
+		session_builders: list = None,
+		session_id: str = None,
 	):
-		upsertor = self.StorageService.upsertor(self.SessionCollection)
+		if session_id is None:
+			session_id = bson.ObjectId()
+		upsertor = self.StorageService.upsertor(self.SessionCollection, obj_id=session_id)
 
 		# Set up required fields
 		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie", "apikey"]):
