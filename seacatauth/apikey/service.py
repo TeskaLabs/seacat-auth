@@ -94,7 +94,7 @@ class ApiKeyService(asab.Service):
 
 		# Create token
 		raw_value = await self.TokenService.create(
-			token_length=32,
+			token_length=self.TokenLength,
 			token_type="apikey",
 			session_id=session.Session.Id,
 			expires_at=expires_at,
