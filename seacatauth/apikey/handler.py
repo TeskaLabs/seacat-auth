@@ -89,14 +89,15 @@ class ApiKeyHandler(object):
 					"a time-unit duration string such as '4 h' or '3 d' "
 					"or an ISO 8601 datetime such as '2030-05-08' or '2030-05-08T23:41:54.000Z'.",
 			},
+			"tenant": {
+				"type": ["string", "null"],
+				"description": "Tenant scope to authorize. If not specified, the API key is tenantless.",
+			},
 			"resources": {
-				"type": "object",
-				"description": "Tenants and resources to grant access to",
-				"additionalProperties": {
-					"type": "array",
-					"items": {"type": "string"}
-				}
-			}
+				"type": "array",
+				"description": "Resources to authorize.",
+				"items": {"type": "string"},
+			},
 		},
 	})
 	@asab.web.tenant.allow_no_tenant
@@ -108,7 +109,8 @@ class ApiKeyHandler(object):
 			expires_at = None
 		result = await self.ApiKeyService.create_api_key(
 			expires_at=expires_at,
-			authz=json_data.get("resources"),
+			tenant=json_data.get("tenant"),
+			resources=json_data.get("resources"),
 			label=json_data.get("label"),
 		)
 		return asab.web.rest.json_response(request, result)

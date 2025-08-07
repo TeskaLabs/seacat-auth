@@ -66,17 +66,21 @@ class ApiKeyService(asab.Service):
 	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
 	async def create_api_key(
 		self, *,
-		authz: typing.Dict[str, typing.Set[str]],
+		tenant: typing.Union[str, None],
+		resources: typing.Set[str],
 		expires_at: typing.Optional[datetime.datetime] = None,
 		label: typing.Optional[str] = None,
 	):
 		expires_at = expires_at or datetime.datetime.now(datetime.UTC) + self.DefaultExpiration
 		# Ensure that the agent has access to the requested resources
-		for tenant, resources in authz.items():
-			if tenant != "*":
-				with asab.contextvars.tenant_context(tenant):
-					authz_obj = asab.contextvars.Authz.get()
-					authz_obj.require_resource_access(*resources)
+		agent_authz = asab.contextvars.Authz.get()
+		if tenant is not None:
+			with asab.contextvars.tenant_context(tenant):
+				agent_authz.require_resource_access(*resources)
+			api_key_authz = {tenant: set(resources)}
+		else:
+			agent_authz.require_resource_access(*resources)
+			api_key_authz = {"*": set(resources)}
 
 		# Create session
 		session_id = bson.ObjectId()
@@ -88,7 +92,7 @@ class ApiKeyService(asab.Service):
 			session_builders=[[
 				(Session.FN.Credentials.Id, credentials_id),
 				(Session.FN.Session.Label, label),
-				(Session.FN.Authorization.Authz, authz),
+				(Session.FN.Authorization.Authz, api_key_authz),
 			]]
 		)
 
