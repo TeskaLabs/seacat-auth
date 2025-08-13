@@ -77,10 +77,10 @@ class ApiKeyService(asab.Service):
 		if tenant is not None:
 			with asab.contextvars.tenant_context(tenant):
 				agent_authz.require_resource_access(*resources)
-			api_key_authz = {tenant: set(resources)}
+			api_key_authz = {tenant: list(resources)}
 		else:
 			agent_authz.require_resource_access(*resources)
-			api_key_authz = {"*": set(resources)}
+			api_key_authz = {"*": list(resources)}
 
 		# Create session
 		session_id = bson.ObjectId()
