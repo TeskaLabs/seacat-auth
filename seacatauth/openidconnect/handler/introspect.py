@@ -93,7 +93,7 @@ class TokenIntrospectionHandler(object):
 				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e))
 				return None
 
-		elif token_type == "ApiKey":
+		elif token_type == self.ApiKeyService.TOKEN_TYPE:
 			try:
 				session = await self.ApiKeyService.get_session_by_api_key(token_value)
 			except exceptions.SessionNotFoundError as e:

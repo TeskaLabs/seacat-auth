@@ -22,6 +22,7 @@ class ApiKeyService(asab.Service):
 	"""
 	API key management
 	"""
+	TOKEN_TYPE = "ApiKey"
 
 	def __init__(self, app, service_name="seacatauth.ApiKeyService"):
 		super().__init__(app, service_name)
@@ -44,14 +45,25 @@ class ApiKeyService(asab.Service):
 		limit: int = None,
 		query_filter: typing.Optional[str | typing.Dict] = None,
 	):
+		query_filter = {
+			Session.FN.Session.Type: "apikey",
+			**(query_filter or {})
+		}
+		tenant = asab.contextvars.Tenant.get()
+		authz = asab.contextvars.Authz.get()
+		if tenant is not None:
+			query_filter[Session.FN.Authorization.Authz] = {
+				tenant: {"$exists": True}
+			}
+		else:
+			# Only superuser can see data from all tenants
+			authz.require_superuser_access()
+
 		data = []
 		async for session in self.SessionService.iterate_sessions(
 			page,
 			limit,
-			query_filter={
-				Session.FN.Session.Type: "apikey",
-				**(query_filter or {})
-			}
+			query_filter=query_filter
 		):
 			data.append(_normalize_api_key(session))
 		return data
@@ -108,7 +120,7 @@ class ApiKeyService(asab.Service):
 		return {
 			"_id": session.Session.Id,
 			"exp": session.Session.Expiration,
-			"token_type": "ApiKey",
+			"token_type": self.TOKEN_TYPE,
 			"token_value": base64.urlsafe_b64encode(raw_value).decode("ascii"),
 		}
 
@@ -145,7 +157,7 @@ class ApiKeyService(asab.Service):
 		try:
 			token_data = await self.TokenService.get(token_bytes, token_type="apikey")
 		except KeyError:
-			raise exceptions.SessionNotFoundError("Invalid or expired API key")
+			raise exceptions.SessionNotFoundError("Invalid or expired API key") from None
 
 		try:
 			session = await self.SessionService.get(token_data["sid"])
@@ -153,7 +165,7 @@ class ApiKeyService(asab.Service):
 			L.error("Integrity error: API key points to a nonexistent session.", struct_data={
 				"sid": token_data["sid"]})
 			await self.TokenService.delete(token_bytes)
-			raise exceptions.SessionNotFoundError("API key points to a nonexistent session")
+			raise exceptions.SessionNotFoundError("API key points to a nonexistent session") from None
 
 		return session
 
