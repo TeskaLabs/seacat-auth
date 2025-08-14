@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha7
 - v25.26-alpha6
 - v25.26-alpha5
 - v25.26-alpha4
@@ -15,6 +16,7 @@
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
+- Fix endpoint for obtaining global roles (#506, v25.26-alpha7)
 - Fix PKCE strength evaluation (#504, v25.26-alpha6)
 - Add default value for passwordlink in credentials creation (#494, v25.26-alpha2)
 - Fix ASAB version printer (#492, v25.26-alpha1)
