@@ -6,6 +6,7 @@ import asab.web.auth
 import asab.web.tenant
 import asab.storage.exceptions
 import asab.exceptions
+import asab.utils
 
 from .... import exceptions
 from .... import generic
@@ -66,9 +67,7 @@ class RoleHandler(object):
 			in: query
 			description: Show only proper tenant roles, without globals.
 			schema:
-				type: string
-				enum:
-				- true
+				type: boolean
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		return await self._list(request, tenant_id=tenant_id)
@@ -77,7 +76,7 @@ class RoleHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	async def list_global_roles(self, request):
 		"""
-		List roles from all tenants
+		List global roles
 
 		---
 		parameters:
@@ -224,6 +223,7 @@ class RoleHandler(object):
 			limit=search.ItemsPerPage,
 			name_filter=search.SimpleFilter,
 			resource_filter=search.get("resource"),
+			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false"))
 		)
 		return asab.web.rest.json_response(request, result)
 
