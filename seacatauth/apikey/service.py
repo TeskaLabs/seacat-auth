@@ -52,8 +52,8 @@ class ApiKeyService(asab.Service):
 		tenant = asab.contextvars.Tenant.get()
 		authz = asab.contextvars.Authz.get()
 		if tenant is not None:
-			query_filter[Session.FN.Authorization.Authz] = {
-				tenant: {"$exists": True}
+			query_filter["{}.{}".format(Session.FN.Authorization.Authz, tenant)] = {
+				"$exists": True
 			}
 		else:
 			# Only superuser can see data from all tenants
