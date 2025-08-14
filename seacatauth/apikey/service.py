@@ -88,10 +88,13 @@ class ApiKeyService(asab.Service):
 		agent_authz = asab.contextvars.Authz.get()
 		if tenant is not None:
 			with asab.contextvars.tenant_context(tenant):
-				agent_authz.require_resource_access(*resources)
-			api_key_authz = {tenant: list(resources)}
+				agent_authz.require_tenant_access()
+				if len(resources) > 0:
+					agent_authz.require_resource_access(*resources)
+				api_key_authz = {tenant: list(resources)}
 		else:
-			agent_authz.require_resource_access(*resources)
+			if len(resources) > 0:
+				agent_authz.require_resource_access(*resources)
 			api_key_authz = {"*": list(resources)}
 
 		# Create session
