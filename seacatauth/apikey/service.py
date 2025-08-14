@@ -161,7 +161,7 @@ class ApiKeyService(asab.Service):
 
 		try:
 			session = await self.SessionService.get(token_data["sid"])
-		except KeyError:
+		except exceptions.SessionNotFoundError:
 			L.error("Integrity error: API key points to a nonexistent session.", struct_data={
 				"sid": token_data["sid"]})
 			await self.TokenService.delete(token_bytes)
