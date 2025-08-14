@@ -82,7 +82,7 @@ class ApiKeyHandler(object):
 			"label": {
 				"type": "string", "description": "Human-readable label for the API key"
 			},
-			"expiration": {
+			"exp": {
 				"oneOf": [{"type": "string"}, {"type": "number"}],
 				"description":
 					"API key expiration time. The value can be either the number of seconds, "
