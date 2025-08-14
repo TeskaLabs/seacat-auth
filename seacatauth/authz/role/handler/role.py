@@ -28,7 +28,7 @@ class RoleHandler(object):
 		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/role", self.list_all_roles)
+		web_app.router.add_get("/role/*", self.list_global_roles)
 		web_app.router.add_get("/role/*/{role_name}", self.get_global_role)
 		web_app.router.add_post("/role/*/{role_name}", self.create_global_role)
 		web_app.router.add_put("/role/*/{role_name}", self.update_global_role)
@@ -39,33 +39,6 @@ class RoleHandler(object):
 		web_app.router.add_post("/role/{tenant}/{role_name}", self.create_role)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_role)
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete_role)
-
-
-	@asab.web.auth.require_superuser
-	@asab.web.tenant.allow_no_tenant
-	async def list_all_roles(self, request):
-		"""
-		List roles from all tenants
-
-		---
-		parameters:
-		-	name: p
-			in: query
-			description: Page number
-			schema:
-				type: integer
-		-	name: i
-			in: query
-			description: Items per page
-			schema:
-				type: integer
-		-	name: resource
-			in: query
-			description: Show only roles that contain the specified resource
-			schema:
-				type: string
-		"""
-		return await self._list(request, tenant_id=None)
 
 
 	async def list_roles(self, request):
@@ -99,6 +72,32 @@ class RoleHandler(object):
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		return await self._list(request, tenant_id=tenant_id)
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def list_global_roles(self, request):
+		"""
+		List roles from all tenants
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: resource
+			in: query
+			description: Show only roles that contain the specified resource
+			schema:
+				type: string
+		"""
+		return await self._list(request, tenant_id=None)
 
 
 	async def get_role(self, request):
