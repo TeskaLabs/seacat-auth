@@ -99,7 +99,7 @@ class ApiKeyService(asab.Service):
 
 		# Create session
 		session_id = bson.ObjectId()
-		credentials_id = "seacatauth:apikey:{}".format(session_id)
+		credentials_id = "seacatauth:apikey"
 		session = await self.SessionService.create_session(
 			session_id=session_id,
 			session_type="apikey",
