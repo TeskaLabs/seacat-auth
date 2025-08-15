@@ -57,6 +57,13 @@ class ResourceHandler(object):
 			description: Filter string
 			schema:
 				type: string
+		-	name: a_id!
+			in: query
+			description: Resource IDs to exclude from the results (comma-separated).
+			required: false
+			explode: false
+			schema:
+				type: array
 		-	name: exclude
 			in: query
 			description:
@@ -99,6 +106,13 @@ class ResourceHandler(object):
 
 		if "globalonly" in exclude:
 			query_filter["global_only"]["ne"] = True
+
+		exclude_ids = request.query.get("a_id!")
+		if exclude_ids:
+			exclude_ids = exclude_ids.split(",")
+			if "_id" not in query_filter:
+				query_filter["_id"] = {}
+			query_filter["_id"]["$nin"] = exclude_ids
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
