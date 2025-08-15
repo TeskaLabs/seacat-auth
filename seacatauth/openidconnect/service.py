@@ -470,7 +470,7 @@ class OpenIdConnectService(asab.Service):
 
 		# Determine the desired access and refresh token expiration time
 		client_id = session.OAuth2.ClientId
-		client = await self.ClientService.get_client(client_id)
+		client = await self.ClientService.get_oauth_client(client_id)
 		access_token_expiration = client.get("session_expiration") or AccessToken.Expiration
 		access_token_expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
 			seconds=access_token_expiration)
