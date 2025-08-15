@@ -110,7 +110,9 @@ class ResourceHandler(object):
 		exclude_ids = request.query.get("a_id!")
 		if exclude_ids:
 			exclude_ids = exclude_ids.split(",")
-			query_filter["_id"] = {"$nin": [re.escape(id_) for id_ in exclude_ids]}
+			if "_id" not in query_filter:
+				query_filter["_id"] = {}
+			query_filter["_id"]["$nin"] = [re.escape(id_) for id_ in exclude_ids]
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
