@@ -28,7 +28,7 @@ class ResourceId(enum.StrEnum):
 	CLIENT_APIKEY_MANAGE = "seacat:client:apikey:manage"
 
 	APIKEY_ACCESS = "seacat:apikey:access"
-	APIKEY_EDIT = "seacat:apikey:edit"
+	APIKEY_MANAGE = "seacat:apikey:manage"
 
 	SESSION_ACCESS = "seacat:session:access"
 	SESSION_TERMINATE = "seacat:session:terminate"

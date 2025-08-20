@@ -75,7 +75,7 @@ class ApiKeyService(asab.Service):
 		return _normalize_api_key(session)
 
 
-	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
+	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def create_api_key(
 		self, *,
 		tenant: typing.Union[str, None],
@@ -128,7 +128,7 @@ class ApiKeyService(asab.Service):
 		}
 
 
-	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
+	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def update_api_key(
 		self, *,
 		key_id: str,
@@ -140,7 +140,7 @@ class ApiKeyService(asab.Service):
 		)
 
 
-	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
+	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def delete_api_key(self, key_id: str):
 		await self.SessionService.delete(session_id=key_id)
 

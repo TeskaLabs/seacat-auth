@@ -101,7 +101,7 @@ class ApiKeyHandler(object):
 		},
 	})
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
+	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def create_api_key(self, request, *, json_data):
 		if "exp" in json_data:
 			expires_at = generic.datetime_from_relative_or_absolute_timestring(json_data["exp"])
@@ -125,7 +125,7 @@ class ApiKeyHandler(object):
 		},
 	})
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
+	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def update_api_key(self, request, *, json_data):
 		await self.ApiKeyService.update_api_key(**json_data)
 		return asab.web.rest.json_response(
@@ -135,7 +135,7 @@ class ApiKeyHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.APIKEY_EDIT)
+	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def delete_api_key(self, request):
 		await self.ApiKeyService.delete_api_key(request.match_info["key_id"])
 		return asab.web.rest.json_response(
