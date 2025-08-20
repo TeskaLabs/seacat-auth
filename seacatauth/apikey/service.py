@@ -45,6 +45,8 @@ class ApiKeyService(asab.Service):
 		limit: int = None,
 		query_filter: typing.Optional[str | typing.Dict] = None,
 	):
+		if isinstance(query_filter, str):
+			query_filter = {Session.FN.Session.Label: {"$regex": query_filter, "$options": "i"}}
 		query_filter = {
 			Session.FN.Session.Type: "apikey",
 			**(query_filter or {})

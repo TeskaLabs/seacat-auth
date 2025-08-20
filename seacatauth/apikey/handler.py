@@ -59,7 +59,9 @@ class ApiKeyHandler(object):
 
 		data = []
 		for api_key in (await self.ApiKeyService.iterate_api_keys(
-			search.Page, search.ItemsPerPage,
+			search.Page,
+			search.ItemsPerPage,
+			query_filter=search.SimpleFilter
 		)):
 			data.append(api_key)
 
