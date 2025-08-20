@@ -351,6 +351,38 @@ def datetime_from_relative_or_absolute_timestring(value: str) -> datetime.dateti
 			raise ValueError("Invalid expiration value: {!r}".format(value))
 
 
+def update_mongodb_filter(query_filter: dict, path: str | list, value: typing.Any) -> None:
+	"""
+	Update a MongoDB filter dictionary with a new value at the specified path.
+	Updates existing $in and $nin array fields by OR-combining their values with the new value.
+
+	Args:
+		query_filter (dict): The MongoDB filter dictionary to update.
+		path (str | list): The path to the field to update. Can be a string with dot notation or a list of keys.
+		value (Any): The value to set at the specified path.
+	"""
+	if isinstance(path, str):
+		path = path.split(".")
+
+	if isinstance(value, set):
+		value = list(value)
+
+	current = query_filter
+	for part in path[:-1]:
+		if part not in current:
+			current[part] = {}
+		current = current[part]
+
+	if path[-1] not in current:
+		current[path[-1]] = value
+	elif path[-1] in {"$in", "$nin"}:
+		# Combine array values for $in or $nin operators
+		current[path[-1]] = list(set(current[path[-1]]) | set(value))
+	else:
+		# Combining other fields is not supported
+		raise NotImplementedError("Cannot update existing field {!r} with a non-array value {!r}".format(path, value))
+
+
 def generate_ergonomic_token(length: int):
 	"""
 	This function generates random string that is "ergonomic".
