@@ -225,10 +225,8 @@ def _build_resource_filter(query: dict = None) -> dict | False:
 	if name_filter:
 		generic.update_mongodb_filter(query_filter, "_id", {"$regex": re.escape(name_filter)})
 
-	if "adeleted" in query:
-		deleted = asab.utils.string_to_boolean(query.get("adeleted"))
-	else:
-		# Do not include deleted items by default
+	deleted = asab.utils.string_to_boolean(query.get("adeleted", False))
+	if deleted is False:
 		deleted = {"$in": [False, None]}
 	generic.update_mongodb_filter(query_filter, "deleted", deleted)
 
