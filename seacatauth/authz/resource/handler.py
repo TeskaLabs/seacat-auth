@@ -105,6 +105,10 @@ class ResourceHandler(object):
 			limit = int(limit)
 
 		query_filter = _build_resource_filter(request.query)
+		if query_filter is False:
+			# Empty result set
+			return asab.web.rest.json_response(request, {"count": 0, "data": []})
+
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
 
@@ -204,9 +208,15 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-def _build_resource_filter(query: dict = None) -> dict | bool:
+def _build_resource_filter(query: dict = None) -> dict | False:
 	"""
 	Build a filter for resources based on the current tenant and authorization context.
+
+	Args:
+		query (dict): The query parameters from the request.
+
+	Returns:
+		dict | False : A MongoDB filter dictionary, or False if the filter leads to empty result.
 	"""
 	query_filter = {}
 
