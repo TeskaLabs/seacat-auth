@@ -354,12 +354,13 @@ def datetime_from_relative_or_absolute_timestring(value: str) -> datetime.dateti
 def update_mongodb_filter(query_filter: dict, path: str | list, value: typing.Any) -> None:
 	"""
 	Update a MongoDB filter dictionary with a new value at the specified path.
-	Updates existing $in and $nin array fields by OR-combining their values with the new value.
+	For "$in" and "$nin", merge values (OR semantics).
+	For other fields, set the value if absent; raise if value is already set.
 
 	Args:
-		query_filter (dict): The MongoDB filter dictionary to update.
-		path (str | list): The path to the field to update. Can be a string with dot notation or a list of keys.
-		value (Any): The value to set at the specified path.
+		query_filter (dict): MongoDB-style filter to mutate.
+		path (str | list[str]): Dot path or list of keys.
+		value (Any): Value to set/merge.
 	"""
 	if isinstance(path, str):
 		path = path.split(".")
