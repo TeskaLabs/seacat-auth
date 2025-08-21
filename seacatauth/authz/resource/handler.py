@@ -208,7 +208,7 @@ class ResourceHandler(object):
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
-def _build_resource_filter(query: dict = None) -> dict | False:
+def _build_resource_filter(query: dict = None) -> dict | bool:
 	"""
 	Build a filter for resources based on the current tenant and authorization context.
 
