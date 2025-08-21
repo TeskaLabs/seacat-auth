@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha9
 - v25.26-alpha8
 - v25.26-alpha7
 - v25.26-alpha6
@@ -13,6 +14,7 @@
 - v25.26-alpha1
 
 ### Breaking changes
+- Resource list query parameters changed: `exclude` is no longer supported (#510, v25.26-alpha9)
 - Admin tenant invitation path changed to `/admin/tenant/{tenant}/invite`.
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
@@ -24,6 +26,7 @@
 - Fix credentials search - Client provider error (#489, v25.26-alpha1)
 
 ### Features
+- Extend resource filtering API (#510, v25.26-alpha9)
 - Negative resource filtering (#509, v25.26-alpha8)
 - New resource ID `seacat:client:apikey:manage` for client API key management (#488, v25.26-alpha4)
 - Prefix client API with /admin (#488, v25.26-alpha4)
