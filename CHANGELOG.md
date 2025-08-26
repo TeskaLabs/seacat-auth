@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha10
 - v25.26-alpha9
 - v25.26-alpha8
 - v25.26-alpha7
@@ -19,6 +20,7 @@
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
+- Remove a- prefix from resource list API parameters (#511, v25.26-alpha10)
 - Fix endpoint for obtaining global roles (#506, v25.26-alpha7)
 - Fix PKCE strength evaluation (#504, v25.26-alpha6)
 - Add default value for passwordlink in credentials creation (#494, v25.26-alpha2)
