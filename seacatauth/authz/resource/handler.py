@@ -59,21 +59,21 @@ class ResourceHandler(object):
 			description: Filter string
 			schema:
 				type: string
-		-	name: a_id!
+		-	name: _id!
 			in: query
 			description: Resource IDs to exclude from the results (comma-separated).
 			required: false
 			explode: false
 			schema:
 				type: array
-		-	name: a_id
+		-	name: _id
 			in: query
 			description: Resource IDs to search (comma-separated).
 			required: false
 			explode: false
 			schema:
 				type: array
-		-	name: acontext
+		-	name: context
 			in: query
 			description:
 				Context in which the resource can be used. If set to "tenant", only resources that are not
@@ -82,7 +82,7 @@ class ResourceHandler(object):
 			schema:
 				type: string
 				enum: ["tenant", "global"]
-		-	name: aauthorized
+		-	name: authorized
 			in: query
 			description:
 				Filter to authorized or unauthorized resources. If set to "true", only resources that the user is
@@ -90,7 +90,7 @@ class ResourceHandler(object):
 			required: false
 			schema:
 				type: boolean
-		-	name: adeleted
+		-	name: deleted
 			in: query
 			description:
 				Filter to active or soft-deleted resources. If set to "true", only deleted resources are listed.
@@ -225,13 +225,13 @@ def _build_resource_filter(query: dict = None) -> dict | bool:
 	if name_filter:
 		generic.update_mongodb_filter(query_filter, "_id", {"$regex": re.escape(name_filter)})
 
-	deleted = asab.utils.string_to_boolean(query.get("adeleted", False))
+	deleted = asab.utils.string_to_boolean(query.get("deleted", False))
 	if deleted is False:
 		deleted = {"$in": [False, None]}
 	generic.update_mongodb_filter(query_filter, "deleted", deleted)
 
-	if "acontext" in query:
-		context = query.get("acontext")
+	if "context" in query:
+		context = query.get("context")
 		if context == "tenant":
 			# Exclude global-only resources
 			generic.update_mongodb_filter(query_filter, "global_only.$ne", True)
@@ -242,10 +242,10 @@ def _build_resource_filter(query: dict = None) -> dict | bool:
 			# Unknown context, return empty result
 			return False
 
-	if "aauthorized" in query:
+	if "authorized" in query:
 		authz = asab.contextvars.Authz.get()
 
-		if asab.utils.string_to_boolean(query["aauthorized"]) is True:
+		if asab.utils.string_to_boolean(query["authorized"]) is True:
 			# Filter to authorized resources only
 			if authz.has_superuser_access():
 				pass
@@ -259,11 +259,11 @@ def _build_resource_filter(query: dict = None) -> dict | bool:
 			else:
 				generic.update_mongodb_filter(query_filter, "_id.$nin", authz._resources())
 
-	exclude_ids = query.get("a_id!")
+	exclude_ids = query.get("_id!")
 	if exclude_ids:
 		generic.update_mongodb_filter(query_filter, "_id.$nin", exclude_ids.split(","))
 
-	search_ids = query.get("a_id")
+	search_ids = query.get("_id")
 	if search_ids:
 		generic.update_mongodb_filter(query_filter, "_id.$in", search_ids.split(","))
 
