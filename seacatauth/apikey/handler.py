@@ -5,7 +5,7 @@ import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
-from .. import generic
+from .. import generic, exceptions
 from ..models.const import ResourceId
 
 
@@ -73,8 +73,11 @@ class ApiKeyHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.APIKEY_ACCESS)
 	async def get_api_key(self, request):
-		result = await self.ApiKeyService.get_api_key(request.match_info["key_id"])
-		return asab.web.rest.json_response(request, result)
+		try:
+			result = await self.ApiKeyService.get_api_key(request.match_info["key_id"])
+			return asab.web.rest.json_response(request, result)
+		except exceptions.ApiKeyNotFoundError as e:
+			return e.json_response(request)
 
 
 	@asab.web.rest.json_schema_handler({
@@ -125,18 +128,24 @@ class ApiKeyHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def update_api_key(self, request, *, json_data):
-		await self.ApiKeyService.update_api_key(request.match_info["key_id"], **json_data)
-		return asab.web.rest.json_response(
-			request,
-			data={"result": "OK"},
-		)
+		try:
+			await self.ApiKeyService.update_api_key(request.match_info["key_id"], **json_data)
+			return asab.web.rest.json_response(
+				request,
+				data={"result": "OK"},
+			)
+		except exceptions.ApiKeyNotFoundError as e:
+			return e.json_response(request)
 
 
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def delete_api_key(self, request):
-		await self.ApiKeyService.delete_api_key(request.match_info["key_id"])
-		return asab.web.rest.json_response(
-			request,
-			data={"result": "OK"},
-		)
+		try:
+			await self.ApiKeyService.delete_api_key(request.match_info["key_id"])
+			return asab.web.rest.json_response(
+				request,
+				data={"result": "OK"},
+			)
+		except exceptions.ApiKeyNotFoundError as e:
+			return e.json_response(request)

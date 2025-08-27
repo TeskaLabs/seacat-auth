@@ -297,6 +297,23 @@ class ClientNotFoundError(ClientError, KeyError):
 		super().__init__(message, *args, client_id=client_id)
 
 
+class ApiKeyNotFoundError(SeacatAuthError, KeyError):
+	def __init__(self, key_id, *args):
+		self.KeyId = key_id
+		super().__init__("Key {!r} not found".format(self.KeyId), *args)
+
+	def json_response(self, request):
+		return asab.web.rest.json_response(
+			request,
+			status=404,
+			data={
+				"result": "ERROR",
+				"tech_err": "API key not found.",
+				"err_dict": {"key_id": self.KeyId}
+			},
+		)
+
+
 class RegistrationNotOpenError(SeacatAuthError):
 	pass
 

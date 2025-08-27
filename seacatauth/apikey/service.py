@@ -73,8 +73,11 @@ class ApiKeyService(asab.Service):
 
 	@asab.web.auth.require(ResourceId.APIKEY_ACCESS)
 	async def get_api_key(self, key_id: str):
-		session = await self.SessionService.get(session_id=key_id)
-		return _normalize_api_key(session)
+		try:
+			session = await self.SessionService.get(session_id=key_id)
+			return _normalize_api_key(session)
+		except exceptions.SessionNotFoundError:
+			raise exceptions.ApiKeyNotFoundError(key_id) from None
 
 
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
@@ -152,15 +155,33 @@ class ApiKeyService(asab.Service):
 		key_id: str,
 		label: typing.Optional[str] = None,
 	):
-		await self.SessionService.update_session(
-			session_id=key_id,
-			session_builders=[(Session.FN.Session.Label, label)]
-		)
+		try:
+			await self.SessionService.update_session(
+				session_id=key_id,
+				session_builders=[(Session.FN.Session.Label, label)]
+			)
+		except exceptions.SessionNotFoundError:
+			raise exceptions.ApiKeyNotFoundError(key_id) from None
 
 
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def delete_api_key(self, key_id: str):
-		await self.SessionService.delete(session_id=key_id)
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_superuser_access():
+			tenant = asab.contextvars.Tenant.get()
+			apikey = await self.get_api_key(key_id)
+			if tenant != apikey["tenant"]:
+				L.error("Cannot delete API key from different tenant.", struct_data={
+					"key_id": key_id,
+					"key_tenant": apikey["tenant"],
+					"agent_tenant": tenant,
+				})
+				raise exceptions.ApiKeyNotFoundError(key_id)
+
+		try:
+			await self.SessionService.delete(session_id=key_id)
+		except exceptions.SessionNotFoundError:
+			raise exceptions.ApiKeyNotFoundError(key_id) from None
 
 
 	async def get_session_by_api_key(self, token_value: str) -> Session:
