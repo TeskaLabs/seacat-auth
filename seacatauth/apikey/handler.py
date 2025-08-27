@@ -5,7 +5,7 @@ import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
-from .. import generic, exceptions
+from .. import generic
 from ..models.const import ResourceId
 
 
@@ -79,7 +79,7 @@ class ApiKeyHandler(object):
 
 	@asab.web.rest.json_schema_handler({
 		"type": "object",
-		"required": ["label", "resources"],
+		"required": ["label", "resources", "exp"],
 		"properties": {
 			"label": {
 				"type": "string", "description": "Human-readable label for the API key"
@@ -93,7 +93,7 @@ class ApiKeyHandler(object):
 			},
 			"tenant": {
 				"type": ["string", "null"],
-				"description": "Tenant scope to authorize. If not specified, the API key is tenantless.",
+				"description": "Tenant context to authorize. If not specified, the API key is tenantless.",
 			},
 			"resources": {
 				"type": "array",
@@ -105,15 +105,11 @@ class ApiKeyHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def create_api_key(self, request, *, json_data):
-		if "exp" in json_data:
-			expires_at = generic.datetime_from_relative_or_absolute_timestring(json_data["exp"])
-		else:
-			expires_at = None
 		result = await self.ApiKeyService.create_api_key(
-			expires_at=expires_at,
+			expires_at=generic.datetime_from_relative_or_absolute_timestring(json_data["exp"]),
 			tenant=json_data.get("tenant"),
-			resources=json_data.get("resources"),
-			label=json_data.get("label"),
+			resources=json_data["resources"],
+			label=json_data["label"],
 		)
 		return asab.web.rest.json_response(request, result)
 
@@ -129,7 +125,7 @@ class ApiKeyHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def update_api_key(self, request, *, json_data):
-		await self.ApiKeyService.update_api_key(**json_data)
+		await self.ApiKeyService.update_api_key(request.match_info["key_id"], **json_data)
 		return asab.web.rest.json_response(
 			request,
 			data={"result": "OK"},
