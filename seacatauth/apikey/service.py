@@ -150,21 +150,6 @@ class ApiKeyService(asab.Service):
 
 
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
-	async def update_api_key(
-		self, *,
-		key_id: str,
-		label: typing.Optional[str] = None,
-	):
-		try:
-			await self.SessionService.update_session(
-				session_id=key_id,
-				session_builders=[(Session.FN.Session.Label, label)]
-			)
-		except exceptions.SessionNotFoundError:
-			raise exceptions.ApiKeyNotFoundError(key_id) from None
-
-
-	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def delete_api_key(self, key_id: str):
 		authz = asab.contextvars.Authz.get()
 		if not authz.has_superuser_access():

@@ -27,7 +27,6 @@ class ApiKeyHandler(object):
 		web_app.router.add_get("/admin/apikey", self.list_api_keys)
 		web_app.router.add_post("/admin/apikey", self.create_api_key)
 		web_app.router.add_get("/admin/apikey/{key_id}", self.get_api_key)
-		web_app.router.add_put("/admin/apikey/{key_id}", self.update_api_key)
 		web_app.router.add_delete("/admin/apikey/{key_id}", self.delete_api_key)
 
 
@@ -115,27 +114,6 @@ class ApiKeyHandler(object):
 			label=json_data["label"],
 		)
 		return asab.web.rest.json_response(request, result)
-
-
-	@asab.web.rest.json_schema_handler({
-		"type": "object",
-		"properties": {
-			"label": {
-				"type": "string", "description": "Label for the API key"
-			},
-		},
-	})
-	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
-	async def update_api_key(self, request, *, json_data):
-		try:
-			await self.ApiKeyService.update_api_key(request.match_info["key_id"], **json_data)
-			return asab.web.rest.json_response(
-				request,
-				data={"result": "OK"},
-			)
-		except exceptions.ApiKeyNotFoundError as e:
-			return e.json_response(request)
 
 
 	@asab.web.tenant.allow_no_tenant
