@@ -93,10 +93,26 @@ class ApiKeyService(asab.Service):
 				agent_authz.require_tenant_access()
 				if len(resources) > 0:
 					agent_authz.require_resource_access(*resources)
+					for resource_id in resources:
+						# Ensure resource exists and is not global-only
+						resource = await self.ResourceService.get(resource_id)
+						if resource.get("global_only", False) is True:
+							L.error(
+								"Global-only resource cannot be authorized in tenant context.",
+								struct_data={"resource_id": resource_id}
+							)
+							raise asab.exceptions.AccessDeniedError()
+
 				api_key_authz = {tenant: list(resources)}
 		else:
+			# Only superuser can create global (tenantless) API keys
+			agent_authz.require_superuser_access()
 			if len(resources) > 0:
 				agent_authz.require_resource_access(*resources)
+				for resource_id in resources:
+					# Ensure resource exists
+					await self.ResourceService.get(resource_id)
+
 			api_key_authz = {"*": list(resources)}
 
 		# Create session
