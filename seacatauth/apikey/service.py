@@ -10,7 +10,7 @@ import asab.web.auth
 import asab.contextvars
 import bson
 
-from .. import exceptions
+from .. import exceptions, generic
 from ..models import Session
 from ..models.const import ResourceId
 
@@ -174,11 +174,11 @@ class ApiKeyService(asab.Service):
 			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		except binascii.Error as e:
 			L.error("Corrupt API key format: Base64 decoding failed.", struct_data={
-				"token_value": token_value})
+				"token_fingerprint": generic.fingerprint(token_value)})
 			raise exceptions.SessionNotFoundError("Corrupt API key format") from e
 		except UnicodeEncodeError as e:
 			L.error("Corrupt API key format: ASCII decoding failed.", struct_data={
-				"token_value": token_value})
+				"token_fingerprint": generic.fingerprint(token_value)})
 			raise exceptions.SessionNotFoundError("Corrupt API key format") from e
 
 		try:

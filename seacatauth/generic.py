@@ -10,6 +10,7 @@ import asab.utils
 import asab.exceptions
 import bcrypt
 import argon2
+import hashlib
 
 
 L = logging.getLogger(__name__)
@@ -390,6 +391,10 @@ def update_mongodb_filter(query_filter: dict, path: str | list, value: typing.An
 	else:
 		# Combining other fields is not supported
 		raise NotImplementedError("Cannot update existing field {!r} with a non-array value {!r}".format(path, value))
+
+
+def fingerprint(value: str):
+	return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()
 
 
 def generate_ergonomic_token(length: int):
