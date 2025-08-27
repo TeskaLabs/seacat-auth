@@ -328,8 +328,11 @@ class SessionService(asab.Service):
 
 
 	async def get(self, session_id):
-		if isinstance(session_id, str):
-			session_id = bson.ObjectId(session_id)
+		try:
+			if isinstance(session_id, str):
+				session_id = bson.ObjectId(session_id)
+		except bson.errors.InvalidId as e:
+			raise exceptions.SessionNotFoundError("Invalid session ID format.", session_id=session_id) from e
 		try:
 			session_dict = await self.StorageService.get(
 				self.SessionCollection, session_id, decrypt=Session.EncryptedAttributes)
