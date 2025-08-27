@@ -127,9 +127,13 @@ def get_bearer_token_value(request):
 def get_token_from_authorization_header(request):
 	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
 	if auth_header is None:
-		L.info("Request has no Authorization header")
+		L.info("Request has no Authorization header.")
 		return None, None
-	return auth_header.split(" ", 1)
+	parts = auth_header.split(" ", 1)
+	if len(parts) != 2:
+		L.warning("Malformed Authorization header.", struct_data={"header": auth_header})
+		return None, None
+	return parts
 
 
 def get_access_token_value_from_websocket(request):
