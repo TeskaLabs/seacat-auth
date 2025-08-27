@@ -192,13 +192,23 @@ class ApiKeyService(asab.Service):
 
 
 def _normalize_api_key(session: Session) -> dict:
+	for k, v in session.Authorization.Authz.items():
+		if k != "*":
+			tenant = k
+			resources = v
+			break
+	else:
+		# Global (tenantless) API key
+		tenant = None
+		resources = session.Authorization.Authz.get("*", [])
+
 	api_key = {
 		"_id": session.Session.Id,
 		"_c": session.Session.CreatedAt,
 		"cid": session.Credentials.Id,
 		"exp": session.Session.Expiration,
-		"resources": session.Authorization.Authz,
+		"tenant": tenant,
+		"resources": resources,
+		"label": session.Session.Label,
 	}
-	if session.Session.Label:
-		api_key["label"] = session.Session.Label
 	return api_key
