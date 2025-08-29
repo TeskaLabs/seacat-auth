@@ -54,8 +54,11 @@ class SessionTokenService(asab.Service):
 
 
 	async def create(
-		self, token_length: int, token_type: str, session_id: str,
-		expires_at: typing.Optional[datetime.datetime] = None,
+		self,
+		token_length: int,
+		token_type: str,
+		session_id: str,
+		expires_at: datetime.datetime,
 		is_session_algorithmic: bool = False,
 		**kwargs
 	) -> bytes:
@@ -79,10 +82,9 @@ class SessionTokenService(asab.Service):
 
 		upsertor.set(SessionTokenField.TokenType, token_type)
 		upsertor.set(SessionTokenField.SessionId, session_id)
+		upsertor.set(SessionTokenField.ExpiresAt, expires_at)
 		if is_session_algorithmic:
 			upsertor.set(SessionTokenField.IsSessionAlgorithmic, is_session_algorithmic)
-		if expires_at:
-			upsertor.set(SessionTokenField.ExpiresAt, expires_at)
 		for k, v in kwargs.items():
 			if v is not None:
 				upsertor.set(k, v)

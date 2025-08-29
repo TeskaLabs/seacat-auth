@@ -10,6 +10,7 @@ import asab.utils
 import asab.exceptions
 import bcrypt
 import argon2
+import hashlib
 
 
 L = logging.getLogger(__name__)
@@ -116,16 +117,26 @@ class SearchParams:
 
 
 def get_bearer_token_value(request):
-	bearer_prefix = "Bearer "
-	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
-	if auth_header is None:
-		L.info("Request has no Authorization header")
-		return None
-	if auth_header.startswith(bearer_prefix):
-		return auth_header[len(bearer_prefix):]
+	token_type, token_value = get_token_from_authorization_header(request)
+	if token_type == "Bearer":
+		return token_value
 
 	L.info("No Bearer token in Authorization header")
 	return None
+
+
+def get_token_from_authorization_header(request):
+	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
+	if auth_header is None:
+		L.info("Request has no Authorization header.")
+		return None, None
+	parts = auth_header.split(" ", 1)
+	if len(parts) != 2:
+		L.warning("Malformed Authorization header.", struct_data={
+			"header_fingerprint": fingerprint(auth_header),
+		})
+		return None, None
+	return parts
 
 
 def get_access_token_value_from_websocket(request):
@@ -382,6 +393,10 @@ def update_mongodb_filter(query_filter: dict, path: str | list, value: typing.An
 	else:
 		# Combining other fields is not supported
 		raise NotImplementedError("Cannot update existing field {!r} with a non-array value {!r}".format(path, value))
+
+
+def fingerprint(value: str):
+	return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()
 
 
 def generate_ergonomic_token(length: int):

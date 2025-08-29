@@ -184,14 +184,17 @@ class SessionService(asab.Service):
 		session_type: str,
 		parent_session_id: bson.ObjectId = None,
 		expiration: float | datetime.datetime = None,
-		session_builders: list = None
+		session_builders: list = None,
+		session_id: str = None,
 	):
-		upsertor = self.StorageService.upsertor(self.SessionCollection)
+		if session_id is None:
+			session_id = bson.ObjectId()
+		upsertor = self.StorageService.upsertor(self.SessionCollection, obj_id=session_id)
 
 		# Set up required fields
-		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie"]):
-			L.error("Unsupported session type", struct_data={"type": session_type})
-			return None
+		if session_type not in frozenset(["root", "openidconnect", "m2m", "cookie", "apikey"]):
+			raise ValueError("Unsupported session type: {}".format(session_type))
+
 		upsertor.set(Session.FN.Session.Type, session_type)
 		if parent_session_id is not None:
 			upsertor.set(Session.FN.Session.ParentSessionId, parent_session_id)
@@ -325,8 +328,11 @@ class SessionService(asab.Service):
 
 
 	async def get(self, session_id):
-		if isinstance(session_id, str):
-			session_id = bson.ObjectId(session_id)
+		try:
+			if isinstance(session_id, str):
+				session_id = bson.ObjectId(session_id)
+		except bson.errors.InvalidId as e:
+			raise exceptions.SessionNotFoundError("Invalid session ID format.", session_id=session_id) from e
 		try:
 			session_dict = await self.StorageService.get(
 				self.SessionCollection, session_id, decrypt=Session.EncryptedAttributes)
@@ -370,6 +376,11 @@ class SessionService(asab.Service):
 
 		async for session_dict in cursor:
 			yield session_dict
+
+
+	async def iterate_sessions(self, page: int = 0, limit: int = None, query_filter: dict = None):
+		async for session_dict in self._iterate_raw(page, limit, query_filter):
+			yield Session(session_dict)
 
 
 	async def list(self, page: int = 0, limit: int = None, query_filter=None, include_expired=False):
