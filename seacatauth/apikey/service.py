@@ -35,7 +35,7 @@ class ApiKeyService(asab.Service):
 
 		self.DefaultExpiration = datetime.timedelta(
 			seconds=asab.Config.getseconds("seacatauth:api_key", "default_expiration"))
-		self.TokenLength = asab.Config.getint("seacatauth:api_key", "token_length")
+		self.TokenLength = asab.Config.getint("seacatauth:api_key", "token_byte_length")
 
 
 	@asab.web.auth.require(ResourceId.APIKEY_ACCESS)
