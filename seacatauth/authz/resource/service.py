@@ -87,6 +87,12 @@ SEACAT_AUTH_RESOURCES = {
 	ResourceId.ROLE_ASSIGN: {
 		"description": "Assign and unassign tenant roles.",
 	},
+	ResourceId.APIKEY_ACCESS: {
+		"description": "View API keys.",
+	},
+	ResourceId.APIKEY_MANAGE: {
+		"description": "Issue new API keys, revoke existing ones.",
+	},
 }
 
 

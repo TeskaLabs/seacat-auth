@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha11
 - v25.26-alpha10
 - v25.26-alpha9
 - v25.26-alpha8
@@ -28,6 +29,7 @@
 - Fix credentials search - Client provider error (#489, v25.26-alpha1)
 
 ### Features
+- Simpler API keys (#505, v25.26-alpha11)
 - Extend resource filtering API (#510, v25.26-alpha9)
 - Negative resource filtering (#509, v25.26-alpha8)
 - New resource ID `seacat:client:apikey:manage` for client API key management (#488, v25.26-alpha4)
