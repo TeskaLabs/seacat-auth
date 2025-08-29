@@ -240,7 +240,7 @@ asab.Config.add_defaults({
 		"default_expiration": "32 d",
 
 		# Length of API key token
-		"token_length": 32,
+		"token_byte_length": 36,
 	},
 })
 
