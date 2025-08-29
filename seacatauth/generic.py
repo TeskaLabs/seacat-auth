@@ -132,7 +132,9 @@ def get_token_from_authorization_header(request):
 		return None, None
 	parts = auth_header.split(" ", 1)
 	if len(parts) != 2:
-		L.warning("Malformed Authorization header.", struct_data={"header": auth_header})
+		L.warning("Malformed Authorization header.", struct_data={
+			"header_fingerprint": fingerprint(auth_header),
+		})
 		return None, None
 	return parts
 
