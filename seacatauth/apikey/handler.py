@@ -107,13 +107,13 @@ class ApiKeyHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require(ResourceId.APIKEY_MANAGE)
 	async def create_api_key(self, request, *, json_data):
-		result = await self.ApiKeyService.create_api_key(
+		response_data = await self.ApiKeyService.create_api_key(
 			expires_at=generic.datetime_from_relative_or_absolute_timestring(json_data["exp"]),
 			tenant=json_data.get("tenant"),
 			resources=json_data["resources"],
 			label=json_data["label"],
 		)
-		return asab.web.rest.json_response(request, result)
+		return asab.web.rest.json_response(request, {"result": "OK", "data": response_data}, status=201)
 
 
 	@asab.web.tenant.allow_no_tenant

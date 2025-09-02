@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha12
 - v25.26-alpha11
 - v25.26-alpha10
 - v25.26-alpha9
@@ -29,6 +30,7 @@
 - Fix credentials search - Client provider error (#489, v25.26-alpha1)
 
 ### Features
+- Standardize API key creation response (#512, v25.26-alpha12)
 - Simpler API keys (#505, v25.26-alpha11)
 - Extend resource filtering API (#510, v25.26-alpha9)
 - Negative resource filtering (#509, v25.26-alpha8)
