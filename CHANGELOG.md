@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha14
 - v25.26-alpha13
 - v25.26-alpha12
 - v25.26-alpha11
@@ -23,6 +24,7 @@
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
+- Fix userinfo endpoint (#514, v25.26-alpha14)
 - Fix websocket authentication introspection (#513, v25.26-alpha13)
 - Standardize API key creation response (#512, v25.26-alpha12)
 - Remove a- prefix from resource list API parameters (#511, v25.26-alpha10)
