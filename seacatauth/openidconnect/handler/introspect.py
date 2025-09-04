@@ -13,7 +13,8 @@ from ... import exceptions
 from ...generic import (
 	nginx_introspection,
 	get_access_token_value_from_websocket,
-	get_token_from_authorization_header
+	get_token_from_authorization_header,
+	fingerprint,
 )
 
 
@@ -79,25 +80,37 @@ class TokenIntrospectionHandler(object):
 
 
 	async def _authenticate_request(self, request):
-		token_type, token_value = get_token_from_authorization_header(request)
-		if token_value is None:
-			token_value = get_access_token_value_from_websocket(request)
-		if token_value is None:
+		"""
+		Authenticate request using access token or API key from Authorization header or Sec-WebSocket-Protocol header.
+
+		Args:
+			request (aiohttp.web.Request): Incoming request.
+
+		Returns:
+			session (Session|None): Authenticated session or None if authentication failed.
+		"""
+		token = get_token_from_authorization_header(request)
+		if token is None:
+			token = get_access_token_value_from_websocket(request)
+		if token is None:
 			L.log(asab.LOG_NOTICE, "Access token not found in 'Authorization' nor 'Sec-WebSocket-Protocol' header")
 			return None
 
+		token_type, token_value = token
 		if token_type == "Bearer":
 			try:
 				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 			except exceptions.SessionNotFoundError as e:
-				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e))
+				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e), struct_data={
+					"token_fingerprint": fingerprint(token_value)})
 				return None
 
 		elif token_type == self.ApiKeyService.TOKEN_TYPE:
 			try:
 				session = await self.ApiKeyService.get_session_by_api_key(token_value)
 			except exceptions.SessionNotFoundError as e:
-				L.log(asab.LOG_NOTICE, "API key matched no session: {}".format(e))
+				L.log(asab.LOG_NOTICE, "API key matched no session: {}".format(e), struct_data={
+					"token_fingerprint": fingerprint(token_value)})
 				return None
 
 		else:
