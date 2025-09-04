@@ -133,19 +133,21 @@ def get_token_from_authorization_header(request) -> typing.Optional[typing.Tuple
 		request: aiohttp.web.Request object
 
 	Returns:
-		Token (type, value) tuple, ot None if the header is missing or malformed.
+		Token (type, value) tuple, or None if the header is missing or malformed.
 	"""
 	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
 	if auth_header is None:
 		L.debug("Request has no Authorization header.")
 		return None
+
 	parts = auth_header.split(" ", 1)
 	if len(parts) != 2:
 		L.warning("Malformed Authorization header.", struct_data={
 			"header_fingerprint": fingerprint(auth_header),
 		})
 		return None
-	return parts
+
+	return parts[0], parts[1]
 
 
 def get_access_token_value_from_websocket(request) -> typing.Optional[typing.Tuple[str, str]]:
@@ -156,10 +158,10 @@ def get_access_token_value_from_websocket(request) -> typing.Optional[typing.Tup
 		request: aiohttp.web.Request object
 
 	Returns:
-		Token (type, value) tuple, ot None if no token is found in the header.
+		Token (type, value) tuple, or None if no token is found in the header.
 	"""
 	token_prefix = "access_token_"
-	ws_protocol_header: str = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
+	ws_protocol_header = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
 	if ws_protocol_header is None:
 		L.debug("Request has no 'Sec-WebSocket-Protocol' header")
 		return None
