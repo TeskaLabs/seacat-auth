@@ -117,12 +117,17 @@ class SearchParams:
 
 
 def get_bearer_token_value(request):
-	token_type, token_value = get_token_from_authorization_header(request)
-	if token_type == "Bearer":
-		return token_value
+	token = get_token_from_authorization_header(request)
+	if token is None:
+		L.debug("Request has no Authorization header")
+		return None
 
-	L.info("No Bearer token in Authorization header")
-	return None
+	token_type, token_value = token
+	if token_type != "Bearer":
+		L.debug("No Bearer token in Authorization header")
+		return
+
+	return token_value
 
 
 def get_token_from_authorization_header(request) -> typing.Optional[typing.Tuple[str, str]]:
