@@ -137,7 +137,7 @@ def get_token_from_authorization_header(request) -> typing.Optional[typing.Tuple
 	"""
 	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
 	if auth_header is None:
-		L.info("Request has no Authorization header.")
+		L.debug("Request has no Authorization header.")
 		return None
 	parts = auth_header.split(" ", 1)
 	if len(parts) != 2:
@@ -161,14 +161,14 @@ def get_access_token_value_from_websocket(request) -> typing.Optional[typing.Tup
 	token_prefix = "access_token_"
 	ws_protocol_header: str = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
 	if ws_protocol_header is None:
-		L.info("Request has no 'Sec-WebSocket-Protocol' header")
+		L.debug("Request has no 'Sec-WebSocket-Protocol' header")
 		return None
 
 	for value in ws_protocol_header.split(", "):
 		if value.startswith(token_prefix):
 			return "Bearer", value[len(token_prefix):]
 
-	L.info("No access token in Sec-WebSocket-Protocol header")
+	L.debug("No access token in Sec-WebSocket-Protocol header")
 	return None
 
 

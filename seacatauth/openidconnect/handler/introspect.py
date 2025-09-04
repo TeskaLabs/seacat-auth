@@ -13,7 +13,8 @@ from ... import exceptions
 from ...generic import (
 	nginx_introspection,
 	get_access_token_value_from_websocket,
-	get_token_from_authorization_header
+	get_token_from_authorization_header,
+	fingerprint,
 )
 
 
@@ -100,14 +101,16 @@ class TokenIntrospectionHandler(object):
 			try:
 				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 			except exceptions.SessionNotFoundError as e:
-				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e))
+				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e), struct_data={
+					"token_fingerprint": fingerprint(token_value)})
 				return None
 
 		elif token_type == self.ApiKeyService.TOKEN_TYPE:
 			try:
 				session = await self.ApiKeyService.get_session_by_api_key(token_value)
 			except exceptions.SessionNotFoundError as e:
-				L.log(asab.LOG_NOTICE, "API key matched no session: {}".format(e))
+				L.log(asab.LOG_NOTICE, "API key matched no session: {}".format(e), struct_data={
+					"token_fingerprint": fingerprint(token_value)})
 				return None
 
 		else:
