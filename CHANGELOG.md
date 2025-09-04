@@ -3,6 +3,7 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26-alpha13
 - v25.26-alpha12
 - v25.26-alpha11
 - v25.26-alpha10
@@ -22,7 +23,8 @@
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
-- Fix websocket authentication introspection (#513, v25.26-alpha12)
+- Fix websocket authentication introspection (#513, v25.26-alpha13)
+- Standardize API key creation response (#512, v25.26-alpha12)
 - Remove a- prefix from resource list API parameters (#511, v25.26-alpha10)
 - Fix endpoint for obtaining global roles (#506, v25.26-alpha7)
 - Fix PKCE strength evaluation (#504, v25.26-alpha6)
