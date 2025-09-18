@@ -72,10 +72,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
-		self.Scope = self.Config.get("scope")
-		assert self.Scope is not None
-
-		self.NonceLength = self.Config.get("nonce_length", self.NonceLength)
+		self.NonceLength = self.Config.getint("nonce_length", self.NonceLength)
 
 		self.JwkSet = None
 
@@ -106,7 +103,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def process_auth_callback(self, request: aiohttp.web.Request, payload: dict, state: dict, **kwargs) -> dict:
-		return await self._get_user_info(payload, expected_nonce=state["nonce"])
+		return await self._get_user_info(payload, expected_nonce=state.get("nonce"))
 
 
 	async def _prepare_jwks(self, overwrite_current=False):

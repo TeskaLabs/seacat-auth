@@ -20,8 +20,8 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 		if self.Type is None:
 			# Infer type for generic providers
 			self.Type = provider_type
-		else:
-			assert self.Type == provider_type, "Provider type mismatch"
+		elif self.Type != provider_type:
+			raise ValueError("Provider type mismatch: expected {!r}, got {!r}".format(self.Type, provider_type))
 
 		# UI-friendly provider name for the login button etc.
 		self.Label = self.Config.get("label") or self.Type

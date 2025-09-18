@@ -65,7 +65,7 @@ class ExternalCredentialsAdminHandler(object):
 		provider_type = request.match_info["provider_type"]
 		subject = request.match_info["sub"]
 		try:
-			await self.ExternalCredentialsService.remove_ext_credentials(provider_type, subject)
+			await self.ExternalCredentialsService.delete_ext_credentials(provider_type, subject)
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		return asab.web.rest.json_response(request, {"result": "OK"})

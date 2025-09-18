@@ -50,14 +50,14 @@ def create_provider(authn_handler, section):
 
 
 __all__ = [
+	"AppleIDOAuth2AuthProvider",
 	"ExternalAuthProviderABC",
-	"OAuth2AuthProvider",
-	"Saml2AuthProvider",
+	"FacebookOAuth2AuthProvider",
 	"GitHubOAuth2AuthProvider",
 	"GoogleOAuth2AuthProvider",
-	"Office365OAuth2AuthProvider",
 	"MojeIDOAuth2AuthProvider",
-	"FacebookOAuth2AuthProvider",
-	"AppleIDOAuth2AuthProvider",
+	"OAuth2AuthProvider",
+	"Office365OAuth2AuthProvider",
+	"Saml2AuthProvider",
 	"create_provider",
 ]
