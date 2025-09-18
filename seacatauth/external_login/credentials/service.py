@@ -73,18 +73,22 @@ class ExternalCredentialsService(asab.Service):
 			credentials_id = await self._create_credentials_via_webhook(
 				provider_type, user_info, authorization_data_safe)
 		else:
-			assert self.RegistrationService.SelfRegistrationEnabled
-			# Attempt registration with local credential providers if registration is enabled
+			ext_provider = self.ExternalAuthenticationService.get_provider(provider_type)
 			cred_data = {
 				"username": user_info.get("preferred_username"),
 				"email": user_info.get("email"),
 				"phone": user_info.get("phone_number"),
 			}
-			try:
-				credentials_id = await self.RegistrationService.CredentialProvider.create(cred_data)
-			except Exception as e:
+			cp = getattr(self.RegistrationService, "CredentialProvider", None)
+			if cp is None:
 				raise exceptions.CredentialsRegistrationError(
-					"Failed to register credentials: {}".format(e), credentials=cred_data)
+					"Registration is disabled: No credential provider configured", credentials=cred_data)
+			if not (self.RegistrationService.SelfRegistrationEnabled or ext_provider.trust_all_credentials()):
+				raise exceptions.CredentialsRegistrationError("Registration is disabled", credentials=cred_data)
+			try:
+				credentials_id = await cp.create(cred_data)
+			except Exception as e:
+				raise exceptions.CredentialsRegistrationError("Failed to register credentials", credentials=cred_data) from e
 
 		assert credentials_id
 
