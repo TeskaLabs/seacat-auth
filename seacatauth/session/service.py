@@ -785,7 +785,7 @@ class SessionService(asab.Service):
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
 				session_builders.append(await external_login_session_builder(
-						external_login_service, root_session.Credentials.Id))
+					external_login_service, root_session.Credentials.Id))
 			session_builders.append(
 				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
 			session_builders.append([
