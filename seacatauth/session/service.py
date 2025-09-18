@@ -13,6 +13,7 @@ import asab
 import asab.storage
 import pymongo
 
+from ..api import local_authz
 from ..models.const import ResourceId
 from .. import exceptions
 from ..events import EventTypes
@@ -724,12 +725,11 @@ class SessionService(asab.Service):
 		role_service = self.App.get_service("seacatauth.RoleService")
 
 		scope = frozenset(["profile", "email", "phone"])
-		ext_login_svc = self.App.get_service("seacatauth.ExternalLoginService")
+		ext_login_svc = self.App.get_service("seacatauth.ExternalCredentialsService")
 		session_builders = [
 			await credentials_session_builder(credentials_service, credentials_id, scope),
 			authentication_session_builder(login_descriptor),
 			await available_factors_session_builder(authentication_service, credentials_id),
-			await external_login_session_builder(ext_login_svc, credentials_id),
 			# TODO: SSO session should not need to have Authz data
 			await authz_session_builder(
 				tenant_service=tenant_service,
@@ -739,6 +739,11 @@ class SessionService(asab.Service):
 			),
 			cookie_session_builder(),
 		]
+
+		with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
+			session_builders.append(await external_login_session_builder(
+				ext_login_svc, credentials_id))
+
 		return session_builders
 
 
@@ -752,7 +757,7 @@ class SessionService(asab.Service):
 		redirect_uri: typing.Optional[str] = None,
 	):
 		authentication_service = self.App.get_service("seacatauth.AuthenticationService")
-		external_login_service = self.App.get_service("seacatauth.ExternalLoginService")
+		external_login_service = self.App.get_service("seacatauth.ExternalCredentialsService")
 		credentials_service = self.App.get_service("seacatauth.CredentialsService")
 		tenant_service = self.App.get_service("seacatauth.TenantService")
 		role_service = self.App.get_service("seacatauth.RoleService")
@@ -773,16 +778,14 @@ class SessionService(asab.Service):
 				credentials_id=root_session.Credentials.Id,
 				tenants=tenants,
 				exclude_resources=exclude_resources,
-			)
+			),
+			[(Session.FN.Authentication.AuthnTime, root_session.Authentication.AuthnTime)]
 		]
 
-		session_builders.append([
-			(Session.FN.Authentication.AuthnTime, root_session.Authentication.AuthnTime),
-		])
-
 		if "profile" in scope or "userinfo:authn" in scope or "userinfo:*" in scope:
-			session_builders.append(
-				await external_login_session_builder(external_login_service, root_session.Credentials.Id))
+			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
+				session_builders.append(await external_login_session_builder(
+						external_login_service, root_session.Credentials.Id))
 			session_builders.append(
 				await available_factors_session_builder(authentication_service, root_session.Credentials.Id))
 			session_builders.append([

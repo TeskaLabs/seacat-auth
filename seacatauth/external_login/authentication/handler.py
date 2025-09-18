@@ -7,9 +7,9 @@ import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
-from ..service import ExternalLoginService
 from ... import exceptions, generic, AuditLogger
-from ..utils import AuthOperation
+from .service import ExternalAuthenticationService
+from .utils import AuthOperation
 from ..exceptions import (
 	ExternalAccountError,
 	LoginWithExternalAccountError,
@@ -21,7 +21,7 @@ from ..exceptions import (
 L = logging.getLogger(__name__)
 
 
-class ExternalLoginPublicHandler(object):
+class ExternalAuthenticationHandler(object):
 	"""
 	External login
 
@@ -29,9 +29,9 @@ class ExternalLoginPublicHandler(object):
 	tags: ["Public - External login"]
 	"""
 
-	def __init__(self, app, external_login_svc: ExternalLoginService):
+	def __init__(self, app, external_authentication_svc: ExternalAuthenticationService):
 		self.App = app
-		self.ExternalLoginService = external_login_svc
+		self.ExternalAuthenticationService = external_authentication_svc
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
@@ -40,12 +40,14 @@ class ExternalLoginPublicHandler(object):
 		web_app.router.add_get("/public/ext-login/{provider_type}/pair", self.pair_external_account)
 		web_app.router.add_get("/public/ext-login/{provider_type}/login", self.login_with_external_account)
 		web_app.router.add_get("/public/ext-login/{provider_type}/signup", self.sign_up_with_external_account)
-		web_app.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
+		web_app.router.add_get(self.ExternalAuthenticationService.CallbackEndpointPath, self.external_auth_callback)
+		web_app.router.add_post(self.ExternalAuthenticationService.CallbackEndpointPath, self.external_auth_callback)
 
 		web_app_public.router.add_get("/public/ext-login/{provider_type}/pair", self.pair_external_account)
 		web_app_public.router.add_get("/public/ext-login/{provider_type}/login", self.login_with_external_account)
 		web_app_public.router.add_get("/public/ext-login/{provider_type}/signup", self.sign_up_with_external_account)
-		web_app_public.router.add_get(self.ExternalLoginService.CallbackEndpointPath, self.external_auth_callback)
+		web_app_public.router.add_get(self.ExternalAuthenticationService.CallbackEndpointPath, self.external_auth_callback)
+		web_app_public.router.add_post(self.ExternalAuthenticationService.CallbackEndpointPath, self.external_auth_callback)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -66,9 +68,8 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.initialize_pairing_external_account(
+		return await self.ExternalAuthenticationService.initialize_pairing_with_ext_provider(
 			provider_type, redirect_uri)
-		return aiohttp.web.HTTPFound(authorization_url)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -91,9 +92,8 @@ class ExternalLoginPublicHandler(object):
 		"""
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
-		authorization_url = await self.ExternalLoginService.initialize_login_with_external_account(
+		return await self.ExternalAuthenticationService.initialize_login_with_ext_provider(
 			provider_type, redirect_uri)
-		return aiohttp.web.HTTPFound(authorization_url)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -115,11 +115,10 @@ class ExternalLoginPublicHandler(object):
 		redirect_uri = request.query.get("redirect_uri")
 		provider_type = request.match_info["provider_type"]
 		try:
-			authorization_url = await self.ExternalLoginService.initialize_signup_with_external_account(
+			return await self.ExternalAuthenticationService.initialize_signup_with_ext_provider(
 				provider_type, redirect_uri)
 		except exceptions.RegistrationNotOpenError:
 			return aiohttp.web.HTTPNotFound()
-		return aiohttp.web.HTTPFound(authorization_url)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -127,7 +126,7 @@ class ExternalLoginPublicHandler(object):
 	async def external_auth_callback(self, request):
 		"""
 		Finalize external account login, sign-up or pairing.
-		Navigable endpoint, OAuth authorization callback. It must be registered as a redirect URI in OAuth app/client
+		Navigable endpoint, OAuth2/SAML authorization callback. It must be registered as a redirect URI in app/client
 		settings at the external account provider.
 		Finishes with redirect to the URL specified at the external auth entrypoint,
 		appending `ext_login_result` to the URL query.
@@ -138,128 +137,53 @@ class ExternalLoginPublicHandler(object):
 			- `login_error`: Logging in with external account failed.
 			- `signup_error`: Signing up with external account failed.
 			- `pairing_error`: Pairing external account to current user's credentials failed.
-
-		---
-		parameters:
-		-	name: code
-			in: query
-			description:
-				OAuth authorization code.
-			schema:
-				type: string
-		-	name: state
-			in: query
-			description:
-				OAuth state variable.
-			schema:
-				type: string
 		"""
+		access_ips = generic.get_request_access_ips(request)
+
 		if request.method == "POST":
-			authorization_data = dict(await request.post())
+			payload = dict(await request.post())
+		elif request.method == "GET":
+			payload = dict(request.query)
 		else:
-			authorization_data = dict(request.query)
+			raise RuntimeError("Unsupported request method {!r}".format(request.method))
 
-		state = authorization_data["state"]
-		operation = state[0]
-		if operation == AuthOperation.LogIn:
-			return await self._login_callback(request, authorization_data)
-		elif operation == AuthOperation.SignUp:
-			return await self._signup_callback(request, authorization_data)
-		elif operation == AuthOperation.PairAccount:
-			return await self._pair_account_callback(request, authorization_data)
-		else:
-			L.error("Cannot determine operation from state.", struct_data={"operation": operation})
-			return aiohttp.web.HTTPBadRequest()
-
-
-	async def _login_callback(self, request, authorization_data):
-		cookie_service = self.App.get_service("seacatauth.CookieService")
 		try:
-			sso_session = await cookie_service.get_session_by_request_cookie(request)
-		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
-			sso_session = None
-
-		access_ips = generic.get_request_access_ips(request)
-		try:
-			operation, new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_login_with_external_account(
-				session_context=sso_session, from_ip=access_ips, **authorization_data)
+			operation_code, new_sso_session, redirect_uri = (
+				await self.ExternalAuthenticationService.process_external_auth_callback(request, payload))
 		except LoginWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed.", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "External account authentication failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
 				"from_ip": access_ips,
 			})
 			return self._error_redirect(e, result=e.Result)
 		except SignupWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed.", struct_data={
+			AuditLogger.log(asab.LOG_NOTICE, "External account sign-up failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
 				"from_ip": access_ips,
 			})
 			return self._error_redirect(e, result=e.Result)
-
-		if operation == AuthOperation.SignUp:
-			result = "signup_success"
-		else:
-			assert operation == AuthOperation.LogIn
-			result = "login_success"
-
-		return self._success_response(redirect_uri, result=result, sso_session=new_sso_session)
-
-
-	async def _signup_callback(self, request, authorization_data):
-		cookie_service = self.App.get_service("seacatauth.CookieService")
-		try:
-			sso_session = await cookie_service.get_session_by_request_cookie(request)
-		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
-			sso_session = None
-
-		access_ips = generic.get_request_access_ips(request)
-		try:
-			new_sso_session, redirect_uri = await self.ExternalLoginService.finalize_signup_with_external_account(
-				session_context=sso_session, from_ip=access_ips, **authorization_data)
-		except SignupWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Sign-up failed.", struct_data={
-				"ext_provider_type": e.ProviderType,
-				"subject_id": e.SubjectId,
-				"from_ip": access_ips,
-			})
-			return self._error_redirect(e, result=e.Result)
-
-		return self._success_response(redirect_uri, result="signup_success", sso_session=new_sso_session)
-
-
-	async def _pair_account_callback(self, request, authorization_data):
-		cookie_service = self.App.get_service("seacatauth.CookieService")
-		try:
-			sso_session = await cookie_service.get_session_by_request_cookie(request)
-		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
-			sso_session = None
-
-		access_ips = generic.get_request_access_ips(request)
-		try:
-			redirect_uri = await self.ExternalLoginService.finalize_pairing_external_account(
-				session_context=sso_session, **authorization_data)
 		except PairingExternalAccountError as e:
-			L.log(asab.LOG_NOTICE, "Failed to pair external account.", struct_data={
+			L.log(asab.LOG_NOTICE, "External account pairing failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
 				"from_ip": access_ips,
 			})
 			return self._error_redirect(e, result=e.Result)
 
-		return self._success_response(redirect_uri, result="pairing_success")
+		return self._success_response(redirect_uri, operation_code, sso_session=new_sso_session)
 
 
 	def _error_redirect(self, error: typing.Optional[ExternalAccountError] = None, result: str = "error"):
 		if not error:
 			redirect_uri = generic.update_url_query_params(
-				self.ExternalLoginService.DefaultRedirectUri,
+				self.ExternalAuthenticationService.DefaultRedirectUri,
 				ext_login_result=result,
 			)
 		else:
 			redirect_uri = generic.update_url_query_params(
-				error.RedirectUri or self.ExternalLoginService.DefaultRedirectUri,
+				error.RedirectUri or self.ExternalAuthenticationService.DefaultRedirectUri,
 				ext_login_result=result,
 			)
 		response = aiohttp.web.HTTPNotFound(headers={
@@ -269,14 +193,24 @@ class ExternalLoginPublicHandler(object):
 		return response
 
 
-	def _success_response(self, redirect_uri: str, result: str, sso_session: typing.Optional = None):
+	def _success_response(self, redirect_uri: str, operation_code: str, sso_session: typing.Optional = None):
+		match operation_code:
+			case AuthOperation.LogIn:
+				result_msg = "signup_success"
+			case AuthOperation.SignUp:
+				result_msg = "login_success"
+			case AuthOperation.PairAccount:
+				result_msg = "pairing_success"
+			case _:
+				raise ValueError("Unknown operation code {!r}".format(operation_code))
+
 		redirect_uri = generic.update_url_query_params(
 			redirect_uri,
-			ext_login_result=result,
+			ext_login_result=result_msg,
 		)
 		response = aiohttp.web.HTTPFound(redirect_uri)
 		if sso_session:
-			self.ExternalLoginService.CookieService.set_session_cookie(
+			self.ExternalAuthenticationService.CookieService.set_session_cookie(
 				response,
 				cookie_value=sso_session.Cookie.Id,
 				client_id=sso_session.OAuth2.ClientId

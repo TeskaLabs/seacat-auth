@@ -1,7 +1,7 @@
-from .generic import GenericOAuth2Login
+from .oauth2 import OAuth2IdentityProvider
 
 
-class MojeIDOAuth2Login(GenericOAuth2Login):
+class MojeIDOAuth2IdentityProvider(OAuth2IdentityProvider):
 	"""
 	Follow these implementation steps:
 	https://www.mojeid.cz/dokumentace/html/ImplementacePodporyMojeid/OpenidConnect/PrehledKroku.html
@@ -11,6 +11,7 @@ class MojeIDOAuth2Login(GenericOAuth2Login):
 	The full callback URL is canonically in the following format:
 	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
+
 	Type = "mojeid"
 	ConfigDefaults = {
 		"issuer": "https://mojeid.cz",

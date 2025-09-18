@@ -1,5 +1,5 @@
 import json
-import re
+import secrets
 import typing
 import urllib.parse
 import logging
@@ -11,13 +11,14 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from ..exceptions import ExternalOAuthFlowError
+from seacatauth.external_login.exceptions import ExternalLoginError
+from .abc import ExternalIdentityProviderABC
 
 
 L = logging.getLogger(__name__)
 
 
-class GenericOAuth2Login(asab.Configurable):
+class OAuth2IdentityProvider(ExternalIdentityProviderABC, asab.Configurable):
 	"""
 	Generic OAuth2 (OpenID) login provider
 
@@ -36,7 +37,7 @@ class GenericOAuth2Login(asab.Configurable):
 	userinfo_endpoint=https://provider.auth/login/oauth/userinfo
 
 	scope=openid name email
-	label=Login via provider.auth
+	label=My Local Auth
 	```
 
 	Seacat Auth external login callback endpoint (/public/ext-login/callback) must be allowed as a redirect URIs
@@ -45,32 +46,12 @@ class GenericOAuth2Login(asab.Configurable):
 	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
 
-	Type = None
+	NonceLength = 32  # Length of the nonce to generate, or 0 to disable nonce
 
-	def __init__(self, external_login_svc, config_section_name, config=None):
+	def __init__(self, external_authentication_svc, config_section_name, config=None):
+		super().__init__(external_authentication_svc, config_section_name, config)
+
 		# TODO: Get the URLs automatically from the discovery_uri (or issuer name)
-		super().__init__(config_section_name, config)
-		if self.Type is None:
-			match = re.match("seacatauth:oauth2:([_a-zA-Z0-9]+)", config_section_name)
-			self.Type = match.group(1)
-
-		# Adopt proper OAuth/OpenID terminology
-		if "authorize_uri" in self.Config:
-			asab.LogObsolete.warning(
-				"The 'authorize_uri' config option will be obsoleted. Use 'authorization_endpoint' instead. ",
-				struct_data={"eol": "2024-01-31"})
-			self.Config["authorization_endpoint"] = self.Config["authorize_uri"]
-		if "access_token_uri" in self.Config:
-			asab.LogObsolete.warning(
-				"The 'access_token_uri' config option will be obsoleted. Use 'token_endpoint' instead. ",
-				struct_data={"eol": "2024-01-31"})
-			self.Config["token_endpoint"] = self.Config["access_token_uri"]
-		if "userinfo_uri" in self.Config:
-			asab.LogObsolete.warning(
-				"The 'userinfo_uri' config option will be obsoleted. Use 'userinfo_endpoint' instead. ",
-				struct_data={"eol": "2024-01-31"})
-			self.Config["userinfo_endpoint"] = self.Config["userinfo_uri"]
-
 		self.Issuer = self.Config.get("issuer")
 		self.DiscoveryUri = self.Config.get("discovery_uri")
 		self.JwksUri = self.Config.get("jwks_uri")
@@ -92,41 +73,47 @@ class GenericOAuth2Login(asab.Configurable):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
-		# Label for "Sign up with {ext_login_provider}" button
-		# TODO: Make this i18n-compatible (like login descriptors)
-		# TODO: Separate label for "Add external login" button
-		self.Label = self.Config.get("label")
-		assert self.Label is not None
+		self.Scope = self.Config.get("scope")
+		assert self.Scope is not None
+
+		self.NonceLength = self.Config.get("nonce_length", self.NonceLength)
 
 		self.JwkSet = None
 
 		# The URL to return to after successful external login
-		# Mostly for debugging purposes
+		# Configurable for debugging purposes
 		if "_callback_url" in self.Config:
 			self.CallbackUrl = self.Config.get("_callback_url")
 		else:
-			self.CallbackUrl = external_login_svc.CallbackUrlTemplate.format(provider_type=self.Type)
+			self.CallbackUrl = external_authentication_svc.CallbackUrlTemplate.format(provider_type=self.Type)
 
 
 	async def initialize(self, app):
 		await self._prepare_jwks()
 
 
-	def acr_value(self) -> str:
-		"""
-		Authentication Context Class Reference (ACR)
-		https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
+		if self.NonceLength:
+			nonce = secrets.token_urlsafe(self.NonceLength)
+			state["nonce"] = nonce
+		else:
+			nonce = None
 
-		OpenID Connect clients may use an ACR value in the authorization request to specifically request which external
-		login provider should be used for End-User authentication.
-		"""
-		return "ext:{}".format(self.Type)
+		auth_uri = self._get_authorize_uri(
+			state=state["state_id"],
+			nonce=nonce
+		)
+		return state, aiohttp.web.HTTPFound(auth_uri)
 
 
-	async def _prepare_jwks(self, speculative=True):
+	async def process_auth_callback(self, request: aiohttp.web.Request, payload: dict, state: dict, **kwargs) -> dict:
+		return await self._get_user_info(payload, expected_nonce=state["nonce"])
+
+
+	async def _prepare_jwks(self, overwrite_current=False):
 		if not self.JwksUri:
 			return
-		if self.JwkSet and speculative:
+		if self.JwkSet and not overwrite_current:
 			return
 		async with aiohttp.ClientSession() as session:
 			async with session.get(self.JwksUri) as resp:
@@ -144,8 +131,9 @@ class GenericOAuth2Login(asab.Configurable):
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
 		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
-	def get_authorize_uri(
-		self, redirect_uri: typing.Optional[str] = None,
+
+	def _get_authorize_uri(
+		self,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
 	):
@@ -153,7 +141,7 @@ class GenericOAuth2Login(asab.Configurable):
 			("response_type", "code"),
 			("client_id", self.ClientId),
 			("scope", self.Scope),
-			("redirect_uri", redirect_uri or self.CallbackUrl),
+			("redirect_uri", self.CallbackUrl),
 			("prompt", "select_account"),
 		]
 		if state is not None:
@@ -164,6 +152,7 @@ class GenericOAuth2Login(asab.Configurable):
 			authorize_uri=self.AuthorizationEndpoint,
 			query_string=urllib.parse.urlencode(query_params)
 		)
+
 
 	@contextlib.asynccontextmanager
 	async def token_request(self, code: str, redirect_uri: str | None = None):
@@ -191,11 +180,12 @@ class GenericOAuth2Login(asab.Configurable):
 						"url": resp.url,
 						"text": text
 					})
-					raise ExternalOAuthFlowError("Token request failed.")
+					raise ExternalLoginError("Token request failed.")
 				else:
 					yield resp
 
-	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+
+	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Obtain the authenticated user's profile info, with the claims normalized to be in line with
 		OpenID UserInfo response.
@@ -214,7 +204,7 @@ class GenericOAuth2Login(asab.Configurable):
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
 				"query": dict(authorize_data)})
-			raise ExternalOAuthFlowError("No 'code' parameter in request.")
+			raise ExternalLoginError("No 'code' parameter in request.")
 
 		async with self.token_request(code) as resp:
 			token_data = await resp.json()
@@ -222,7 +212,7 @@ class GenericOAuth2Login(asab.Configurable):
 		if "id_token" not in token_data:
 			L.error("Token response does not contain 'id_token'", struct_data={
 				"provider": self.Type, "resp": token_data})
-			raise ExternalOAuthFlowError("No 'id_token' in token response.")
+			raise ExternalLoginError("No 'id_token' in token response.")
 
 		id_token = token_data["id_token"]
 		await self._prepare_jwks()
@@ -231,6 +221,7 @@ class GenericOAuth2Login(asab.Configurable):
 		user_info = self._user_data_from_id_token_claims(id_token_claims)
 		user_info["sub"] = str(user_info["sub"])
 		return user_info
+
 
 	def _user_data_from_id_token_claims(self, id_token_claims: dict):
 		user_info = {
@@ -243,6 +234,7 @@ class GenericOAuth2Login(asab.Configurable):
 		}
 		return user_info
 
+
 	def _get_verified_claims(self, id_token, expected_nonce: str | None = None):
 		check_claims = self._get_claims_to_verify()
 		if expected_nonce:
@@ -252,14 +244,14 @@ class GenericOAuth2Login(asab.Configurable):
 			claims = json.loads(id_token.claims)
 		except jwcrypto.jws.InvalidJWSSignature:
 			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
-			raise ExternalOAuthFlowError("Invalid ID token signature.")
+			raise ExternalLoginError("Invalid ID token signature.")
 		except jwcrypto.jwt.JWTExpired:
 			L.error("Expired ID token.", struct_data={"provider": self.Type})
-			raise ExternalOAuthFlowError("Expired ID token.")
+			raise ExternalLoginError("Expired ID token.")
 		except Exception as e:
 			L.error("Error reading ID token claims.", struct_data={
 				"provider": self.Type, "error": str(e)})
-			raise ExternalOAuthFlowError("Error reading ID token claims.")
+			raise ExternalLoginError("Error reading ID token claims.")
 		return claims
 
 

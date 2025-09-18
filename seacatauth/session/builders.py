@@ -34,9 +34,9 @@ async def credentials_session_builder(credentials_service, credentials_id, scope
 	return data
 
 
-async def external_login_session_builder(external_login_service, credentials_id):
+async def external_login_session_builder(external_credentials_service, credentials_id):
 	external_logins = {}
-	for result in await external_login_service.list_external_accounts(credentials_id):
+	for result in await external_credentials_service.list_ext_credentials(credentials_id):
 		try:
 			external_logins[result["type"]] = result["sub"]
 		except KeyError:

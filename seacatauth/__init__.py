@@ -229,10 +229,7 @@ asab.Config.add_defaults({
 		"state_expiration": "10m",
 
 		# Length of OAuth state string
-		"state_length": 16,
-
-		# Length of OAuth nonce string
-		"nonce_length": 16,
+		"state_length": 32,
 	},
 
 	"seacatauth:api_key": {

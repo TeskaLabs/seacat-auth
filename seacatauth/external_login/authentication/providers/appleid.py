@@ -2,14 +2,14 @@ import json
 import logging
 import typing
 import urllib.parse
-from .generic import GenericOAuth2Login
-from ..exceptions import ExternalOAuthFlowError
+from .oauth2 import OAuth2IdentityProvider
+from seacatauth.external_login.exceptions import ExternalLoginError
 
 
 L = logging.getLogger(__name__)
 
 
-class AppleIDOAuth2Login(GenericOAuth2Login):
+class AppleIDOAuth2IdentityProvider(OAuth2IdentityProvider):
 	"""
 	This app ("Service ID" in Apple terminology) must be registered at Apple developer site:
 	https://developer.apple.com/account/resources/identifiers/list/serviceId
@@ -34,11 +34,11 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 		"label": "AppleID",
 	}
 
-	def __init__(self, external_login_svc, config_section_name, config=None):
-		super().__init__(external_login_svc, config_section_name, config)
+	def __init__(self, external_authentication_svc, config_section_name, config=None):
+		super().__init__(external_authentication_svc, config_section_name, config)
 		self.Scope = self.Config.get("scope")
 
-	def get_authorize_uri(
+	def _get_authorize_uri(
 		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
@@ -59,7 +59,7 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		auth_error = authorize_data.get("error")
 		if auth_error is not None:
 			if auth_error == "user_cancelled_authorize":
@@ -67,13 +67,13 @@ class AppleIDOAuth2Login(GenericOAuth2Login):
 					"User has cancelled authorization with identity provider",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
 				)
-				raise ExternalOAuthFlowError("User cancelled authorization.")
+				raise ExternalLoginError("User cancelled authorization.")
 			else:
 				L.error(
 					"An unknown error has occurred during authorization flow",
 					struct_data={"provider": self.Type, "auth_error": auth_error}
 				)
-				raise ExternalOAuthFlowError("Unknown error during authorization flow.")
+				raise ExternalLoginError("Unknown error during authorization flow.")
 
 		id_token = authorize_data.get("id_token")
 		verified_claims = self._get_verified_claims(id_token, expected_nonce)
