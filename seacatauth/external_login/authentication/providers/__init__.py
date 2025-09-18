@@ -1,11 +1,11 @@
-from .abc import ExternalIdentityProviderABC
-from .oauth2 import OAuth2IdentityProvider
-from .github import GitHubOAuth2IdentityProvider
-from .google import GoogleOAuth2IdentityProvider
-from .office365 import Office365OAuth2IdentityProvider
-from .mojeid import MojeIDOAuth2IdentityProvider
-from .facebook import FacebookOAuth2IdentityProvider
-from .appleid import AppleIDOAuth2IdentityProvider
+from .abc import ExternalAuthProviderABC
+from .oauth2 import OAuth2AuthProvider
+from .github import GitHubOAuth2AuthProvider
+from .google import GoogleOAuth2AuthProvider
+from .office365 import Office365OAuth2AuthProvider
+from .mojeid import MojeIDOAuth2AuthProvider
+from .facebook import FacebookOAuth2AuthProvider
+from .appleid import AppleIDOAuth2AuthProvider
 
 
 def create_provider(authn_handler, section):
@@ -15,46 +15,46 @@ def create_provider(authn_handler, section):
 
 	provider_type = parts[1]
 	if provider_type == "oauth2:github":
-		return GitHubOAuth2IdentityProvider(authn_handler, section)
+		return GitHubOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "oauth2:google":
-		return GoogleOAuth2IdentityProvider(authn_handler, section)
+		return GoogleOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "oauth2:office365":
-		return Office365OAuth2IdentityProvider(authn_handler, section)
+		return Office365OAuth2AuthProvider(authn_handler, section)
 	if provider_type == "oauth2:mojeid":
-		return MojeIDOAuth2IdentityProvider(authn_handler, section)
+		return MojeIDOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "oauth2:facebook":
-		return FacebookOAuth2IdentityProvider(authn_handler, section)
+		return FacebookOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "oauth2:appleid":
-		return AppleIDOAuth2IdentityProvider(authn_handler, section)
+		return AppleIDOAuth2AuthProvider(authn_handler, section)
 	if provider_type.startswith("oauth2:"):
-		return OAuth2IdentityProvider(authn_handler, section)
+		return OAuth2AuthProvider(authn_handler, section)
 
 	# Backward compatibility for old provider type names
 	if provider_type == "github":
-		return GitHubOAuth2IdentityProvider(authn_handler, section)
+		return GitHubOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "google":
-		return GoogleOAuth2IdentityProvider(authn_handler, section)
+		return GoogleOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "office365":
-		return Office365OAuth2IdentityProvider(authn_handler, section)
+		return Office365OAuth2AuthProvider(authn_handler, section)
 	if provider_type == "mojeid":
-		return MojeIDOAuth2IdentityProvider(authn_handler, section)
+		return MojeIDOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "facebook":
-		return FacebookOAuth2IdentityProvider(authn_handler, section)
+		return FacebookOAuth2AuthProvider(authn_handler, section)
 	if provider_type == "appleid":
-		return AppleIDOAuth2IdentityProvider(authn_handler, section)
+		return AppleIDOAuth2AuthProvider(authn_handler, section)
 
 	return None
 
 
 __all__ = [
-	"ExternalIdentityProviderABC",
-	"OAuth2IdentityProvider",
+	"ExternalAuthProviderABC",
+	"OAuth2AuthProvider",
 	"Saml2IdentityProvider",
-	"GitHubOAuth2IdentityProvider",
-	"GoogleOAuth2IdentityProvider",
-	"Office365OAuth2IdentityProvider",
-	"MojeIDOAuth2IdentityProvider",
-	"FacebookOAuth2IdentityProvider",
-	"AppleIDOAuth2IdentityProvider",
+	"GitHubOAuth2AuthProvider",
+	"GoogleOAuth2AuthProvider",
+	"Office365OAuth2AuthProvider",
+	"MojeIDOAuth2AuthProvider",
+	"FacebookOAuth2AuthProvider",
+	"AppleIDOAuth2AuthProvider",
 	"create_provider",
 ]

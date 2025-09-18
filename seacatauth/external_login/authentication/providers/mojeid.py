@@ -1,7 +1,7 @@
-from .oauth2 import OAuth2IdentityProvider
+from .oauth2 import OAuth2AuthProvider
 
 
-class MojeIDOAuth2IdentityProvider(OAuth2IdentityProvider):
+class MojeIDOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	Follow these implementation steps:
 	https://www.mojeid.cz/dokumentace/html/ImplementacePodporyMojeid/OpenidConnect/PrehledKroku.html

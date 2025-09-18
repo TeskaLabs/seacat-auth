@@ -1,7 +1,7 @@
-from .oauth2 import OAuth2IdentityProvider
+from .oauth2 import OAuth2AuthProvider
 
 
-class Office365OAuth2IdentityProvider(OAuth2IdentityProvider):
+class Office365OAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be first registered at Azure Active Directory:
 	https://portal.azure.com

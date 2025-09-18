@@ -4,7 +4,6 @@ import typing
 import urllib.parse
 import logging
 import contextlib
-import asab
 import aiohttp
 import aiohttp.web
 import jwcrypto.jwt
@@ -12,13 +11,13 @@ import jwcrypto.jwk
 import jwcrypto.jws
 
 from seacatauth.external_login.exceptions import ExternalLoginError
-from .abc import ExternalIdentityProviderABC
+from .abc import ExternalAuthProviderABC
 
 
 L = logging.getLogger(__name__)
 
 
-class OAuth2IdentityProvider(ExternalIdentityProviderABC, asab.Configurable):
+class OAuth2AuthProvider(ExternalAuthProviderABC):
 	"""
 	Generic OAuth2 (OpenID) login provider
 

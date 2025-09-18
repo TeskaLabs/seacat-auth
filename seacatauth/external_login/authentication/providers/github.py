@@ -3,14 +3,14 @@ import typing
 import urllib.parse
 import aiohttp
 
-from .oauth2 import OAuth2IdentityProvider
+from .oauth2 import OAuth2AuthProvider
 from seacatauth.external_login.exceptions import ExternalLoginError
 
 
 L = logging.getLogger(__name__)
 
 
-class GitHubOAuth2IdentityProvider(OAuth2IdentityProvider):
+class GitHubOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be registered at Github:
 	https://github.com/settings/developers

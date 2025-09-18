@@ -1,7 +1,7 @@
-from .oauth2 import OAuth2IdentityProvider
+from .oauth2 import OAuth2AuthProvider
 
 
-class GoogleOAuth2IdentityProvider(OAuth2IdentityProvider):
+class GoogleOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be first registered at Google Cloud:
 	https://console.cloud.google.com/apis/credentials

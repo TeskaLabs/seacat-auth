@@ -3,14 +3,14 @@ import typing
 import urllib.parse
 import aiohttp
 
-from .oauth2 import OAuth2IdentityProvider
+from .oauth2 import OAuth2AuthProvider
 from seacatauth.external_login.exceptions import ExternalLoginError
 
 
 L = logging.getLogger(__name__)
 
 
-class FacebookOAuth2IdentityProvider(OAuth2IdentityProvider):
+class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be registered at Facebook:
 	https://developers.facebook.com/docs/facebook-login/web
