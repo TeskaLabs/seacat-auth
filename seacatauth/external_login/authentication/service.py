@@ -56,7 +56,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		self.DefaultRedirectUri = asab.Config.get("seacatauth:external_login", "default_redirect_uri")
 		if not self.DefaultRedirectUri:
-			self.DefaultRedirectUri = "{}#/".format(app.AuthWebUiUrl)  # "My account" page
+			self.DefaultRedirectUri = app.PublicUrl
 
 		app.PubSub.subscribe("Application.housekeeping!", self._delete_expired_states)
 
