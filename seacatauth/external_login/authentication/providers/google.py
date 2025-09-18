@@ -1,7 +1,7 @@
-from .generic import GenericOAuth2Login
+from .oauth2 import OAuth2AuthProvider
 
 
-class GoogleOAuth2Login(GenericOAuth2Login):
+class GoogleOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be first registered at Google Cloud:
 	https://console.cloud.google.com/apis/credentials
@@ -11,6 +11,7 @@ class GoogleOAuth2Login(GenericOAuth2Login):
 	The full callback URL is canonically in the following format:
 	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
+
 	Type = "google"
 	ConfigDefaults = {
 		"issuer": "accounts.google.com",  # !! Google's issuer does not exactly match the one stated in discovery data

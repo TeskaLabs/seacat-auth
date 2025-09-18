@@ -1,6 +1,6 @@
 import typing
 
-from ..exceptions import SeacatAuthError
+from seacatauth.exceptions import SeacatAuthError
 
 
 class ExternalAccountError(SeacatAuthError):
@@ -46,9 +46,9 @@ class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
 			self.SubjectId, self.ProviderType), *args)
 
 
-class ExternalOAuthFlowError(SeacatAuthError):
+class ExternalLoginError(SeacatAuthError):
 	"""
-	Failed to complete OAuth 2.0 Authorization Code flow at external identity provider
+	Failed to complete external login flow
 	"""
 	def __init__(self, message: str, *args):
 		super().__init__(message, *args)
