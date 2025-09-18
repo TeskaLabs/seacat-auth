@@ -2,14 +2,14 @@ import json
 import logging
 import typing
 import urllib.parse
-from .oauth2 import OAuth2IdentityProvider
+from .oauth2 import OAuth2AuthProvider
 from seacatauth.external_login.exceptions import ExternalLoginError
 
 
 L = logging.getLogger(__name__)
 
 
-class AppleIDOAuth2IdentityProvider(OAuth2IdentityProvider):
+class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app ("Service ID" in Apple terminology) must be registered at Apple developer site:
 	https://developer.apple.com/account/resources/identifiers/list/serviceId

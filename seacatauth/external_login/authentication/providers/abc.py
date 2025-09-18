@@ -9,7 +9,7 @@ import asab
 L = logging.getLogger(__name__)
 
 
-class ExternalIdentityProviderABC(abc.ABC, asab.Configurable):
+class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 
 	Type = None
 

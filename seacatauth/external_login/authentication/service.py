@@ -12,7 +12,7 @@ from ...models import Session
 from ...events import EventTypes
 from ...api import local_authz
 from .utils import AuthOperation
-from .providers import ExternalIdentityProviderABC, create_provider
+from .providers import ExternalAuthProviderABC, create_provider
 from ..exceptions import (
 	LoginWithExternalAccountError,
 	SignupWithExternalAccountError,
@@ -60,7 +60,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		app.PubSub.subscribe("Application.housekeeping!", self._delete_expired_states)
 
-		self.Providers: typing.Dict[str, ExternalIdentityProviderABC] = {}
+		self.Providers: typing.Dict[str, ExternalAuthProviderABC] = {}
 		self._prepare_providers()
 
 
@@ -82,7 +82,7 @@ class ExternalAuthenticationService(asab.Service):
 			await provider.initialize(app)
 
 
-	def get_provider(self, provider_type: str) -> ExternalIdentityProviderABC:
+	def get_provider(self, provider_type: str) -> ExternalAuthProviderABC:
 		"""
 		Get an external identity provider by its type.
 
