@@ -5,6 +5,7 @@ import asab.web.rest
 import pymongo
 
 from ... import exceptions
+from ...api import local_authz
 from ...models.const import ResourceId
 from ..exceptions import (
 	PairingExternalAccountError,
@@ -93,7 +94,8 @@ class ExternalCredentialsService(asab.Service):
 		assert credentials_id
 
 		try:
-			await self.create_ext_credentials(credentials_id, provider_type, user_info)
+			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
+				await self.create_ext_credentials(credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict as e:
 			L.log(asab.LOG_NOTICE, "Cannot pair external account: Already paired.", struct_data={
 				"cid": credentials_id,
@@ -247,7 +249,7 @@ class ExternalCredentialsService(asab.Service):
 			"authorization_response": authorization_data,
 		}
 
-		async with aiohttp.ClientSession() as session:
+		async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
 			async with session.post(self.RegistrationWebhookUri, json=request_data) as resp:
 				if resp.status not in frozenset([200, 201]):
 					text = await resp.text()

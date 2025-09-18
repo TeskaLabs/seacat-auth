@@ -111,7 +111,7 @@ class ExternalAuthenticationService(asab.Service):
 		self,
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
-	) -> str:
+	) -> aiohttp.web.Response:
 		response = await self._prepare_external_auth_request(
 			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
 		L.log(asab.LOG_NOTICE, "Initialized login with external account.", struct_data={
@@ -123,8 +123,8 @@ class ExternalAuthenticationService(asab.Service):
 		self,
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
-	) -> str:
-		if not self._can_sign_up_new_credentials(provider_type):
+	) -> aiohttp.web.Response:
+		if not self.can_sign_up_new_credentials(provider_type):
 			L.error("Signup with external account is not enabled.")
 			raise exceptions.RegistrationNotOpenError()
 		response = await self._prepare_external_auth_request(
@@ -139,7 +139,7 @@ class ExternalAuthenticationService(asab.Service):
 		self,
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
-	) -> str:
+	) -> aiohttp.web.Response:
 		response = await self._prepare_external_auth_request(
 			provider_type, operation=AuthOperation.PairAccount, redirect_uri=redirect_uri)
 		L.log(asab.LOG_NOTICE, "Initialized pairing external account.", struct_data={
@@ -243,18 +243,16 @@ class ExternalAuthenticationService(asab.Service):
 		except ExternalAccountNotFoundError as e:
 			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={
 				"type": e.ProviderType, "sub": e.SubjectId})
-			if not self._can_sign_up_new_credentials(provider_type):
+			if not self.can_sign_up_new_credentials(provider_type):
 				raise LoginWithExternalAccountError(
 					"Logged in with unknown external account; sign-up not allowed.",
 					provider_type=e.ProviderType,
 					subject_id=e.SubjectId,
 				) from e
 
-			# Create Seacat credentials
-			credentials_id = await self._create_new_seacat_auth_credentials(
+			# Create credentials and pair external account
+			credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
 				provider_type, user_info, payload)
-			# Pair the external account with the created credentials
-			await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
 			# Log the user in
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
@@ -267,9 +265,8 @@ class ExternalAuthenticationService(asab.Service):
 			return AuthOperation.SignUp, new_sso_session
 
 		# Get current SSO session (if any) to determine if we are re-logging in or logging in anew
-		cookie_service = self.App.get_service("seacatauth.CookieService")
 		try:
-			current_sso_session = await cookie_service.get_session_by_request_cookie(request)
+			current_sso_session = await self.CookieService.get_session_by_request_cookie(request)
 		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
 			current_sso_session = None
 
@@ -463,10 +460,7 @@ class ExternalAuthenticationService(asab.Service):
 
 
 	def _get_final_redirect_uri(self, state: dict):
-		if "redirect_uri" in state and state["redirect_uri"]:
-			return state["redirect_uri"]
-		# No redirect_uri was specified; redirect to default URL
-		return self.DefaultRedirectUri
+		return state.get("redirect_uri") or self.DefaultRedirectUri
 
 
 	async def _create_state(
