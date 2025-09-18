@@ -72,7 +72,8 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
-		self.NonceLength = self.Config.getint("nonce_length", self.NonceLength)
+		if "nonce_length" in self.Config:
+			self.NonceLength = self.Config.getint("nonce_length")
 
 		self.JwkSet = None
 
