@@ -8,13 +8,13 @@ import saml2.client
 import saml2.response
 
 from seacatauth.external_login.exceptions import ExternalLoginError
-from .abc import ExternalIdentityProviderABC
+from .abc import ExternalAuthProviderABC
 
 
 L = logging.getLogger(__name__)
 
 
-class Saml2IdentityProvider(ExternalIdentityProviderABC):
+class Saml2AuthProvider(ExternalAuthProviderABC):
 	"""
 	Generic SAML 2 login provider
 
