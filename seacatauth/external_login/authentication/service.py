@@ -313,7 +313,9 @@ class ExternalAuthenticationService(asab.Service):
 
 		# Verify that the external account is not registered already
 		try:
-			await self.get_external_account(provider_type, subject_id=user_info["sub"])
+			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
+				await self.ExternalCredentialsService.get_ext_credentials(
+					provider_type, subject_id=user_info["sub"])
 			L.log(asab.LOG_NOTICE, "Cannot sign up with external account: Account already paired.", struct_data={
 				"provider": provider_type, "sub": user_info.get("sub")})
 			raise SignupWithExternalAccountError(
@@ -325,7 +327,7 @@ class ExternalAuthenticationService(asab.Service):
 			# Unknown account can be used for signup
 			pass
 
-		if not self._can_sign_up_new_credentials(provider_type):
+		if not self.can_sign_up_new_credentials(provider_type):
 			L.error("Sign-up with external account not enabled.")
 			raise SignupWithExternalAccountError(
 				"Sign-up with external account not enabled.",
@@ -333,11 +335,9 @@ class ExternalAuthenticationService(asab.Service):
 				subject_id=user_info["sub"],
 			)
 
-		# Create Seacat credentials
-		credentials_id = await self._create_new_seacat_auth_credentials(
+		# Create credentials and pair external account in one step
+		credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
 			provider_type, user_info, payload)
-		# Pair the external account with the created credentials
-		await self.ExternalLoginAccountStorage.create(credentials_id, provider_type, user_info)
 
 		# Log the user in
 		sso_session = await self._login(

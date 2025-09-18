@@ -193,12 +193,12 @@ class ExternalAuthenticationHandler(object):
 		return response
 
 
-	def _success_response(self, redirect_uri: str, operation_code: str, sso_session: typing.Optional = None):
+	def _success_response(self, redirect_uri: str, operation_code: AuthOperation, sso_session: typing.Optional = None):
 		match operation_code:
 			case AuthOperation.LogIn:
-				result_msg = "signup_success"
-			case AuthOperation.SignUp:
 				result_msg = "login_success"
+			case AuthOperation.SignUp:
+				result_msg = "signup_success"
 			case AuthOperation.PairAccount:
 				result_msg = "pairing_success"
 			case _:
