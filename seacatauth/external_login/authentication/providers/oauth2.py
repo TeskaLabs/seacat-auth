@@ -72,7 +72,8 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		self.Ident = self.Config.get("ident", "email")
 		assert self.Ident is not None
 
-		self.NonceLength = self.Config.getint("nonce_length", self.NonceLength)
+		if "nonce_length" in self.Config:
+			self.NonceLength = self.Config.getint("nonce_length")
 
 		self.JwkSet = None
 
@@ -111,7 +112,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			return
 		if self.JwkSet and not overwrite_current:
 			return
-		async with aiohttp.ClientSession() as session:
+		async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
 			async with session.get(self.JwksUri) as resp:
 				if resp.status != 200:
 					text = await resp.text()
@@ -167,7 +168,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		headers = {
 			"content-type": "application/x-www-form-urlencoded"
 		}
-		async with aiohttp.ClientSession() as session:
+		async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
 			async with session.post(self.TokenEndpoint, data=query_string, headers=headers) as resp:
 				if resp.status != 200:
 					text = await resp.text()
