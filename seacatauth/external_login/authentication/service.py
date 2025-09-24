@@ -99,11 +99,9 @@ class ExternalAuthenticationService(asab.Service):
 		"""
 		Check if new credentials from the given external identity provider can be registered.
 		"""
-		provider = self.get_provider(provider_type)
 		return (
-			self.ExternalCredentialsService.RegistrationWebhookUri is not None
+			self.ExternalCredentialsService.RegistrationWebhookUri
 			or self.ExternalCredentialsService.RegistrationService.SelfRegistrationEnabled
-			or provider.trust_all_credentials()
 		)
 
 
@@ -319,6 +317,7 @@ class ExternalAuthenticationService(asab.Service):
 				"External account already signed up.",
 				provider_type=provider_type,
 				subject_id=user_info["sub"],
+				error_detail="already_paired",
 			)
 		except ExternalAccountNotFoundError:
 			# Unknown account can be used for signup
@@ -396,7 +395,7 @@ class ExternalAuthenticationService(asab.Service):
 					credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict as e:
 			L.error(
-				"Cannot finalize pairing external account: Already paired to different credentials.",
+				"Cannot finalize pairing external account: Record for this account already exists.",
 				struct_data={
 					"cid": credentials_id,
 					"provider": provider_type,
@@ -408,6 +407,8 @@ class ExternalAuthenticationService(asab.Service):
 				subject_id=user_info.get("sub"),
 				credentials_id=credentials_id,
 				provider_type=provider_type,
+				redirect_uri=state.get("redirect_uri"),
+				error_detail="already_paired",
 			) from e
 
 		return AuthOperation.PairAccount, None
