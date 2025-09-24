@@ -14,6 +14,26 @@ from .abc import ExternalAuthProviderABC
 L = logging.getLogger(__name__)
 
 
+_MS_ENTRA_AMR = {
+	"http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/password": "password",
+	"http://schemas.microsoft.com/claims/multipleauthn": "mfa",
+}
+_SAML_AMR = {
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:Kerberos": "kerberos",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:Password": "password",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:PGP": "pgp",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:SecureRemotePassword": "srp",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:XMLDSig": "xmldsig",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:SPKI": "spki",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:Smartcard": "smartcard",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:SmartcardPKI": "smartcard",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:TLSClient": "tlsclient",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:Unspecified": "unspecified",
+	"urn:oasis:names:tc:SAML:2.0:ac:classes:X509": "x509",
+	"urn:federation:authentication:windows": "windows",
+}
+
+
 class Saml2AuthProvider(ExternalAuthProviderABC):
 	"""
 	Generic SAML 2 login provider
@@ -114,3 +134,31 @@ class Saml2AuthProvider(ExternalAuthProviderABC):
 			raise ExternalLoginError("Failed to obtain user metadata from SAML response.")
 
 		return user_identity
+
+
+def _get_attribute(authn_response: saml2.response.AuthnResponse, attribute_name: str) -> typing.List[str]:
+	"""
+	Get attribute values from SAML response.
+	"""
+	vals = []
+	for stmt in (authn_response.assertion.attribute_statement or []):
+		for attr in (stmt.attribute or []):
+			if attr.name == attribute_name:
+				vals.extend([v.text for v in (attr.attribute_value or []) if hasattr(v, "text")])
+	return vals
+
+
+def _get_amr_values(authn_response: saml2.response.AuthnResponse) -> typing.Set[str]:
+	"""
+	Get AMR (Authentication Methods References) values from SAML response.
+	"""
+	values = set()
+	for v in _get_attribute(authn_response, "http://schemas.microsoft.com/claims/authnmethodsreferences"):
+		if v in _MS_ENTRA_AMR:
+			values.add(_MS_ENTRA_AMR[v])
+
+	for v, *_ in authn_response.authn_info():
+		if v in _SAML_AMR:
+			values.add(_SAML_AMR[v])
+
+	return values
