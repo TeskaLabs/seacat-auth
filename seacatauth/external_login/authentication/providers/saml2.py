@@ -34,7 +34,7 @@ _SAML_AMR = {
 }
 
 
-class Saml2AuthProvider(ExternalAuthProviderABC):
+class SamlAuthProvider(ExternalAuthProviderABC):
 	"""
 	Generic SAML 2 login provider
 

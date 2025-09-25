@@ -6,7 +6,7 @@ from .office365 import Office365OAuth2AuthProvider
 from .mojeid import MojeIDOAuth2AuthProvider
 from .facebook import FacebookOAuth2AuthProvider
 from .appleid import AppleIDOAuth2AuthProvider
-from .saml2 import Saml2AuthProvider
+from .saml2 import SamlAuthProvider
 
 
 def create_provider(authn_handler, section):
@@ -29,8 +29,8 @@ def create_provider(authn_handler, section):
 		return AppleIDOAuth2AuthProvider(authn_handler, section)
 	if provider_type.startswith("oauth2:"):
 		return OAuth2AuthProvider(authn_handler, section)
-	if provider_type.startswith("saml2:"):
-		return Saml2AuthProvider(authn_handler, section)
+	if provider_type.startswith("saml:"):
+		return SamlAuthProvider(authn_handler, section)
 
 	# Backward compatibility for old provider type names
 	if provider_type == "github":
@@ -50,14 +50,14 @@ def create_provider(authn_handler, section):
 
 
 __all__ = [
-	"AppleIDOAuth2AuthProvider",
 	"ExternalAuthProviderABC",
+	"AppleIDOAuth2AuthProvider",
 	"FacebookOAuth2AuthProvider",
 	"GitHubOAuth2AuthProvider",
 	"GoogleOAuth2AuthProvider",
 	"MojeIDOAuth2AuthProvider",
 	"OAuth2AuthProvider",
 	"Office365OAuth2AuthProvider",
-	"Saml2AuthProvider",
+	"SamlAuthProvider",
 	"create_provider",
 ]
