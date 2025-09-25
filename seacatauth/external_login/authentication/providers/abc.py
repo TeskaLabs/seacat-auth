@@ -66,13 +66,6 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 		raise NotImplementedError()
 
 
-	def trust_all_credentials(self) -> bool:
-		"""
-		Whether the external login provider is implicitly trusted to provide verified user credentials.
-		"""
-		return False
-
-
 	def acr_value(self) -> str:
 		"""
 		Authentication Context Class Reference (ACR)
