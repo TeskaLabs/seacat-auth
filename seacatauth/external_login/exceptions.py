@@ -14,6 +14,7 @@ class ExternalAccountError(SeacatAuthError):
 		provider_type: typing.Optional[str] = None,
 		subject_id: typing.Optional[str] = None,
 		redirect_uri: typing.Optional[str] = None,
+		error_detail: typing.Optional[str] = None,
 		**kwargs
 	):
 		super().__init__(message, *args)
@@ -21,6 +22,7 @@ class ExternalAccountError(SeacatAuthError):
 		self.ProviderType = provider_type
 		self.SubjectId = subject_id
 		self.RedirectUri = redirect_uri
+		self.ErrorDetail = error_detail
 
 
 class LoginWithExternalAccountError(ExternalAccountError):

@@ -175,7 +175,7 @@ class ExternalCredentialsService(asab.Service):
 		except KeyError:
 			raise ExternalAccountNotFoundError(provider_type, subject_id)
 
-		ext_credentials = _add_back_compat_fields(ext_credentials)
+		ext_credentials = _normalize_ext_credentials(ext_credentials)
 
 		ensure_access_permissions(ext_credentials["cid"])
 
@@ -201,7 +201,7 @@ class ExternalCredentialsService(asab.Service):
 
 		ext_credentials = []
 		async for cred in cursor:
-			ext_credentials.append(_add_back_compat_fields(cred))
+			ext_credentials.append(_normalize_ext_credentials(cred))
 
 		return ext_credentials
 
@@ -278,13 +278,17 @@ def _make_id(provider_type: str, subject_id: str):
 	return "{} {}".format(provider_type, subject_id)
 
 
-def _add_back_compat_fields(account: dict):
+def _normalize_ext_credentials(account: dict):
+	# Normalize old field names
 	if "e" in account and "email" not in account:
 		account["email"] = account["e"]
 	if "s" in account and "sub" not in account:
 		account["sub"] = account["s"]
 	if "t" in account and "type" not in account:
 		account["type"] = account["t"]
+
+	# Add 'label' field for easier identification of the account
+	account["label"] = account.get("email") or account.get("username") or account["sub"]
 	return account
 
 

@@ -156,36 +156,45 @@ class ExternalAuthenticationHandler(object):
 				"subject_id": e.SubjectId,
 				"from_ip": access_ips,
 			})
-			return self._error_redirect(e, result=e.Result)
+			return self._error_redirect(e)
 		except SignupWithExternalAccountError as e:
 			AuditLogger.log(asab.LOG_NOTICE, "External account sign-up failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
 				"from_ip": access_ips,
 			})
-			return self._error_redirect(e, result=e.Result)
+			return self._error_redirect(e)
 		except PairingExternalAccountError as e:
 			L.log(asab.LOG_NOTICE, "External account pairing failed.", struct_data={
 				"ext_provider_type": e.ProviderType,
 				"subject_id": e.SubjectId,
 				"from_ip": access_ips,
 			})
-			return self._error_redirect(e, result=e.Result)
+			return self._error_redirect(e)
 
 		return self._success_response(redirect_uri, operation_code, sso_session=new_sso_session)
 
 
-	def _error_redirect(self, error: typing.Optional[ExternalAccountError] = None, result: str = "error"):
-		if not error:
-			redirect_uri = generic.update_url_query_params(
-				self.ExternalAuthenticationService.DefaultRedirectUri,
-				ext_login_result=result,
-			)
+	def _error_redirect(self, error: typing.Optional[ExternalAccountError] = None):
+		result = error.Result
+		if error and error.RedirectUri:
+			redirect_uri = error.RedirectUri
 		else:
-			redirect_uri = generic.update_url_query_params(
-				error.RedirectUri or self.ExternalAuthenticationService.DefaultRedirectUri,
-				ext_login_result=result,
-			)
+			redirect_uri = self.ExternalAuthenticationService.DefaultRedirectUri
+
+		error_params = {"ext_login_result": result}
+		if error.ErrorDetail:
+			error_params["ext_login_error"] = error.ErrorDetail
+
+		if "#" in redirect_uri:
+			# URI contains fragment, add the result to the fragment
+			# (some apps use fragment for client-side routing and state)
+			base, fragment = redirect_uri.split("#", 1)
+			fragment = generic.update_url_query_params(fragment, **error_params)
+			redirect_uri = "{}#{}".format(base, fragment)
+		else:
+			redirect_uri = generic.update_url_query_params(redirect_uri, **error_params)
+
 		response = aiohttp.web.HTTPNotFound(headers={
 			"Location": redirect_uri,
 			"Refresh": "0;url={}".format(redirect_uri),
@@ -204,10 +213,21 @@ class ExternalAuthenticationHandler(object):
 			case _:
 				raise ValueError("Unknown operation code {!r}".format(operation_code))
 
-		redirect_uri = generic.update_url_query_params(
-			redirect_uri,
-			ext_login_result=result_msg,
-		)
+		if "#" in redirect_uri:
+			# URI contains fragment, add the result to the fragment
+			# (some apps use fragment for client-side routing and state)
+			base, fragment = redirect_uri.split("#", 1)
+			fragment = generic.update_url_query_params(
+				fragment,
+				ext_login_result=result_msg,
+			)
+			redirect_uri = "{}#{}".format(base, fragment)
+		else:
+			redirect_uri = generic.update_url_query_params(
+				redirect_uri,
+				ext_login_result=result_msg,
+			)
+
 		response = aiohttp.web.HTTPFound(redirect_uri)
 		if sso_session:
 			self.ExternalAuthenticationService.CookieService.set_session_cookie(
