@@ -80,13 +80,13 @@ class ExternalCredentialsService(asab.Service):
 				"email": user_info.get("email"),
 				"phone": user_info.get("phone_number"),
 			}
-			cp = getattr(self.RegistrationService, "CredentialProvider", None)
+			cp = self.RegistrationService.CredentialProvider
 			if cp is None:
 				raise exceptions.CredentialsRegistrationError(
-					"Sign-up is disabled: No suitable credential provider", credentials=cred_data)
+					"Registration disabled: No suitable credential provider", credentials=cred_data)
 			if not self.RegistrationService.SelfRegistrationEnabled:
 				raise exceptions.CredentialsRegistrationError(
-					"Sign-up without invitation is disabled", credentials=cred_data)
+					"Registration without invitation is disabled", credentials=cred_data)
 			try:
 				credentials_id = await cp.create(cred_data)
 			except Exception as e:
