@@ -82,10 +82,7 @@ class ExternalAuthenticationHandler(object):
 			schema:
 				type: string
 		"""
-		print("request.url", request.url)
-		print("request.query", request.query)
 		redirect_uri = request.query.get("redirect_uri")
-		print("redirect_uri IN", redirect_uri)
 		provider_type = request.match_info["provider_type"]
 		return await self.ExternalAuthenticationService.initialize_login_with_ext_provider(
 			provider_type, redirect_uri)

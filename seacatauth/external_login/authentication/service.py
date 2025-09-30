@@ -158,7 +158,6 @@ class ExternalAuthenticationService(asab.Service):
 			"redirect_uri": redirect_uri,
 		}
 		state, response = await provider.prepare_auth_request(state=state)
-		print("state IN", state)
 		await self._create_state(**state)
 		return response
 
