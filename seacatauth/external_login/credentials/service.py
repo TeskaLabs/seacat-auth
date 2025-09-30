@@ -9,7 +9,6 @@ from ... import exceptions
 from ...api import local_authz
 from ...models.const import ResourceId
 from ..exceptions import (
-	PairingExternalAccountError,
 	ExternalAccountNotFoundError,
 )
 
@@ -95,22 +94,8 @@ class ExternalCredentialsService(asab.Service):
 
 		assert credentials_id
 
-		try:
-			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
-				await self.create_ext_credentials(credentials_id, provider_type, user_info)
-
-		except asab.exceptions.Conflict as e:
-			L.log(asab.LOG_NOTICE, "Cannot pair external account: Already paired.", struct_data={
-				"cid": credentials_id,
-				"provider": provider_type,
-				"sub": user_info.get("sub"),
-			})
-			raise PairingExternalAccountError(
-				"External account already paired.",
-				subject_id=user_info.get("sub"),
-				credentials_id=credentials_id,
-				provider_type=provider_type,
-			) from e
+		with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
+			await self.create_ext_credentials(credentials_id, provider_type, user_info)
 
 		return credentials_id
 

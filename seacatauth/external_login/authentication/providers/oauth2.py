@@ -196,6 +196,18 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		- first_name
 		- last_name
 		"""
+		error = authorize_data.get("error")
+		if error is not None:
+			error_description = authorize_data.get("error_description", "")
+			L.error("Error response from authorize endpoint.", struct_data={
+				"provider": self.Type,
+				"error": error,
+				"error_description": error_description,
+				"query": dict(authorize_data)
+			})
+			raise ExternalLoginError("Error response from authorize endpoint: {} {}".format(
+				error, error_description))
+
 		code = authorize_data.get("code")
 		if code is None:
 			L.error("Code parameter not provided in authorize response.", struct_data={
