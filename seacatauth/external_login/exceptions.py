@@ -1,4 +1,4 @@
-from seacatauth.exceptions import SeacatAuthError
+from ..exceptions import SeacatAuthError
 
 
 class ExternalAccountNotFoundError(SeacatAuthError, KeyError):

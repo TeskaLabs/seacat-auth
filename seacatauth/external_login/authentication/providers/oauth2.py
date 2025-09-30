@@ -10,7 +10,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
-from seacatauth.external_login.exceptions import ExternalLoginError
+from ...exceptions import ExternalLoginError
 from .abc import ExternalAuthProviderABC
 
 
