@@ -55,6 +55,10 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	def _init_saml_client(self):
+		for key in ("entity_id", "idp_metadata_url"):
+			if key not in self.Config:
+				raise ValueError("Missing '{}' in SAML provider configuration.".format(key))
+
 		config_dict = {
 			"entityid": self.Config["entity_id"],  # Must be registered at IdP
 			"service": {
