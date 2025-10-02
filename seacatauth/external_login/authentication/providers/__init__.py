@@ -6,7 +6,7 @@ from .office365 import Office365OAuth2AuthProvider
 from .mojeid import MojeIDOAuth2AuthProvider
 from .facebook import FacebookOAuth2AuthProvider
 from .appleid import AppleIDOAuth2AuthProvider
-from .saml2 import SamlAuthProvider
+from .saml import SamlAuthProvider
 
 
 def create_provider(authn_handler, section):
