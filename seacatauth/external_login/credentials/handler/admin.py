@@ -38,7 +38,10 @@ class ExternalCredentialsAdminHandler(object):
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		data = await self.ExternalCredentialsService.list_ext_credentials(credentials_id)
-		return asab.web.rest.json_response(request, data)
+		return asab.web.rest.json_response(request, {
+			"data": data,
+			"count": len(data),
+		})
 
 
 	@asab.web.tenant.allow_no_tenant

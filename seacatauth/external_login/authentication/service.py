@@ -14,9 +14,6 @@ from ...api import local_authz
 from .utils import AuthOperation
 from .providers import ExternalAuthProviderABC, create_provider
 from ..exceptions import (
-	LoginWithExternalAccountError,
-	SignupWithExternalAccountError,
-	PairingExternalAccountError,
 	ExternalAccountNotFoundError,
 	ExternalLoginError,
 )
@@ -54,6 +51,7 @@ class ExternalAuthenticationService(asab.Service):
 			self.CallbackEndpointPath.lstrip("/")
 		)
 
+		self.LoginUri = "{}#/login".format(app.AuthWebUiUrl)
 		self.DefaultRedirectUri = asab.Config.get("seacatauth:external_login", "default_redirect_uri")
 		if not self.DefaultRedirectUri:
 			self.DefaultRedirectUri = app.PublicUrl
@@ -168,7 +166,7 @@ class ExternalAuthenticationService(asab.Service):
 		self,
 		request: aiohttp.web.Request,
 		payload: dict,
-	) -> typing.Tuple[AuthOperation, typing.Any, str]:
+	) -> aiohttp.web.Response:
 		"""
 		Process the authorization response from the external account provider.
 		Determine the operation (login, signup, pairing) and call the appropriate handler.
@@ -178,47 +176,31 @@ class ExternalAuthenticationService(asab.Service):
 			payload: The payload containing authorization response data.
 
 		Returns:
-			A tuple containing the executed operation code (AuthOperation), the new or updated SSO session object, and
-			the redirect URI.
+			Redirect response to the final destination after processing the external authentication.
 		"""
 		state_id = _get_auth_callback_state_id(payload)
-		state = await self._get_state(state_id)
+		state = await self._pop_state(state_id)
 
-		provider_type = state["provider"]
-		provider = self.get_provider(provider_type)
-		user_info = await provider.process_auth_callback(request, payload, state)
-		if "sub" not in user_info:
-			L.error("User info does not contain the mandatory 'sub' claim.", struct_data={
-				"provider": provider_type, "user_info": user_info})
-			raise ExternalLoginError("User info does not contain the mandatory 'sub' claim.")
-
-		match operation_code := state["_id"][0]:
+		match operation_code := state["operation"]:
 			case AuthOperation.LogIn:
-				operation_code, sso_session = await self._finalize_login_with_ext_provider(
-					request, payload, user_info, state)
+				return await self._finalize_login_with_ext_provider(
+					request, payload, state)
 			case AuthOperation.SignUp:
-				operation_code, sso_session = await self._finalize_signup_with_ext_provider(
-					request, payload, user_info, state)
+				return await self._finalize_signup_with_ext_provider(
+					request, payload, state)
 			case AuthOperation.PairAccount:
-				operation_code, sso_session = await self._finalize_pairing_with_ext_provider(
-					request, payload, user_info, state)
+				return await self._finalize_pairing_with_ext_provider(
+					request, payload, state)
 			case _:
 				raise ValueError("Unknown operation code {!r}".format(operation_code))
-
-		redirect_uri = self._get_final_redirect_uri(state)
-
-		await self._delete_state(state["_id"])
-
-		return operation_code, sso_session, redirect_uri
 
 
 	async def _finalize_login_with_ext_provider(
 		self,
 		request: aiohttp.web.Request,
 		payload: dict,
-		user_info: dict,
 		state: dict,
-	) -> typing.Tuple[AuthOperation, typing.Optional[Session]]:
+	) -> aiohttp.web.Response:
 		"""
 		Log the user in using their external account.
 
@@ -226,13 +208,42 @@ class ExternalAuthenticationService(asab.Service):
 			request: The incoming HTTP request.
 			payload: The payload containing authorization response data.
 			state: The state object retrieved from storage.
-			user_info: The user information obtained from the external login provider.
 
 		Returns:
-			A tuple containing the operation type (AuthOperation) that was executed and the new SSO session object.
+			Redirect response to the final destination after processing the external authentication.
 		"""
-		# Find the external account and its associated Seacat credentials ID
 		provider_type = state["provider"]
+		provider = self.get_provider(provider_type)
+
+		try:
+			user_info = await provider.process_auth_callback(request, payload, state)
+		except exceptions.AccessDeniedError as e:
+			L.log(asab.LOG_NOTICE, "External authentication failed: Access denied.", struct_data={
+				"provider": provider_type,
+				"state": state["_id"],
+				"error": str(e),
+			})
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="login_failed",
+				delete_sso_cookie=True,
+				redirect_uri=self._get_final_redirect_uri(state),
+				ext_login_error="access_denied",
+			)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
+				"provider": provider_type,
+				"state": state["_id"],
+				"error": str(e),
+			})
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="login_failed",
+				delete_sso_cookie=True,
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
+
+		# Find the external account and its associated Seacat credentials ID
 		try:
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
 				account = await self.ExternalCredentialsService.get_ext_credentials(
@@ -242,15 +253,27 @@ class ExternalAuthenticationService(asab.Service):
 			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={
 				"type": e.ProviderType, "sub": e.SubjectId})
 			if not self.can_sign_up_new_credentials(provider_type):
-				raise LoginWithExternalAccountError(
-					"Logged in with unknown external account; sign-up not allowed.",
-					provider_type=e.ProviderType,
-					subject_id=e.SubjectId,
-				) from e
+				# Redirect to login page with error message, keep the original redirect uri in the query
+				return self._error_redirect_response(
+					self.LoginUri,
+					result="login_failed",
+					delete_sso_cookie=True,
+					ext_login_error="not_found",
+					redirect_uri=self._get_final_redirect_uri(state)
+				)
 
 			# Create credentials and pair external account
-			credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
-				provider_type, user_info, payload)
+			try:
+				credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
+					provider_type, user_info, payload)
+			except exceptions.CredentialsRegistrationError as e:
+				L.error("Sign-up with external account failed: {}".format(e))
+				return self._error_redirect_response(
+					self.LoginUri,
+					result="login_failed",
+					delete_sso_cookie=True,
+					redirect_uri=self._get_final_redirect_uri(state)
+				)
 
 			# Log the user in
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
@@ -260,7 +283,8 @@ class ExternalAuthenticationService(asab.Service):
 					current_sso_session=None,
 				)
 
-			return AuthOperation.SignUp, new_sso_session
+			return self._success_redirect_response(
+				self._get_final_redirect_uri(state), "signup_success", sso_session=new_sso_session)
 
 		# Get current SSO session (if any) to determine if we are re-logging in or logging in anew
 		try:
@@ -281,16 +305,16 @@ class ExternalAuthenticationService(asab.Service):
 				current_sso_session=current_sso_session,
 			)
 
-		return AuthOperation.LogIn, new_sso_session
+		return self._success_redirect_response(
+			self._get_final_redirect_uri(state), "login_success", sso_session=new_sso_session)
 
 
 	async def _finalize_signup_with_ext_provider(
 		self,
 		request: aiohttp.web.Request,
 		payload: dict,
-		user_info: dict,
 		state: dict,
-	) -> typing.Tuple[AuthOperation, typing.Any]:
+	) -> aiohttp.web.Response:
 		"""
 		Sign up a new user using their external account.
 
@@ -298,13 +322,50 @@ class ExternalAuthenticationService(asab.Service):
 			request: The incoming HTTP request.
 			payload: The payload containing authorization response data.
 			state: The state object retrieved from storage.
-			user_info: The user information obtained from the external login provider.
 
 		Returns:
-			A tuple containing the operation type (AuthOperation) that was executed and the new SSO session object.
+			Redirect response to the final destination after processing the external authentication.
 		"""
-		# Find the external account and its associated Seacat credentials ID
 		provider_type = state["provider"]
+		provider = self.get_provider(provider_type)
+
+		try:
+			user_info = await provider.process_auth_callback(request, payload, state)
+		except exceptions.AccessDeniedError as e:
+			L.log(asab.LOG_NOTICE, "External authentication failed: Access denied.", struct_data={
+				"provider": provider_type,
+				"state": state["_id"],
+				"error": str(e),
+			})
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="signup_failed",
+				delete_sso_cookie=True,
+				redirect_uri=self._get_final_redirect_uri(state),
+				ext_login_error="access_denied",
+			)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
+				"provider": provider_type,
+				"state": state["_id"],
+				"error": str(e),
+			})
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="signup_failed",
+				delete_sso_cookie=True,
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
+
+		if not self.can_sign_up_new_credentials(provider_type):
+			L.error("Sign-up with external account not enabled.")
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="signup_failed",
+				delete_sso_cookie=True,
+				ext_login_error="registration_disabled",
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
 
 		# Verify that the external account is not registered already
 		try:
@@ -313,27 +374,30 @@ class ExternalAuthenticationService(asab.Service):
 					provider_type, subject_id=user_info["sub"])
 			L.log(asab.LOG_NOTICE, "Cannot sign up with external account: Account already paired.", struct_data={
 				"provider": provider_type, "sub": user_info.get("sub")})
-			raise SignupWithExternalAccountError(
-				"External account already signed up.",
-				provider_type=provider_type,
-				subject_id=user_info["sub"],
-				error_detail="already_paired",
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="signup_failed",
+				delete_sso_cookie=True,
+				ext_login_error="already_exists",
+				redirect_uri=self._get_final_redirect_uri(state)
 			)
+
 		except ExternalAccountNotFoundError:
 			# Unknown account can be used for signup
 			pass
 
-		if not self.can_sign_up_new_credentials(provider_type):
-			L.error("Sign-up with external account not enabled.")
-			raise SignupWithExternalAccountError(
-				"Sign-up with external account not enabled.",
-				provider_type=provider_type,
-				subject_id=user_info["sub"],
-			)
-
 		# Create credentials and pair external account in one step
-		credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
-			provider_type, user_info, payload)
+		try:
+			credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
+				provider_type, user_info, payload)
+		except exceptions.CredentialsRegistrationError as e:
+			L.error("Sign-up with external account failed: {}".format(e))
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="signup_failed",
+				delete_sso_cookie=True,
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
 
 		# Log the user in
 		sso_session = await self._login(
@@ -342,16 +406,16 @@ class ExternalAuthenticationService(asab.Service):
 			current_sso_session=None,
 		)
 
-		return AuthOperation.SignUp, sso_session
+		return self._success_redirect_response(
+			self._get_final_redirect_uri(state), "signup_success", sso_session=sso_session)
 
 
 	async def _finalize_pairing_with_ext_provider(
 		self,
 		request: aiohttp.web.Request,
 		payload: dict,
-		user_info: dict,
 		state: dict,
-	) -> typing.Tuple[AuthOperation, typing.Any]:
+	) -> aiohttp.web.Response:
 		"""
 		Pair external account with the current user's credentials.
 
@@ -359,12 +423,37 @@ class ExternalAuthenticationService(asab.Service):
 			request: The incoming HTTP request.
 			payload: The payload containing authorization response data.
 			state: The state object retrieved from storage.
-			user_info: The user information obtained from the external login provider.
 
 		Returns:
-			A tuple containing the operation type (AuthOperation) that was executed and the new SSO session object.
+			Redirect response to the final destination after processing the external authentication.
 		"""
 		provider_type = state["provider"]
+		provider = self.get_provider(provider_type)
+
+		try:
+			user_info = await provider.process_auth_callback(request, payload, state)
+		except exceptions.AccessDeniedError as e:
+			L.log(asab.LOG_NOTICE, "External authentication failed: Access denied.", struct_data={
+				"provider": provider_type,
+				"state": state["_id"],
+				"error": str(e),
+			})
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="pairing_failed",
+				redirect_uri=self._get_final_redirect_uri(state),
+				ext_login_error="access_denied",
+			)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
+				"provider": provider_type,
+				"state": state["_id"],
+				"error": str(e),
+			})
+			return self._error_redirect_response(
+				self._get_final_redirect_uri(state),
+				result="pairing_failed",
+			)
 
 		# Get current SSO session (if any) to determine if we are re-logging in or logging in anew
 		cookie_service = self.App.get_service("seacatauth.CookieService")
@@ -376,7 +465,13 @@ class ExternalAuthenticationService(asab.Service):
 				"sub": user_info.get("sub"),
 				"state": state["_id"],
 			})
-			raise exceptions.AccessDeniedError("Authentication required")
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="pairing_failed",
+				delete_sso_cookie=True,
+				ext_login_error="not_authenticated",
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
 
 		if current_sso_session.is_anonymous():
 			L.error("Cannot finalize pairing external account: Anonymous SSO session.", struct_data={
@@ -384,7 +479,13 @@ class ExternalAuthenticationService(asab.Service):
 				"sub": user_info.get("sub"),
 				"state": state["_id"],
 			})
-			raise exceptions.AccessDeniedError("Authentication required")
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="pairing_failed",
+				delete_sso_cookie=True,
+				ext_login_error="not_authenticated",
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
 
 		credentials_id = current_sso_session.Credentials.Id
 
@@ -393,7 +494,7 @@ class ExternalAuthenticationService(asab.Service):
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
 				await self.ExternalCredentialsService.create_ext_credentials(
 					credentials_id, provider_type, user_info)
-		except asab.exceptions.Conflict as e:
+		except asab.exceptions.Conflict:
 			L.error(
 				"Cannot finalize pairing external account: Record for this account already exists.",
 				struct_data={
@@ -402,16 +503,14 @@ class ExternalAuthenticationService(asab.Service):
 					"sub": user_info.get("sub"),
 				}
 			)
-			raise PairingExternalAccountError(
-				"External account already paired.",
-				subject_id=user_info.get("sub"),
-				credentials_id=credentials_id,
-				provider_type=provider_type,
-				redirect_uri=state.get("redirect_uri"),
-				error_detail="already_paired",
-			) from e
+			return self._error_redirect_response(
+				self._get_final_redirect_uri(state),
+				result="pairing_failed",
+				ext_login_error="already_exists"
+			)
 
-		return AuthOperation.PairAccount, None
+		return self._success_redirect_response(
+			self._get_final_redirect_uri(state), "pairing_success")
 
 
 	async def _login(
@@ -483,20 +582,17 @@ class ExternalAuthenticationService(asab.Service):
 		return state_id
 
 
-	async def _get_state(self, state_id):
+	async def _pop_state(self, state_id):
 		state = await self.StorageService.get(self.ExternalLoginStateCollection, state_id)
 		if state["_c"] < datetime.datetime.now(datetime.timezone.utc) - self.StateExpiration:
 			raise KeyError(state_id)
 		state["operation"] = AuthOperation.deserialize(state["operation"])
+		await self.StorageService.delete(self.ExternalLoginStateCollection, state_id)
 		return state
 
 
 	async def _update_state(self, state_id):
 		raise NotImplementedError()
-
-
-	async def _delete_state(self, state_id):
-		return await self.StorageService.delete(self.ExternalLoginStateCollection, state_id)
 
 
 	async def _delete_expired_states(self, *args, **kwargs):
@@ -507,6 +603,40 @@ class ExternalAuthenticationService(asab.Service):
 			L.info("Expired external login states deleted.", struct_data={
 				"count": result.deleted_count
 			})
+
+
+	def _error_redirect_response(
+		self,
+		location: str,
+		result: str = "error",
+		delete_sso_cookie: bool = False,
+		**query_params
+	) -> aiohttp.web.Response:
+		location = _update_url_query(location, ext_login_result=result, **query_params)
+		response = aiohttp.web.HTTPNotFound(headers={
+			"Location": location,
+			"Refresh": "0;url={}".format(location),
+		})
+		if delete_sso_cookie:
+			self.CookieService.delete_session_cookie(response)
+		return response
+
+
+	def _success_redirect_response(
+		self,
+		location: str,
+		result: str = "success",
+		sso_session: typing.Optional[Session] = None,
+		**query_params
+	) -> aiohttp.web.Response:
+		location = _update_url_query(location, ext_login_result=result, **query_params)
+		response = aiohttp.web.HTTPFound(location)
+		if sso_session:
+			self.CookieService.set_session_cookie(
+				response,
+				cookie_value=sso_session.Cookie.Id,
+			)
+		return response
 
 
 def _get_auth_callback_state_id(payload: dict) -> str:
@@ -538,3 +668,17 @@ def _get_auth_callback_state_id(payload: dict) -> str:
 		raise ValueError("No state in authorization response payload")
 
 	return state_id
+
+
+def _update_url_query(url: str, **query_params) -> str:
+	"""
+	Update the query parameters of a given URL.
+	If the URL contains a fragment, the query parameters are added to the fragment instead.
+	"""
+	if "#" in url:
+		base, fragment = url.split("#", 1)
+		fragment = generic.update_url_query_params(fragment, **query_params)
+		url = "{}#{}".format(base, fragment)
+	else:
+		url = generic.update_url_query_params(url, **query_params)
+	return url

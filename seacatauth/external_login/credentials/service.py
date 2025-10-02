@@ -2,13 +2,13 @@ import logging
 import aiohttp
 import asab
 import asab.web.rest
+import asab.exceptions
 import pymongo
 
 from ... import exceptions
 from ...api import local_authz
 from ...models.const import ResourceId
 from ..exceptions import (
-	PairingExternalAccountError,
 	ExternalAccountNotFoundError,
 )
 
@@ -61,7 +61,7 @@ class ExternalCredentialsService(asab.Service):
 			The ID of the newly created credentials.
 
 		Raises:
-			SignupWithExternalAccountError: If sign-up fails due to various reasons (e.g., account already exists,
+			CredentialsRegistrationError: If sign-up fails due to various reasons (e.g., account already exists,
 				registration disabled).
 		"""
 		if self.RegistrationWebhookUri:
@@ -71,43 +71,34 @@ class ExternalCredentialsService(asab.Service):
 				for k, v in authorization_data.items()
 				if k != "code"
 			}
-			credentials_id = await self._create_credentials_via_webhook(
-				provider_type, user_info, authorization_data_safe)
+			try:
+				credentials_id = await self._create_credentials_via_webhook(
+					provider_type, user_info, authorization_data_safe)
+			except aiohttp.ClientConnectionError:
+				raise exceptions.CredentialsRegistrationError("Registration webhook is unreachable")
 		else:
-			ext_provider = self.ExternalAuthenticationService.get_provider(provider_type)
 			cred_data = {
 				"username": user_info.get("preferred_username"),
 				"email": user_info.get("email"),
 				"phone": user_info.get("phone_number"),
 			}
-			cp = getattr(self.RegistrationService, "CredentialProvider", None)
+			cp = self.RegistrationService.CredentialProvider
 			if cp is None:
 				raise exceptions.CredentialsRegistrationError(
-					"Registration is disabled: No credential provider configured", credentials=cred_data)
-			if not (self.RegistrationService.SelfRegistrationEnabled or ext_provider.trust_all_credentials()):
-				raise exceptions.CredentialsRegistrationError("Registration is disabled", credentials=cred_data)
+					"Registration disabled: No suitable credential provider", credentials=cred_data)
+			if not self.RegistrationService.SelfRegistrationEnabled:
+				raise exceptions.CredentialsRegistrationError(
+					"Registration without invitation is disabled", credentials=cred_data)
 			try:
 				credentials_id = await cp.create(cred_data)
 			except Exception as e:
-				raise exceptions.CredentialsRegistrationError("Failed to register credentials", credentials=cred_data) from e
+				raise exceptions.CredentialsRegistrationError(
+					"Failed to create new credentials", credentials=cred_data) from e
 
 		assert credentials_id
 
-		try:
-			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
-				await self.create_ext_credentials(credentials_id, provider_type, user_info)
-		except asab.exceptions.Conflict as e:
-			L.log(asab.LOG_NOTICE, "Cannot pair external account: Already paired.", struct_data={
-				"cid": credentials_id,
-				"provider": provider_type,
-				"sub": user_info.get("sub"),
-			})
-			raise PairingExternalAccountError(
-				"External account already paired.",
-				subject_id=user_info.get("sub"),
-				credentials_id=credentials_id,
-				provider_type=provider_type,
-			) from e
+		with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
+			await self.create_ext_credentials(credentials_id, provider_type, user_info)
 
 		return credentials_id
 

@@ -1,21 +1,13 @@
 import logging
-import typing
 import aiohttp.web
-import asab
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
 
-from ... import exceptions, generic, AuditLogger
+from ... import exceptions
 from .service import ExternalAuthenticationService
-from .utils import AuthOperation
-from ..exceptions import (
-	ExternalAccountError,
-	LoginWithExternalAccountError,
-	SignupWithExternalAccountError,
-	PairingExternalAccountError,
-)
+
 
 
 L = logging.getLogger(__name__)
@@ -138,8 +130,6 @@ class ExternalAuthenticationHandler(object):
 			- `signup_error`: Signing up with external account failed.
 			- `pairing_error`: Pairing external account to current user's credentials failed.
 		"""
-		access_ips = generic.get_request_access_ips(request)
-
 		if request.method == "POST":
 			payload = dict(await request.post())
 		elif request.method == "GET":
@@ -147,92 +137,4 @@ class ExternalAuthenticationHandler(object):
 		else:
 			raise RuntimeError("Unsupported request method {!r}".format(request.method))
 
-		try:
-			operation_code, new_sso_session, redirect_uri = (
-				await self.ExternalAuthenticationService.process_external_auth_callback(request, payload))
-		except LoginWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "External account authentication failed.", struct_data={
-				"ext_provider_type": e.ProviderType,
-				"subject_id": e.SubjectId,
-				"from_ip": access_ips,
-			})
-			return self._error_redirect(e)
-		except SignupWithExternalAccountError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "External account sign-up failed.", struct_data={
-				"ext_provider_type": e.ProviderType,
-				"subject_id": e.SubjectId,
-				"from_ip": access_ips,
-			})
-			return self._error_redirect(e)
-		except PairingExternalAccountError as e:
-			L.log(asab.LOG_NOTICE, "External account pairing failed.", struct_data={
-				"ext_provider_type": e.ProviderType,
-				"subject_id": e.SubjectId,
-				"from_ip": access_ips,
-			})
-			return self._error_redirect(e)
-
-		return self._success_response(redirect_uri, operation_code, sso_session=new_sso_session)
-
-
-	def _error_redirect(self, error: typing.Optional[ExternalAccountError] = None):
-		result = error.Result
-		if error and error.RedirectUri:
-			redirect_uri = error.RedirectUri
-		else:
-			redirect_uri = self.ExternalAuthenticationService.DefaultRedirectUri
-
-		error_params = {"ext_login_result": result}
-		if error.ErrorDetail:
-			error_params["ext_login_error"] = error.ErrorDetail
-
-		if "#" in redirect_uri:
-			# URI contains fragment, add the result to the fragment
-			# (some apps use fragment for client-side routing and state)
-			base, fragment = redirect_uri.split("#", 1)
-			fragment = generic.update_url_query_params(fragment, **error_params)
-			redirect_uri = "{}#{}".format(base, fragment)
-		else:
-			redirect_uri = generic.update_url_query_params(redirect_uri, **error_params)
-
-		response = aiohttp.web.HTTPNotFound(headers={
-			"Location": redirect_uri,
-			"Refresh": "0;url={}".format(redirect_uri),
-		})
-		return response
-
-
-	def _success_response(self, redirect_uri: str, operation_code: AuthOperation, sso_session: typing.Optional = None):
-		match operation_code:
-			case AuthOperation.LogIn:
-				result_msg = "login_success"
-			case AuthOperation.SignUp:
-				result_msg = "signup_success"
-			case AuthOperation.PairAccount:
-				result_msg = "pairing_success"
-			case _:
-				raise ValueError("Unknown operation code {!r}".format(operation_code))
-
-		if "#" in redirect_uri:
-			# URI contains fragment, add the result to the fragment
-			# (some apps use fragment for client-side routing and state)
-			base, fragment = redirect_uri.split("#", 1)
-			fragment = generic.update_url_query_params(
-				fragment,
-				ext_login_result=result_msg,
-			)
-			redirect_uri = "{}#{}".format(base, fragment)
-		else:
-			redirect_uri = generic.update_url_query_params(
-				redirect_uri,
-				ext_login_result=result_msg,
-			)
-
-		response = aiohttp.web.HTTPFound(redirect_uri)
-		if sso_session:
-			self.ExternalAuthenticationService.CookieService.set_session_cookie(
-				response,
-				cookie_value=sso_session.Cookie.Id,
-				client_id=sso_session.OAuth2.ClientId
-			)
-		return response
+		return await self.ExternalAuthenticationService.process_external_auth_callback(request, payload)

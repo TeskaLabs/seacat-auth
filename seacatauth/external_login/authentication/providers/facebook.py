@@ -4,7 +4,7 @@ import urllib.parse
 import aiohttp
 
 from .oauth2 import OAuth2AuthProvider
-from seacatauth.external_login.exceptions import ExternalLoginError
+from ...exceptions import ExternalLoginError
 
 
 L = logging.getLogger(__name__)
