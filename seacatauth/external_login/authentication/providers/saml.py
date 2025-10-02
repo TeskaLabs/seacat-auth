@@ -130,7 +130,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			L.error("Cannot parse SAML authentication response: {}".format(e), struct_data={
 				"provider": self.Type,
 			})
-			raise ExternalLoginError("Malformed SAML response.")
+			raise ExternalLoginError("Malformed SAML response.") from e
 
 		if not authn_response.status_ok():
 			L.error("SAML authentication failed.", struct_data={
@@ -141,11 +141,11 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		user_identity = authn_response.get_identity()
 		try:
 			user_identity["sub"] = authn_response.get_subject().text
-		except ValueError:
+		except ValueError as e:
 			L.error("Cannot infer subject ID from SAML authentication response.", struct_data={
 				"provider": self.Type,
 			})
-			raise ExternalLoginError("Failed to obtain user metadata from SAML response.")
+			raise ExternalLoginError("Failed to obtain user metadata from SAML response.") from e
 
 		return user_identity
 
