@@ -506,7 +506,7 @@ class ExternalAuthenticationService(asab.Service):
 			return self._error_redirect_response(
 				self._get_final_redirect_uri(state),
 				result="pairing_failed",
-				ext_login_error="already_paired"
+				ext_login_error="already_exists"
 			)
 
 		return self._success_redirect_response(
