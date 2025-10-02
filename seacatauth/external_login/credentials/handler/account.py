@@ -36,7 +36,10 @@ class ExternalLoginAccountHandler(object):
 		"""
 		authz = asab.contextvars.Authz.get()
 		data = await self.ExternalCredentialsService.list_ext_credentials(authz.CredentialsId)
-		return asab.web.rest.json_response(request, data)
+		return asab.web.rest.json_response(request, {
+			"data": data,
+			"count": len(data),
+		})
 
 
 	@asab.web.tenant.allow_no_tenant
