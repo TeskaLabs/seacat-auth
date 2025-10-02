@@ -102,8 +102,12 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			binding=saml2.BINDING_HTTP_REDIRECT,
 			relay_state=state["state_id"],
 		)
-		assert authn_request["method"] == "GET"
-		auth_uri = dict(authn_request["headers"])["Location"]
+
+		headers = dict(authn_request.get("headers", []))
+		auth_uri = headers.get("Location")
+		if not auth_uri:
+			raise ExternalLoginError("Missing redirect Location from SAML client.")
+
 		state["request_id"] = saml_request_id
 		return state, aiohttp.web.HTTPFound(auth_uri)
 
