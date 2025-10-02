@@ -71,11 +71,11 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 					"allow_unsolicited": False,
 					"authn_requests_signed": False,
 					"want_response_signed": (
-						self.Config.getboolean("want_response_signed", True) if "want_response_signed" in self.Config
+						self.Config.getboolean("want_response_signed") if "want_response_signed" in self.Config
 						else False
 					),
 					"want_assertions_signed": (
-						self.Config.getboolean("want_assertions_signed", True) if "want_assertions_signed" in self.Config
+						self.Config.getboolean("want_assertions_signed") if "want_assertions_signed" in self.Config
 						else True
 					),
 				}
