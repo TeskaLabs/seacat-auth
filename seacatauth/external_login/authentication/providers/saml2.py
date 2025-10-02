@@ -113,7 +113,6 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		if saml_response is None:
 			L.error("No SAMLResponse in request payload", struct_data={
 				"provider": self.Type,
-				"payload": payload,
 			})
 			raise ExternalLoginError("Malformed SAML response.")
 
@@ -126,7 +125,6 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		except Exception as e:
 			L.error("Cannot parse SAML authentication response: {}".format(e), struct_data={
 				"provider": self.Type,
-				"payload": payload,
 			})
 			raise ExternalLoginError("Malformed SAML response.")
 
