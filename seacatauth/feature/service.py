@@ -11,7 +11,7 @@ class FeatureService(asab.Service):
 		super().__init__(app, service_name)
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
-		self.ExternalLoginService = app.get_service("seacatauth.ExternalLoginService")
+		self.ExternalAuthenticationService = app.get_service("seacatauth.ExternalAuthenticationService")
 
 	async def get_features(self):
 		features = {}
@@ -31,7 +31,7 @@ class FeatureService(asab.Service):
 					api_base_url=self.App.PublicSeacatAuthApiUrl.rstrip("/"), provider_type=provider.Type),
 				"label": provider.Label
 			}
-			for provider in self.ExternalLoginService.Providers.values()
+			for provider in self.ExternalAuthenticationService.Providers.values()
 		]
 		if len(login_with_external_account_uris) > 0:
 			login["external"] = login_with_external_account_uris
@@ -50,7 +50,7 @@ class FeatureService(asab.Service):
 					api_base_url=self.App.PublicSeacatAuthApiUrl.rstrip("/"), provider_type=provider.Type),
 				"label": provider.Label
 			}
-			for provider in self.ExternalLoginService.Providers.values()
+			for provider in self.ExternalAuthenticationService.Providers.values()
 		]
 		if len(pair_external_account_uris) > 0:
 			my_account["external_login"] = pair_external_account_uris
