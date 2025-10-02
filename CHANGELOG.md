@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## v25.38
+
+### Pre-releases
+- v25.38-alpha1
+
+### Fixes
+
+### Features
+
+### Refactoring
+- Decouple external authentication from external credentials management (#515, v25.38-alpha1)
+
+---
+
+
 ## v25.26
 
 ### Pre-releases

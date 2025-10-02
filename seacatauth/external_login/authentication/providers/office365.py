@@ -1,7 +1,7 @@
-from .generic import GenericOAuth2Login
+from .oauth2 import OAuth2AuthProvider
 
 
-class Office365OAuth2Login(GenericOAuth2Login):
+class Office365OAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be first registered at Azure Active Directory:
 	https://portal.azure.com
@@ -11,6 +11,7 @@ class Office365OAuth2Login(GenericOAuth2Login):
 	The full callback URL is canonically in the following format:
 	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
+
 	Type = "office365"
 	ConfigDefaults = {
 		"issuer": "https://login.microsoftonline.com/{tenant_id}/v2.0",
@@ -23,8 +24,8 @@ class Office365OAuth2Login(GenericOAuth2Login):
 		"label": "Office365",
 	}
 
-	def __init__(self, external_login_svc, config_section_name):
-		super().__init__(external_login_svc, config_section_name)
+	def __init__(self, external_authentication_svc, config_section_name):
+		super().__init__(external_authentication_svc, config_section_name)
 		self.TenantID = self.Config.get("tenant_id")
 		assert self.TenantID not in (None, "")
 
