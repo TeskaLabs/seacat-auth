@@ -11,6 +11,7 @@ import jwcrypto.jwk
 import jwcrypto.jws
 
 from ...exceptions import ExternalLoginError
+from ....exceptions import AccessDeniedError
 from .abc import ExternalAuthProviderABC
 
 
@@ -205,6 +206,8 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 				"error_description": error_description,
 				"query": dict(authorize_data)
 			})
+			if error == "access_denied":
+				raise AccessDeniedError("User denied access.")
 			raise ExternalLoginError("Error response from authorize endpoint: {} {}".format(
 				error, error_description))
 

@@ -61,7 +61,7 @@ class ExternalCredentialsService(asab.Service):
 			The ID of the newly created credentials.
 
 		Raises:
-			SignupWithExternalAccountError: If sign-up fails due to various reasons (e.g., account already exists,
+			CredentialsRegistrationError: If sign-up fails due to various reasons (e.g., account already exists,
 				registration disabled).
 		"""
 		if self.RegistrationWebhookUri:
@@ -71,8 +71,11 @@ class ExternalCredentialsService(asab.Service):
 				for k, v in authorization_data.items()
 				if k != "code"
 			}
-			credentials_id = await self._create_credentials_via_webhook(
-				provider_type, user_info, authorization_data_safe)
+			try:
+				credentials_id = await self._create_credentials_via_webhook(
+					provider_type, user_info, authorization_data_safe)
+			except aiohttp.ClientConnectionError:
+				raise exceptions.CredentialsRegistrationError("Registration webhook is unreachable")
 		else:
 			cred_data = {
 				"username": user_info.get("preferred_username"),
