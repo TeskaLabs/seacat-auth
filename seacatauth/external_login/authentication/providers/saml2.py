@@ -68,10 +68,16 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 							(self.CallbackUrl, saml2.BINDING_HTTP_POST),  # Must be registered at IdP
 						],
 					},
-					"allow_unsolicited": True,
+					"allow_unsolicited": False,
 					"authn_requests_signed": False,
-					"want_response_signed": False,
-					"want_assertions_signed": True,
+					"want_response_signed": (
+						self.Config.getboolean("want_response_signed", True) if "want_response_signed" in self.Config
+						else False
+					),
+					"want_assertions_signed": (
+						self.Config.getboolean("want_assertions_signed", True) if "want_assertions_signed" in self.Config
+						else True
+					),
 				}
 			},
 			"metadata": {
@@ -92,12 +98,13 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
-		_, authn_request = self.SamlClient.prepare_for_authenticate(
+		saml_request_id, authn_request = self.SamlClient.prepare_for_authenticate(
 			binding=saml2.BINDING_HTTP_REDIRECT,
 			relay_state=state["state_id"],
 		)
 		assert authn_request["method"] == "GET"
 		auth_uri = dict(authn_request["headers"])["Location"]
+		state["request_id"] = saml_request_id
 		return state, aiohttp.web.HTTPFound(auth_uri)
 
 
@@ -113,7 +120,8 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		try:
 			authn_response = self.SamlClient.parse_authn_request_response(
 				saml_response,
-				binding=saml2.BINDING_HTTP_POST
+				binding=saml2.BINDING_HTTP_POST,
+				outstanding={state["request_id"]: True},
 			)
 		except Exception as e:
 			L.error("Cannot parse SAML authentication response: {}".format(e), struct_data={

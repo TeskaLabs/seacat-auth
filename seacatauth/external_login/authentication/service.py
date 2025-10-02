@@ -570,6 +570,7 @@ class ExternalAuthenticationService(asab.Service):
 		operation: AuthOperation,
 		redirect_uri: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None,
+		request_id: typing.Optional[str] = None,
 	):
 		upsertor = self.StorageService.upsertor(self.ExternalLoginStateCollection, obj_id=state_id)
 		upsertor.set("provider", provider)
@@ -578,6 +579,8 @@ class ExternalAuthenticationService(asab.Service):
 			upsertor.set("redirect_uri", redirect_uri)
 		if nonce:
 			upsertor.set("nonce", nonce)
+		if request_id:
+			upsertor.set("request_id", request_id)
 		state_id = await upsertor.execute(event_type=EventTypes.EXTERNAL_LOGIN_STATE_CREATED)
 		return state_id
 
