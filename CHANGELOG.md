@@ -3,11 +3,13 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha2
 - v25.38-alpha1
 
 ### Fixes
 
 ### Features
+- External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
 - Decouple external authentication from external credentials management (#515, v25.38-alpha1)
