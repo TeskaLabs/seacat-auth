@@ -9,7 +9,7 @@ import typing
 
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
-from .. import AuditLogger, generic, exceptions
+from .. import AuditLogger, exceptions
 
 
 L = logging.getLogger(__name__)
@@ -239,7 +239,15 @@ class CredentialsService(asab.Service):
 				return False
 
 
-	async def list(self, search_params: generic.SearchParams, try_global_search: bool = False):
+	async def list(
+		self,
+		page: int = 0,
+		limit: int = 10,
+		simple_filter: str | None = None,
+		tenant_filter: str | None = None,
+		role_filter: str | None = None,
+		try_global_search: bool = False
+	):
 		"""
 		List credentials that are members of currently authorized tenants.
 		Global_search lists all credentials, regardless of tenants, but this requires superuser authorization.
@@ -249,12 +257,12 @@ class CredentialsService(asab.Service):
 		if tenant_ctx:
 			authz.require_tenant_access()
 
-		searched_tenants = _authorize_searched_tenants(search_params, try_global_search)
-		searched_roles = _authorize_searched_roles(search_params)
+		searched_tenants = _authorize_searched_tenants(tenant_filter, try_global_search)
+		searched_roles = _authorize_searched_roles(role_filter)
 
 		credentials = []
-		offset = search_params.Page * search_params.ItemsPerPage
-		async for credentials_data in self.iterate_stable(filter=search_params.SimpleFilter):
+		offset = page * limit
+		async for credentials_data in self.iterate_stable(filter=simple_filter):
 			if not await self._role_filter(credentials_data["_id"], searched_roles):
 				continue
 			if not await self._tenant_filter(credentials_data["_id"], searched_tenants):
@@ -263,7 +271,7 @@ class CredentialsService(asab.Service):
 				offset -= 1
 				continue
 			credentials.append(credentials_data)
-			if len(credentials) >= search_params.ItemsPerPage:
+			if len(credentials) >= limit:
 				break
 
 		return {"data": credentials}
@@ -655,7 +663,7 @@ class CredentialsService(asab.Service):
 
 
 def _authorize_searched_tenants(
-	search_params: generic.SearchParams,
+	tenant_filter: str | None,
 	try_global_search: bool = False
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
@@ -666,16 +674,15 @@ def _authorize_searched_tenants(
 	if tenant_ctx:
 		authz.require_tenant_access()
 
-	searched_tenant = search_params.AdvancedFilter.get("tenant")
-	if searched_tenant:
+	if tenant_filter:
 		if authz.has_superuser_access():
 			# Superuser can search any tenant
-			return [searched_tenant]
-		elif searched_tenant == tenant_ctx:
+			return [tenant_filter]
+		elif tenant_filter == tenant_ctx:
 			# Regular user can only search the authorized tenant in context
-			return [searched_tenant]
+			return [tenant_filter]
 		else:
-			raise exceptions.TenantAccessDeniedError(tenant=searched_tenant, subject=authz.CredentialsId)
+			raise exceptions.TenantAccessDeniedError(tenant=tenant_filter, subject=authz.CredentialsId)
 
 	elif try_global_search and authz.has_superuser_access():
 		# Superuser can search globally
@@ -687,7 +694,7 @@ def _authorize_searched_tenants(
 
 
 def _authorize_searched_roles(
-	search_params: generic.SearchParams
+	role_filter: str | None
 ) -> typing.Optional[typing.Iterable[str]]:
 	"""
 	Authorize and return a list of roles to filter by.
@@ -697,22 +704,21 @@ def _authorize_searched_roles(
 	if tenant_ctx:
 		authz.require_tenant_access()
 
-	searched_role = search_params.AdvancedFilter.get("role")
-	if not searched_role:
+	if not role_filter:
 		return None
 
 	if authz.has_superuser_access():
 		# Superuser can search anything
-		return [searched_role]
+		return [role_filter]
 
-	tenant_id = searched_role.split("/")[0]
+	tenant_id = role_filter.split("/")[0]
 	if tenant_id == "*":
 		# Global roles are searchable by anybody
-		return [searched_role]
+		return [role_filter]
 
 	elif tenant_id == tenant_ctx:
 		# Regular users can only search roles in the currently authorized tenant
-		return [searched_role]
+		return [role_filter]
 
 	else:
 		raise exceptions.TenantAccessDeniedError(tenant=tenant_id, subject=authz.CredentialsId)

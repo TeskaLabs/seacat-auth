@@ -195,22 +195,19 @@ class CredentialsHandler(object):
 		-	name: global
 			in: query
 			required: false
-			description:
+			description: Try to search in all tenants, not only in the currently authorized one
 			schema: {"type": "boolean"}
 		"""
 		authz = asab.contextvars.Authz.get()
-		search = generic.SearchParams(request.query)
+		tenant_filter = request.query.get("tenant") or request.query.get("atenant", None)
+		role_filter = request.query.get("role") or request.query.get("arole", None)
+		simple_filter = request.query.get("f")
 
 		# BACK-COMPAT: Convert the old "mode" search to advanced filters
 		mode = request.query.get("m", "default")
-		if mode == "role":
-			search.AdvancedFilter["role"] = request.query.get("f")
-			search.SimpleFilter = None
-		elif mode == "tenant":
-			search.AdvancedFilter["tenant"] = request.query.get("f")
-			search.SimpleFilter = None
-		elif mode == "default":
-			search.SimpleFilter = request.query.get("f")
+		if mode == "tenant":
+			tenant_filter = request.query.get("f")
+			simple_filter = None
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
@@ -221,7 +218,14 @@ class CredentialsHandler(object):
 			tenant_ctx = asab.contextvars.Tenant.set(None)
 
 		try:
-			result = await self.CredentialsService.list(search, try_global_search)
+			result = await self.CredentialsService.list(
+				page=int(request.query.get("p", 1)) - 1,
+				limit=int(request.query.get("i", 10)),
+				tenant_filter=tenant_filter,
+				role_filter=role_filter,
+				simple_filter=simple_filter,
+				try_global_search=try_global_search,
+			)
 		except exceptions.AccessDeniedError as e:
 			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
 			return asab.web.rest.json_response(request, status=403, data={
