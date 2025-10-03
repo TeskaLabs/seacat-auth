@@ -3,11 +3,13 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha4
 - v25.38-alpha3
 - v25.38-alpha2
 - v25.38-alpha1
 
 ### Fixes
+- Fix pysaml2 dependency (#518, v25.38-alpha4)
 
 ### Features
 - Filtering credentials by active/suspended status (#517, v25.38-alpha3)

@@ -7,7 +7,7 @@ import saml2.config
 import saml2.client
 import saml2.response
 
-from seacatauth.external_login.exceptions import ExternalLoginError
+from ...exceptions import ExternalLoginError
 from .abc import ExternalAuthProviderABC
 
 
