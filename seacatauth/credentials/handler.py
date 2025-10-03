@@ -197,7 +197,7 @@ class CredentialsHandler(object):
 			required: false
 			description: Try to search in all tenants, not only in the currently authorized one
 			schema: {"type": "boolean"}
-		-	name: status
+		-	name: astatus
 			in: query
 			required: false
 			description: Filter users by status ("active", "suspended"). If omitted, all statuses are returned ("any").
@@ -228,16 +228,14 @@ class CredentialsHandler(object):
 		else:
 			tenant_ctx = asab.contextvars.Tenant.set(None)
 
-		status_filter = request.query.get("status")
+		status_filter = request.query.get("astatus")
 		if status_filter is not None:
 			status_filter = status_filter.split(",")
 			for status in status_filter:
 				if status not in frozenset(["active", "suspended", "any"]):
-					return asab.web.rest.json_response(request, status=400, data={
-						"result": "INVALID-ARGUMENT",
-						"argument": "status",
-						"tech_err": "Invalid status filter value",
-					})
+					raise asab.exceptions.ValidationError(
+						"Invalid status filter: {!r}".format(request.query.get("astatus")))
+			# If "any" is present, ignore all other status filters
 			if "any" in status_filter:
 				status_filter = None  # No filtering
 
