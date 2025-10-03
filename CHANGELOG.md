@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha5
 - v25.38-alpha4
 - v25.38-alpha3
 - v25.38-alpha2
@@ -16,6 +17,7 @@
 - External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
+- Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
 - Decouple external authentication from external credentials management (#515, v25.38-alpha1)
 
 ---
