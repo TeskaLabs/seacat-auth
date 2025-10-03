@@ -12,7 +12,8 @@ from ...models import Session
 from ...events import EventTypes
 from ...api import local_authz
 from .utils import AuthOperation
-from .providers import ExternalAuthProviderABC, create_provider
+from .providers.abc import ExternalAuthProviderABC
+from .providers import create_provider
 from ..exceptions import (
 	ExternalAccountNotFoundError,
 	ExternalLoginError,
