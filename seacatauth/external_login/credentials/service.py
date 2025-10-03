@@ -1,4 +1,6 @@
 import logging
+import secrets
+
 import aiohttp
 import asab
 import asab.web.rest
@@ -41,6 +43,7 @@ class ExternalCredentialsService(asab.Service):
 
 		coll = await self.StorageService.collection(self.ExternalCredentialsCollection)
 		await coll.create_index([("cid", pymongo.ASCENDING)])
+		await coll.create_index([("type", pymongo.ASCENDING), ("sub", pymongo.ASCENDING)])
 
 
 	async def sign_up_ext_credentials(
@@ -120,7 +123,7 @@ class ExternalCredentialsService(asab.Service):
 		sub = str(user_info["sub"])
 		upsertor = self.StorageService.upsertor(
 			self.ExternalCredentialsCollection,
-			obj_id=_make_id(provider_type, sub)
+			obj_id=secrets.token_urlsafe(20)
 		)
 		upsertor.set("type", provider_type)
 		upsertor.set("sub", sub)
@@ -149,7 +152,7 @@ class ExternalCredentialsService(asab.Service):
 		return external_account_id
 
 
-	async def get_ext_credentials(self, provider_type: str, subject_id: str) -> dict:
+	async def get_ext_credentials_by_type_and_sub(self, provider_type: str, subject_id: str) -> dict:
 		"""
 		Retrieve external credentials by provider type and subject ID.
 
@@ -160,11 +163,36 @@ class ExternalCredentialsService(asab.Service):
 		Returns:
 			A dictionary containing the external credentials information.
 		"""
-		ext_creds_id = _make_id(provider_type, subject_id)
+		coll = await self.StorageService.collection(self.ExternalCredentialsCollection)
 		try:
-			ext_credentials = await self.StorageService.get(self.ExternalCredentialsCollection, ext_creds_id)
+			ext_credentials = await coll.find_one({
+			"type": provider_type,
+			"sub": subject_id,
+		})
 		except KeyError:
-			raise ExternalAccountNotFoundError(provider_type, subject_id)
+			raise ExternalAccountNotFoundError(type=provider_type, sub=subject_id)
+
+		ext_credentials = _normalize_ext_credentials(ext_credentials)
+
+		ensure_access_permissions(ext_credentials["cid"])
+
+		return ext_credentials
+
+
+	async def get_ext_credentials(self, ext_credentials_id: str) -> dict:
+		"""
+		Retrieve external credentials by the credentials ID.
+
+		Args:
+			ext_credentials_id: The ID of the external credentials.
+
+		Returns:
+			A dictionary containing the external credentials information.
+		"""
+		try:
+			ext_credentials = await self.StorageService.get(self.ExternalCredentialsCollection, ext_credentials_id)
+		except KeyError:
+			raise ExternalAccountNotFoundError(_id=ext_credentials_id)
 
 		ext_credentials = _normalize_ext_credentials(ext_credentials)
 
@@ -197,27 +225,25 @@ class ExternalCredentialsService(asab.Service):
 		return ext_credentials
 
 
-	async def update_ext_credentials(self, provider_type: str, subject_id: str, **kwargs):
+	async def update_ext_credentials(self, ext_credentials_id: str, **kwargs):
 		raise NotImplementedError()
 
 
-	async def delete_ext_credentials(self, provider_type: str, subject_id: str):
+	async def delete_ext_credentials(self, ext_credentials_id: str):
 		"""
-		Delete external credentials by provider type and subject ID.
+		Delete external credentials by their ID.
 
 		Args:
-			provider_type: The type of the external identity provider (e.g., "google", "facebook").
-			subject_id: The subject ID of the user in the external identity provider.
+			ext_credentials_id: The ID of the external credentials.
 		"""
-		ext_creds_id = _make_id(provider_type, subject_id)
 		try:
-			ext_credentials = await self.StorageService.get(self.ExternalCredentialsCollection, ext_creds_id)
+			ext_credentials = await self.StorageService.get(self.ExternalCredentialsCollection, ext_credentials_id)
 		except KeyError:
-			raise ExternalAccountNotFoundError(provider_type, subject_id)
+			raise ExternalAccountNotFoundError(_id=ext_credentials_id)
 
 		ensure_edit_permissions(ext_credentials["cid"])
 
-		return await self.StorageService.delete(self.ExternalCredentialsCollection, ext_creds_id)
+		return await self.StorageService.delete(self.ExternalCredentialsCollection, ext_credentials_id)
 
 
 	async def _create_credentials_via_webhook(

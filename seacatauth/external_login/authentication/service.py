@@ -247,12 +247,11 @@ class ExternalAuthenticationService(asab.Service):
 		# Find the external account and its associated Seacat credentials ID
 		try:
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
-				account = await self.ExternalCredentialsService.get_ext_credentials(
+				account = await self.ExternalCredentialsService.get_ext_credentials_by_type_and_sub(
 					provider_type, subject_id=user_info["sub"])
 			credentials_id = account["cid"]
 		except ExternalAccountNotFoundError as e:
-			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={
-				"type": e.ProviderType, "sub": e.SubjectId})
+			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={"query": e.Query})
 			if not self.can_sign_up_new_credentials(provider_type):
 				# Redirect to login page with error message, keep the original redirect uri in the query
 				return self._error_redirect_response(
@@ -371,7 +370,7 @@ class ExternalAuthenticationService(asab.Service):
 		# Verify that the external account is not registered already
 		try:
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
-				await self.ExternalCredentialsService.get_ext_credentials(
+				await self.ExternalCredentialsService.get_ext_credentials_by_type_and_sub(
 					provider_type, subject_id=user_info["sub"])
 			L.log(asab.LOG_NOTICE, "Cannot sign up with external account: Account already paired.", struct_data={
 				"provider": provider_type, "sub": user_info.get("sub")})
