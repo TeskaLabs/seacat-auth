@@ -216,7 +216,7 @@ class CredentialsService(asab.Service):
 				yield credobj
 
 
-	async def _tenant_filter(self, credentials_id: str, tenant_ids: typing.Iterable):
+	async def _tenant_filter(self, credentials_id: str, tenant_ids: typing.Iterable) -> bool:
 		if tenant_ids is None:
 			return True
 		tenant_svc = self.App.get_service("seacatauth.TenantService")
@@ -227,7 +227,8 @@ class CredentialsService(asab.Service):
 			except KeyError:
 				return False
 
-	async def _role_filter(self, credentials_id: str, role_ids: typing.Iterable):
+
+	async def _role_filter(self, credentials_id: str, role_ids: typing.Iterable) -> bool:
 		if role_ids is None:
 			return True
 		role_svc = self.App.get_service("seacatauth.RoleService")
@@ -239,6 +240,16 @@ class CredentialsService(asab.Service):
 				return False
 
 
+	def _status_filter(self, credentials_data: dict, status_filter: typing.List[str] | None) -> bool:
+		if status_filter is None:
+			return True
+		if credentials_data.get("suspended", False) and "suspended" in status_filter:
+			return True
+		if not credentials_data.get("suspended", False) and "active" in status_filter:
+			return True
+		return False
+
+
 	async def list(
 		self,
 		page: int = 0,
@@ -246,6 +257,7 @@ class CredentialsService(asab.Service):
 		simple_filter: str | None = None,
 		tenant_filter: str | None = None,
 		role_filter: str | None = None,
+		status_filter: typing.List[str] | None = None,
 		try_global_search: bool = False
 	):
 		"""
@@ -266,6 +278,8 @@ class CredentialsService(asab.Service):
 			if not await self._role_filter(credentials_data["_id"], searched_roles):
 				continue
 			if not await self._tenant_filter(credentials_data["_id"], searched_tenants):
+				continue
+			if not self._status_filter(credentials_data, status_filter):
 				continue
 			if offset > 0:
 				offset -= 1

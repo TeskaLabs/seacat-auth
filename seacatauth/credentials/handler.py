@@ -197,6 +197,17 @@ class CredentialsHandler(object):
 			required: false
 			description: Try to search in all tenants, not only in the currently authorized one
 			schema: {"type": "boolean"}
+		-	name: status
+			in: query
+			required: false
+			description: Filter users by status ("active", "suspended"). If omitted, all statuses are returned ("any").
+			schema: {
+				"type": "array",
+				"items": {"type": "string"},
+				"enum": ["active", "suspended", "any"],
+				"default": ["any"],
+			}
+			explode: false
 		"""
 		authz = asab.contextvars.Authz.get()
 		tenant_filter = request.query.get("tenant") or request.query.get("atenant", None)
@@ -217,6 +228,19 @@ class CredentialsHandler(object):
 		else:
 			tenant_ctx = asab.contextvars.Tenant.set(None)
 
+		status_filter = request.query.get("status")
+		if status_filter is not None:
+			status_filter = status_filter.split(",")
+			for status in status_filter:
+				if status not in frozenset(["active", "suspended", "any"]):
+					return asab.web.rest.json_response(request, status=400, data={
+						"result": "INVALID-ARGUMENT",
+						"argument": "status",
+						"tech_err": "Invalid status filter value",
+					})
+			if "any" in status_filter:
+				status_filter = None  # No filtering
+
 		try:
 			result = await self.CredentialsService.list(
 				page=int(request.query.get("p", 1)) - 1,
@@ -224,6 +248,7 @@ class CredentialsHandler(object):
 				tenant_filter=tenant_filter,
 				role_filter=role_filter,
 				simple_filter=simple_filter,
+				status_filter=status_filter,
 				try_global_search=try_global_search,
 			)
 		except exceptions.AccessDeniedError as e:
