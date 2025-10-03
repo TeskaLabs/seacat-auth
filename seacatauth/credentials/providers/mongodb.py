@@ -88,23 +88,6 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			except Exception as e:
 				L.warning("{}; fix it and restart the app".format(e))
 
-		# Add indexing by active external login providers
-		ext_provider_svc = self.SessionService.App.get_service("seacatauth.ExternalLoginService")
-		for provider_type in ext_provider_svc.Providers:
-			sub_field_name = "external_login.{}".format(provider_type)
-			try:
-				await coll.create_index(
-					[
-						(sub_field_name, pymongo.ASCENDING),
-					],
-					unique=True,
-					partialFilterExpression={
-						sub_field_name: {"$exists": True, "$gt": ""}
-					}
-				)
-			except Exception as e:
-				L.warning("{}; fix it and restart the app".format(e))
-
 		# Index by registration code
 		try:
 			await coll.create_index(

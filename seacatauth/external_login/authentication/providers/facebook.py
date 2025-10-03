@@ -3,14 +3,14 @@ import typing
 import urllib.parse
 import aiohttp
 
-from .generic import GenericOAuth2Login
-from ..exceptions import ExternalOAuthFlowError
+from .oauth2 import OAuth2AuthProvider
+from ...exceptions import ExternalLoginError
 
 
 L = logging.getLogger(__name__)
 
 
-class FacebookOAuth2Login(GenericOAuth2Login):
+class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 	"""
 	This app must be registered at Facebook:
 	https://developers.facebook.com/docs/facebook-login/web
@@ -23,6 +23,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 	The full callback URL is canonically in the following format:
 	https://{my_domain}/api/seacat-auth/public/ext-login/callback
 	"""
+
 	Type = "facebook"
 	ConfigDefaults = {
 		# Facebook uses a custom OAuth implementation. There is no OpenID discovery_uri.
@@ -35,15 +36,15 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		"label": "Facebook",
 	}
 
-	def __init__(self, external_login_svc, config_section_name):
-		super().__init__(external_login_svc, config_section_name)
+	def __init__(self, external_authentication_svc, config_section_name):
+		super().__init__(external_authentication_svc, config_section_name)
 		self.UserInfoEndpoint = self.Config.get("userinfo_endpoint")
 		self.ResponseType = self.Config.get("response_type")
 		self.Scope = self.Config.get("scope")
 		self.Fields = self.Config.get("fields")
 		assert self.UserInfoEndpoint not in (None, "")
 
-	def get_authorize_uri(
+	def _get_authorize_uri(
 		self, redirect_uri: typing.Optional[str] = None,
 		state: typing.Optional[str] = None,
 		nonce: typing.Optional[str] = None
@@ -62,7 +63,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Info is not contained in token response, call to userinfo_endpoint is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
@@ -72,7 +73,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 			L.error("Code parameter not provided in authorize response.", struct_data={
 				"provider": self.Type,
 				"query": dict(authorize_data)})
-			raise ExternalOAuthFlowError("No 'code' parameter in request.")
+			raise ExternalLoginError("No 'code' parameter in request.")
 
 		async with self.token_request(code) as resp:
 			token_data = await resp.json()
@@ -80,7 +81,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 		if "access_token" not in token_data:
 			L.error("Token response does not contain 'access_token'.", struct_data={
 				"provider": self.Type, "resp": token_data})
-			raise ExternalOAuthFlowError("No 'access_token' in token response.")
+			raise ExternalLoginError("No 'access_token' in token response.")
 
 		access_token = token_data["access_token"]
 
@@ -95,7 +96,7 @@ class FacebookOAuth2Login(GenericOAuth2Login):
 						"data": data,
 						"url": resp.url
 					})
-					raise ExternalOAuthFlowError("Token request failed.")
+					raise ExternalLoginError("Token request failed.")
 
 		user_info = {}
 		if "id" in data:
