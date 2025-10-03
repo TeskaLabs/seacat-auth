@@ -7,7 +7,7 @@ import asab.exceptions
 import asab.utils
 import asab.contextvars
 
-from .. import exceptions, generic
+from .. import exceptions
 from ..models.const import ResourceId
 from . import schema
 
