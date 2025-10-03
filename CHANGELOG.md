@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha3
 - v25.38-alpha2
 - v25.38-alpha1
 
