@@ -3,12 +3,14 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha3
 - v25.38-alpha2
 - v25.38-alpha1
 
 ### Fixes
 
 ### Features
+- Filtering credentials by active/suspended status (#517, v25.38-alpha3)
 - External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
