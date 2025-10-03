@@ -9,7 +9,6 @@ import asab.exceptions
 import asab.utils
 
 from .... import exceptions
-from .... import generic
 from ....models.const import ResourceId
 from . import schema
 
@@ -216,13 +215,12 @@ class RoleHandler(object):
 
 
 	async def _list(self, request, tenant_id):
-		search = generic.SearchParams(request.query)
 		result = await self.RoleService.list(
 			tenant_id=tenant_id,
-			page=search.Page,
-			limit=search.ItemsPerPage,
-			name_filter=search.SimpleFilter,
-			resource_filter=search.get("resource"),
+			page=int(request.query.get("p", 1)) - 1,
+			limit=int(request.query["i"]) if "i" in request.query else None,
+			name_filter=request.query.get("f", None),
+			resource_filter=request.query.get("aresource", None),
 			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false"))
 		)
 		return asab.web.rest.json_response(request, result)
