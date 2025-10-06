@@ -25,8 +25,8 @@ class ExternalLoginAccountHandler(object):
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/account/ext-login", self.list_my_ext_credentials)
-		web_app.router.add_get("/account/ext-login/{provider_type}/{subject_id}", self.get_my_ext_credentials)
-		web_app.router.add_delete("/account/ext-login/{provider_type}/{subject_id}", self.remove_my_ext_credentials)
+		web_app.router.add_get("/account/ext-login/{ext_credentials_id}", self.get_my_ext_credentials)
+		web_app.router.add_delete("/account/ext-login/{ext_credentials_id}", self.remove_my_ext_credentials)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -47,11 +47,9 @@ class ExternalLoginAccountHandler(object):
 		"""
 		Get the current user's external login credentials detail
 		"""
-		provider_type = request.match_info["provider_type"]
-		subject_id = request.match_info["subject_id"]
+		ext_credentials_id = request.match_info["ext_credentials_id"]
 		try:
-			data = await self.ExternalCredentialsService.get_ext_credentials(
-				provider_type, subject_id)
+			data = await self.ExternalCredentialsService.get_ext_credentials(ext_credentials_id)
 			return asab.web.rest.json_response(request, data)
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
@@ -62,11 +60,9 @@ class ExternalLoginAccountHandler(object):
 		"""
 		Remove the current user's external login account
 		"""
-		provider_type = request.match_info["provider_type"]
-		subject_id = request.match_info["subject_id"]
+		ext_credentials_id = request.match_info["ext_credentials_id"]
 		try:
-			await self.ExternalCredentialsService.delete_ext_credentials(
-				provider_type, subject_id)
+			await self.ExternalCredentialsService.delete_ext_credentials(ext_credentials_id)
 			return asab.web.rest.json_response(request, {"result": "OK"})
 		except ExternalAccountNotFoundError:
 			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)

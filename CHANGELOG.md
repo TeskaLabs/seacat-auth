@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha6
 - v25.38-alpha5
 - v25.38-alpha4
 - v25.38-alpha3
@@ -10,6 +11,7 @@
 - v25.38-alpha1
 
 ### Fixes
+- Opaque external credential IDs (#521, v25.38-alpha6)
 - Fix pysaml2 dependency (#518, v25.38-alpha4)
 
 ### Features

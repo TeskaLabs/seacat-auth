@@ -5,11 +5,9 @@ class ExternalAccountNotFoundError(SeacatAuthError, KeyError):
 	"""
 	External login account not found
 	"""
-	def __init__(self, provider_type: str, subject_id: str, *args):
-		self.ProviderType = provider_type
-		self.SubjectId = subject_id
-		super().__init__("External login account {!r} not found in provider {!r}".format(
-			self.SubjectId, self.ProviderType), *args)
+	def __init__(self, *args, query, **kwargs):
+		self.Query = query
+		super().__init__("No external credentials matched the query {!r}".format(self.Query), *args)
 
 
 class ExternalLoginError(SeacatAuthError):
