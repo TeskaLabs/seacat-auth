@@ -164,13 +164,13 @@ class ExternalCredentialsService(asab.Service):
 			A dictionary containing the external credentials information.
 		"""
 		coll = await self.StorageService.collection(self.ExternalCredentialsCollection)
-		try:
-			ext_credentials = await coll.find_one({
-				"type": provider_type,
-				"sub": subject_id,
-			})
-		except KeyError:
-			raise ExternalAccountNotFoundError(type=provider_type, sub=subject_id)
+		ext_credentials = await coll.find_one({
+			"type": provider_type,
+			"sub": subject_id,
+		})
+
+		if ext_credentials is None:
+			raise ExternalAccountNotFoundError(query={"type": provider_type, "sub": subject_id})
 
 		ext_credentials = _normalize_ext_credentials(ext_credentials)
 
@@ -192,7 +192,7 @@ class ExternalCredentialsService(asab.Service):
 		try:
 			ext_credentials = await self.StorageService.get(self.ExternalCredentialsCollection, ext_credentials_id)
 		except KeyError:
-			raise ExternalAccountNotFoundError(_id=ext_credentials_id)
+			raise ExternalAccountNotFoundError(query={"_id": ext_credentials_id})
 
 		ext_credentials = _normalize_ext_credentials(ext_credentials)
 
@@ -239,7 +239,7 @@ class ExternalCredentialsService(asab.Service):
 		try:
 			ext_credentials = await self.StorageService.get(self.ExternalCredentialsCollection, ext_credentials_id)
 		except KeyError:
-			raise ExternalAccountNotFoundError(_id=ext_credentials_id)
+			raise ExternalAccountNotFoundError(query={"_id": ext_credentials_id})
 
 		ensure_edit_permissions(ext_credentials["cid"])
 
