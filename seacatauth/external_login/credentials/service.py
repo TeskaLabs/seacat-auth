@@ -166,9 +166,9 @@ class ExternalCredentialsService(asab.Service):
 		coll = await self.StorageService.collection(self.ExternalCredentialsCollection)
 		try:
 			ext_credentials = await coll.find_one({
-			"type": provider_type,
-			"sub": subject_id,
-		})
+				"type": provider_type,
+				"sub": subject_id,
+			})
 		except KeyError:
 			raise ExternalAccountNotFoundError(type=provider_type, sub=subject_id)
 
