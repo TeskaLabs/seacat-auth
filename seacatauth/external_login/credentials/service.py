@@ -291,10 +291,6 @@ class ExternalCredentialsService(asab.Service):
 		return credentials_id
 
 
-def _make_id(provider_type: str, subject_id: str):
-	return "{} {}".format(provider_type, subject_id)
-
-
 def _normalize_ext_credentials(account: dict):
 	# Normalize old field names
 	if "e" in account and "email" not in account:
