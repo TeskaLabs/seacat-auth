@@ -6,9 +6,9 @@ import asab.web.auth
 import asab.web.tenant
 import asab.storage.exceptions
 import asab.exceptions
+import asab.utils
 
 from .... import exceptions
-from .... import generic
 from ....models.const import ResourceId
 from . import schema
 
@@ -28,7 +28,7 @@ class RoleHandler(object):
 		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/role", self.list_all_roles)
+		web_app.router.add_get("/role/*", self.list_global_roles)
 		web_app.router.add_get("/role/*/{role_name}", self.get_global_role)
 		web_app.router.add_post("/role/*/{role_name}", self.create_global_role)
 		web_app.router.add_put("/role/*/{role_name}", self.update_global_role)
@@ -39,38 +39,6 @@ class RoleHandler(object):
 		web_app.router.add_post("/role/{tenant}/{role_name}", self.create_role)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_role)
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete_role)
-
-
-	@asab.web.auth.require_superuser
-	@asab.web.tenant.allow_no_tenant
-	async def list_all_roles(self, request):
-		"""
-		List roles from all tenants
-
-		---
-		parameters:
-		-	name: p
-			in: query
-			description: Page number
-			schema:
-				type: integer
-		-	name: i
-			in: query
-			description: Items per page
-			schema:
-				type: integer
-		-	name: resource
-			in: query
-			description: Show only roles that contain the specified resource
-			schema:
-				type: string
-		-	name: assign_cid
-			in: query
-			description: Include info about what roles are assigned and can be assigned to this credentials ID.
-			schema:
-				type: string
-		"""
-		return await self._list_roles(request, tenant_id=None)
 
 
 	async def list_roles(self, request):
@@ -98,6 +66,43 @@ class RoleHandler(object):
 			in: query
 			description: Show only proper tenant roles, without globals.
 			schema:
+				type: boolean
+		-	name: assign_cid
+			in: query
+			description: Include info about what roles are assigned and can be assigned to this credentials ID.
+			schema:
+				type: string
+		"""
+		tenant_id = asab.contextvars.Tenant.get()
+		return await self._list_roles(request, tenant_id=tenant_id)
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def list_global_roles(self, request):
+		"""
+		List global roles
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: resource
+			in: query
+			description: Show only roles that contain the specified resource
+			schema:
+				type: string
+		-	name: exclude_global
+			in: query
+			description: Show only proper tenant roles, without globals.
+			schema:
 				type: string
 				enum:
 				- true
@@ -107,8 +112,7 @@ class RoleHandler(object):
 			schema:
 				type: string
 		"""
-		tenant_id = asab.contextvars.Tenant.get()
-		return await self._list_roles(request, tenant_id=tenant_id)
+		return await self._list_roles(request, tenant_id=None)
 
 
 	async def get_role(self, request):
@@ -228,14 +232,14 @@ class RoleHandler(object):
 
 
 	async def _list_roles(self, request, tenant_id):
-		search = generic.SearchParams(request.query)
 		result = await self.RoleService.list_roles(
 			tenant_id=tenant_id,
-			page=search.Page,
-			limit=search.ItemsPerPage,
-			name_filter=search.SimpleFilter,
-			resource_filter=search.get("resource"),
-			assign_cid=search.get("assign_cid"),
+			page=int(request.query.get("p", 1)) - 1,
+			limit=int(request.query["i"]) if "i" in request.query else None,
+			name_filter=request.query.get("f", None),
+			resource_filter=request.query.get("aresource", None),
+			assign_cid=request.query.get("assign_cid"),
+			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false"))
 		)
 		return asab.web.rest.json_response(request, result)
 

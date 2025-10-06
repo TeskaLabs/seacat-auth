@@ -49,7 +49,7 @@ class SeaCatAuthApplication(asab.Application):
 		self.PublicWebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
 
 		import asab.web.tenant
-		self.AsabTenantService = asab.web.tenant.TenantService(self)
+		self.AsabTenantService = asab.web.tenant.TenantService(self, strict=False)
 		self.AsabTenantService.install(self.WebContainer)
 		self.AsabTenantService.install(self.PublicWebContainer)
 
@@ -152,6 +152,10 @@ class SeaCatAuthApplication(asab.Application):
 		self.ClientService = ClientService(self)
 		self.ClientHandler = ClientHandler(self, self.ClientService)
 
+		from .apikey import ApiKeyService, ApiKeyHandler
+		self.ApiKeyService = ApiKeyService(self)
+		self.ApiKeyHandler = ApiKeyHandler(self, self.ApiKeyService)
+
 		# Load OpenID Connect module
 		# depends on: CookieService, SessionService, AuthenticationService,
 		#   CredentialsService, TenantService, RoleService, ClientService
@@ -162,12 +166,21 @@ class SeaCatAuthApplication(asab.Application):
 		self.OTPService = OTPService(self)
 		self.OTPHandler = OTPHandler(self, self.OTPService)
 
-		from .external_login import (
-			ExternalLoginService, ExternalLoginAdminHandler, ExternalLoginAccountHandler, ExternalLoginPublicHandler)
-		self.ExternalLoginService = ExternalLoginService(self)
-		self.ExternalLoginAdminHandler = ExternalLoginAdminHandler(self, self.ExternalLoginService)
-		self.ExternalLoginAccountHandler = ExternalLoginAccountHandler(self, self.ExternalLoginService)
-		self.ExternalLoginPublicHandler = ExternalLoginPublicHandler(self, self.ExternalLoginService)
+		from .external_login.authentication import (
+			ExternalAuthenticationService,
+			ExternalAuthenticationHandler
+		)
+		self.ExternalAuthenticationService = ExternalAuthenticationService(self)
+		self.ExternalLoginPublicHandler = ExternalAuthenticationHandler(self, self.ExternalAuthenticationService)
+
+		from .external_login.credentials import (
+			ExternalCredentialsService,
+			ExternalCredentialsAdminHandler,
+			ExternalLoginAccountHandler,
+		)
+		self.ExternalCredentialsService = ExternalCredentialsService(self)
+		self.ExternalLoginAdminHandler = ExternalCredentialsAdminHandler(self, self.ExternalCredentialsService)
+		self.ExternalLoginAccountHandler = ExternalLoginAccountHandler(self, self.ExternalCredentialsService)
 
 		from .feature import FeatureService, FeatureHandler
 		self.FeatureService = FeatureService(self)

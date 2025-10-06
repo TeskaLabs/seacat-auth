@@ -10,7 +10,12 @@ import asab.web.tenant
 import asab.utils
 
 from ... import exceptions
-from ...generic import nginx_introspection, get_bearer_token_value, get_access_token_value_from_websocket
+from ...generic import (
+	nginx_introspection,
+	get_access_token_value_from_websocket,
+	get_token_from_authorization_header,
+	fingerprint,
+)
 
 
 L = logging.getLogger(__name__)
@@ -32,6 +37,7 @@ class TokenIntrospectionHandler(object):
 		self.SessionService = app.get_service("seacatauth.SessionService")
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
+		self.ApiKeyService = app.get_service("seacatauth.ApiKeyService")
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
@@ -74,16 +80,41 @@ class TokenIntrospectionHandler(object):
 
 
 	async def _authenticate_request(self, request):
-		token_value = get_bearer_token_value(request)
-		if token_value is None:
-			token_value = get_access_token_value_from_websocket(request)
-		if token_value is None:
+		"""
+		Authenticate request using access token or API key from Authorization header or Sec-WebSocket-Protocol header.
+
+		Args:
+			request (aiohttp.web.Request): Incoming request.
+
+		Returns:
+			session (Session|None): Authenticated session or None if authentication failed.
+		"""
+		token = get_token_from_authorization_header(request)
+		if token is None:
+			token = get_access_token_value_from_websocket(request)
+		if token is None:
 			L.log(asab.LOG_NOTICE, "Access token not found in 'Authorization' nor 'Sec-WebSocket-Protocol' header")
 			return None
-		try:
-			session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-		except exceptions.SessionNotFoundError:
-			L.log(asab.LOG_NOTICE, "Access token matched no session.")
+
+		token_type, token_value = token
+		if token_type == "Bearer":
+			try:
+				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
+			except exceptions.SessionNotFoundError as e:
+				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e), struct_data={
+					"token_fingerprint": fingerprint(token_value)})
+				return None
+
+		elif token_type == self.ApiKeyService.TOKEN_TYPE:
+			try:
+				session = await self.ApiKeyService.get_session_by_api_key(token_value)
+			except exceptions.SessionNotFoundError as e:
+				L.log(asab.LOG_NOTICE, "API key matched no session: {}".format(e), struct_data={
+					"token_fingerprint": fingerprint(token_value)})
+				return None
+
+		else:
+			L.error("Unsupported token type: {}".format(token_type))
 			return None
 
 		# Validate client if requested
@@ -91,7 +122,7 @@ class TokenIntrospectionHandler(object):
 		client_id = request.query.get("client_id")
 		if client_id is not None:
 			try:
-				client = await self.ClientService.get(client_id)
+				client = await self.ClientService.get_client(client_id)
 			except KeyError:
 				L.error("Client not found.", struct_data={"client_id": client_id})
 				return None

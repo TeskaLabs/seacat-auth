@@ -7,7 +7,7 @@ import asab.exceptions
 import asab.utils
 import asab.contextvars
 
-from .. import exceptions, generic
+from .. import exceptions
 from ..models.const import ResourceId
 from . import schema
 
@@ -33,9 +33,30 @@ class CredentialsHandler(object):
 
 		web_app = app.WebContainer.WebApp
 
+		web_app.router.add_get("/admin/credentials-provider", self.list_providers)
+		web_app.router.add_get("/admin/credentials-provider/{provider_id}", self.get_provider_info)
+
+		web_app.router.add_put("/admin/credentials-ident", self.get_idents_from_ids)
+
+		web_app.router.add_get("/admin/credentials", self.list_credentials)
+		web_app.router.add_post("/admin/credentials/{provider}", self.create_credentials)
+		web_app.router.add_get("/admin/credentials/{credentials_id}", self.get_credentials)
+		web_app.router.add_put("/admin/credentials/{credentials_id}", self.update_credentials)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}", self.delete_credentials)
+
+		web_app.router.add_get("/admin/credentials/{credentials_id}/last-login", self.get_last_login_data)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/enforce-factors", self.enforce_factors)
+
+		web_app.router.add_get("/account/credentials", self.get_my_credentials)
+		web_app.router.add_put("/account/credentials", self.update_my_credentials)
+		web_app.router.add_get("/account/credentials/provider", self.get_my_provider_info)
+		web_app.router.add_get("/account/credentials/last-login", self.get_my_last_login_data)
+
+		# BACK-COMPAT. Remove after 2025-12-31.
+		# >>>
 		web_app.router.add_get("/credentials", self.list_credentials)
 		web_app.router.add_put("/idents", self.get_idents_from_ids)
-		web_app.router.add_put("/usernames", self.get_idents_from_ids)  # TODO: Back compat. Remove once UI adapts to the new endpoint.
+		web_app.router.add_put("/usernames", self.get_idents_from_ids)
 		web_app.router.add_get("/locate", self.locate_credentials)
 		web_app.router.add_get("/credentials/{credentials_id}", self.get_credentials)
 		web_app.router.add_get("/last_login/{credentials_id}", self.get_last_login_data)
@@ -51,6 +72,7 @@ class CredentialsHandler(object):
 		web_app.router.add_get("/account/provider", self.get_my_provider_info)
 		web_app.router.add_put("/account/credentials", self.update_my_credentials)
 		web_app.router.add_get("/account/last-login", self.get_my_last_login_data)
+		# <<<
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -173,22 +195,30 @@ class CredentialsHandler(object):
 		-	name: global
 			in: query
 			required: false
-			description:
+			description: Try to search in all tenants, not only in the currently authorized one
 			schema: {"type": "boolean"}
+		-	name: astatus
+			in: query
+			required: false
+			description: Filter users by status ("active", "suspended"). If omitted, all statuses are returned ("any").
+			schema: {
+				"type": "array",
+				"items": {"type": "string"},
+				"enum": ["active", "suspended", "any"],
+				"default": ["any"],
+			}
+			explode: false
 		"""
 		authz = asab.contextvars.Authz.get()
-		search = generic.SearchParams(request.query, filter_params={"role", "tenant"})
+		tenant_filter = request.query.get("tenant") or request.query.get("atenant", None)
+		role_filter = request.query.get("role") or request.query.get("arole", None)
+		simple_filter = request.query.get("f")
 
 		# BACK-COMPAT: Convert the old "mode" search to advanced filters
 		mode = request.query.get("m", "default")
-		if mode == "role":
-			search.AdvancedFilter["role"] = request.query.get("f")
-			search.SimpleFilter = None
-		elif mode == "tenant":
-			search.AdvancedFilter["tenant"] = request.query.get("f")
-			search.SimpleFilter = None
-		elif mode == "default":
-			search.SimpleFilter = request.query.get("f")
+		if mode == "tenant":
+			tenant_filter = request.query.get("f")
+			simple_filter = None
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
@@ -198,8 +228,27 @@ class CredentialsHandler(object):
 		else:
 			tenant_ctx = asab.contextvars.Tenant.set(None)
 
+		status_filter = request.query.get("astatus")
+		if status_filter is not None:
+			status_filter = status_filter.split(",")
+			for status in status_filter:
+				if status not in frozenset(["active", "suspended", "any"]):
+					raise asab.exceptions.ValidationError(
+						"Invalid status filter: {!r}".format(request.query.get("astatus")))
+			# If "any" is present, ignore all other status filters
+			if "any" in status_filter:
+				status_filter = None  # No filtering
+
 		try:
-			result = await self.CredentialsService.list(search, try_global_search)
+			result = await self.CredentialsService.list(
+				page=int(request.query.get("p", 1)) - 1,
+				limit=int(request.query.get("i", 10)),
+				tenant_filter=tenant_filter,
+				role_filter=role_filter,
+				simple_filter=simple_filter,
+				status_filter=status_filter,
+				try_global_search=try_global_search,
+			)
 		except exceptions.AccessDeniedError as e:
 			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
 			return asab.web.rest.json_response(request, status=403, data={
@@ -299,7 +348,7 @@ class CredentialsHandler(object):
 		"""
 		Create new credentials
 		"""
-		reset_password = json_data.pop("passwordlink")
+		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 
@@ -407,6 +456,30 @@ class CredentialsHandler(object):
 
 		if result["status"] != "OK":
 			return asab.web.rest.json_response(request, result, status=400)
+
+		return asab.web.rest.json_response(request, result)
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def get_my_credentials(self, request):
+		"""
+		Get the current user's own credentials
+
+		---
+		parameters:
+		-	name: last_login
+			in: query
+			description: Whether to include the last successful and failed login data
+			required: false
+			schema:
+				type: boolean
+				default: no
+		"""
+		authz = asab.contextvars.Authz.get()
+		result = await self.CredentialsService.get(authz.CredentialsId)
+
+		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
+			result["_ll"] = await self.LastActivityService.get_last_logins(authz.CredentialsId)
 
 		return asab.web.rest.json_response(request, result)
 

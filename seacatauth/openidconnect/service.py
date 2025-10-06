@@ -324,8 +324,11 @@ class OpenIdConnectService(asab.Service):
 			userinfo["impersonator_sid"] = session.Authentication.ImpersonatorSessionId
 			userinfo["impersonator_cid"] = session.Authentication.ImpersonatorCredentialsId
 
-		if await otp_service.has_activated_totp(session.Credentials.Id):
-			userinfo["totp_set"] = True
+		try:
+			if await otp_service.has_activated_totp(session.Credentials.Id):
+				userinfo["totp_set"] = True
+		except exceptions.CredentialsNotFoundError:
+			pass
 
 		if session.Authentication.AvailableFactors is not None:
 			userinfo["available_factors"] = session.Authentication.AvailableFactors
@@ -470,7 +473,7 @@ class OpenIdConnectService(asab.Service):
 
 		# Determine the desired access and refresh token expiration time
 		client_id = session.OAuth2.ClientId
-		client = await self.ClientService.get(client_id)
+		client = await self.ClientService.get_client(client_id)
 		access_token_expiration = client.get("session_expiration") or AccessToken.Expiration
 		access_token_expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
 			seconds=access_token_expiration)

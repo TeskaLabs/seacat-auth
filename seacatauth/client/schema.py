@@ -8,7 +8,7 @@ CLIENT_METADATA_SCHEMA = {
 	"preferred_client_id": {
 		"type": "string",
 		"pattern": "^[-_a-zA-Z0-9]{4,64}$",
-		"description": "(Non-canonical) Preferred client ID."
+		"description": "Preferred client ID. If not specified, a random ID will be generated.",
 	},
 	"client_name": {  # Can have language tags (e.g. "client_name#cs")
 		"type": "string",
@@ -93,7 +93,7 @@ CLIENT_METADATA_SCHEMA = {
 		"type": "string",
 		"description":
 			"Requested Client Authentication method for the Token Endpoint. "
-			"If omitted, the default is `none`.",
+			"If omitted, the default is `client_secret_basic`.",
 		"enum": [str(v) for v in OAuth2.TokenEndpointAuthMethod]
 	},
 	# "token_endpoint_auth_signing_alg": {},

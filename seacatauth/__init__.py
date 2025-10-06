@@ -229,11 +229,16 @@ asab.Config.add_defaults({
 		"state_expiration": "10m",
 
 		# Length of OAuth state string
-		"state_length": 16,
+		"state_length": 32,
+	},
 
-		# Length of OAuth nonce string
-		"nonce_length": 16,
-	}
+	"seacatauth:api_key": {
+		# Default expiration for API keys
+		"default_expiration": "32 d",
+
+		# Length of API key token
+		"token_byte_length": 36,
+	},
 })
 
 AuditLogger = logging.getLogger("AUDIT")

@@ -13,6 +13,7 @@ RUN apk add --no-cache \
   py3-pip \
   libstdc++ \
   openssl \
+  xmlsec \
   openldap
 
 # Create build environment so that dependencies like aiohttp can be build
@@ -45,13 +46,14 @@ RUN apk add --no-cache  \
     pyotp \
     webauthn==1.9.0 \
     pyyaml \
+    pysaml2 \
     pymongo \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
-RUN /venv/bin/python -c "import asab; print(asab.__version__)"
+RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
@@ -68,6 +70,7 @@ FROM alpine:3.21
 RUN apk add --no-cache \
   python3 \
   openssl \
+  xmlsec \
   openldap
 
 COPY --from=builder /venv /venv

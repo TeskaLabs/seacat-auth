@@ -1,13 +1,15 @@
 import logging
 import re
+
 import asab
 import asab.contextvars
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
+import asab.utils
 
-from ... import exceptions
+from ... import exceptions, generic
 from ...models.const import ResourceId
 from . import schema
 
@@ -57,48 +59,55 @@ class ResourceHandler(object):
 			description: Filter string
 			schema:
 				type: string
-		-	name: exclude
+		-	name: _id!
 			in: query
-			description:
-				Exclude resources based on their type/status. If omitted, this parameter defaults
-				to `exclude=deleted`, which means the results include all active resources.
+			description: Resource IDs to exclude from the results (comma-separated).
 			required: false
 			explode: false
 			schema:
 				type: array
-				items:
-					enum: ["active", "deleted", "globalonly"]
+		-	name: _id
+			in: query
+			description: Resource IDs to search (comma-separated).
+			required: false
+			explode: false
+			schema:
+				type: array
+		-	name: context
+			in: query
+			description:
+				Context in which the resource can be used. If set to "tenant", only resources that are not
+				global-only are returned. Defaults to "global", returning all resources.
+			required: false
+			schema:
+				type: string
+				enum: ["tenant", "global"]
+		-	name: authorized
+			in: query
+			description:
+				Filter to authorized or unauthorized resources. If set to "true", only resources that the user is
+				authorized to access are returned.
+			required: false
+			schema:
+				type: boolean
+		-	name: deleted
+			in: query
+			description:
+				Filter to active or soft-deleted resources. If set to "true", only deleted resources are listed.
+				Defaults to "false", listing only active resources.
+			required: false
+			schema:
+				type: boolean
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = request.query.get("i", None)
 		if limit is not None:
 			limit = int(limit)
 
-		# Filter by ID.startswith()
-		query_filter = {}
-		name_filter = request.query.get("f")
-		if name_filter:
-			query_filter["_id"] = {"$regex": re.escape(name_filter)}
-
-		# Get the types of resources to exclude from the results
-		# By default, exclude only deleted resources
-		exclude = request.query.get("exclude", "")
-		if len(exclude) == 0:
-			exclude = "deleted"
-		exclude = exclude.split(",")
-		if "deleted" in exclude:
-			if "active" in exclude:
-				return asab.web.rest.json_response(request, {"data": [], "count": 0})
-			else:
-				query_filter["deleted"] = {"$in": [None, False]}
-		else:
-			if "active" in exclude:
-				query_filter["deleted"] = True
-			else:
-				pass
-
-		if "globalonly" in exclude:
-			query_filter["global_only"]["ne"] = True
+		query_filter = _build_resource_filter(request.query)
+		if query_filter is False:
+			# Empty result set
+			return asab.web.rest.json_response(request, {"count": 0, "data": []})
 
 		resources = await self.ResourceService.list(page, limit, query_filter)
 		return asab.web.rest.json_response(request, resources)
@@ -197,3 +206,65 @@ class ResourceHandler(object):
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		return asab.web.rest.json_response(request, {"result": "OK"})
+
+
+def _build_resource_filter(query: dict = None) -> dict | bool:
+	"""
+	Build a filter for resources based on the current tenant and authorization context.
+
+	Args:
+		query (dict): The query parameters from the request.
+
+	Returns:
+		dict | False : A MongoDB filter dictionary, or False if the filter leads to empty result.
+	"""
+	query_filter = {}
+
+	# Search in resource ID
+	name_filter = query.get("f")
+	if name_filter:
+		generic.update_mongodb_filter(query_filter, "_id", {"$regex": re.escape(name_filter)})
+
+	deleted = asab.utils.string_to_boolean(query.get("deleted", False))
+	if deleted is False:
+		deleted = {"$in": [False, None]}
+	generic.update_mongodb_filter(query_filter, "deleted", deleted)
+
+	if "context" in query:
+		context = query.get("context")
+		if context == "tenant":
+			# Exclude global-only resources
+			generic.update_mongodb_filter(query_filter, "global_only.$ne", True)
+		elif context == "global":
+			# Include all resources
+			pass
+		else:
+			# Unknown context, return empty result
+			return False
+
+	if "authorized" in query:
+		authz = asab.contextvars.Authz.get()
+
+		if asab.utils.string_to_boolean(query["authorized"]) is True:
+			# Filter to authorized resources only
+			if authz.has_superuser_access():
+				pass
+			else:
+				generic.update_mongodb_filter(query_filter, "_id.$in", authz._resources())
+		else:
+			# Filter to unauthorized resources only
+			if authz.has_superuser_access():
+				# There is nothing to filter, superuser can see all resources
+				return False
+			else:
+				generic.update_mongodb_filter(query_filter, "_id.$nin", authz._resources())
+
+	exclude_ids = query.get("_id!")
+	if exclude_ids:
+		generic.update_mongodb_filter(query_filter, "_id.$nin", exclude_ids.split(","))
+
+	search_ids = query.get("_id")
+	if search_ids:
+		generic.update_mongodb_filter(query_filter, "_id.$in", search_ids.split(","))
+
+	return query_filter

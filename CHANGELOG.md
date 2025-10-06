@@ -1,5 +1,79 @@
 # CHANGELOG
 
+## v25.38
+
+### Pre-releases
+- v25.38-alpha6
+- v25.38-alpha5
+- v25.38-alpha4
+- v25.38-alpha3
+- v25.38-alpha2
+- v25.38-alpha1
+
+### Fixes
+- Opaque external credential IDs (#521, v25.38-alpha6)
+- Fix pysaml2 dependency (#518, v25.38-alpha4)
+
+### Features
+- Filtering credentials by active/suspended status (#517, v25.38-alpha3)
+- External login with SAML (#516, v25.38-alpha2)
+
+### Refactoring
+- Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
+- Decouple external authentication from external credentials management (#515, v25.38-alpha1)
+
+---
+
+
+## v25.26
+
+### Pre-releases
+- v25.26-alpha14
+- v25.26-alpha13
+- v25.26-alpha12
+- v25.26-alpha11
+- v25.26-alpha10
+- v25.26-alpha9
+- v25.26-alpha8
+- v25.26-alpha7
+- v25.26-alpha6
+- v25.26-alpha5
+- v25.26-alpha4
+- v25.26-alpha3
+- v25.26-alpha2
+- v25.26-alpha1
+
+### Breaking changes
+- Resource list query parameters changed: `exclude` is no longer supported (#510, v25.26-alpha9)
+- Admin tenant invitation path changed to `/admin/tenant/{tenant}/invite`.
+  Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
+
+### Fixes
+- Fix userinfo endpoint (#514, v25.26-alpha14)
+- Fix websocket authentication introspection (#513, v25.26-alpha13)
+- Standardize API key creation response (#512, v25.26-alpha12)
+- Remove a- prefix from resource list API parameters (#511, v25.26-alpha10)
+- Fix endpoint for obtaining global roles (#506, v25.26-alpha7)
+- Fix PKCE strength evaluation (#504, v25.26-alpha6)
+- Add default value for passwordlink in credentials creation (#494, v25.26-alpha2)
+- Fix ASAB version printer (#492, v25.26-alpha1)
+- Fix credentials search - Client provider error (#489, v25.26-alpha1)
+
+### Features
+- Standardize API key creation response (#512, v25.26-alpha12)
+- Simpler API keys (#505, v25.26-alpha11)
+- Extend resource filtering API (#510, v25.26-alpha9)
+- Negative resource filtering (#509, v25.26-alpha8)
+- New resource ID `seacat:client:apikey:manage` for client API key management (#488, v25.26-alpha4)
+- Prefix client API with /admin (#488, v25.26-alpha4)
+- Prefix credentials API with /admin (#493, v25.26-alpha3)
+
+### Refactoring
+- Adapt to ASAB tenant mode (#501, v25.26-alpha5)
+
+---
+
+
 ## v25.13
 
 ### Pre-releases

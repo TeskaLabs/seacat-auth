@@ -10,146 +10,72 @@ import asab.utils
 import asab.exceptions
 import bcrypt
 import argon2
+import hashlib
 
 
 L = logging.getLogger(__name__)
 
 
-class SearchParams:
-	"""
-	Parse and validate standard search parameters from request query
-	"""
-	def __init__(
-		self, query: typing.Mapping, *,
-		sort_params: typing.Optional[typing.List[str]] = None,
-		filter_params: typing.Optional[typing.List[str]] = None,
-		page_default: typing.Optional[int] = 0,
-		items_per_page_default: typing.Optional[int] = 10,
-		simple_filter_default: typing.Optional[str] = None,
-		sort_by_default: typing.Optional[str] = None,
-	):
-		# Set defaults
-		self.Query: typing.Mapping = query
-		self.FilterParams: typing.List[str] = filter_params or []
-		self.SortParams: typing.List[str] = sort_params or []
-		self.Page: int | None = page_default
-		self.ItemsPerPage: int | None = items_per_page_default
-		self.SimpleFilter: str | None = simple_filter_default
-		self.AdvancedFilter: dict = {}
-		self.SortBy: typing.List[typing.Tuple[str, int]] = []
-
-		# Load actual parameter values from the query dict
-		for k, v in self.Query.items():
-			if k == "p":
-				try:
-					v = int(v)
-					assert v >= 1
-				except (ValueError, AssertionError) as e:
-					raise asab.exceptions.ValidationError(
-						"The value of `p` (page) query parameter must be a positive integer, not {!r}".format(v)
-					) from e
-				self.Page = v - 1  # Page number is 1-indexed
-
-			elif k in {"i", "l"}:
-				try:
-					v = int(v)
-					assert v >= 1
-				except (ValueError, AssertionError) as e:
-					raise asab.exceptions.ValidationError(
-						"The value of `i` or `l` (items per page) query parameter must be a positive integer, "
-						"not {!r}".format(v)
-					) from e
-				self.ItemsPerPage = v
-
-			elif k == "f":
-				self.SimpleFilter = v
-
-			elif k.startswith("a") and k[1:] in self.FilterParams:
-				self.AdvancedFilter[k[1:]] = v
-
-			elif k.startswith("s") and k[1:] in self.SortParams:
-				if not v in {"a", "d"}:
-					raise asab.exceptions.ValidationError(
-						"The value of `s{}` (sort order) query parameter must be either 'a' or 'd', "
-						"not {!r}".format(k[1:], v)
-					)
-				self.SortBy.append((k[1:], 1 if v == "a" else -1))
-
-			else:
-				# Ignore any other parameter
-				L.warning("Unknown query parameter: {!r}={!r}".format(k, v))
-
-		if not self.SortBy:
-			self.SortBy = sort_by_default or []
-
-	def asdict(self):
-		d = {}
-		if self.Page is not None:
-			d["page"] = self.Page
-		if self.ItemsPerPage is not None:
-			d["items_per_page"] = self.ItemsPerPage
-		if self.SimpleFilter is not None:
-			d["simple_filter"] = self.SimpleFilter
-		if self.AdvancedFilter:
-			d["advanced_filter"] = self.AdvancedFilter
-		if self.SortBy:
-			d["sort_by"] = self.SortBy
-		return d
-
-	def __repr__(self):
-		return "SearchParams({})".format(", ".join(
-			"{}={}".format(k, repr(v))
-			for k, v in self.asdict().items()
-		))
-
-	def get(self, key: str, default=None):
-		return self.Query.get(key, default)
-
-	def getint(self, key: str, default=None):
-		if key not in self.Query:
-			return default
-		return int(self.Query[key])
-
-	def getfloat(self, key: str, default=None):
-		if key not in self.Query:
-			return default
-		return float(self.Query[key])
-
-	def getboolean(self, key: str, default=None):
-		if key not in self.Query:
-			return default
-		return asab.utils.string_to_boolean(self.Query[key])
-
-	def getseconds(self, key: str, default=None):
-		if key not in self.Query:
-			return default
-		return asab.utils.convert_to_seconds(self.Query[key])
-
-
 def get_bearer_token_value(request):
-	bearer_prefix = "Bearer "
+	token = get_token_from_authorization_header(request)
+	if token is None:
+		L.debug("Request has no Authorization header")
+		return None
+
+	token_type, token_value = token
+	if token_type != "Bearer":
+		L.debug("No Bearer token in Authorization header")
+		return
+
+	return token_value
+
+
+def get_token_from_authorization_header(request) -> typing.Optional[typing.Tuple[str, str]]:
+	"""
+	Parse the 'Authorization' header and return (type, value) tuple.
+
+	Args:
+		request: aiohttp.web.Request object
+
+	Returns:
+		Token (type, value) tuple, or None if the header is missing or malformed.
+	"""
 	auth_header = request.headers.get(aiohttp.hdrs.AUTHORIZATION, None)
 	if auth_header is None:
-		L.info("Request has no Authorization header")
+		L.debug("Request has no Authorization header.")
 		return None
-	if auth_header.startswith(bearer_prefix):
-		return auth_header[len(bearer_prefix):]
 
-	L.info("No Bearer token in Authorization header")
-	return None
+	parts = auth_header.split(" ", 1)
+	if len(parts) != 2:
+		L.warning("Malformed Authorization header.", struct_data={
+			"header_fingerprint": fingerprint(auth_header),
+		})
+		return None
+
+	return parts[0], parts[1]
 
 
-def get_access_token_value_from_websocket(request):
+def get_access_token_value_from_websocket(request) -> typing.Optional[typing.Tuple[str, str]]:
+	"""
+	Extract access token from 'Sec-WebSocket-Protocol' header.
+
+	Args:
+		request: aiohttp.web.Request object
+
+	Returns:
+		Token (type, value) tuple, or None if no token is found in the header.
+	"""
 	token_prefix = "access_token_"
-	ws_protocol_header: str = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
+	ws_protocol_header = request.headers.get(aiohttp.hdrs.SEC_WEBSOCKET_PROTOCOL)
 	if ws_protocol_header is None:
-		L.info("Request has no 'Sec-WebSocket-Protocol' header")
+		L.debug("Request has no 'Sec-WebSocket-Protocol' header")
 		return None
+
 	for value in ws_protocol_header.split(", "):
 		if value.startswith(token_prefix):
-			return value[len(token_prefix):]
+			return "Bearer", value[len(token_prefix):]
 
-	L.info("No access token in Sec-WebSocket-Protocol header")
+	L.debug("No access token in Sec-WebSocket-Protocol header")
 	return None
 
 
@@ -360,6 +286,43 @@ def datetime_from_relative_or_absolute_timestring(value: str) -> datetime.dateti
 			return datetime.datetime.fromisoformat(value).astimezone(datetime.UTC)
 		except ValueError:
 			raise ValueError("Invalid expiration value: {!r}".format(value))
+
+
+def update_mongodb_filter(query_filter: dict, path: str | list, value: typing.Any) -> None:
+	"""
+	Update a MongoDB filter dictionary with a new value at the specified path.
+	For "$in" and "$nin", merge values (OR semantics).
+	For other fields, set the value if absent; raise if value is already set.
+
+	Args:
+		query_filter (dict): MongoDB-style filter to mutate.
+		path (str | list[str]): Dot path or list of keys.
+		value (Any): Value to set/merge.
+	"""
+	if isinstance(path, str):
+		path = path.split(".")
+
+	if isinstance(value, set):
+		value = list(value)
+
+	current = query_filter
+	for part in path[:-1]:
+		if part not in current:
+			current[part] = {}
+		current = current[part]
+
+	if path[-1] not in current:
+		current[path[-1]] = value
+	elif path[-1] in {"$in", "$nin"}:
+		# Combine array values for $in or $nin operators
+		current[path[-1]] = list(set(current[path[-1]]) | set(value))
+	else:
+		# Combining other fields is not supported
+		raise NotImplementedError("Cannot update existing field {!r} with a non-array value {!r}".format(path, value))
+
+
+def fingerprint(value: str):
+	return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()
 
 
 def generate_ergonomic_token(length: int):

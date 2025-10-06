@@ -25,6 +25,10 @@ class ResourceId(enum.StrEnum):
 
 	CLIENT_ACCESS = "seacat:client:access"
 	CLIENT_EDIT = "seacat:client:edit"
+	CLIENT_APIKEY_MANAGE = "seacat:client:apikey:manage"
+
+	APIKEY_ACCESS = "seacat:apikey:access"
+	APIKEY_MANAGE = "seacat:apikey:manage"
 
 	SESSION_ACCESS = "seacat:session:access"
 	SESSION_TERMINATE = "seacat:session:terminate"
@@ -65,9 +69,22 @@ class OAuth2:
 
 
 	class CodeChallengeMethod(enum.StrEnum):
+		# The methods must be ordered from the weakest to the strongest
 		NONE = "none"
 		PLAIN = "plain"
 		S256 = "S256"
+
+		@classmethod
+		def is_stronger_or_equal(cls, a, b):
+			"""
+			Returns True if 'a' is stronger or equal to 'b'.
+			"""
+			for method in cls:
+				# Whatever method encountered first is the weaker one
+				if method == b:
+					return True
+				if method == a:
+					return False
 
 
 	class IdTokenSigningAlg(enum.StrEnum):
