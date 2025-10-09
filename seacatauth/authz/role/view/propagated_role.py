@@ -24,6 +24,15 @@ class PropagatedRoleView(RoleView):
 		return {"tenant": {"$exists": False}, "propagated": True}
 
 
+	def _add_public_id(
+		self,
+		add_fields: dict,
+	):
+		add_fields["public_id"] = {
+			"$concat": [self.TenantId, "/~", {"$substr": ["$_id", 2, -1]}]
+		}
+
+
 	def _apply_tenant_match(
 		self,
 		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
