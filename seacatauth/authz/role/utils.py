@@ -64,7 +64,10 @@ def role_aggregation_pipeline(
 	"""
 	pipeline = [
 		{"$match": base_query},
-		{"$addFields": {"_public_id": public_id_expr}},
+		{"$set": {
+			"_public_id": public_id_expr, 
+			"description": {"$ifNull": ["$description", " "]}
+		}}
 	]
 	if add_fields:
 		pipeline.append({"$addFields": add_fields})

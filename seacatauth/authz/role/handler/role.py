@@ -234,25 +234,36 @@ class RoleHandler(object):
 	async def _list_roles(self, request, tenant_id):
 		assign_cid_assigned_filter = None
 		assign_cid_assignable_filter = None
+		assign_cid_assigned_sort = None
+		assign_cid_assignable_sort = None
 		assign_cid = request.query.get("assign_cid")
+		sort = []
 		if assign_cid is not None:
 			if "aassign_cid.assigned" in request.query:
 				assign_cid_assigned_filter = asab.utils.string_to_boolean(request.query["aassign_cid.assigned"])
 			if "aassign_cid.assignable" in request.query:
 				assign_cid_assignable_filter = asab.utils.string_to_boolean(request.query["aassign_cid.assignable"])
+			if "sassign_cid.assigned" in request.query:
+				assign_cid_assigned_sort = request.query["sassign_cid.assigned"]
+			if "sassign_cid.assignable" in request.query:
+				assign_cid_assignable_sort = request.query["sassign_cid.assignable"]
+
+		for param in ("s_id", "sdescription"):
+			if param in request.query:
+				sort.append((param[1:], request.query[param]))
 
 		result = await self.RoleService.list_roles(
 			tenant_id=tenant_id,
 			page=int(request.query.get("p", 1)) - 1,
 			limit=int(request.query["i"]) if "i" in request.query else None,
-			sort=None,
+			sort=sort,
 			name_filter=request.query.get("f", None),
 			resource_filter=request.query.get("aresource", None),
 			assign_cid=assign_cid,
 			assign_cid_assigned_filter=assign_cid_assigned_filter,
 			assign_cid_assignable_filter=assign_cid_assignable_filter,
-			assign_cid_assigned_sort=None,
-			assign_cid_assignable_sort=None,
+			assign_cid_assigned_sort=assign_cid_assigned_sort,
+			assign_cid_assignable_sort=assign_cid_assignable_sort,
 			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false")),
 		)
 		return asab.web.rest.json_response(request, result)

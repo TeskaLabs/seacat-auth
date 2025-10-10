@@ -56,6 +56,40 @@ class BoolFieldOp(enum.StrEnum):
 	SORT_DESC = "sort_desc"
 
 
+def _sorting_key(
+	role: dict,
+	sort: list[tuple[str, str]],
+	resource_match: tuple[typing.Any, BoolFieldOp],
+	tenant_match: tuple[typing.Any, BoolFieldOp],
+	id_match: tuple[typing.Any, BoolFieldOp],
+):
+	keys = []
+	if resource_match:
+		if resource_match[1] == BoolFieldOp.SORT_ASC:
+			keys.append(role["resource_match"])
+		elif resource_match[1] == BoolFieldOp.SORT_DESC:
+			keys.append(not role["resource_match"])
+	if tenant_match:
+		if tenant_match[1] == BoolFieldOp.SORT_ASC:
+			keys.append(role["tenant_match"])
+		elif tenant_match[1] == BoolFieldOp.SORT_DESC:
+			keys.append(not role["tenant_match"])
+	if id_match:
+		if id_match[1] == BoolFieldOp.SORT_ASC:
+			keys.append(role["id_match"])
+		elif id_match[1] == BoolFieldOp.SORT_DESC:
+			keys.append(not role["id_match"])
+	if sort:
+		for field, direction in sort:
+			assert field in {"_id", "label", "description"}
+			if direction == "a":
+				keys.append(role.get(field, ""))
+			elif direction == "d":
+				keys.append([-ord(c) for c in role.get(field, "")])
+
+	return keys
+
+
 class RoleService(asab.Service):
 	"""
 	Role object schema:
@@ -207,7 +241,7 @@ class RoleService(asab.Service):
 		tenant_id: str | None = None,
 		page: int = 0,
 		limit: int | None = None,
-		sort: tuple[str, str] | None = None,
+		sort: list[tuple[str, str]] | None = None,
 		name_filter: str = None,
 		resource_filter: str | None = None,
 		exclude_global: bool = False,
@@ -224,6 +258,7 @@ class RoleService(asab.Service):
 		else:
 			authz.require_tenant_access()
 
+		resource_match = (resource_filter, BoolFieldOp.FILTER_TRUE) if resource_filter else None
 		tenant_match = None
 		id_match = None
 		if assign_cid is not None:
@@ -291,13 +326,12 @@ class RoleService(asab.Service):
 				limit=(limit - len(roles)) if limit else None,
 				sort=sort,
 				name_filter=name_filter,
-				resource_match=(resource_filter, BoolFieldOp.FILTER_TRUE) if resource_filter
-					else None,
+				resource_match=resource_match,
 				tenant_match=tenant_match,
 				id_match=id_match,
 			) for view in views
 			if view is not None),
-			key=lambda r: r["_id"]
+			key=lambda r: _sorting_key(r, sort, resource_match, tenant_match, id_match)
 		):
 			if assign_cid:
 				role["assign_cid"] = {

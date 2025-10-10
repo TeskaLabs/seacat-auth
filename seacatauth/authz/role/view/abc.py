@@ -70,7 +70,7 @@ class RoleView(abc.ABC):
 		self,
 		offset: int = 0,
 		limit: int | None = None,
-		sort: typing.Tuple[str, int] | None = None,
+		sort: list[tuple[str, str]] | None = None,
 		name_filter: str | None = None,
 		resource_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
 		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
@@ -94,7 +94,13 @@ class RoleView(abc.ABC):
 		filter = {}
 		_sort = {}
 		if sort:
-			_sort[sort[0]] = sort[1]
+			for field, direction in sort:
+				if direction == "a":
+					_sort[field] = 1
+				elif direction == "d":
+					_sort[field] = -1
+				else:
+					raise ValueError("Invalid sort direction: {}".format(direction))
 
 		if name_filter:
 			filter["_public_id"] = {"$regex": re.escape(name_filter)}
@@ -111,7 +117,6 @@ class RoleView(abc.ABC):
 
 		if id_match:
 			self._apply_id_match(id_match, add_fields, filter, _sort)
-
 
 		pipeline = role_aggregation_pipeline(
 			base_query=base_query,
