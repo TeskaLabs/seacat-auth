@@ -27,6 +27,21 @@ class RolesHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 
 		web_app = app.WebContainer.WebApp
+
+		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/*", self.get_credentials_roles)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*", self.set_credentials_roles)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.assign_credentials_role)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.unassign_credentials_role)
+		web_app.router.add_put("/admin/roles/*", self.batch_get_credentials_global_roles)
+
+		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/{tenant}", self.get_credentials_roles)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/{tenant}", self.set_credentials_roles)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/{tenant}/{role_name}", self.assign_credentials_role)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/roles/{tenant}/{role_name}", self.unassign_credentials_role)
+		web_app.router.add_put("/admin/roles/{tenant}", self.batch_get_credentials_roles)
+
+		# DEPRECATED, BACKWARD COMPATIBILITY
+		# >>>
 		web_app.router.add_get("/roles/*/{credentials_id}", self.get_credentials_global_roles)
 		web_app.router.add_put("/roles/*/{credentials_id}", self.set_credentials_global_roles)
 		web_app.router.add_put("/roles/*", self.batch_get_credentials_global_roles)
@@ -38,6 +53,7 @@ class RolesHandler(object):
 		web_app.router.add_put("/roles/{tenant}", self.batch_get_credentials_roles)
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_credentials_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_credentials_role)
+		# <<<
 
 
 	async def get_credentials_roles(self, request):
