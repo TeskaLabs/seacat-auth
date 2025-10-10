@@ -43,6 +43,7 @@ def apply_bool_field_op(
 
 def role_aggregation_pipeline(
 	base_query: dict,
+	public_id_expr,
 	add_fields: dict,
 	filter: dict = None,
 	sort: dict = None,
@@ -54,6 +55,7 @@ def role_aggregation_pipeline(
 
 	Args:
 		base_query: The base query to match roles
+		public_id_expr: The expression to compute the public ID of the role
 		add_fields: The fields to add to the documents
 		filter: The filter to apply after adding fields
 		sort: The sort to apply to the documents
@@ -62,6 +64,7 @@ def role_aggregation_pipeline(
 	"""
 	pipeline = [
 		{"$match": base_query},
+		{"$addFields": {"_public_id": public_id_expr}},
 	]
 	if add_fields:
 		pipeline.append({"$addFields": add_fields})

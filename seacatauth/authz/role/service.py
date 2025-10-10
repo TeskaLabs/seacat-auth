@@ -7,13 +7,16 @@ import asab.web.auth
 import asab.web.tenant
 import asab.storage.exceptions
 import asab.exceptions
+import enum
 
 from ... import exceptions
 from ...api import local_authz
 from ...models.const import ResourceId
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
+from .view.abc import RoleView
 from .view.propagated_role import global_role_id_to_propagated
+from .utils import amerge_sorted
 
 
 L = logging.getLogger(__name__)
@@ -43,6 +46,14 @@ TENANT_ADMIN_ROLE_PROPERTIES = {
 	],
 	"propagated": True,
 }
+
+
+class BoolFieldOp(enum.StrEnum):
+	NONE = "none"
+	FILTER_TRUE = "filter_true"
+	FILTER_FALSE = "filter_false"
+	SORT_ASC = "sort_asc"
+	SORT_DESC = "sort_desc"
 
 
 class RoleService(asab.Service):
@@ -143,7 +154,12 @@ class RoleService(asab.Service):
 				L.warning("Tenant admin role is not ready.", struct_data={"role": self.TenantAdminRole})
 
 
-	def _prepare_views(self, tenant_id: str | None, exclude_global: bool = False, exclude_propagated: bool = False):
+	def _prepare_views(
+		self,
+		tenant_id: str | None,
+		exclude_global: bool = False,
+		exclude_propagated: bool = False
+	) -> typing.List[RoleView]:
 		assert tenant_id != "*"
 		views = []
 		if tenant_id:
@@ -163,16 +179,44 @@ class RoleService(asab.Service):
 			return tenant_id
 
 
+	async def _get_tenants_where_roles_assignable(self, target_cid: str | None = None) -> typing.Set[str]:
+		"""
+		Returns a set of tenants where the agent can assign roles to the target credentials.
+		"""
+		target_tenants = set(await self.TenantService.get_tenants(target_cid))
+
+		authz = asab.contextvars.Authz.get()
+		if authz.has_superuser_access():
+			# Superusers can assign roles in any tenant plus global roles
+			return {None, *target_tenants}
+
+		tenant = asab.contextvars.Tenant.get()
+		if tenant not in target_tenants:
+			# Target does not have access to the current tenant, so no editable tenants
+			return set()
+
+		# Current tenant is editable if the user has ROLE_ASSIGN in it
+		if authz.has_resource_access(ResourceId.ROLE_ASSIGN):
+			return {tenant}
+		else:
+			return set()
+
+
 	async def list_roles(
 		self,
-		tenant_id: typing.Optional[str] = None,
+		tenant_id: str | None = None,
 		page: int = 0,
-		limit: int = None,
+		limit: int | None = None,
+		sort: tuple[str, str] | None = None,
 		name_filter: str = None,
-		resource_filter: str = None,
+		resource_filter: str | None = None,
 		exclude_global: bool = False,
 		exclude_propagated: bool = False,
-		assign_cid: typing.Optional[str] = None,
+		assign_cid: str | None = None,
+		assign_cid_assigned_filter: bool | None = None,
+		assign_cid_assignable_filter: bool | None = None,
+		assign_cid_assigned_sort: str | None = None,
+		assign_cid_assignable_sort: str | None = None,
 	):
 		authz = asab.contextvars.Authz.get()
 		if tenant_id in {"*", None}:
@@ -180,42 +224,89 @@ class RoleService(asab.Service):
 		else:
 			authz.require_tenant_access()
 
+		tenant_match = None
+		id_match = None
 		if assign_cid is not None:
 			cred_roles = set(await self.get_roles_by_credentials(
 				assign_cid, [tenant_id] if tenant_id is not None else None))
-		else:
-			cred_roles = None
+			if assign_cid_assigned_filter is not None:
+				id_match = (
+					cred_roles,
+					BoolFieldOp.FILTER_TRUE if assign_cid_assigned_filter
+					else BoolFieldOp.FILTER_FALSE
+				)
+			elif assign_cid_assigned_sort is not None:
+				id_match = (
+					cred_roles,
+					BoolFieldOp.SORT_ASC if assign_cid_assigned_sort == "a"
+					else BoolFieldOp.SORT_DESC
+				)
+			else:
+				id_match = (cred_roles, BoolFieldOp.NONE)
+
+			editable_tenants = await self._get_tenants_where_roles_assignable(target_cid=assign_cid)
+			if assign_cid_assignable_filter is not None:
+				tenant_match = (
+					editable_tenants,
+					BoolFieldOp.FILTER_TRUE if assign_cid_assignable_filter
+					else BoolFieldOp.FILTER_FALSE
+				)
+			elif assign_cid_assignable_sort is not None:
+				tenant_match = (
+					editable_tenants,
+					BoolFieldOp.SORT_ASC if assign_cid_assignable_sort == "a"
+					else BoolFieldOp.SORT_DESC
+				)
+			else:
+				tenant_match = (editable_tenants, BoolFieldOp.NONE)
 
 		views = self._prepare_views(tenant_id, exclude_global, exclude_propagated)
 		counts = [
-			await view.count(name_filter, resource_filter)
+			await view.count(
+				name_filter,
+				resource_match=(resource_filter, BoolFieldOp.FILTER_TRUE) if resource_filter
+					else None,
+				tenant_match=tenant_match,
+				id_match=id_match,
+			)
 			for view in views
 		]
-		roles = []
+
 		offset = (page or 0) * (limit or 0)
-		for count, view in zip(counts, views):
-			if offset > count:
-				offset -= count
+		for i, count in enumerate(counts):
+			if count == 0:
+				# Remove empty views to optimize iteration
+				views[i] = None
 				continue
 
-			async for role in view.iterate(
+			if offset >= count:
+				offset -= count
+				views.pop(i)
+				continue
+
+		roles = []
+		async for role in amerge_sorted(
+			*(view.iterate(
 				offset=offset,
 				limit=(limit - len(roles)) if limit else None,
-				sort=("_id", 1),
+				sort=sort,
 				name_filter=name_filter,
-				resource_filter=resource_filter,
-			):
-				if cred_roles is not None:
-					role["assign_cid"] = {
-						"assigned": role["_id"] in cred_roles,
-						"editable": await self.can_assign_role(role["_id"], target_cid=assign_cid),
-					}
-				roles.append(role)
-
+				resource_match=(resource_filter, BoolFieldOp.FILTER_TRUE) if resource_filter
+					else None,
+				tenant_match=tenant_match,
+				id_match=id_match,
+			) for view in views
+			if view is not None),
+			key=lambda r: r["_id"]
+		):
+			if assign_cid:
+				role["assign_cid"] = {
+					"assigned": role["id_match"],
+					"assignable": role["tenant_match"],
+				}
+			roles.append(role)
 			if limit and len(roles) >= limit:
 				break
-
-			offset = 0
 
 		result = {
 			"count": sum(counts),

@@ -54,6 +54,7 @@ class RoleView(abc.ABC):
 
 		count_pipeline = role_aggregation_pipeline(
 			base_query=base_query,
+			public_id_expr=self._public_id_expr(),
 			add_fields=add_fields,
 			filter=filter,
 		)
@@ -95,8 +96,6 @@ class RoleView(abc.ABC):
 		if sort:
 			_sort[sort[0]] = sort[1]
 
-		self._add_public_id(add_fields)
-
 		if name_filter:
 			filter["_public_id"] = {"$regex": re.escape(name_filter)}
 
@@ -116,6 +115,7 @@ class RoleView(abc.ABC):
 
 		pipeline = role_aggregation_pipeline(
 			base_query=base_query,
+			public_id_expr=self._public_id_expr(),
 			add_fields=add_fields,
 			filter=filter,
 			sort=_sort,
@@ -132,11 +132,8 @@ class RoleView(abc.ABC):
 		raise NotImplementedError()
 
 
-	def _add_public_id(
-		self,
-		add_fields: dict,
-	):
-		add_fields["_public_id"] = "$id"
+	def _public_id_expr(self):
+		return "$_id"
 
 
 	def _apply_tenant_match(
@@ -157,7 +154,7 @@ class RoleView(abc.ABC):
 		sort: dict,
 	):
 		add_fields["id_match"] = {
-			"$in": ["_public_id", list(id_match[0])]
+			"$in": ["$_public_id", list(id_match[0])]
 		}
 		apply_bool_field_op("id_match", id_match[1], filter, sort)
 

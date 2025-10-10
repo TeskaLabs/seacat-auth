@@ -24,14 +24,10 @@ class PropagatedRoleView(RoleView):
 		return {"tenant": {"$exists": False}, "propagated": True}
 
 
-	def _add_public_id(
-		self,
-		add_fields: dict,
-	):
-		add_fields["public_id"] = {
+	def _public_id_expr(self):
+		return {
 			"$concat": [self.TenantId, "/~", {"$substr": ["$_id", 2, -1]}]
 		}
-
 
 	def _apply_tenant_match(
 		self,
@@ -48,7 +44,7 @@ class PropagatedRoleView(RoleView):
 				raise StopIteration()
 			case _:
 				# All results possible, sorting has no effect
-				pass
+				return
 
 
 	def _role_tenant_matches(self, role_id: str):
