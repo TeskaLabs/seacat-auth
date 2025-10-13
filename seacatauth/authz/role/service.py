@@ -233,7 +233,7 @@ class RoleService(asab.Service):
 		page: int = 0,
 		limit: int | None = None,
 		sort: list[tuple[str, str]] | None = None,
-		name_filter: str = None,
+		name_filter: str | None = None,
 		resource_filter: str | None = None,
 		exclude_global: bool = False,
 		exclude_propagated: bool = False,

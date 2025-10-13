@@ -18,7 +18,7 @@ class RoleView(abc.ABC):
 	async def count(
 		self,
 		name_filter: str | None = None,
-		resource_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
+		resource_match: typing.Tuple[str, BoolFieldOp] | None = None,
 		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
 		id_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
 		**kwargs
@@ -28,7 +28,7 @@ class RoleView(abc.ABC):
 
 		Args:
 			name_filter: If given, only roles whose ID matches this regex are counted.
-			resource_match: If given, only roles matching (or not matching) the given resources are counted.
+			resource_match: If given, only roles with (or without) the given resource are counted.
 			tenant_match: If given, only roles matching (or not matching) the given tenants are counted.
 			id_match: If given, only roles matching (or not matching) the given IDs are counted.
 		"""
@@ -72,7 +72,7 @@ class RoleView(abc.ABC):
 		limit: int | None = None,
 		sort: list[tuple[str, str]] | None = None,
 		name_filter: str | None = None,
-		resource_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
+		resource_match: typing.Tuple[str, BoolFieldOp] | None = None,
 		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
 		id_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
 		**kwargs
@@ -85,7 +85,7 @@ class RoleView(abc.ABC):
 			limit: Maximum number of matching roles to return.
 			sort: If given, sort results by the given field and direction.
 			name_filter: If given, only roles whose ID matches this regex are returned.
-			resource_match: If given, only roles matching (or not matching) the given resources are returned.
+			resource_match: If given, only roles with (or without) the given resource are returned.
 			tenant_match: If given, only roles matching (or not matching) the given tenants are returned.
 			id_match: If given, only roles matching (or not matching) the given IDs are returned.
 		"""
@@ -172,10 +172,7 @@ class RoleView(abc.ABC):
 		sort: dict,
 	):
 		add_fields["resource_match"] = {
-			"$gt": [
-				{"$size": {"$setIntersection": ["$resources", list(resource_match[0])]}},
-				0
-			]
+			"$in": [resource_match[0], "$resources"]
 		}
 		apply_bool_field_op("resource_match", resource_match[1], filter, sort)
 
