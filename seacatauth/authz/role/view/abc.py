@@ -11,6 +11,7 @@ class RoleView(abc.ABC):
 		self.CollectionName = collection_name
 
 
+	@abc.abstractmethod
 	async def get(self, role_id: str) -> dict:
 		raise NotImplementedError()
 
@@ -133,6 +134,7 @@ class RoleView(abc.ABC):
 			yield self._normalize_role(role)
 
 
+	@abc.abstractmethod
 	def _base_query(self) -> dict:
 		raise NotImplementedError()
 
@@ -141,6 +143,7 @@ class RoleView(abc.ABC):
 		return "$_id"
 
 
+	@abc.abstractmethod
 	def _apply_tenant_match(
 		self,
 		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
@@ -177,6 +180,7 @@ class RoleView(abc.ABC):
 		apply_bool_field_op("resource_match", resource_match[1], filter, sort)
 
 
+	@abc.abstractmethod
 	def _role_tenant_matches(self, role_id: str):
 		raise NotImplementedError()
 
