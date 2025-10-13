@@ -26,7 +26,15 @@ class PropagatedRoleView(RoleView):
 
 	def _public_id_expr(self):
 		return {
-			"$concat": [self.TenantId, "/~", {"$substr": ["$_id", 2, -1]}]
+			"$concat": [
+				self.TenantId,
+				"/~",
+				{"$substrBytes": [
+					"$_id",
+					2,
+					{"$subtract": [{"$strLenBytes": "$_id"}, 2]},
+				]}
+			]
 		}
 
 	def _apply_tenant_match(
