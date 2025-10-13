@@ -57,7 +57,7 @@ class RoleHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: resource
+		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource.
 			schema:
@@ -72,6 +72,40 @@ class RoleHandler(object):
 			description: Include info about what roles are assigned and can be assigned to this credentials ID.
 			schema:
 				type: string
+		-	name: aassign_cid.assignable
+			in: query
+			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+			schema:
+				type: boolean
+		-	name: aassign_cid.assigned
+			in: query
+			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			schema:
+				type: boolean
+		-	name: s_id
+			in: query
+			description: Sort by the role ID.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sdescription
+			in: query
+			description: Sort by the role description.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassign_cid.assignable
+			in: query
+			description: Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassign_cid.assigned
+			in: query
+			description: Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		return await self._list_roles(request, tenant_id=tenant_id)
@@ -94,7 +128,7 @@ class RoleHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: resource
+		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource
 			schema:
@@ -111,6 +145,40 @@ class RoleHandler(object):
 			description: Include info about what roles are assigned and can be assigned to this credentials ID.
 			schema:
 				type: string
+		-	name: aassign_cid.assignable
+			in: query
+			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+			schema:
+				type: boolean
+		-	name: aassign_cid.assigned
+			in: query
+			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			schema:
+				type: boolean
+		-	name: s_id
+			in: query
+			description: Sort by the role ID.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sdescription
+			in: query
+			description: Sort by the role description.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassign_cid.assignable
+			in: query
+			description: Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassign_cid.assigned
+			in: query
+			description: Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		"""
 		return await self._list_roles(request, tenant_id=None)
 
