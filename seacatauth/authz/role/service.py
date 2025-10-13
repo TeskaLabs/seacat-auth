@@ -343,30 +343,6 @@ class RoleService(asab.Service):
 		return result
 
 
-	async def can_assign_role(self, role_id: str, target_cid: str) -> bool:
-		authz = asab.contextvars.Authz.get()
-		tenant_id, _ = self.parse_role_id(role_id)
-
-		if tenant_id is not None and not (await self.TenantService.has_tenant_assigned(target_cid, tenant_id)):
-			return False
-
-		# Superusers can assign any role, including global roles
-		if authz.has_superuser_access():
-			return True
-
-		if tenant_id is None:
-			# Global roles can be assigned by superusers only
-			return False
-
-		# Tenant roles can be assigned only if their tenant is in the current authorization context
-		if not tenant_id == asab.contextvars.Tenant.get():
-			return False
-		if not authz.has_tenant_access():
-			return False
-		return True
-
-
-
 	async def _get(self, role_id: str):
 		tenant_id, role_name = self.parse_role_id(role_id)
 		try:
