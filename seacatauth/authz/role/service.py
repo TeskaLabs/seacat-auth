@@ -7,7 +7,6 @@ import asab.web.auth
 import asab.web.tenant
 import asab.storage.exceptions
 import asab.exceptions
-import enum
 
 from ... import exceptions
 from ...api import local_authz
@@ -16,7 +15,7 @@ from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 from .view.abc import RoleView
 from .view.propagated_role import global_role_id_to_propagated
-from .utils import amerge_sorted
+from .utils import amerge_sorted, BoolFieldOp
 
 
 L = logging.getLogger(__name__)
@@ -46,14 +45,6 @@ TENANT_ADMIN_ROLE_PROPERTIES = {
 	],
 	"propagated": True,
 }
-
-
-class BoolFieldOp(enum.StrEnum):
-	NONE = "none"
-	FILTER_TRUE = "filter_true"
-	FILTER_FALSE = "filter_false"
-	SORT_ASC = "sort_asc"
-	SORT_DESC = "sort_desc"
 
 
 def _sorting_key(
