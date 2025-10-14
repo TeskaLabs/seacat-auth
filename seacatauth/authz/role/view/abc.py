@@ -2,8 +2,6 @@ import typing
 import abc
 import re
 
-from ..utils import BoolFieldOp, apply_bool_field_op, role_aggregation_pipeline
-
 
 class RoleView(abc.ABC):
 	def __init__(self, storage_service, collection_name):
@@ -18,53 +16,43 @@ class RoleView(abc.ABC):
 
 	async def count(
 		self,
-		name_filter: str | None = None,
-		resource_match: typing.Tuple[str, BoolFieldOp] | None = None,
-		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
-		id_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
+		id_substring: str | None = None,
+		description_substring: str | None = None,
+		resource_filter: str | None = None,
+		flag_tenants: typing.Iterable[str] | None = None,
+		tenant_flag_filter: bool | None = None,
+		flag_ids: typing.Iterable[str] | None = None,
+		id_flag_filter: bool | None = None,
 		**kwargs
 	) -> int:
 		"""
 		Count roles matching the given criteria.
 
 		Args:
-			name_filter: If given, only roles whose ID matches this regex are counted.
-			resource_match: If given, only roles with (or without) the given resource are counted.
-			tenant_match: If given, only roles matching (or not matching) the given tenants are counted.
-			id_match: If given, only roles matching (or not matching) the given IDs are counted.
+			id_substring: If given, count only roles whose ID contains this substring.
+			description_substring: If given, count only roles whose description contains this substring.
+			resource_filter: If given, count only roles with the given resource.
+			flag_tenants: If given, add a boolean field "_tenant_flag" indicating whether the role matches any of the given tenants.
+			tenant_flag_filter: If given, filter results by the value of the "_tenant_flag" field.
+			flag_ids: If given, add a boolean field "_id_flag" indicating whether the role ID is in the given list.
+			id_flag_filter: If given, filter results by the value of the "_id_flag" field.
 		"""
-		base_query = self._base_query()
-		if name_filter:
-			base_query["_id"] = {"$regex": re.escape(name_filter)}
-		add_fields = {}
-		filter = {}
-		sort = {}
-
-		if tenant_match:
-			try:
-				self._apply_tenant_match(tenant_match, add_fields, filter, sort)
-			except StopIteration:
-				# No results pass through the filter
-				return 0
-
-		if resource_match:
-			self._apply_resource_match(resource_match, add_fields, filter, sort)
-
-		if id_match:
-			self._apply_id_match(id_match, add_fields, filter, sort)
-
-		count_pipeline = role_aggregation_pipeline(
-			base_query=base_query,
-			public_id_expr=self._public_id_expr(),
-			add_fields=add_fields,
-			filter=filter,
+		pipeline = self._aggregation_pipeline(
+			id_substring=id_substring,
+			description_substring=description_substring,
+			resource_filter=resource_filter,
+			flag_tenants=flag_tenants,
+			tenant_flag_filter=tenant_flag_filter,
+			flag_ids=flag_ids,
+			id_flag_filter=id_flag_filter,
+			**kwargs
 		)
-		count_pipeline.append({"$count": "count"})
-		count = await self.StorageService.Database[self.CollectionName].aggregate(count_pipeline).to_list(length=1)
-		if not count:
+		pipeline.append({"$count": "count"})
+		result = await self.StorageService.Database[self.CollectionName].aggregate(pipeline).to_list(length=1)
+		if not result:
 			return 0
 
-		return count[0]["count"]
+		return result[0]["count"]
 
 
 	async def iterate(
@@ -72,10 +60,14 @@ class RoleView(abc.ABC):
 		offset: int = 0,
 		limit: int | None = None,
 		sort: list[tuple[str, str]] | None = None,
-		name_filter: str | None = None,
-		resource_match: typing.Tuple[str, BoolFieldOp] | None = None,
-		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
-		id_match: typing.Tuple[typing.Iterable[str], BoolFieldOp] | None = None,
+		id_substring: str | None = None,
+		description_substring: str | None = None,
+		resource_filter: str | None = None,
+		flag_tenants: typing.Iterable[str] | None = None,
+		tenant_flag_filter: bool | None = None,
+		flag_ids: typing.Iterable[str] | None = None,
+		id_flag_filter: bool | None = None,
+		project: dict | None = None,
 		**kwargs
 	) -> typing.AsyncGenerator:
 		"""
@@ -85,53 +77,109 @@ class RoleView(abc.ABC):
 			offset: Number of matching roles to skip.
 			limit: Maximum number of matching roles to return.
 			sort: If given, sort results by the given field and direction.
-			name_filter: If given, only roles whose ID matches this regex are returned.
-			resource_match: If given, only roles with (or without) the given resource are returned.
-			tenant_match: If given, only roles matching (or not matching) the given tenants are returned.
-			id_match: If given, only roles matching (or not matching) the given IDs are returned.
+			id_substring: If given, return only roles whose ID contains this substring.
+			description_substring: If given, return only roles whose description contains this substring.
+			resource_filter: If given, return only roles with the given resource.
+			flag_tenants: If given, add a boolean field "_tenant_flag" indicating whether the role matches any of the given tenants.
+			tenant_flag_filter: If given, filter results by the value of the "_tenant_flag" field.
+			flag_ids: If given, add a boolean field "_id_flag" indicating whether the role ID is in the given list.
+			id_flag_filter: If given, filter results by the value of the "_id_flag" field.
+			project: If given, project only the given fields.
+
+		Returns:
+			An async generator yielding matching roles.
 		"""
-		base_query = self._base_query()
-		add_fields = {}
-		filter = {}
-		_sort = {}
-		if sort:
-			for field, direction in sort:
-				if direction == "a":
-					_sort[field] = 1
-				elif direction == "d":
-					_sort[field] = -1
-				else:
-					raise ValueError("Invalid sort direction: {}".format(direction))
-
-		if name_filter:
-			filter["_public_id"] = {"$regex": re.escape(name_filter)}
-
-		if tenant_match:
-			try:
-				self._apply_tenant_match(tenant_match, add_fields, filter, _sort)
-			except StopIteration:
-				# No results pass through the filter
-				return
-
-		if resource_match:
-			self._apply_resource_match(resource_match, add_fields, filter, _sort)
-
-		if id_match:
-			self._apply_id_match(id_match, add_fields, filter, _sort)
-
-		pipeline = role_aggregation_pipeline(
-			base_query=base_query,
-			public_id_expr=self._public_id_expr(),
-			add_fields=add_fields,
-			filter=filter,
-			sort=_sort,
+		pipeline = self._aggregation_pipeline(
 			offset=offset,
 			limit=limit,
+			sort=sort,
+			id_substring=id_substring,
+			description_substring=description_substring,
+			resource_filter=resource_filter,
+			flag_tenants=flag_tenants,
+			tenant_flag_filter=tenant_flag_filter,
+			flag_ids=flag_ids,
+			id_flag_filter=id_flag_filter,
+			project=project,
+			**kwargs
 		)
-
 		cursor = self.StorageService.Database[self.CollectionName].aggregate(pipeline)
 		async for role in cursor:
 			yield self._normalize_role(role)
+
+
+	def _aggregation_pipeline(
+		self,
+		offset: int | None = None,
+		limit: int | None = None,
+		sort: list[tuple[str, str]] | None = None,
+		id_substring: str | None = None,
+		description_substring: str | None = None,
+		resource_filter: str | None = None,
+		flag_tenants: typing.Iterable[str] | None = None,
+		tenant_flag_filter: bool | None = None,
+		flag_ids: typing.Iterable[str] | None = None,
+		id_flag_filter: bool | None = None,
+		project: dict | None = None,
+		**kwargs
+	) -> list[dict]:
+		pipeline = []
+		base_match = self._base_query()
+		if resource_filter:
+			base_match["resources"] = {"$in": resource_filter}
+		if description_substring:
+			base_match["description"] = {"$regex": re.escape(description_substring)}
+		pipeline.append({"$match": base_match})
+
+		add_public_id = {"$set": {
+			"_public_id": self._public_id_expr(),
+			"description": {"$ifNull": ["$description", " "]}
+		}}
+		pipeline.append(add_public_id)
+
+		add_fields = {}
+		second_match = {}
+
+		if id_substring:
+			second_match["_public_id"] = {"$regex": re.escape(id_substring)}
+
+		if flag_tenants:
+			is_tenant_match = self._is_tenant_match(flag_tenants)
+			if tenant_flag_filter is not None:
+				if is_tenant_match != tenant_flag_filter:
+					# No results possible
+					return
+				else:
+					# All results possible, sorting has no effect
+					pass
+			add_fields["_tenant_flag"] = is_tenant_match
+
+		if flag_ids:
+			add_fields["_id_flag"] = {
+				"$in": ["$_public_id", flag_ids]
+			}
+			if id_flag_filter is not None:
+				second_match["_id_flag"] = id_flag_filter
+
+		if add_fields:
+			pipeline.append({"$set": add_fields})
+
+		if second_match:
+			pipeline.append({"$match": second_match})
+
+		if sort:
+			pipeline.append({"$sort": {k: v for k, v in sort}})
+
+		if offset:
+			pipeline.append({"$skip": offset})
+
+		if limit:
+			pipeline.append({"$limit": limit})
+
+		if project:
+			pipeline.append({"$project": project})
+
+		return pipeline
 
 
 	@abc.abstractmethod
@@ -144,40 +192,8 @@ class RoleView(abc.ABC):
 
 
 	@abc.abstractmethod
-	def _apply_tenant_match(
-		self,
-		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
-		add_fields: dict,
-		filter: dict,
-		sort: dict,
-	):
-		raise NotImplementedError()
-
-
-	def _apply_id_match(
-		self,
-		id_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
-		add_fields: dict,
-		filter: dict,
-		sort: dict,
-	):
-		add_fields["id_match"] = {
-			"$in": ["$_public_id", list(id_match[0])]
-		}
-		apply_bool_field_op("id_match", id_match[1], filter, sort)
-
-
-	def _apply_resource_match(
-		self,
-		resource_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
-		add_fields: dict,
-		filter: dict,
-		sort: dict,
-	):
-		add_fields["resource_match"] = {
-			"$in": [resource_match[0], "$resources"]
-		}
-		apply_bool_field_op("resource_match", resource_match[1], filter, sort)
+	def _is_tenant_match(self, tenants: typing.Iterable[str]) -> bool:
+		raise NotImplementedError
 
 
 	@abc.abstractmethod

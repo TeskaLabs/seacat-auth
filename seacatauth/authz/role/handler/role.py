@@ -57,29 +57,24 @@ class RoleHandler(object):
 			description: Items per page
 			schema:
 				type: integer
+		-	name: f
+			in: query
+			description: Name filter (substring match)
+			schema:
+				type: string
 		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource.
 			schema:
 				type: string
+		-	name: adescription
+			in: query
+			description: Description filter (substring match)
+			schema:
+				type: string
 		-	name: exclude_global
 			in: query
 			description: Show only proper tenant roles, without globals.
-			schema:
-				type: boolean
-		-	name: assign_cid
-			in: query
-			description: Include info about what roles are assigned and can be assigned to this credentials ID.
-			schema:
-				type: string
-		-	name: aassign_cid.assignable
-			in: query
-			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
-			schema:
-				type: boolean
-		-	name: aassign_cid.assigned
-			in: query
-			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
 			schema:
 				type: boolean
 		-	name: s_id
@@ -91,18 +86,6 @@ class RoleHandler(object):
 		-	name: sdescription
 			in: query
 			description: Sort by the role description.
-			schema:
-				type: string
-				enum: ["a" ,"d"]
-		-	name: sassign_cid.assignable
-			in: query
-			description: Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
-			schema:
-				type: string
-				enum: ["a" ,"d"]
-		-	name: sassign_cid.assigned
-			in: query
-			description: Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
 			schema:
 				type: string
 				enum: ["a" ,"d"]
@@ -128,6 +111,11 @@ class RoleHandler(object):
 			description: Items per page
 			schema:
 				type: integer
+		-	name: f
+			in: query
+			description: Filter by ID (substring match)
+			schema:
+				type: string
 		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource
@@ -140,21 +128,6 @@ class RoleHandler(object):
 				type: string
 				enum:
 				- true
-		-	name: assign_cid
-			in: query
-			description: Include info about what roles are assigned and can be assigned to this credentials ID.
-			schema:
-				type: string
-		-	name: aassign_cid.assignable
-			in: query
-			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
-			schema:
-				type: boolean
-		-	name: aassign_cid.assigned
-			in: query
-			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
-			schema:
-				type: boolean
 		-	name: s_id
 			in: query
 			description: Sort by the role ID.
@@ -164,18 +137,6 @@ class RoleHandler(object):
 		-	name: sdescription
 			in: query
 			description: Sort by the role description.
-			schema:
-				type: string
-				enum: ["a" ,"d"]
-		-	name: sassign_cid.assignable
-			in: query
-			description: Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
-			schema:
-				type: string
-				enum: ["a" ,"d"]
-		-	name: sassign_cid.assigned
-			in: query
-			description: Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
 			schema:
 				type: string
 				enum: ["a" ,"d"]
@@ -300,25 +261,17 @@ class RoleHandler(object):
 
 
 	async def _list_roles(self, request, tenant_id):
-		assign_cid_assigned_filter = None
-		assign_cid_assignable_filter = None
-		assign_cid_assigned_sort = None
-		assign_cid_assignable_sort = None
-		assign_cid = request.query.get("assign_cid")
 		sort = []
-		if assign_cid is not None:
-			if "aassign_cid.assigned" in request.query:
-				assign_cid_assigned_filter = asab.utils.string_to_boolean(request.query["aassign_cid.assigned"])
-			if "aassign_cid.assignable" in request.query:
-				assign_cid_assignable_filter = asab.utils.string_to_boolean(request.query["aassign_cid.assignable"])
-			if "sassign_cid.assigned" in request.query:
-				assign_cid_assigned_sort = request.query["sassign_cid.assigned"]
-			if "sassign_cid.assignable" in request.query:
-				assign_cid_assignable_sort = request.query["sassign_cid.assignable"]
-
 		for param in ("s_id", "sdescription"):
 			if param in request.query:
-				sort.append((param[1:], request.query[param]))
+				match request.query[param]:
+					case "a":
+						sort.append((param[1:], 1))
+					case "d":
+						sort.append((param[1:], -1))
+					case _:
+						raise asab.exceptions.ValidationError(
+							"Sorting parameter {!r} must be 'a' (ascending) or 'd' (descending).".format(param))
 
 		result = await self.RoleService.list_roles(
 			tenant_id=tenant_id,
@@ -326,12 +279,8 @@ class RoleHandler(object):
 			limit=int(request.query["i"]) if "i" in request.query else None,
 			sort=sort,
 			name_filter=request.query.get("f", None),
+			description_filter=request.query.get("adescription", None),
 			resource_filter=request.query.get("aresource", None),
-			assign_cid=assign_cid,
-			assign_cid_assigned_filter=assign_cid_assigned_filter,
-			assign_cid_assignable_filter=assign_cid_assignable_filter,
-			assign_cid_assigned_sort=assign_cid_assigned_sort,
-			assign_cid_assignable_sort=assign_cid_assignable_sort,
 			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false")),
 		)
 		return asab.web.rest.json_response(request, result)

@@ -1,6 +1,5 @@
 import typing
 
-from ..utils import BoolFieldOp
 from .abc import RoleView
 
 
@@ -23,26 +22,12 @@ class CustomTenantRoleView(RoleView):
 		return {"tenant": self.TenantId}
 
 
-	def _apply_tenant_match(
-		self,
-		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
-		add_fields: dict,
-		filter: dict,
-		sort: dict,
-	):
-		is_tenant_match = self.TenantId in tenant_match[0]
-		add_fields["tenant_match"] = is_tenant_match
-		match (is_tenant_match, tenant_match[1]):
-			case (True, BoolFieldOp.FILTER_FALSE) | (False, BoolFieldOp.FILTER_TRUE):
-				# No results possible
-				raise StopIteration()
-			case _:
-				# All results possible, sorting has no effect
-				pass
-
-
 	def _role_tenant_matches(self, role_id: str) -> bool:
 		return role_id.split("/")[0] == self.TenantId
+
+
+	def _is_tenant_match(self, tenants: typing.Iterable[str]) -> bool:
+		return self.TenantId in tenants
 
 
 	def _normalize_role(self, role: dict) -> dict:

@@ -5,6 +5,7 @@ import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 import asab.exceptions
+import asab.utils
 
 from ....models.const import ResourceId
 from . import schema
@@ -59,20 +60,214 @@ class RolesHandler(object):
 	async def get_credentials_roles(self, request):
 		"""
 		Get credentials' roles
+
+		---
+		parameters:
+		- 	name: expand
+			in: query
+			description: Expand the result and return the roles as objects rather than just role IDs.
+				When in expanded mode, the endpoint also supports pagination, filtering and sorting.
+			schema:
+				type: boolean
+				default: false
+		-	name: p
+			in: query
+			description: Page number
+				(Only available in expanded mode)
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+				(Only available in expanded mode)
+			schema:
+				type: integer
+		-	name: f
+			in: query
+			description: Filter by ID (substring match)
+				(Only available in expanded mode)
+			schema:
+				type: string
+		-	name: aresource
+			in: query
+			description: Show only roles that contain the specified resource
+				(Only available in expanded mode)
+			schema:
+				type: string
+		-	name: aassigned
+			in: query
+			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: boolean
+		-	name: aassignable
+			in: query
+			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: boolean
+		-	name: sdescription
+			in: query
+			description: Sort by the role description.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassigned
+			in: query
+			description: Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassignable
+			in: query
+			description: Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
-		creds_id = request.match_info["credentials_id"]
-		result = await self.RoleService.get_roles_by_credentials(creds_id, tenants=[tenant_id])
-		return asab.web.rest.json_response(request, result)
+		return await self._get_credentials_roles(request, tenant_id=tenant_id)
 
 
 	@asab.web.tenant.allow_no_tenant
 	async def get_credentials_global_roles(self, request):
 		"""
 		Get credentials' global roles
+
+		---
+		parameters:
+		- 	name: expand
+			in: query
+			description:
+				Expand the result and return the roles as objects rather than just role IDs.
+				When in expanded mode, the endpoint also supports pagination, filtering and sorting.
+			schema:
+				type: boolean
+				default: false
+		-	name: p
+			in: query
+			description: Page number
+				(Only available in expanded mode)
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+				(Only available in expanded mode)
+			schema:
+				type: integer
+		-	name: f
+			in: query
+			description: Filter by ID (substring match)
+				(Only available in expanded mode)
+			schema:
+				type: string
+		-	name: aresource
+			in: query
+			description: Show only roles that contain the specified resource
+				(Only available in expanded mode)
+			schema:
+				type: string
+		-	name: aassigned
+			in: query
+			description:
+				Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: boolean
+		-	name: aassignable
+			in: query
+			description:
+				Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: boolean
+		-	name: sdescription
+			in: query
+			description: Sort by the role description.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassigned
+			in: query
+			description:
+				Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sassignable
+			in: query
+			description:
+				Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		"""
+		return await self._get_credentials_roles(request, tenant_id=None)
+
+
+	async def _get_credentials_roles(self, request, tenant_id):
 		creds_id = request.match_info["credentials_id"]
-		result = await self.RoleService.get_roles_by_credentials(creds_id, tenants=[])
+		expand = asab.utils.string_to_boolean(request.query.get("expand", "false"))
+		if not expand:
+			forbidden_params = {
+				"p", "i", "f", "adescription", "aresource", "aassigned", "aassignable",
+				"s_id", "sdescription", "sassigned", "sassignable"
+			}
+			if forbidden_params & set(request.query):
+				raise asab.exceptions.ValidationError(
+					"Pagination, filtering and sorting parameters {} are only allowed when 'expand=true'.".format(
+						", ".join("{!r}".format(p) for p in forbidden_params)
+					)
+				)
+			tenants = [] if tenant_id is None else [tenant_id]
+			result = await self.RoleService.get_roles_by_credentials(creds_id, tenants=tenants)
+		else:
+			page = int(request.query.get("p", 1)) - 1
+			limit = int(request.query["i"]) if "i" in request.query else None
+			sort = []
+			for param in ("s_id", "sdescription", "sassigned", "sassignable"):
+				if param in request.query:
+					match request.query[param]:
+						case "a":
+							sort.append((param[1:], 1))
+						case "d":
+							sort.append((param[1:], -1))
+						case _:
+							raise asab.exceptions.ValidationError(
+								"Sorting parameter {!r} must be 'a' (ascending) or 'd' (descending).".format(param))
+			name_filter = request.query.get("f")
+			resource_filter=request.query.get("aresource", None),
+			description_filter=request.query.get("adescription", None)
+			assigned_filter = (
+				asab.utils.string_to_boolean(request.query.get("aassigned"))
+				if request.query.get("aassigned") not in (None, "", "all", "any")
+				else True  # Default to True to show only assigned roles
+			)
+			assignable_filter = (
+				asab.utils.string_to_boolean(request.query.get("aassignable"))
+				if request.query.get("aassignable") not in (None, "", "all", "any")
+				else None
+			)
+			result = await self.RoleService.list_roles(
+				tenant_id=tenant_id,
+				page=page,
+				limit=limit,
+				sort=sort,
+				name_filter=name_filter,
+				description_filter=description_filter,
+				resource_filter=resource_filter,
+				assign_cid=creds_id,
+				assigned_filter=assigned_filter,
+				assignable_filter=assignable_filter,
+			)
+
 		return asab.web.rest.json_response(request, result)
 
 

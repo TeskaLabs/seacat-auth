@@ -1,6 +1,5 @@
 import typing
 
-from ..utils import BoolFieldOp
 from .abc import RoleView
 
 
@@ -37,28 +36,15 @@ class PropagatedRoleView(RoleView):
 			]
 		}
 
-	def _apply_tenant_match(
-		self,
-		tenant_match: typing.Tuple[typing.Iterable[str], BoolFieldOp],
-		add_fields: dict,
-		filter: dict,
-		sort: dict,
-	):
-		is_tenant_match = self.TenantId in tenant_match[0]
-		add_fields["tenant_match"] = is_tenant_match
-		match (is_tenant_match, tenant_match[1]):
-			case (True, BoolFieldOp.FILTER_FALSE) | (False, BoolFieldOp.FILTER_TRUE):
-				# No results possible
-				raise StopIteration()
-			case _:
-				# All results possible, sorting has no effect
-				return
-
 
 	def _role_tenant_matches(self, role_id: str):
 		tenant_id, role_name = role_id.split("/")
 		assert role_name[0] == "~"
 		return tenant_id == self.TenantId
+
+
+	def _is_tenant_match(self, tenants: typing.Iterable[str]) -> bool:
+		return self.TenantId in tenants
 
 
 	def _global_role_id_to_propagated(self, role_id: str):
@@ -75,7 +61,7 @@ class PropagatedRoleView(RoleView):
 		role = super()._normalize_role(role)
 		role["type"] = "tenant"
 		role["global_role_id"] = role["_id"]
-		role["_id"] = self._global_role_id_to_propagated(role["_id"])
+		# role["_id"] = self._global_role_id_to_propagated(role["_id"])
 		role["read_only"] = True
 		role["tenant"] = self.TenantId
 		return role

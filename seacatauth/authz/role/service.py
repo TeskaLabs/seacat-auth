@@ -15,7 +15,7 @@ from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 from .view.abc import RoleView
 from .view.propagated_role import global_role_id_to_propagated
-from .utils import amerge_sorted, BoolFieldOp
+from .utils import amerge_sorted
 
 
 L = logging.getLogger(__name__)
@@ -49,34 +49,18 @@ TENANT_ADMIN_ROLE_PROPERTIES = {
 
 def _sorting_key(
 	role: dict,
-	sort: list[tuple[str, str]],
-	resource_match: tuple[typing.Any, BoolFieldOp],
-	tenant_match: tuple[typing.Any, BoolFieldOp],
-	id_match: tuple[typing.Any, BoolFieldOp],
+	sort: list[tuple[str, int]],
 ):
 	keys = []
-	if resource_match:
-		if resource_match[1] == BoolFieldOp.SORT_ASC:
-			keys.append(role["resource_match"])
-		elif resource_match[1] == BoolFieldOp.SORT_DESC:
-			keys.append(not role["resource_match"])
-	if tenant_match:
-		if tenant_match[1] == BoolFieldOp.SORT_ASC:
-			keys.append(role["tenant_match"])
-		elif tenant_match[1] == BoolFieldOp.SORT_DESC:
-			keys.append(not role["tenant_match"])
-	if id_match:
-		if id_match[1] == BoolFieldOp.SORT_ASC:
-			keys.append(role["id_match"])
-		elif id_match[1] == BoolFieldOp.SORT_DESC:
-			keys.append(not role["id_match"])
 	if sort:
 		for field, direction in sort:
-			assert field in {"_id", "label", "description"}
-			if direction == "a":
-				keys.append(role.get(field, ""))
-			elif direction == "d":
-				keys.append([-ord(c) for c in role.get(field, "")])
+			if field in {"_id", "description"}:
+				if direction == 1:
+					keys.append(role.get(field, ""))
+				elif direction == -1:
+					keys.append([-ord(c) for c in role.get(field, "")])
+			elif field in {"assigned", "assignable"}:
+				keys.append(direction * role.get(field, False))
 
 	return keys
 
@@ -232,16 +216,15 @@ class RoleService(asab.Service):
 		tenant_id: str | None = None,
 		page: int = 0,
 		limit: int | None = None,
-		sort: list[tuple[str, str]] | None = None,
+		sort: list[tuple[str, int]] | None = None,
 		name_filter: str | None = None,
+		description_filter: str | None = None,
 		resource_filter: str | None = None,
 		exclude_global: bool = False,
 		exclude_propagated: bool = False,
 		assign_cid: str | None = None,
-		assign_cid_assigned_filter: bool | None = None,
-		assign_cid_assignable_filter: bool | None = None,
-		assign_cid_assigned_sort: str | None = None,
-		assign_cid_assignable_sort: str | None = None,
+		assigned_filter: bool | None = None,
+		assignable_filter: bool | None = None,
 	):
 		authz = asab.contextvars.Authz.get()
 		if tenant_id in {"*", None}:
@@ -249,51 +232,24 @@ class RoleService(asab.Service):
 		else:
 			authz.require_tenant_access()
 
-		resource_match = (resource_filter, BoolFieldOp.FILTER_TRUE) if resource_filter else None
-		tenant_match = None
-		id_match = None
 		if assign_cid is not None:
-			cred_roles = set(await self.get_roles_by_credentials(
-				assign_cid, [tenant_id] if tenant_id is not None else None))
-			if assign_cid_assigned_filter is not None:
-				id_match = (
-					cred_roles,
-					BoolFieldOp.FILTER_TRUE if assign_cid_assigned_filter
-					else BoolFieldOp.FILTER_FALSE
-				)
-			elif assign_cid_assigned_sort is not None:
-				id_match = (
-					cred_roles,
-					BoolFieldOp.SORT_ASC if assign_cid_assigned_sort == "a"
-					else BoolFieldOp.SORT_DESC
-				)
-			else:
-				id_match = (cred_roles, BoolFieldOp.NONE)
-
-			editable_tenants = await self._get_tenants_where_roles_assignable(target_cid=assign_cid)
-			if assign_cid_assignable_filter is not None:
-				tenant_match = (
-					editable_tenants,
-					BoolFieldOp.FILTER_TRUE if assign_cid_assignable_filter
-					else BoolFieldOp.FILTER_FALSE
-				)
-			elif assign_cid_assignable_sort is not None:
-				tenant_match = (
-					editable_tenants,
-					BoolFieldOp.SORT_ASC if assign_cid_assignable_sort == "a"
-					else BoolFieldOp.SORT_DESC
-				)
-			else:
-				tenant_match = (editable_tenants, BoolFieldOp.NONE)
+			cred_roles = list(await self.get_roles_by_credentials(
+				assign_cid, [tenant_id] if tenant_id is not None else None)) or []
+			editable_tenants = list(await self._get_tenants_where_roles_assignable(target_cid=assign_cid)) or []
+		else:
+			editable_tenants = None
+			cred_roles = None
 
 		views = self._prepare_views(tenant_id, exclude_global, exclude_propagated)
 		counts = [
 			await view.count(
-				name_filter,
-				resource_match=(resource_filter, BoolFieldOp.FILTER_TRUE) if resource_filter
-					else None,
-				tenant_match=tenant_match,
-				id_match=id_match,
+				id_substring=name_filter,
+				description_substring=description_filter,
+				resource_match=resource_filter,
+				flag_tenants=editable_tenants,
+				tenant_flag_filter=assignable_filter,
+				flag_ids=cred_roles,
+				id_flag_filter=assigned_filter,
 			)
 			for view in views
 		]
@@ -307,7 +263,7 @@ class RoleService(asab.Service):
 
 			if offset >= count:
 				offset -= count
-				views.pop(i)
+				views[i] = None
 				continue
 
 		roles = []
@@ -316,19 +272,30 @@ class RoleService(asab.Service):
 				offset=offset,
 				limit=(limit - len(roles)) if limit else None,
 				sort=sort,
-				name_filter=name_filter,
-				resource_match=resource_match,
-				tenant_match=tenant_match,
-				id_match=id_match,
+				id_substring=name_filter,
+				description_substring=description_filter,
+				resource_match=resource_filter,
+				flag_tenants=editable_tenants,
+				tenant_flag_filter=assignable_filter,
+				flag_ids=cred_roles,
+				id_flag_filter=assigned_filter,
+				project={
+					"_id": "$_public_id",
+					"_c": 1,
+					"_m": 1,
+					"_v": 1,
+					"type": 1,
+					"global_role_id": 1,
+					"tenant_role_id": 1,
+					"description": 1,
+					"resources": 1,
+					"assigned": "$_id_flag",
+					"assignable": "$_tenant_flag",
+				}
 			) for view in views
 			if view is not None),
-			key=lambda r: _sorting_key(r, sort, resource_match, tenant_match, id_match)
+			key=lambda r: _sorting_key(r, sort)
 		):
-			if assign_cid:
-				role["assign_cid"] = {
-					"assigned": role["id_match"],
-					"assignable": role["tenant_match"],
-				}
 			roles.append(role)
 			if limit and len(roles) >= limit:
 				break
@@ -337,8 +304,6 @@ class RoleService(asab.Service):
 			"count": sum(counts),
 			"data": roles,
 		}
-		if assign_cid is not None:
-			result["assign_cid"] = assign_cid
 
 		return result
 
