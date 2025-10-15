@@ -260,7 +260,7 @@ class RoleService(asab.Service):
 			await view.count(
 				id_substring=name_filter,
 				description_substring=description_filter,
-				resource_match=resource_filter,
+				resource_filter=resource_filter,
 				flag_tenants=editable_tenants,
 				tenant_flag_filter=assignable_filter,
 				flag_ids=cred_roles,
@@ -281,15 +281,23 @@ class RoleService(asab.Service):
 				views[i] = None
 				continue
 
-		roles = []
-		async for role in amerge_sorted(
-			*(view.iterate(
+		iterators = []
+		for count, view in zip(counts, views):
+			if count == 0:
+				# Skip empty views to optimize iteration
+				continue
+
+			if offset >= count:
+				offset -= count
+				continue
+
+			iterators.append(view.iterate(
 				offset=offset,
-				limit=(limit - len(roles)) if limit else None,
+				limit=limit,
 				sort=sort,
 				id_substring=name_filter,
 				description_substring=description_filter,
-				resource_match=resource_filter,
+				resource_filter=resource_filter,
 				flag_tenants=editable_tenants,
 				tenant_flag_filter=assignable_filter,
 				flag_ids=cred_roles,
@@ -298,8 +306,12 @@ class RoleService(asab.Service):
 					"assigned": "$_id_flag",
 					"assignable": "$_tenant_flag",
 				}
-			) for view in views
-			if view is not None),
+			))
+			offset = 0
+
+		roles = []
+		async for role in amerge_sorted(
+			*iterators,
 			key=lambda r: _sorting_key(r, sort)
 		):
 			roles.append(role)
