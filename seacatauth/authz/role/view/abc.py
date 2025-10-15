@@ -47,6 +47,9 @@ class RoleView(abc.ABC):
 			id_flag_filter=id_flag_filter,
 			**kwargs
 		)
+		if pipeline is None:
+			return 0
+
 		pipeline.append({"$count": "count"})
 		result = await self.StorageService.Database[self.CollectionName].aggregate(pipeline).to_list(length=1)
 		if not result:
@@ -103,6 +106,9 @@ class RoleView(abc.ABC):
 			project=project,
 			**kwargs
 		)
+		if pipeline is None:
+			return
+
 		cursor = self.StorageService.Database[self.CollectionName].aggregate(pipeline)
 		async for role in cursor:
 			yield self._normalize_role(role)
