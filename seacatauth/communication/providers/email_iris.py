@@ -3,6 +3,7 @@ import aiohttp
 import asab
 import asab.web.rest.json
 
+from ... import exceptions
 from .abc import CommunicationProviderABC
 
 
@@ -84,8 +85,9 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 					if resp.status == 200:
 						L.log(asab.LOG_NOTICE, "Email sent.")
 					else:
-						L.error("Error response from ASAB Iris.", struct_data=response)
-						raise RuntimeError("Email delivery failed.")
+						L.error("Error response from ASAB Iris.", struct_data={
+							"tech_err": response.get("tech_err")})
+						raise exceptions.MessageDeliveryError("Email delivery failed.", channel=self.Channel)
 		except aiohttp.ClientError as e:
 			L.error("Error connecting to ASAB Iris: {}".format(e))
 			raise RuntimeError("Email delivery failed.")
