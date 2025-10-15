@@ -294,16 +294,7 @@ class RoleService(asab.Service):
 				tenant_flag_filter=assignable_filter,
 				flag_ids=cred_roles,
 				id_flag_filter=assigned_filter,
-				project={
-					"_id": "$_public_id",
-					"_c": 1,
-					"_m": 1,
-					"_v": 1,
-					"type": 1,
-					"global_role_id": 1,
-					"tenant_role_id": 1,
-					"description": 1,
-					"resources": 1,
+				set_fields={
 					"assigned": "$_id_flag",
 					"assignable": "$_tenant_flag",
 				}

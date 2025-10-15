@@ -70,7 +70,7 @@ class RoleView(abc.ABC):
 		tenant_flag_filter: bool | None = None,
 		flag_ids: typing.Iterable[str] | None = None,
 		id_flag_filter: bool | None = None,
-		project: dict | None = None,
+		set_fields: dict | None = None,
 		**kwargs
 	) -> typing.AsyncGenerator:
 		"""
@@ -87,7 +87,7 @@ class RoleView(abc.ABC):
 			tenant_flag_filter: If given, filter results by the value of the "_tenant_flag" field.
 			flag_ids: If given, add a boolean field "_id_flag" indicating whether the role ID is in the given list.
 			id_flag_filter: If given, filter results by the value of the "_id_flag" field.
-			project: If given, project only the given fields.
+			set_fields: If given, set the given fields in the final stage.
 
 		Returns:
 			An async generator yielding matching roles.
@@ -103,7 +103,7 @@ class RoleView(abc.ABC):
 			tenant_flag_filter=tenant_flag_filter,
 			flag_ids=flag_ids,
 			id_flag_filter=id_flag_filter,
-			project=project,
+			set_fields=set_fields,
 			**kwargs
 		)
 		if pipeline is None:
@@ -126,7 +126,7 @@ class RoleView(abc.ABC):
 		tenant_flag_filter: bool | None = None,
 		flag_ids: typing.Iterable[str] | None = None,
 		id_flag_filter: bool | None = None,
-		project: dict | None = None,
+		set_fields: dict | None = None,
 		**kwargs
 	) -> list[dict] | None:
 		"""
@@ -143,7 +143,7 @@ class RoleView(abc.ABC):
 			tenant_flag_filter: If given, filter results by the value of the "_tenant_flag" field.
 			flag_ids: If given, add a boolean field "_id_flag" indicating whether the role ID is in the given list.
 			id_flag_filter: If given, filter results by the value of the "_id_flag" field.
-			project: If given, project only the given fields.
+			set_fields: If given, set the given fields in the final stage.
 
 		Returns:
 			A list of aggregation pipeline stages, or None if no results are possible.
@@ -158,7 +158,7 @@ class RoleView(abc.ABC):
 
 		add_public_id = {"$set": {
 			"_public_id": self._public_id_expr(),
-			"description": {"$ifNull": ["$description", " "]}
+			"description": {"$ifNull": ["$description", ""]}
 		}}
 		pipeline.append(add_public_id)
 
@@ -187,7 +187,7 @@ class RoleView(abc.ABC):
 				second_match["_id_flag"] = id_flag_filter
 
 		if add_fields:
-			pipeline.append({"$set": add_fields})
+			pipeline.append({"$addFields": add_fields})
 
 		if second_match:
 			pipeline.append({"$match": second_match})
@@ -201,8 +201,8 @@ class RoleView(abc.ABC):
 		if limit:
 			pipeline.append({"$limit": limit})
 
-		if project:
-			pipeline.append({"$project": project})
+		if set_fields:
+			pipeline.append({"$addFields": set_fields})
 
 		return pipeline
 

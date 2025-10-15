@@ -61,7 +61,7 @@ class PropagatedRoleView(RoleView):
 		role = super()._normalize_role(role)
 		role["type"] = "tenant"
 		role["global_role_id"] = role["_id"]
-		# role["_id"] = self._global_role_id_to_propagated(role["_id"])
+		role["_id"] = self._global_role_id_to_propagated(role["_id"])
 		role["read_only"] = True
 		role["tenant"] = self.TenantId
 		return role
