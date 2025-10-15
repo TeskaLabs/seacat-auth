@@ -23,7 +23,6 @@ class RoleView(abc.ABC):
 		tenant_flag_filter: bool | None = None,
 		flag_ids: typing.Iterable[str] | None = None,
 		id_flag_filter: bool | None = None,
-		**kwargs
 	) -> int:
 		"""
 		Count roles matching the given criteria.
@@ -45,7 +44,6 @@ class RoleView(abc.ABC):
 			tenant_flag_filter=tenant_flag_filter,
 			flag_ids=flag_ids,
 			id_flag_filter=id_flag_filter,
-			**kwargs
 		)
 		if pipeline is None:
 			return 0
@@ -71,7 +69,6 @@ class RoleView(abc.ABC):
 		flag_ids: typing.Iterable[str] | None = None,
 		id_flag_filter: bool | None = None,
 		set_fields: dict | None = None,
-		**kwargs
 	) -> typing.AsyncGenerator:
 		"""
 		Iterate over roles matching the given criteria.
@@ -104,7 +101,6 @@ class RoleView(abc.ABC):
 			flag_ids=flag_ids,
 			id_flag_filter=id_flag_filter,
 			set_fields=set_fields,
-			**kwargs
 		)
 		if pipeline is None:
 			return
@@ -127,7 +123,6 @@ class RoleView(abc.ABC):
 		flag_ids: typing.Iterable[str] | None = None,
 		id_flag_filter: bool | None = None,
 		set_fields: dict | None = None,
-		**kwargs
 	) -> list[dict] | None:
 		"""
 		Construct a MongoDB aggregation pipeline for querying roles.
