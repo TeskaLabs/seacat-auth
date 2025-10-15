@@ -36,3 +36,17 @@ async def amerge_sorted(*iters: typing.AsyncIterable, key: typing.Callable | Non
 			heapq.heappush(heap, (key(nxt), idx, nxt, iterator))
 		except StopAsyncIteration:
 			pass
+
+
+class ReverseSortingString(str):
+	"""
+	Helper class to invert string comparison for sorting in descending order
+	"""
+	def __lt__(self, other):
+		return str.__gt__(self, other)
+	def __le__(self, other):
+		return str.__ge__(self, other)
+	def __gt__(self, other):
+		return str.__lt__(self, other)
+	def __ge__(self, other):
+		return str.__le__(self, other)

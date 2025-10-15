@@ -15,7 +15,7 @@ from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 from .view.abc import RoleView
 from .view.propagated_role import global_role_id_to_propagated
-from .utils import amerge_sorted
+from .utils import amerge_sorted, ReverseSortingString
 
 
 L = logging.getLogger(__name__)
@@ -45,24 +45,6 @@ TENANT_ADMIN_ROLE_PROPERTIES = {
 	],
 	"propagated": True,
 }
-
-
-def _sorting_key(
-	role: dict,
-	sort: list[tuple[str, int]],
-):
-	keys = []
-	if sort:
-		for field, direction in sort:
-			if field in {"_id", "description"}:
-				if direction == 1:
-					keys.append(role.get(field, ""))
-				elif direction == -1:
-					keys.append([-ord(c) for c in role.get(field, "")])
-			elif field in {"assigned", "assignable"}:
-				keys.append(direction * role.get(field, False))
-
-	return keys
 
 
 class RoleService(asab.Service):
@@ -465,7 +447,7 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
 			raise e
 
-		assert_role_is_editable(role_current)
+		_assert_role_is_editable(role_current)
 
 		# Unassign the role from all credentials
 		await self.delete_role_assignments(role_current)
@@ -495,7 +477,7 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
 			raise e
 
-		assert_role_is_editable(role_current)
+		_assert_role_is_editable(role_current)
 
 		# Validate resources
 		resources_to_assign = set().union(
@@ -833,8 +815,26 @@ class RoleService(asab.Service):
 		)
 
 
-def assert_role_is_editable(role: dict):
+def _assert_role_is_editable(role: dict):
 	if role.get("read_only"):
 		L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role["_id"]})
 		raise exceptions.NotEditableError("Role is not editable.")
 	return True
+
+
+def _sorting_key(
+	role: dict,
+	sort: list[tuple[str, int]],
+):
+	keys = []
+	if sort:
+		for field, direction in sort:
+			if field in {"_id", "description"}:
+				if direction == 1:
+					keys.append(role.get(field, ""))
+				elif direction == -1:
+					keys.append(ReverseSortingString(role.get(field, "")))
+			elif field in {"assigned", "assignable"}:
+				keys.append(direction * role.get(field, False))
+
+	return keys
