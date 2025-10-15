@@ -99,13 +99,15 @@ class RolesHandler(object):
 			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
-				type: boolean
+				type: string
+				enum: ["true", "false", "any"]
 		-	name: aassignable
 			in: query
 			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
-				type: boolean
+				type: string
+				enum: ["true", "false", "any"]
 		-	name: sdescription
 			in: query
 			description: Sort by the role description.
@@ -177,14 +179,16 @@ class RolesHandler(object):
 				Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
-				type: boolean
+				type: string
+				enum: ["true", "false", "any"]
 		-	name: aassignable
 			in: query
 			description:
 				Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
-				type: boolean
+				type: string
+				enum: ["true", "false", "any"]
 		-	name: sdescription
 			in: query
 			description: Sort by the role description.
@@ -243,8 +247,8 @@ class RolesHandler(object):
 							raise asab.exceptions.ValidationError(
 								"Sorting parameter {!r} must be 'a' (ascending) or 'd' (descending).".format(param))
 			name_filter = request.query.get("f")
-			resource_filter=request.query.get("aresource", None),
-			description_filter=request.query.get("adescription", None)
+			resource_filter = request.query.get("aresource", None),
+			description_filter = request.query.get("adescription", None)
 			assigned_filter = (
 				asab.utils.string_to_boolean(request.query.get("aassigned"))
 				if request.query.get("aassigned") not in (None, "", "all", "any")

@@ -122,7 +122,26 @@ class RoleView(abc.ABC):
 		id_flag_filter: bool | None = None,
 		project: dict | None = None,
 		**kwargs
-	) -> list[dict]:
+	) -> list[dict] | None:
+		"""
+		Construct a MongoDB aggregation pipeline for querying roles.
+
+		Args:
+			offset: Number of matching roles to skip.
+			limit: Maximum number of matching roles to return.
+			sort: If given, sort results by the given field and direction.
+			id_substring: If given, return only roles whose ID contains this substring.
+			description_substring: If given, return only roles whose description contains this substring.
+			resource_filter: If given, return only roles with the given resource.
+			flag_tenants: If given, add a boolean field "_tenant_flag" indicating whether the role matches any of the given tenants.
+			tenant_flag_filter: If given, filter results by the value of the "_tenant_flag" field.
+			flag_ids: If given, add a boolean field "_id_flag" indicating whether the role ID is in the given list.
+			id_flag_filter: If given, filter results by the value of the "_id_flag" field.
+			project: If given, project only the given fields.
+
+		Returns:
+			A list of aggregation pipeline stages, or None if no results are possible.
+		"""
 		pipeline = []
 		base_match = self._base_query()
 		if resource_filter:

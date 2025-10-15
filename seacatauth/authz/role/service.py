@@ -180,17 +180,19 @@ class RoleService(asab.Service):
 		return views
 
 
-	def _role_tenant_id(self, role_id: str):
-		tenant_id = role_id.split("/")[0]
-		if tenant_id == "*":
-			return None
-		else:
-			return tenant_id
-
-
 	async def _get_tenants_where_roles_assignable(self, target_cid: str | None = None) -> typing.Set[str]:
 		"""
-		Returns a set of tenants where the agent can assign roles to the target credentials.
+		Returns a set of tenants where the caller can assign roles to the target credentials.
+
+		Args:
+			target_cid:
+				Credentials ID of the target user. If None, use the current user.
+				If given, the target user must have access to the current tenant
+				for the current tenant to be included in the result.
+
+		Returns:
+			Set of tenant IDs where the caller can assign roles to the target user.
+			Includes None if the caller can assign global roles.
 		"""
 		target_tenants = set(await self.TenantService.get_tenants(target_cid))
 
@@ -226,6 +228,37 @@ class RoleService(asab.Service):
 		assigned_filter: bool | None = None,
 		assignable_filter: bool | None = None,
 	):
+		"""
+		List roles matching the given criteria.
+
+		Args:
+			tenant_id:
+				If given, list roles defined in the given tenant plus global roles.
+				If None or "*", list global roles only.
+			page: Page number (0..N).
+			limit: Page size. If None, return all matching roles.
+			sort: List of (field, direction) tuples to sort the results by.
+				Direction is 1 for ascending and -1 for descending.
+				Supported fields are "_id", "description", "assigned" and "assignable".
+			name_filter: If given, return only roles whose ID contains this substring.
+			description_filter: If given, return only roles whose description contains this substring.
+			resource_filter: If given, return only roles with the given resource.
+			exclude_global: If True, exclude global roles from the results.
+			exclude_propagated: If True, exclude propagated global roles from the results.
+			assign_cid:
+				If given, add a boolean field "assigned" indicating whether the role is assigned to the given
+				credentials ID. Also filter the results by the `assigned_filter` parameter if given.
+				Requires that the caller has ROLE_ASSIGN in the target tenant (if `tenant_id` is given).
+			assigned_filter:
+				If given, filter results by the value of the "assigned" field.
+				Requires `assign_cid` to be set.
+			assignable_filter:
+				If given, add a boolean field "assignable" indicating whether the role can be assigned to the
+				credentials ID by the caller. Also filter the results by this field if given.
+				Requires `assign_cid` to be set. To be assignable, the caller must have ROLE_ASSIGN in the target
+				tenant (if `tenant_id` is given) and the target credentials must have access to the target tenant
+				(if `tenant_id` is given).
+		"""
 		authz = asab.contextvars.Authz.get()
 		if tenant_id in {"*", None}:
 			tenant_id = None
