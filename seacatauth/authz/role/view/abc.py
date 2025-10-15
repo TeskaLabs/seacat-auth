@@ -145,7 +145,7 @@ class RoleView(abc.ABC):
 		pipeline = []
 		base_match = self._base_query()
 		if resource_filter:
-			base_match["resources"] = {"$in": resource_filter}
+			base_match["resources"] = resource_filter
 		if description_substring:
 			base_match["description"] = {"$regex": re.escape(description_substring)}
 		pipeline.append({"$match": base_match})

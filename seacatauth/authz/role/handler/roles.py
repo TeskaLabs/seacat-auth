@@ -247,7 +247,7 @@ class RolesHandler(object):
 							raise asab.exceptions.ValidationError(
 								"Sorting parameter {!r} must be 'a' (ascending) or 'd' (descending).".format(param))
 			name_filter = request.query.get("f")
-			resource_filter = request.query.get("aresource", None),
+			resource_filter = request.query.get("aresource", None)
 			description_filter = request.query.get("adescription", None)
 			assigned_filter = (
 				asab.utils.string_to_boolean(request.query.get("aassigned"))
