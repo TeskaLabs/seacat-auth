@@ -8,7 +8,6 @@ import typing
 
 import aiohttp
 import aiohttp.client_exceptions
-import urllib.parse
 import random
 import asab.config
 import asab.tls
@@ -16,6 +15,7 @@ import asab.tls
 from .. import exceptions
 from ..models.const import ResourceId
 from ..authz import build_credentials_authz
+from . import utils
 
 
 L = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.Kibana = KibanaUtils(self.App, config_section_name, config)
 
 		elasticsearch_url = self.Config.get("url")
-		self.ElasticSearchNodesUrls = get_url_list(elasticsearch_url)
+		self.ElasticSearchNodesUrls = utils.get_url_list(elasticsearch_url)
 		if len(self.ElasticSearchNodesUrls) == 0:
 			raise ValueError("No ElasticSearch URL has been provided")
 
@@ -97,7 +97,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		if self.ElasticSearchNodesUrls[0].startswith("https://"):
 			# Try to build SSL context from either the default or the [elasticsearch] section,
 			#   whichever contains SSL config options
-			if section_has_ssl_option(config_section_name):
+			if utils.section_has_ssl_option(config_section_name):
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 			else:
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder("elasticsearch")
@@ -118,6 +118,10 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Credentials.updated!", self._on_authz_change)
 		self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 		self.App.PubSub.subscribe("Application.tick/10!", self._retry_sync)
+
+
+	async def initialize(self):
+		pass
 
 
 	@contextlib.asynccontextmanager
@@ -829,52 +833,6 @@ class KibanaUtils(asab.config.Configurable):
 
 		async for tenant in self.TenantService.iterate():
 			await self.sync_space_and_roles(tenant)
-
-
-def getmultiline(url_string):
-	"""
-	URL can be a multiline with lines / items devided by spaces
-	url=https://localhost:9200 https://localhost:9200 https://localhost:9200
-	"""
-	return [item.strip() for item in re.split(r"\s+", url_string) if len(item) > 0]
-
-
-def get_url_list(urls):
-	"""
-	URLs can devided by a semicolon
-	url=https://localhost:9200;localhost:9200;localhost:9200
-	"""
-	server_urls = []
-	if len(urls) > 0:
-		urls = getmultiline(urls)
-		for url in urls:
-			scheme, netloc, path = parse_url(url)
-
-			server_urls += [
-				urllib.parse.urlunparse((scheme, netloc, path, None, None, None))
-				for netloc in netloc.split(';')
-			]
-
-	return server_urls
-
-
-def parse_url(url):
-	parsed_url = urllib.parse.urlparse(url)
-	url_path = parsed_url.path
-	if not url_path.endswith("/"):
-		url_path += "/"
-
-	return parsed_url.scheme, parsed_url.netloc, url_path
-
-
-def section_has_ssl_option(config_section_name):
-	"""
-	Checks if at least one of SSL config options (cert, key, cafile, capath, cadata etc.) appears in a config section
-	"""
-	for item in asab.Config.options(config_section_name):
-		if item in asab.tls.SSLContextBuilder.ConfigDefaults:
-			return True
-	return False
 
 
 def get_index_access_role_name(tenant: str, privileges: str):
