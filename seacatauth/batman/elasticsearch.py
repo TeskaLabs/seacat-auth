@@ -140,6 +140,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		Raises:
 			ClientConnectionError if no node is reachable.
 		"""
+		last_error = None
 		for node_url in random.sample(self.ElasticSearchNodesUrls, len(self.ElasticSearchNodesUrls)):
 			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
 				async with aiohttp.ClientSession(
@@ -149,11 +150,12 @@ class ElasticSearchIntegration(asab.config.Configurable):
 						async with api_call(session=session) as result:
 							yield result
 							return
-					except (aiohttp.client_exceptions.ClientConnectionError, asyncio.TimeoutError):
+					except (aiohttp.client_exceptions.ClientConnectionError, asyncio.TimeoutError) as e:
+						last_error = e
 						L.debug("ElasticSearch node {} is not reachable, trying another one.".format(node_url))
 						continue
 		raise aiohttp.client_exceptions.ClientConnectionError(
-			"Cannot connect to any of the configured ElasticSearch nodes.")
+			"Cannot connect to any of the configured ElasticSearch nodes.") from last_error
 
 
 	async def _on_init(self, event_name):

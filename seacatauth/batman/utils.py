@@ -37,8 +37,8 @@ def get_url_list(urls: str) -> list[str]:
 		for url in urls:
 			scheme, netloc, path = parse_url(url)
 			server_urls.extend(
-				urllib.parse.urlunparse((scheme, netloc, path, None, None, None))
-				for netloc in netloc.split(';')
+				urllib.parse.urlunparse((scheme, netloc, path, "", "", ""))
+				for netloc in netloc.split(";")
 			)
 
 	return server_urls
@@ -69,6 +69,8 @@ def section_has_ssl_option(config_section_name: str):
 	Args:
 		config_section_name: Name of the config section to check
 	"""
+	if config_section_name not in asab.Config:
+		return False
 	for item in asab.Config.options(config_section_name):
 		if item in asab.tls.SSLContextBuilder.ConfigDefaults:
 			return True
