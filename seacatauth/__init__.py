@@ -12,10 +12,6 @@ asab.Config.add_defaults({
 		# Defaults to "http://localhost", which can be overwritten by PUBLIC_SERVER_URL environment variable.
 		"public_url": "",
 
-		# URL prefix of public Seacat Auth API
-		# The URL can be either absolute, or relative to the "public_url" above.
-		"public_seacat_auth_base_url": "api/seacat-auth/",
-
 		# URL prefix of public OpenID Connect API
 		# The URL can be either absolute, or relative to the "public_url" above.
 		"public_openidconnect_base_url": "api/",
@@ -25,6 +21,11 @@ asab.Config.add_defaults({
 		# The domain name is extracted for cookie and authentication purposes.
 		# The URL can be either absolute, or relative to the "public_url" above.
 		"auth_webui_base_url": "auth/",
+
+		# URL prefix of Seacat Auth Web UI's public API
+		# Used for building external login callback URLs.
+		# The URL can be either absolute, or relative to the "public_url" above.
+		"auth_webui_api_base_url": "auth/api/seacat-auth/",
 	},
 
 	# Admin API (non-public)

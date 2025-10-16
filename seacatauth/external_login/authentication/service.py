@@ -48,7 +48,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		self.CallbackEndpointPath = "/public/ext-login/callback"
 		self.CallbackUrlTemplate = "{}{}".format(
-			app.PublicSeacatAuthApiUrl,
+			app.AuthWebUiApiBaseUrl,
 			self.CallbackEndpointPath.lstrip("/")
 		)
 

@@ -28,7 +28,7 @@ class FeatureService(asab.Service):
 			{
 				"type": provider.Type,
 				"authorize_uri": "{api_base_url}/public/ext-login/{provider_type}/login".format(
-					api_base_url=self.App.PublicSeacatAuthApiUrl.rstrip("/"), provider_type=provider.Type),
+					api_base_url=self.App.AuthWebUiApiBaseUrl.rstrip("/"), provider_type=provider.Type),
 				"label": provider.Label
 			}
 			for provider in self.ExternalAuthenticationService.Providers.values()
@@ -47,7 +47,7 @@ class FeatureService(asab.Service):
 			{
 				"type": provider.Type,
 				"authorize_uri": "{api_base_url}/public/ext-login/{provider_type}/pair".format(
-					api_base_url=self.App.PublicSeacatAuthApiUrl.rstrip("/"), provider_type=provider.Type),
+					api_base_url=self.App.AuthWebUiApiBaseUrl.rstrip("/"), provider_type=provider.Type),
 				"label": provider.Label
 			}
 			for provider in self.ExternalAuthenticationService.Providers.values()
