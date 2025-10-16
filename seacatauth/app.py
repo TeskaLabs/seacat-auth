@@ -18,7 +18,7 @@ class SeaCatAuthApplication(asab.Application):
 		self.PrivateKey = self._load_private_key()
 
 		self.PublicUrl = None
-		self.PublicSeacatAuthApiUrl = None
+		self.AuthWebUiApiBaseUrl = None
 		self.PublicOpenIdConnectApiUrl = None
 		self.AuthWebUiUrl = None
 		self._prepare_public_urls()
@@ -347,18 +347,6 @@ class SeaCatAuthApplication(asab.Application):
 				"Seacat Auth public interface is running on plain insecure HTTP ({!r}). "
 				"This may limit the functionality of certain components.".format(self.PublicUrl))
 
-		# Public base URL of Seacat Auth API
-		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/seacat-auth/",
-		#   yielding for example "https://example.com/api/seacat-auth/public/features"
-		self.PublicSeacatAuthApiUrl = asab.Config.get(
-			"general", "public_seacat_auth_base_url").rstrip("/") + "/"
-		if not (
-			self.PublicSeacatAuthApiUrl.startswith("https://")
-			or self.PublicSeacatAuthApiUrl.startswith("http://")
-		):
-			# Relative URL: Append to PublicUrl
-			self.PublicSeacatAuthApiUrl = urllib.parse.urljoin(self.PublicUrl, self.PublicSeacatAuthApiUrl)
-
 		# Public base URL of OpenID Connect API
 		#   Canonically, this is "${PUBLIC_SERVER_URL}/api/openidconnect/",
 		#   yielding for example "https://example.com/api/openidconnect/authorize"
@@ -382,3 +370,33 @@ class SeaCatAuthApplication(asab.Application):
 		):
 			# Relative URL: Append to PublicUrl
 			self.AuthWebUiUrl = urllib.parse.urljoin(self.PublicUrl, self.AuthWebUiUrl)
+
+		# URL prefix of Seacat Auth API that is used by the Auth Web UI
+		#   Canonically, this is "${PUBLIC_SERVER_URL}/auth/api/seacat-auth/",
+		#   yielding for example "https://example.com/auth/api/seacat-auth/public/features"
+		back_compat = asab.Config.get(
+			"general", "public_seacat_auth_base_url", fallback=None)
+		if back_compat is not None:
+			asab.LogObsolete.warning(
+				"Config option 'public_seacat_auth_base_url' in the 'general' section has been renamed to "
+				"'auth_webui_api_base_url'. Please update your configuration file.",
+				struct_data={"eol": "2026-01-31"}
+			)
+		self.AuthWebUiApiBaseUrl = back_compat or asab.Config.get(
+			"general", "auth_webui_api_base_url").rstrip("/") + "/"
+		if not (
+			self.AuthWebUiApiBaseUrl.startswith("https://")
+			or self.AuthWebUiApiBaseUrl.startswith("http://")
+		):
+			# Relative URL: Append to PublicUrl
+			self.AuthWebUiApiBaseUrl = urllib.parse.urljoin(self.PublicUrl, self.AuthWebUiApiBaseUrl)
+
+		# Ensure that AuthWebUiApiBaseUrl is a sub-URL of AuthWebUiUrl
+		if not self.AuthWebUiApiBaseUrl.startswith(self.AuthWebUiUrl):
+			raise ValueError(
+				"The 'auth_webui_api_base_url' ({}) is not a sub-URL of the 'auth_webui_base_url' ({}). "
+				"Please revise your configuration.".format(
+					self.AuthWebUiApiBaseUrl,
+					self.AuthWebUiUrl
+				)
+			)
