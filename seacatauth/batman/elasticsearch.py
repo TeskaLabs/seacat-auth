@@ -171,6 +171,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def full_sync(self):
+		"""
+		Perform full synchronization of all index access roles, Kibana spaces and roles, and credentials.
+		"""
 		self.RetrySyncAll = None
 		try:
 			await self._sync_all_index_access_roles()
@@ -245,6 +248,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _sync_all_index_access_roles(self):
+		"""
+		Ensure that all tenants have corresponding index access roles in ElasticSearch
+		"""
 		try:
 			async for tenant in self.TenantService.iterate():
 				# Update Elasticsearch roles with index access privileges
@@ -255,7 +261,17 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			return
 
 
-	async def _upsert_role_for_index_access(self, tenant_id: str, privileges: str = "read"):
+	async def _upsert_role_for_index_access(self, tenant_id: str, privileges: str = "read") -> str | None:
+		"""
+		Create or update an ElasticSearch role with index access privileges
+
+		Args:
+			tenant_id: Tenant whose indices are to be accessed
+			privileges: "read" for read-only access or "all" for read-write access
+
+		Returns:
+			The name of the created or updated role
+		"""
 		assert privileges in {"read", "all"}
 		role_name = get_index_access_role_name(tenant_id, privileges)
 		required_index_settings = {
@@ -321,10 +337,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		return role_name
 
 
-	async def initialize(self):
-		pass
-
-
 	async def _initialize_resources(self):
 		"""
 		Create Seacat Auth resources that are mapped to ElasticSearch and Kibana roles
@@ -374,12 +386,21 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def sync_all_credentials(self):
+		"""
+		Perform synchronization of all credentials
+		"""
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
 		async for cred in self.CredentialsService.iterate():
 			await self.sync_credentials(cred)
 
 
 	async def sync_credentials(self, cred: dict):
+		"""
+		Create or update a user in ElasticSearch/Kibana corresponding to the provided credentials
+
+		Args:
+			cred: Credentials document
+		"""
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
@@ -462,6 +483,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	def _prepare_session_headers(self, username, password, api_key):
+		"""
+		Prepare HTTP headers for authentication with ElasticSearch / Kibana
+		"""
 		headers = {}
 		if username != "" and api_key != "":
 			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
@@ -518,10 +542,16 @@ class KibanaUtils(asab.config.Configurable):
 
 
 	def is_enabled(self):
+		"""
+		Returns True if Kibana integration is enabled
+		"""
 		return self.KibanaUrl is not None
 
 
 	def get_kibana_resources(self):
+		"""
+		Returns a dict of Kibana-related resources that should be created in Seacat Auth
+		"""
 		return {
 			self.ReadResourceId: {
 				"description": "Read-only access to tenant space in Kibana",
@@ -539,6 +569,9 @@ class KibanaUtils(asab.config.Configurable):
 
 
 	def get_kibana_roles_by_authz(self, authz: dict):
+		"""
+		Returns a set of Kibana roles that should be assigned to a user with the provided authorization scope
+		"""
 		roles = set()
 		for tenant_id, authorized_resources in authz.items():
 			if tenant_id == "*":
@@ -554,12 +587,18 @@ class KibanaUtils(asab.config.Configurable):
 
 	@contextlib.asynccontextmanager
 	async def _kibana_session(self):
+		"""
+		Provides an aiohttp.ClientSession for communicating with Kibana
+		"""
 		async with aiohttp.TCPConnector(ssl=False) as connector:
 			async with aiohttp.ClientSession(connector=connector, headers=self.Headers) as session:
 				yield session
 
 
 	def _prepare_session_headers(self, username, password, api_key):
+		"""
+		Prepare HTTP headers for authentication with Kibana
+		"""
 		headers = {"kbn-xsrf": "kibana"}
 
 		if username and api_key:
@@ -573,7 +612,17 @@ class KibanaUtils(asab.config.Configurable):
 		return headers
 
 
-	def space_id_from_tenant_id(self, tenant_id: str):
+	def space_id_from_tenant_id(self, tenant_id: str) -> str:
+		"""
+		Maps a Seacat tenant ID to a valid Kibana space ID.
+		Kibana space IDs may only contain lowercase letters (a-z), numbers (0-9), hyphens (-), and underscores (_).
+
+		Args:
+			tenant_id: Seacat tenant ID
+
+		Returns:
+			A valid Kibana space ID
+		"""
 		if tenant_id == "default":
 			# "default" is a reserved space name in Kibana
 			return "tenant-default"
@@ -584,6 +633,9 @@ class KibanaUtils(asab.config.Configurable):
 	async def upsert_kibana_space(self, tenant: str | dict):
 		"""
 		Create a Kibana space for specified tenant or update its metadata if necessary.
+
+		Args:
+			tenant: Tenant ID or tenant document
 		"""
 		assert self.is_enabled()
 
@@ -664,7 +716,13 @@ class KibanaUtils(asab.config.Configurable):
 			L.info("Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
 
 
-	async def get_kibana_spaces(self):
+	async def get_kibana_spaces(self) -> list | None:
+		"""
+		Retrieve a list of all Kibana spaces
+
+		Returns:
+			A list of Kibana spaces or None on error
+		"""
 		assert self.is_enabled()
 
 		async with self._kibana_session() as session:
@@ -680,9 +738,10 @@ class KibanaUtils(asab.config.Configurable):
 	async def upsert_role_for_space_access(self, tenant_id: str, privileges: str = "read"):
 		"""
 		Create or update a Kibana role with Kibana space privileges
-		@param tenant_id: Tenant whose Kibana space is to be accessed
-		@param privileges: "read" for read-only access or "all" for read-write access
-		@return:
+
+		Args:
+			tenant_id: Tenant whose Kibana space is to be accessed
+			privileges: "read" for read-only access or "all" for read-write access
 		"""
 		assert self.is_enabled()
 		assert privileges in {"read", "all"}
@@ -743,6 +802,9 @@ class KibanaUtils(asab.config.Configurable):
 	async def sync_space_and_roles(self, tenant: str | dict):
 		"""
 		Sync Kibana space with Seacat tenant, add Kibana space access to ElasticSearch roles
+
+		Args:
+			tenant: Tenant ID or tenant document
 		"""
 		assert self.is_enabled()
 
