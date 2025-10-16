@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha7
 - v25.38-alpha6
 - v25.38-alpha5
 - v25.38-alpha4
@@ -11,6 +12,7 @@
 - v25.38-alpha1
 
 ### Fixes
+- Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha7)
 - Opaque external credential IDs (#521, v25.38-alpha6)
 - Fix pysaml2 dependency (#518, v25.38-alpha4)
 
