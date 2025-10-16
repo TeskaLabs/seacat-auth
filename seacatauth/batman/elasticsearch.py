@@ -146,9 +146,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 					connector=connector, headers=self.Headers, base_url=node_url
 				) as session:
 					try:
-						result = await api_call(session=session)
-						yield result
-						return
+						async with api_call(session=session) as result:
+							yield result
+							return
 					except (aiohttp.client_exceptions.ClientConnectionError, asyncio.TimeoutError):
 						L.debug("ElasticSearch node {} is not reachable, trying another one.".format(node_url))
 						continue
