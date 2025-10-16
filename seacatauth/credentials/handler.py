@@ -7,7 +7,7 @@ import asab.exceptions
 import asab.utils
 import asab.contextvars
 
-from .. import exceptions, generic
+from .. import exceptions
 from ..models.const import ResourceId
 from . import schema
 
@@ -195,22 +195,30 @@ class CredentialsHandler(object):
 		-	name: global
 			in: query
 			required: false
-			description:
+			description: Try to search in all tenants, not only in the currently authorized one
 			schema: {"type": "boolean"}
+		-	name: astatus
+			in: query
+			required: false
+			description: Filter users by status ("active", "suspended"). If omitted, all statuses are returned ("any").
+			schema: {
+				"type": "array",
+				"items": {"type": "string"},
+				"enum": ["active", "suspended", "any"],
+				"default": ["any"],
+			}
+			explode: false
 		"""
 		authz = asab.contextvars.Authz.get()
-		search = generic.SearchParams(request.query)
+		tenant_filter = request.query.get("tenant") or request.query.get("atenant", None)
+		role_filter = request.query.get("role") or request.query.get("arole", None)
+		simple_filter = request.query.get("f")
 
 		# BACK-COMPAT: Convert the old "mode" search to advanced filters
 		mode = request.query.get("m", "default")
-		if mode == "role":
-			search.AdvancedFilter["role"] = request.query.get("f")
-			search.SimpleFilter = None
-		elif mode == "tenant":
-			search.AdvancedFilter["tenant"] = request.query.get("f")
-			search.SimpleFilter = None
-		elif mode == "default":
-			search.SimpleFilter = request.query.get("f")
+		if mode == "tenant":
+			tenant_filter = request.query.get("f")
+			simple_filter = None
 
 		try_global_search = asab.utils.string_to_boolean(request.query.get("global", "false"))
 
@@ -220,8 +228,27 @@ class CredentialsHandler(object):
 		else:
 			tenant_ctx = asab.contextvars.Tenant.set(None)
 
+		status_filter = request.query.get("astatus")
+		if status_filter is not None:
+			status_filter = status_filter.split(",")
+			for status in status_filter:
+				if status not in frozenset(["active", "suspended", "any"]):
+					raise asab.exceptions.ValidationError(
+						"Invalid status filter: {!r}".format(request.query.get("astatus")))
+			# If "any" is present, ignore all other status filters
+			if "any" in status_filter:
+				status_filter = None  # No filtering
+
 		try:
-			result = await self.CredentialsService.list(search, try_global_search)
+			result = await self.CredentialsService.list(
+				page=int(request.query.get("p", 1)) - 1,
+				limit=int(request.query.get("i", 10)),
+				tenant_filter=tenant_filter,
+				role_filter=role_filter,
+				simple_filter=simple_filter,
+				status_filter=status_filter,
+				try_global_search=try_global_search,
+			)
 		except exceptions.AccessDeniedError as e:
 			L.log(asab.LOG_NOTICE, "Cannot list credentials: {}".format(e))
 			return asab.web.rest.json_response(request, status=403, data={

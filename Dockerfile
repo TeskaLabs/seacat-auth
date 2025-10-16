@@ -13,6 +13,7 @@ RUN apk add --no-cache \
   py3-pip \
   libstdc++ \
   openssl \
+  xmlsec \
   openldap
 
 # Create build environment so that dependencies like aiohttp can be build
@@ -45,6 +46,7 @@ RUN apk add --no-cache  \
     pyotp \
     webauthn==1.9.0 \
     pyyaml \
+    pysaml2 \
     pymongo \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git@v25.36"
@@ -68,6 +70,7 @@ FROM alpine:3.21
 RUN apk add --no-cache \
   python3 \
   openssl \
+  xmlsec \
   openldap
 
 COPY --from=builder /venv /venv
