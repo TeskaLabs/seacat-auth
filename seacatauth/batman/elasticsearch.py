@@ -288,24 +288,20 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			"privileges": [privileges],
 		}
 
-		try:
-			async with self._with_elasticsearch_nodes(
-				lambda session: session.get("_security/role/{}".format(role_name))
-			) as resp:
-				if resp.status == 200:
-					role_data = (await resp.json()).get(role_name)
-				elif resp.status == 404:
-					role_data = None
-				else:
-					text = await resp.text()
-					L.error(
-						"Failed to get ElasticSearch role:\n{}".format(text[:1000]),
-						struct_data={"code": resp.status, "role": role_name}
-					)
-					return
-		except aiohttp.client_exceptions.ClientConnectionError:
-			raise aiohttp.client_exceptions.ClientConnectionError(
-				"Cannot connect to any of the configured ElasticSearch nodes.")
+		async with self._with_elasticsearch_nodes(
+			lambda session: session.get("_security/role/{}".format(role_name))
+		) as resp:
+			if resp.status == 200:
+				role_data = (await resp.json()).get(role_name)
+			elif resp.status == 404:
+				role_data = None
+			else:
+				text = await resp.text()
+				L.error(
+					"Failed to get ElasticSearch role:\n{}".format(text[:1000]),
+					struct_data={"code": resp.status, "role": role_name}
+				)
+				return
 
 		# Check if index privileges are present in role settings
 		if role_data and role_data.get("indices"):
@@ -318,21 +314,17 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		# Add access to elasticsearch indices
 		role_data = {"indices": [required_index_settings]}
-		try:
-			async with self._with_elasticsearch_nodes(
-				lambda session: session.put("_security/role/{}".format(role_name), json=role_data)
-			) as resp:
-				if not (200 <= resp.status < 300):
-					text = await resp.text()
-					L.error(
-						"Failed to create/update ElasticSearch role:\n{}".format(text[:1000]),
-						struct_data={"code": resp.status, "role": role_name}
-					)
-					return
-				result = await resp.json()
-		except aiohttp.client_exceptions.ClientConnectionError:
-			raise aiohttp.client_exceptions.ClientConnectionError(
-				"Cannot connect to any of the configured ElasticSearch nodes.")
+		async with self._with_elasticsearch_nodes(
+			lambda session: session.put("_security/role/{}".format(role_name), json=role_data)
+		) as resp:
+			if not (200 <= resp.status < 300):
+				text = await resp.text()
+				L.error(
+					"Failed to create/update ElasticSearch role:\n{}".format(text[:1000]),
+					struct_data={"code": resp.status, "role": role_name}
+				)
+				return
+			result = await resp.json()
 
 		created = result.get("role", {}).get("created")
 		if created is True:
@@ -459,23 +451,18 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		elastic_user["roles"] = list(elk_roles)
 
-
-		try:
-			async with self._with_elasticsearch_nodes(
-				lambda session: session.post("_xpack/security/user/{}".format(username), json=elastic_user)
-			) as resp:
-				if 200 <= resp.status < 300:
-					# Everything is alright here
-					pass
-				else:
-					text = await resp.text()
-					L.warning(
-						"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
-						struct_data={"cid": cred["_id"]}
-					)
-		except aiohttp.client_exceptions.ClientConnectionError:
-			raise aiohttp.client_exceptions.ClientConnectionError(
-				"Cannot connect to any of the configured ElasticSearch nodes.")
+		async with self._with_elasticsearch_nodes(
+			lambda session: session.post("_xpack/security/user/{}".format(username), json=elastic_user)
+		) as resp:
+			if 200 <= resp.status < 300:
+				# Everything is alright here
+				pass
+			else:
+				text = await resp.text()
+				L.warning(
+					"Failed to create/update user in ElasticSearch:\n{}".format(text[:1000]),
+					struct_data={"cid": cred["_id"]}
+				)
 
 
 	def _prepare_ignored_usernames(self):
