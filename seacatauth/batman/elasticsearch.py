@@ -1,11 +1,13 @@
+import asyncio
 import contextlib
 import datetime
 import re
 import ssl
 import logging
+import typing
+
 import aiohttp
 import aiohttp.client_exceptions
-import urllib.parse
 import random
 import asab.config
 import asab.tls
@@ -13,6 +15,7 @@ import asab.tls
 from .. import exceptions
 from ..models.const import ResourceId
 from ..authz import build_credentials_authz
+from . import utils
 
 
 L = logging.getLogger(__name__)
@@ -73,7 +76,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.Kibana = KibanaUtils(self.App, config_section_name, config)
 
 		elasticsearch_url = self.Config.get("url")
-		self.ElasticSearchNodesUrls = get_url_list(elasticsearch_url)
+		self.ElasticSearchNodesUrls = utils.get_url_list(elasticsearch_url)
 		if len(self.ElasticSearchNodesUrls) == 0:
 			raise ValueError("No ElasticSearch URL has been provided")
 
@@ -94,7 +97,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		if self.ElasticSearchNodesUrls[0].startswith("https://"):
 			# Try to build SSL context from either the default or the [elasticsearch] section,
 			#   whichever contains SSL config options
-			if section_has_ssl_option(config_section_name):
+			if utils.section_has_ssl_option(config_section_name):
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder(config_section_name)
 			else:
 				self.SSLContextBuilder = asab.tls.SSLContextBuilder("elasticsearch")
@@ -117,11 +120,42 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		self.App.PubSub.subscribe("Application.tick/10!", self._retry_sync)
 
 
+	async def initialize(self):
+		pass
+
+
 	@contextlib.asynccontextmanager
-	async def _elasticsearch_session(self):
-		async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
-			async with aiohttp.ClientSession(connector=connector, headers=self.Headers) as session:
-				yield session
+	async def _with_elasticsearch_nodes(self, api_call: typing.Callable[..., typing.Awaitable]):
+		"""
+		Tries to call the provided api_call function with a session connected to one of the available
+		ElasticSearch nodes. If the node is not reachable, tries another one until all nodes are exhausted.
+
+		Args:
+			api_call: A callable that takes an aiohttp.ClientSession as its only argument and returns
+				an awaitable (usually a coroutine).
+
+		Yields:
+			The result of the api_call.
+
+		Raises:
+			ClientConnectionError if no node is reachable.
+		"""
+		last_error = None
+		for node_url in random.sample(self.ElasticSearchNodesUrls, len(self.ElasticSearchNodesUrls)):
+			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
+				async with aiohttp.ClientSession(
+					connector=connector, headers=self.Headers, base_url=node_url
+				) as session:
+					try:
+						async with api_call(session=session) as result:
+							yield result
+							return
+					except (aiohttp.client_exceptions.ClientConnectionError, asyncio.TimeoutError) as e:
+						last_error = e
+						L.debug("ElasticSearch node {} is not reachable, trying another one.".format(node_url))
+						continue
+		raise aiohttp.client_exceptions.ClientConnectionError(
+			"Cannot connect to any of the configured ElasticSearch nodes.") from last_error
 
 
 	async def _on_init(self, event_name):
@@ -143,6 +177,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def full_sync(self):
+		"""
+		Perform full synchronization of all index access roles, Kibana spaces and roles, and credentials.
+		"""
 		self.RetrySyncAll = None
 		try:
 			await self._sync_all_index_access_roles()
@@ -184,8 +221,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			return
 
 		try:
-			async with self._elasticsearch_session() as session:
-				await self.sync_credentials(session, credentials)
+			await self.sync_credentials(credentials)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
@@ -218,6 +254,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _sync_all_index_access_roles(self):
+		"""
+		Ensure that all tenants have corresponding index access roles in ElasticSearch
+		"""
 		try:
 			async for tenant in self.TenantService.iterate():
 				# Update Elasticsearch roles with index access privileges
@@ -228,7 +267,17 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			return
 
 
-	async def _upsert_role_for_index_access(self, tenant_id: str, privileges: str = "read"):
+	async def _upsert_role_for_index_access(self, tenant_id: str, privileges: str = "read") -> str | None:
+		"""
+		Create or update an ElasticSearch role with index access privileges
+
+		Args:
+			tenant_id: Tenant whose indices are to be accessed
+			privileges: "read" for read-only access or "all" for read-write access
+
+		Returns:
+			The name of the created or updated role
+		"""
 		assert privileges in {"read", "all"}
 		role_name = get_index_access_role_name(tenant_id, privileges)
 		required_index_settings = {
@@ -239,19 +288,20 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			"privileges": [privileges],
 		}
 
-		async with self._elasticsearch_session() as session:
-			async with session.get("{}_security/role/{}".format(random.choice(self.ElasticSearchNodesUrls), role_name)) as resp:
-				if resp.status == 200:
-					role_data = (await resp.json()).get(role_name)
-				elif resp.status == 404:
-					role_data = None
-				else:
-					text = await resp.text()
-					L.error(
-						"Failed to get ElasticSearch role:\n{}".format(text[:1000]),
-						struct_data={"code": resp.status, "role": role_name}
-					)
-					return
+		async with self._with_elasticsearch_nodes(
+			lambda session: session.get("_security/role/{}".format(role_name))
+		) as resp:
+			if resp.status == 200:
+				role_data = (await resp.json()).get(role_name)
+			elif resp.status == 404:
+				role_data = None
+			else:
+				text = await resp.text()
+				L.error(
+					"Failed to get ElasticSearch role:\n{}".format(text[:1000]),
+					struct_data={"code": resp.status, "role": role_name}
+				)
+				return
 
 		# Check if index privileges are present in role settings
 		if role_data and role_data.get("indices"):
@@ -264,18 +314,17 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		# Add access to elasticsearch indices
 		role_data = {"indices": [required_index_settings]}
-		async with self._elasticsearch_session() as session:
-			async with session.put(
-				"{}_security/role/{}".format(random.choice(self.ElasticSearchNodesUrls), role_name), json=role_data
-			) as resp:
-				if not (200 <= resp.status < 300):
-					text = await resp.text()
-					L.error(
-						"Failed to create/update ElasticSearch role:\n{}".format(text[:1000]),
-						struct_data={"code": resp.status, "role": role_name}
-					)
-					return
-				result = await resp.json()
+		async with self._with_elasticsearch_nodes(
+			lambda session: session.put("_security/role/{}".format(role_name), json=role_data)
+		) as resp:
+			if not (200 <= resp.status < 300):
+				text = await resp.text()
+				L.error(
+					"Failed to create/update ElasticSearch role:\n{}".format(text[:1000]),
+					struct_data={"code": resp.status, "role": role_name}
+				)
+				return
+			result = await resp.json()
 
 		created = result.get("role", {}).get("created")
 		if created is True:
@@ -284,10 +333,6 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			L.info("ElasticSearch role updated.", struct_data={"role": role_name})
 
 		return role_name
-
-
-	async def initialize(self):
-		pass
 
 
 	async def _initialize_resources(self):
@@ -339,13 +384,21 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def sync_all_credentials(self):
+		"""
+		Perform synchronization of all credentials
+		"""
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
-		async with self._elasticsearch_session() as session:
-			async for cred in self.CredentialsService.iterate():
-				await self.sync_credentials(session, cred)
+		async for cred in self.CredentialsService.iterate():
+			await self.sync_credentials(cred)
 
 
-	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
+	async def sync_credentials(self, cred: dict):
+		"""
+		Create or update a user in ElasticSearch/Kibana corresponding to the provided credentials
+
+		Args:
+			cred: Credentials document
+		"""
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
@@ -398,9 +451,8 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 		elastic_user["roles"] = list(elk_roles)
 
-		async with session.post(
-			"{}_xpack/security/user/{}".format(random.choice(self.ElasticSearchNodesUrls), username),
-			json=elastic_user
+		async with self._with_elasticsearch_nodes(
+			lambda session: session.post("_xpack/security/user/{}".format(username), json=elastic_user)
 		) as resp:
 			if 200 <= resp.status < 300:
 				# Everything is alright here
@@ -424,6 +476,9 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	def _prepare_session_headers(self, username, password, api_key):
+		"""
+		Prepare HTTP headers for authentication with ElasticSearch / Kibana
+		"""
 		headers = {}
 		if username != "" and api_key != "":
 			raise ValueError("Cannot authenticate with both 'api_key' and 'username'+'password'.")
@@ -480,10 +535,16 @@ class KibanaUtils(asab.config.Configurable):
 
 
 	def is_enabled(self):
+		"""
+		Returns True if Kibana integration is enabled
+		"""
 		return self.KibanaUrl is not None
 
 
 	def get_kibana_resources(self):
+		"""
+		Returns a dict of Kibana-related resources that should be created in Seacat Auth
+		"""
 		return {
 			self.ReadResourceId: {
 				"description": "Read-only access to tenant space in Kibana",
@@ -501,6 +562,9 @@ class KibanaUtils(asab.config.Configurable):
 
 
 	def get_kibana_roles_by_authz(self, authz: dict):
+		"""
+		Returns a set of Kibana roles that should be assigned to a user with the provided authorization scope
+		"""
 		roles = set()
 		for tenant_id, authorized_resources in authz.items():
 			if tenant_id == "*":
@@ -516,12 +580,18 @@ class KibanaUtils(asab.config.Configurable):
 
 	@contextlib.asynccontextmanager
 	async def _kibana_session(self):
+		"""
+		Provides an aiohttp.ClientSession for communicating with Kibana
+		"""
 		async with aiohttp.TCPConnector(ssl=False) as connector:
 			async with aiohttp.ClientSession(connector=connector, headers=self.Headers) as session:
 				yield session
 
 
 	def _prepare_session_headers(self, username, password, api_key):
+		"""
+		Prepare HTTP headers for authentication with Kibana
+		"""
 		headers = {"kbn-xsrf": "kibana"}
 
 		if username and api_key:
@@ -535,7 +605,17 @@ class KibanaUtils(asab.config.Configurable):
 		return headers
 
 
-	def space_id_from_tenant_id(self, tenant_id: str):
+	def space_id_from_tenant_id(self, tenant_id: str) -> str:
+		"""
+		Maps a Seacat tenant ID to a valid Kibana space ID.
+		Kibana space IDs may only contain lowercase letters (a-z), numbers (0-9), hyphens (-), and underscores (_).
+
+		Args:
+			tenant_id: Seacat tenant ID
+
+		Returns:
+			A valid Kibana space ID
+		"""
 		if tenant_id == "default":
 			# "default" is a reserved space name in Kibana
 			return "tenant-default"
@@ -546,6 +626,9 @@ class KibanaUtils(asab.config.Configurable):
 	async def upsert_kibana_space(self, tenant: str | dict):
 		"""
 		Create a Kibana space for specified tenant or update its metadata if necessary.
+
+		Args:
+			tenant: Tenant ID or tenant document
 		"""
 		assert self.is_enabled()
 
@@ -626,7 +709,13 @@ class KibanaUtils(asab.config.Configurable):
 			L.info("Kibana space created.", struct_data={"id": space_id, "tenant": tenant_id})
 
 
-	async def get_kibana_spaces(self):
+	async def get_kibana_spaces(self) -> list | None:
+		"""
+		Retrieve a list of all Kibana spaces
+
+		Returns:
+			A list of Kibana spaces or None on error
+		"""
 		assert self.is_enabled()
 
 		async with self._kibana_session() as session:
@@ -642,9 +731,10 @@ class KibanaUtils(asab.config.Configurable):
 	async def upsert_role_for_space_access(self, tenant_id: str, privileges: str = "read"):
 		"""
 		Create or update a Kibana role with Kibana space privileges
-		@param tenant_id: Tenant whose Kibana space is to be accessed
-		@param privileges: "read" for read-only access or "all" for read-write access
-		@return:
+
+		Args:
+			tenant_id: Tenant whose Kibana space is to be accessed
+			privileges: "read" for read-only access or "all" for read-write access
 		"""
 		assert self.is_enabled()
 		assert privileges in {"read", "all"}
@@ -705,6 +795,9 @@ class KibanaUtils(asab.config.Configurable):
 	async def sync_space_and_roles(self, tenant: str | dict):
 		"""
 		Sync Kibana space with Seacat tenant, add Kibana space access to ElasticSearch roles
+
+		Args:
+			tenant: Tenant ID or tenant document
 		"""
 		assert self.is_enabled()
 
@@ -729,52 +822,6 @@ class KibanaUtils(asab.config.Configurable):
 
 		async for tenant in self.TenantService.iterate():
 			await self.sync_space_and_roles(tenant)
-
-
-def getmultiline(url_string):
-	"""
-	URL can be a multiline with lines / items devided by spaces
-	url=https://localhost:9200 https://localhost:9200 https://localhost:9200
-	"""
-	return [item.strip() for item in re.split(r"\s+", url_string) if len(item) > 0]
-
-
-def get_url_list(urls):
-	"""
-	URLs can devided by a semicolon
-	url=https://localhost:9200;localhost:9200;localhost:9200
-	"""
-	server_urls = []
-	if len(urls) > 0:
-		urls = getmultiline(urls)
-		for url in urls:
-			scheme, netloc, path = parse_url(url)
-
-			server_urls += [
-				urllib.parse.urlunparse((scheme, netloc, path, None, None, None))
-				for netloc in netloc.split(';')
-			]
-
-	return server_urls
-
-
-def parse_url(url):
-	parsed_url = urllib.parse.urlparse(url)
-	url_path = parsed_url.path
-	if not url_path.endswith("/"):
-		url_path += "/"
-
-	return parsed_url.scheme, parsed_url.netloc, url_path
-
-
-def section_has_ssl_option(config_section_name):
-	"""
-	Checks if at least one of SSL config options (cert, key, cafile, capath, cadata etc.) appears in a config section
-	"""
-	for item in asab.Config.options(config_section_name):
-		if item in asab.tls.SSLContextBuilder.ConfigDefaults:
-			return True
-	return False
 
 
 def get_index_access_role_name(tenant: str, privileges: str):
