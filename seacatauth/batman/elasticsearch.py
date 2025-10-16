@@ -121,22 +121,33 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	@contextlib.asynccontextmanager
-	async def _elasticsearch_session(self):
-		async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
-			async with aiohttp.ClientSession(connector=connector, headers=self.Headers) as session:
-				yield session
-
-
-	@contextlib.asynccontextmanager
 	async def _with_elasticsearch_nodes(self, api_call: typing.Callable[..., typing.Awaitable]):
+		"""
+		Tries to call the provided api_call function with a session connected to one of the available
+		ElasticSearch nodes. If the node is not reachable, tries another one until all nodes are exhausted.
+
+		Args:
+			api_call: A callable that takes an aiohttp.ClientSession as its only argument and returns
+				an awaitable (usually a coroutine).
+
+		Yields:
+			The result of the api_call.
+
+		Raises:
+			ClientConnectionError if no node is reachable.
+		"""
 		for node_url in random.sample(self.ElasticSearchNodesUrls, len(self.ElasticSearchNodesUrls)):
-			async with self._elasticsearch_session(base_url=node_url) as session:
-				try:
-					result = await api_call(session=session)
-					yield result
-				except (aiohttp.client_exceptions.ClientConnectionError, asyncio.TimeoutError):
-					L.debug("ElasticSearch node {} is not reachable, trying another one.".format(node_url))
-					continue
+			async with aiohttp.TCPConnector(ssl=self.SSLContext or False) as connector:
+				async with aiohttp.ClientSession(
+					connector=connector, headers=self.Headers, base_url=node_url
+				) as session:
+					try:
+						result = await api_call(session=session)
+						yield result
+						return
+					except (aiohttp.client_exceptions.ClientConnectionError, asyncio.TimeoutError):
+						L.debug("ElasticSearch node {} is not reachable, trying another one.".format(node_url))
+						continue
 		raise aiohttp.client_exceptions.ClientConnectionError(
 			"Cannot connect to any of the configured ElasticSearch nodes.")
 
@@ -201,8 +212,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 			return
 
 		try:
-			async with self._elasticsearch_session() as session:
-				await self.sync_credentials(session, credentials)
+			await self.sync_credentials(credentials)
 		except aiohttp.client_exceptions.ClientConnectionError as e:
 			L.error("Cannot connect to ElasticSearch: {}".format(str(e)))
 			self.RetrySyncAll = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
@@ -365,12 +375,11 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 	async def sync_all_credentials(self):
 		# TODO: Remove users that are managed by us but are removed (use `managed_role` to find these)
-		async with self._elasticsearch_session() as session:
-			async for cred in self.CredentialsService.iterate():
-				await self.sync_credentials(session, cred)
+		async for cred in self.CredentialsService.iterate():
+			await self.sync_credentials(cred)
 
 
-	async def sync_credentials(self, session: aiohttp.ClientSession, cred: dict):
+	async def sync_credentials(self, cred: dict):
 		username = cred.get("username")
 		if username is None:
 			# Be defensive
