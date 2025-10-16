@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha8
 - v25.38-alpha7
 - v25.38-alpha6
 - v25.38-alpha5
@@ -11,8 +12,13 @@
 - v25.38-alpha2
 - v25.38-alpha1
 
+### Breaking changes
+- In the `general` config section, the option `public_seacat_auth_base_url` is renamed 
+  to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
+
 ### Fixes
-- Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha7)
+- Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha8)
+- Make sure external login callback is on the sub-path of Auth UI (#522, v25.38-alpha7)
 - Opaque external credential IDs (#521, v25.38-alpha6)
 - Fix pysaml2 dependency (#518, v25.38-alpha4)
 
