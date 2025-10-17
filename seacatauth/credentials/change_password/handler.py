@@ -192,7 +192,9 @@ class ChangePasswordHandler(object):
 	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
-		Send a password reset link to specified user
+		Send a password reset link to specified user and return it in the response if the caller is superuser.
+		As long as either email communication is successful or the caller is superuser, the result is
+		considered successful.
 		"""
 		response_data = {}
 		authz = asab.contextvars.Authz.get()
@@ -203,7 +205,9 @@ class ChangePasswordHandler(object):
 			L.error("Password reset denied: Credentials not found.", struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR",
-				"tech_err": "Credentials not found.",
+				"tech_err": "Credentials {!r} not found.".format(credentials_id),
+				"error": "SeaCatAuthError|Credentials '{{cid}}' not found.",
+				"error_dict": {"cid": credentials_id},
 			})
 
 		# Deny password reset to suspended credentials
@@ -211,10 +215,13 @@ class ChangePasswordHandler(object):
 			L.error("Password reset denied: Credentials suspended.", struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
-				"tech_err": "Credentials suspended.",
+				"tech_err": "Credentials {!r} suspended.".format(credentials_id),
+				"error": "SeaCatAuthError|Credentials '{{cid}}' are suspended.",
+				"error_dict": {"cid": credentials_id},
 			})
 
-		# Check if password reset link can be sent (in email or at least in the response)
+		# Check if password reset link can be disclosed (in email or at least in the response)
+		link_disclosed = False
 		if not (
 			authz.has_superuser_access()
 			or await self.ChangePasswordService.CommunicationService.can_send_to_target(credentials, "email")
@@ -223,7 +230,8 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id})
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
-				"tech_err": "Password reset link cannot be sent.",
+				"tech_err": "No way to communicate password reset link.",
+				"error": "SeaCatAuthError|No way to communicate password reset link.",
 			})
 
 		# Create the password reset link
@@ -235,6 +243,7 @@ class ChangePasswordHandler(object):
 		# Superusers receive the password reset link in response
 		if authz.has_superuser_access():
 			response_data["password_reset_url"] = password_reset_url
+			link_disclosed = True
 
 		# Email the link to the user
 		try:
@@ -243,14 +252,27 @@ class ChangePasswordHandler(object):
 				reset_url=password_reset_url,
 				new_user=False
 			)
+			link_disclosed = True
+			email_delivery_result = {"result": "OK"}
 		except exceptions.MessageDeliveryError:
-			# Send error response but include the password reset link
-			response_data["result"] = "ERROR"
-			response_data["tech_err"] = "Failed to send password reset link."
-			return asab.web.rest.json_response(request, response_data, status=400)
+			email_delivery_result = {
+				"result": "ERROR",
+				"tech_err": "Failed to send password reset link.",
+				"error": "SeaCatAuthError|Failed to send password reset link.",
+			}
 
-		response_data["result"] = "OK"
-		return asab.web.rest.json_response(request, response_data)
+		response_data["email_sent"] = email_delivery_result
+		if link_disclosed:
+			response_data["result"] = "OK"
+			status = 200
+		else:
+			response_data.update({
+				"result": "ERROR",
+				"tech_err": "No way to communicate password reset link.",
+				"error": "SeaCatAuthError|No way to communicate password reset link.",
+			})
+			status = 400
+		return asab.web.rest.json_response(request, response_data, status=status)
 
 
 	@asab.web.rest.json_schema_handler(schema.REQUEST_LOST_PASSWORD_RESET)

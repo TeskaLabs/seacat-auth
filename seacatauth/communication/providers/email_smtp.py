@@ -6,6 +6,7 @@ import re
 import asab
 
 from .abc import CommunicationProviderABC
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -104,17 +105,22 @@ class SMTPEmailProvider(CommunicationProviderABC):
 			)
 		else:
 			msg.attach(email.mime.text.MIMEText(message["message_body"], "html", "utf-8"))
-			result = await aiosmtplib.send(
-				msg,
-				sender=self.From,
-				recipients=[to],
-				hostname=self.Host,
-				port=self.Port,
-				username=self.User if len(self.User) > 0 else None,
-				password=self.Password,
-				use_tls=self.SSL,
-				start_tls=self.StartTLS
-			)
+			try:
+				result = await aiosmtplib.send(
+					msg,
+					sender=self.From,
+					recipients=[to],
+					hostname=self.Host,
+					port=self.Port,
+					username=self.User if len(self.User) > 0 else None,
+					password=self.Password,
+					use_tls=self.SSL,
+					start_tls=self.StartTLS
+				)
+			except ConnectionError as e:
+				L.error("Cannot connect to SMTP server: {}".format(e))
+				raise exceptions.MessageDeliveryError("Cannot connect to SMTP server", channel=self.Channel)
+
 			L.log(asab.LOG_NOTICE, "Email sent.", struct_data={"result": result[1]})
 
 		return
