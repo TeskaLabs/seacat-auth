@@ -13,7 +13,9 @@ from ...api import local_authz
 from ...models.const import ResourceId
 from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
+from .view.abc import RoleView
 from .view.propagated_role import global_role_id_to_propagated
+from .utils import amerge_sorted, ReverseSortingString
 
 
 L = logging.getLogger(__name__)
@@ -143,7 +145,12 @@ class RoleService(asab.Service):
 				L.warning("Tenant admin role is not ready.", struct_data={"role": self.TenantAdminRole})
 
 
-	def _prepare_views(self, tenant_id: str | None, exclude_global: bool = False, exclude_propagated: bool = False):
+	def _prepare_views(
+		self,
+		tenant_id: str | None,
+		exclude_global: bool = False,
+		exclude_propagated: bool = False
+	) -> typing.List[RoleView]:
 		assert tenant_id != "*"
 		views = []
 		if tenant_id:
@@ -155,60 +162,168 @@ class RoleService(asab.Service):
 		return views
 
 
-	def _role_tenant_id(self, role_id: str):
-		tenant_id = role_id.split("/")[0]
-		if tenant_id == "*":
-			return None
+	async def _get_tenants_where_roles_assignable(self, target_cid: str | None = None) -> typing.Set[str]:
+		"""
+		Returns a set of tenants where the caller can assign roles to the target credentials.
+
+		Args:
+			target_cid:
+				Credentials ID of the target user. If None, use the current user.
+				If given, the target user must have access to the current tenant
+				for the current tenant to be included in the result.
+
+		Returns:
+			Set of tenant IDs where the caller can assign roles to the target user.
+			Includes None if the caller can assign global roles.
+		"""
+		target_tenants = set(await self.TenantService.get_tenants(target_cid))
+
+		authz = asab.contextvars.Authz.get()
+		if authz.has_superuser_access():
+			# Superusers can assign roles in any tenant plus global roles
+			return {None, *target_tenants}
+
+		tenant = asab.contextvars.Tenant.get()
+		if tenant not in target_tenants:
+			# Target does not have access to the current tenant, so no editable tenants
+			return set()
+
+		# Current tenant is editable if the user has ROLE_ASSIGN in it
+		if authz.has_resource_access(ResourceId.ROLE_ASSIGN):
+			return {tenant}
 		else:
-			return tenant_id
+			return set()
 
 
-	async def list(
+	async def list_roles(
 		self,
-		tenant_id: typing.Optional[str] = None,
+		tenant_id: str | None = None,
 		page: int = 0,
-		limit: int = None,
-		name_filter: str = None,
-		resource_filter: str = None,
+		limit: int | None = None,
+		sort: list[tuple[str, int]] | None = None,
+		name_filter: str | None = None,
+		description_filter: str | None = None,
+		resource_filter: str | None = None,
 		exclude_global: bool = False,
 		exclude_propagated: bool = False,
+		assign_cid: str | None = None,
+		assigned_filter: bool | None = None,
+		assignable_filter: bool | None = None,
 	):
+		"""
+		List roles matching the given criteria.
+
+		Args:
+			tenant_id:
+				If given, list roles defined in the given tenant plus global roles.
+				If None or "*", list global roles only.
+			page: Page number (0..N).
+			limit: Page size. If None, return all matching roles.
+			sort: List of (field, direction) tuples to sort the results by.
+				Direction is 1 for ascending and -1 for descending.
+				Supported fields are "_id", "description", "assigned" and "assignable".
+			name_filter: If given, return only roles whose ID contains this substring.
+			description_filter: If given, return only roles whose description contains this substring.
+			resource_filter: If given, return only roles with the given resource.
+			exclude_global: If True, exclude global roles from the results.
+			exclude_propagated: If True, exclude propagated global roles from the results.
+			assign_cid:
+				If given, add a boolean field "assigned" indicating whether the role is assigned to the given
+				credentials ID. Also filter the results by the `assigned_filter` parameter if given.
+				Requires that the caller has ROLE_ASSIGN in the target tenant (if `tenant_id` is given).
+			assigned_filter:
+				If given, filter results by the value of the "assigned" field.
+				Requires `assign_cid` to be set.
+			assignable_filter:
+				If given, add a boolean field "assignable" indicating whether the role can be assigned to the
+				credentials ID by the caller. Also filter the results by this field if given.
+				Requires `assign_cid` to be set. To be assignable, the caller must have ROLE_ASSIGN in the target
+				tenant (if `tenant_id` is given) and the target credentials must have access to the target tenant
+				(if `tenant_id` is given).
+		"""
 		authz = asab.contextvars.Authz.get()
 		if tenant_id in {"*", None}:
 			tenant_id = None
 		else:
 			authz.require_tenant_access()
 
+		if assign_cid is not None:
+			cred_roles = list(await self.get_roles_by_credentials(
+				assign_cid, [tenant_id] if tenant_id is not None else None)) or []
+			editable_tenants = list(await self._get_tenants_where_roles_assignable(target_cid=assign_cid)) or []
+		else:
+			editable_tenants = None
+			cred_roles = None
+
 		views = self._prepare_views(tenant_id, exclude_global, exclude_propagated)
 		counts = [
-			await view.count(name_filter, resource_filter)
+			await view.count(
+				id_substring=name_filter,
+				description_substring=description_filter,
+				resource_filter=resource_filter,
+				flag_tenants=editable_tenants,
+				tenant_flag_filter=assignable_filter,
+				flag_ids=cred_roles,
+				id_flag_filter=assigned_filter,
+			)
 			for view in views
 		]
-		roles = []
+
 		offset = (page or 0) * (limit or 0)
+		for i, count in enumerate(counts):
+			if count == 0:
+				# Remove empty views to optimize iteration
+				views[i] = None
+				continue
+
+			if offset >= count:
+				offset -= count
+				views[i] = None
+				continue
+
+		iterators = []
 		for count, view in zip(counts, views):
-			if offset > count:
+			if count == 0:
+				# Skip empty views to optimize iteration
+				continue
+
+			if offset >= count:
 				offset -= count
 				continue
 
-			async for role in view.iterate(
+			iterators.append(view.iterate(
 				offset=offset,
-				limit=(limit - len(roles)) if limit else None,
-				sort=("_id", 1),
-				name_filter=name_filter,
+				limit=limit,
+				sort=sort,
+				id_substring=name_filter,
+				description_substring=description_filter,
 				resource_filter=resource_filter,
-			):
-				roles.append(role)
+				flag_tenants=editable_tenants,
+				tenant_flag_filter=assignable_filter,
+				flag_ids=cred_roles,
+				id_flag_filter=assigned_filter,
+				set_fields={
+					"assigned": "$_id_flag",
+					"assignable": "$_tenant_flag",
+				}
+			))
+			offset = 0
 
+		roles = []
+		async for role in amerge_sorted(
+			*iterators,
+			key=lambda r: _sorting_key(r, sort)
+		):
+			roles.append(role)
 			if limit and len(roles) >= limit:
 				break
 
-			offset = 0
-
-		return {
+		result = {
 			"count": sum(counts),
 			"data": roles,
 		}
+
+		return result
 
 
 	async def _get(self, role_id: str):
@@ -335,7 +450,7 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
 			raise e
 
-		assert_role_is_editable(role_current)
+		_assert_role_is_editable(role_current)
 
 		# Unassign the role from all credentials
 		await self.delete_role_assignments(role_current)
@@ -365,7 +480,7 @@ class RoleService(asab.Service):
 			L.log(asab.LOG_NOTICE, "Role not found.", struct_data={"role_id": role_id})
 			raise e
 
-		assert_role_is_editable(role_current)
+		_assert_role_is_editable(role_current)
 
 		# Validate resources
 		resources_to_assign = set().union(
@@ -703,8 +818,26 @@ class RoleService(asab.Service):
 		)
 
 
-def assert_role_is_editable(role: dict):
+def _assert_role_is_editable(role: dict):
 	if role.get("read_only"):
 		L.log(asab.LOG_NOTICE, "Role is not editable.", struct_data={"role_id": role["_id"]})
 		raise exceptions.NotEditableError("Role is not editable.")
 	return True
+
+
+def _sorting_key(
+	role: dict,
+	sort: list[tuple[str, int]],
+):
+	keys = []
+	if sort:
+		for field, direction in sort:
+			if field in {"_id", "description"}:
+				if direction == 1:
+					keys.append(role.get(field, ""))
+				elif direction == -1:
+					keys.append(ReverseSortingString(role.get(field, "")))
+			elif field in {"assigned", "assignable"}:
+				keys.append(direction * role.get(field, False))
+
+	return keys
