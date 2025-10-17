@@ -54,13 +54,11 @@ class ApiKeyHandler(object):
 			schema:
 				type: string
 		"""
-		search = generic.SearchParams(request.query, sort_by_default=[("_c", 1)])
-
 		data = []
 		for api_key in (await self.ApiKeyService.iterate_api_keys(
-			search.Page,
-			search.ItemsPerPage,
-			query_filter=search.SimpleFilter
+			page=int(request.query.get("p", 1)) - 1,
+			limit=int(request.query["i"]) if "i" in request.query else None,
+			query_filter=request.query.get("f", None),
 		)):
 			data.append(api_key)
 

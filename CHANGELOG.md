@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## v25.26.1
+
+This patch brings the repository to the same state as v25.38-alpha8.
+
+### Fixes
+- Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha8)
+- Make sure external login callback is on the sub-path of Auth UI (#522, v25.38-alpha7)
+- Opaque external credential IDs (#521, v25.38-alpha6)
+- Fix pysaml2 dependency (#518, v25.38-alpha4)
+
+### Features
+- Filtering credentials by active/suspended status (#517, v25.38-alpha3)
+- External login with SAML (#516, v25.38-alpha2)
+
+### Refactoring
+- Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
+- Decouple external authentication from external credentials management (#515, v25.38-alpha1)
+
+---
+
+
 ## v25.26
 
 ### Pre-releases
