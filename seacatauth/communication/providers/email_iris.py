@@ -43,12 +43,16 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 	async def is_enabled(self) -> bool:
 		url = "{}{}".format(self.AsabIrisUrl, "features")
-		async with _asab_iris_session(self.App) as session:
-			async with session.get(url) as resp:
-				response = await resp.json()
-				if resp.status != 200:
-					L.error("Error response from ASAB Iris.", struct_data=response)
-					return False
+		try:
+			async with _asab_iris_session(self.App) as session:
+				async with session.get(url) as resp:
+					response = await resp.json()
+					if resp.status != 200:
+						L.error("Error response from ASAB Iris.", struct_data=response)
+						return False
+		except aiohttp.ClientError as e:
+			L.error("Error connecting to ASAB Iris: {}".format(e))
+			return False
 
 		enabled_orchestrators = response.get("orchestrators", [])
 		return "email" in enabled_orchestrators
@@ -73,14 +77,18 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		data = asab.web.rest.json.JSONDumper(pretty=False)(email_decl)
 
 		url = "{}{}".format(self.AsabIrisUrl, "send_email")
-		async with _asab_iris_session(self.App) as session:
-			async with session.put(url, data=data, headers={"Content-Type": "application/json"}) as resp:
-				response = await resp.json()
-				if resp.status == 200:
-					L.log(asab.LOG_NOTICE, "Email sent.")
-				else:
-					L.error("Error response from ASAB Iris.", struct_data=response)
-					raise RuntimeError("Email delivery failed.")
+		try:
+			async with _asab_iris_session(self.App) as session:
+				async with session.put(url, data=data, headers={"Content-Type": "application/json"}) as resp:
+					response = await resp.json()
+					if resp.status == 200:
+						L.log(asab.LOG_NOTICE, "Email sent.")
+					else:
+						L.error("Error response from ASAB Iris.", struct_data=response)
+						raise RuntimeError("Email delivery failed.")
+		except aiohttp.ClientError as e:
+			L.error("Error connecting to ASAB Iris: {}".format(e))
+			raise RuntimeError("Email delivery failed.")
 
 
 	def _get_template_path(self, template_id: str) -> str:
