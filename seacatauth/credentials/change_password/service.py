@@ -165,6 +165,20 @@ class ChangePasswordService(asab.Service):
 		return hashlib.sha256(password_reset_token.encode("ascii")).digest()
 
 
+	async def can_request_password_reset(self, credentials: dict) -> bool:
+		"""
+		Check whether the caller can request a password reset of the target credentials
+
+		The result is true iff all the following conditions are met:
+		- The caller has access to SEACAT_CREDENTIALS_EDIT resource
+		- The target credentials are editable
+		- The target credentials are not suspended
+		- It is possible to disclose the password reset link to the target credentials via email or
+			to the caller via HTTP response.
+		"""
+		!!TODO
+
+
 	def verify_password_strength(self, password: str):
 		if len(password) > self.PasswordMaxLength:
 			raise asab.exceptions.ValidationError(

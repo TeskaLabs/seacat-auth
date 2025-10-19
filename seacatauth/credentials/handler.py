@@ -338,6 +338,8 @@ class CredentialsHandler(object):
 		if asab.config.utils.string_to_boolean(request.query.get("last_login", "no")):
 			credentials["_ll"] = await self.LastActivityService.get_last_logins(credentials_id)
 
+		credentials["actions"] = self.CredentialsService.get_allowed_actions(credentials)
+
 		return asab.web.rest.json_response(request, credentials)
 
 

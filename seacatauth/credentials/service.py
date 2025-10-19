@@ -10,6 +10,7 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, exceptions
+from ..models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
@@ -674,6 +675,25 @@ class CredentialsService(asab.Service):
 
 		# The request and the target credentials have no tenant in common
 		return False
+
+
+	async def get_allowed_actions(self, credentials_id: str) -> typing.Dict[str, bool]:
+		"""
+		Get dict of actions that the caller is allowed to perform on the target credentials
+		"""
+		authz = asab.contextvars.Authz.get()
+		credentials = await self.get(credentials_id)
+		provider = self.get_provider(credentials_id)
+
+		allowed_actions = {}
+		if provider.Editable and authz.has_resource_access(ResourceId.CREDENTIALS_EDIT):
+			allowed_actions["update_suspended_status"] = True
+
+		change_pwd_service = self.App.get_service("seacatauth.ChangePasswordService")
+		if await change_pwd_service.can_request_password_reset(credentials):
+			allowed_actions["password_reset"] = True
+
+		return allowed_actions
 
 
 def _authorize_searched_tenants(
