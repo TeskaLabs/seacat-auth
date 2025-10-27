@@ -1,29 +1,12 @@
 # CHANGELOG
 
-## v25.26.1
-
-This patch brings the repository to the same state as v25.38-alpha8.
-
-### Fixes
-- Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha8)
-- Make sure external login callback is on the sub-path of Auth UI (#522, v25.38-alpha7)
-- Opaque external credential IDs (#521, v25.38-alpha6)
-- Fix pysaml2 dependency (#518, v25.38-alpha4)
-
-### Features
-- Filtering credentials by active/suspended status (#517, v25.38-alpha3)
-- External login with SAML (#516, v25.38-alpha2)
-
-### Refactoring
-- Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
-- Decouple external authentication from external credentials management (#515, v25.38-alpha1)
-
----
-
-
 ## v25.26
 
 ### Pre-releases
+- v25.26.02
+- v25.26.01
+- v25.26
+- v25.26-beta
 - v25.26-alpha14
 - v25.26-alpha13
 - v25.26-alpha12
@@ -45,6 +28,11 @@ This patch brings the repository to the same state as v25.38-alpha8.
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
+- Update ASAB version to v25.43.01 (#526, v25.26.02)
+- Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.26.01)
+- Make sure external login callback is on the sub-path of Auth UI (#522, v25.26.01)
+- Opaque external credential IDs (#521, v25.26.01)
+- Fix pysaml2 dependency (#518, v25.26.01)
 - Fix userinfo endpoint (#514, v25.26-alpha14)
 - Fix websocket authentication introspection (#513, v25.26-alpha13)
 - Standardize API key creation response (#512, v25.26-alpha12)
@@ -56,6 +44,8 @@ This patch brings the repository to the same state as v25.38-alpha8.
 - Fix credentials search - Client provider error (#489, v25.26-alpha1)
 
 ### Features
+- Filtering credentials by active/suspended status (#517, v25.26.01)
+- External login with SAML (#516, v25.26.01)
 - Standardize API key creation response (#512, v25.26-alpha12)
 - Simpler API keys (#505, v25.26-alpha11)
 - Extend resource filtering API (#510, v25.26-alpha9)
@@ -65,6 +55,8 @@ This patch brings the repository to the same state as v25.38-alpha8.
 - Prefix credentials API with /admin (#493, v25.26-alpha3)
 
 ### Refactoring
+- Rename credentials "status" param to "astatus" (#520, v25.26.01)
+- Decouple external authentication from external credentials management (#515, v25.26.01)
 - Adapt to ASAB tenant mode (#501, v25.26-alpha5)
 
 ---
