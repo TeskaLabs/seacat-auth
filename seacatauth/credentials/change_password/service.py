@@ -9,6 +9,7 @@ import asab.exceptions
 from ... import exceptions
 from ...generic import generate_ergonomic_token
 from ...events import EventTypes
+from ...models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
@@ -176,7 +177,19 @@ class ChangePasswordService(asab.Service):
 		- It is possible to disclose the password reset link to the target credentials via email or
 			to the caller via HTTP response.
 		"""
-		!!TODO
+		authz = asab.contextvars.Authz.get(None)
+		if authz is None:
+			return False
+		if not authz.has_resource_access(ResourceId.CREDENTIALS_EDIT):
+			return False
+		if credentials.get("read_only", False) is True:
+			return False
+		if credentials.get("suspended", False) is True:
+			return False
+		if can_get_password_link_via_response(authz):
+			return True
+		return await self.CommunicationService.can_send_to_target(
+			credentials, channel="email")
 
 
 	def verify_password_strength(self, password: str):
@@ -203,3 +216,7 @@ class ChangePasswordService(asab.Service):
 		if len(re.findall(r"[^a-zA-Z0-9]", password)) < self.PasswordMinSpecialCount:
 			raise exceptions.WeakPasswordError(
 				"Password must contain at least {} special characters.".format(self.PasswordMinSpecialCount))
+
+
+def can_get_password_link_via_response(authz) -> bool:
+	return authz.has_superuser_access()

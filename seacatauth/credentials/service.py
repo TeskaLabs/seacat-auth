@@ -677,12 +677,17 @@ class CredentialsService(asab.Service):
 		return False
 
 
-	async def get_allowed_actions(self, credentials_id: str) -> typing.Dict[str, bool]:
+	async def get_allowed_actions(self, credentials: str | dict) -> typing.Dict[str, bool]:
 		"""
 		Get dict of actions that the caller is allowed to perform on the target credentials
 		"""
+		if isinstance(credentials, dict):
+			credentials_id = credentials["_id"]
+		else:
+			credentials_id = credentials
+			credentials = await self.get(credentials_id)
+
 		authz = asab.contextvars.Authz.get()
-		credentials = await self.get(credentials_id)
 		provider = self.get_provider(credentials_id)
 
 		allowed_actions = {}
