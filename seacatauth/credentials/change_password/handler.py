@@ -206,8 +206,7 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR",
 				"tech_err": "Credentials {!r} not found.".format(credentials_id),
-				"error": "SeaCatAuthError|Credentials '{{cid}}' not found.",
-				"error_dict": {"cid": credentials_id},
+				"error": "SeaCatAuthError|Credentials not found.",
 			})
 
 		# Deny password reset to suspended credentials
@@ -215,9 +214,8 @@ class ChangePasswordHandler(object):
 			L.error("Password reset denied: Credentials suspended.", struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
-				"tech_err": "Credentials {!r} suspended.".format(credentials_id),
-				"error": "SeaCatAuthError|Credentials '{{cid}}' are suspended.",
-				"error_dict": {"cid": credentials_id},
+				"tech_err": "Credentials {!r} are suspended.".format(credentials_id),
+				"error": "SeaCatAuthError|Credentials are suspended.",
 			})
 
 		# Check if password reset link can be disclosed (in email or at least in the response)
@@ -268,8 +266,8 @@ class ChangePasswordHandler(object):
 		else:
 			response_data.update({
 				"result": "ERROR",
-				"tech_err": "No way to communicate password reset link.",
-				"error": "SeaCatAuthError|No way to communicate password reset link.",
+				"tech_err": "Failed to send email with password reset link.",
+				"error": "SeaCatAuthError|Failed to send email with password reset link.",
 			})
 			status = 400
 		return asab.web.rest.json_response(request, response_data, status=status)
