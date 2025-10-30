@@ -119,7 +119,7 @@ class SMTPEmailProvider(CommunicationProviderABC):
 				)
 			except ConnectionError as e:
 				L.error("Cannot connect to SMTP server: {}".format(e))
-				raise exceptions.MessageDeliveryError("Cannot connect to SMTP server", channel=self.Channel)
+				raise exceptions.ServerCommunicationError("Error connecting to SMTP server")
 
 			L.log(asab.LOG_NOTICE, "Email sent.", struct_data={"result": result[1]})
 

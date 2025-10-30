@@ -252,6 +252,12 @@ class ChangePasswordHandler(object):
 			)
 			link_disclosed = True
 			email_delivery_result = {"result": "OK"}
+		except exceptions.ServerCommunicationError:
+			email_delivery_result = {
+				"result": "ERROR",
+				"tech_err": "Cannot connect to the email service.",
+				"error": "SeaCatAuthError|Cannot connect to the email service.",
+			}
 		except exceptions.MessageDeliveryError:
 			email_delivery_result = {
 				"result": "ERROR",
@@ -327,6 +333,9 @@ class ChangePasswordHandler(object):
 				reset_url=password_reset_url,
 				new_user=False
 			)
+		except exceptions.ServerCommunicationError:
+			L.error("Lost password reset failed: Failed to connect to email service.", struct_data={
+				"cid": credentials_id, "from": access_ips})
 		except exceptions.MessageDeliveryError:
 			L.error("Lost password reset failed: Failed to send password reset link.", struct_data={
 				"cid": credentials_id, "from": access_ips})
