@@ -219,62 +219,73 @@ class ChangePasswordHandler(object):
 			})
 
 		# Check if password reset link can be disclosed (in email or at least in the response)
-		link_disclosed = False
-		if not (
-			authz.has_superuser_access()
-			or await self.ChangePasswordService.CommunicationService.can_send_to_target(credentials, "email")
-		):
-			L.error("Password reset denied: No way to communicate password reset link.", struct_data={
-				"cid": credentials_id})
-			return asab.web.rest.json_response(request, status=400, data={
-				"result": "ERROR",
-				"tech_err": "No way to communicate password reset link.",
-				"error": "SeaCatAuthError|No way to communicate password reset link.",
-			})
-
-		# Create the password reset link
-		password_reset_url = await self.ChangePasswordService.init_password_reset(
-			credentials,
-			expiration=json_data.get("expiration"),
-		)
+		password_reset_url = None
+		url_disclosed = False
+		can_get_link_in_response = authz.has_superuser_access()
+		email_service_enabled = await self.ChangePasswordService.CommunicationService.is_channel_enabled("email")
+		can_email_to_target = await self.ChangePasswordService.CommunicationService.can_send_to_target(
+			credentials, "email")
 
 		# Superusers receive the password reset link in response
-		if authz.has_superuser_access():
-			response_data["password_reset_url"] = password_reset_url
-			link_disclosed = True
-
-		# Email the link to the user
-		try:
-			await self.ChangePasswordService.CommunicationService.password_reset(
-				credentials=credentials,
-				reset_url=password_reset_url,
-				new_user=False
+		if can_get_link_in_response:
+			password_reset_url = await self.ChangePasswordService.init_password_reset(
+				credentials,
+				expiration=json_data.get("expiration"),
 			)
-			link_disclosed = True
-			email_delivery_result = {"result": "OK"}
-		except exceptions.ServerCommunicationError:
+			response_data["password_reset_url"] = password_reset_url
+			url_disclosed = True
+
+		# Check email communication availability and send email
+		if not email_service_enabled:
+			L.error("Password reset denied: Email service not available.", struct_data={
+				"cid": credentials_id})
 			email_delivery_result = {
 				"result": "ERROR",
-				"tech_err": "Cannot connect to the email service.",
-				"error": "SeaCatAuthError|Cannot connect to the email service.",
+				"tech_err": "Email service not available.",
+				"error": "SeaCatAuthError|Email service not available.",
 			}
-		except exceptions.MessageDeliveryError:
+		elif not can_email_to_target:
+			L.error("Password reset denied: Credentials have no email address.", struct_data={
+				"cid": credentials_id})
 			email_delivery_result = {
 				"result": "ERROR",
-				"tech_err": "Failed to send password reset link.",
-				"error": "SeaCatAuthError|Failed to send password reset link.",
+				"tech_err": "Credentials have no email address.",
+				"error": "SeaCatAuthError|Credentials have no email address.",
 			}
+		else:
+			if not password_reset_url:
+				password_reset_url = await self.ChangePasswordService.init_password_reset(
+					credentials,
+					expiration=json_data.get("expiration"),
+				)
+			# Email the link to the user
+			try:
+				await self.ChangePasswordService.CommunicationService.password_reset(
+					credentials=credentials,
+					reset_url=password_reset_url,
+					new_user=False
+				)
+				url_disclosed = True
+				email_delivery_result = {"result": "OK"}
+			except exceptions.ServerCommunicationError:
+				email_delivery_result = {
+					"result": "ERROR",
+					"tech_err": "Cannot connect to the email service.",
+					"error": "SeaCatAuthError|Cannot connect to the email service.",
+				}
+			except exceptions.MessageDeliveryError:
+				email_delivery_result = {
+					"result": "ERROR",
+					"tech_err": "Failed to send password reset link.",
+					"error": "SeaCatAuthError|Failed to send password reset link.",
+				}
 
 		response_data["email_sent"] = email_delivery_result
-		if link_disclosed:
+		if url_disclosed:
 			response_data["result"] = "OK"
 			status = 200
 		else:
-			response_data.update({
-				"result": "ERROR",
-				"tech_err": "Failed to send email with password reset link.",
-				"error": "SeaCatAuthError|Failed to send email with password reset link.",
-			})
+			response_data.update(email_delivery_result)
 			status = 400
 		return asab.web.rest.json_response(request, response_data, status=status)
 
