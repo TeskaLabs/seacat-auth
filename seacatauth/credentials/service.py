@@ -677,30 +677,6 @@ class CredentialsService(asab.Service):
 		return False
 
 
-	async def get_allowed_actions(self, credentials: str | dict) -> typing.Dict[str, bool]:
-		"""
-		Get dict of actions that the caller is allowed to perform on the target credentials
-		"""
-		if isinstance(credentials, dict):
-			credentials_id = credentials["_id"]
-		else:
-			credentials_id = credentials
-			credentials = await self.get(credentials_id)
-
-		authz = asab.contextvars.Authz.get()
-		provider = self.get_provider(credentials_id)
-
-		allowed_actions = {}
-		if provider.Editable and authz.has_resource_access(ResourceId.CREDENTIALS_EDIT):
-			allowed_actions["update_suspended_status"] = True
-
-		change_pwd_service = self.App.get_service("seacatauth.ChangePasswordService")
-		if await change_pwd_service.can_request_password_reset(credentials):
-			allowed_actions["password_reset"] = True
-
-		return allowed_actions
-
-
 def _authorize_searched_tenants(
 	tenant_filter: str | None,
 	try_global_search: bool = False
