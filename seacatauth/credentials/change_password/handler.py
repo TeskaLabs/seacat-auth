@@ -206,7 +206,7 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR",
 				"tech_err": "Credentials {!r} not found.".format(credentials_id),
-				"error": "SeaCatAuthError|Credentials not found.",
+				"error": "SeaCatAuthError|Credentials not found",
 			})
 
 		# Deny password reset to suspended credentials
@@ -215,7 +215,7 @@ class ChangePasswordHandler(object):
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
 				"tech_err": "Credentials {!r} are suspended.".format(credentials_id),
-				"error": "SeaCatAuthError|Credentials are suspended.",
+				"error": "SeaCatAuthError|Credentials are suspended",
 			})
 
 		# Check if password reset link can be disclosed (in email or at least in the response)
@@ -242,7 +242,7 @@ class ChangePasswordHandler(object):
 			email_delivery_result = {
 				"result": "ERROR",
 				"tech_err": "Email service not available.",
-				"error": "SeaCatAuthError|Email service not available.",
+				"error": "SeaCatAuthError|Email service not available",
 			}
 		elif not can_email_to_target:
 			L.error("Password reset denied: Credentials have no email address.", struct_data={
@@ -250,7 +250,7 @@ class ChangePasswordHandler(object):
 			email_delivery_result = {
 				"result": "ERROR",
 				"tech_err": "Credentials have no email address.",
-				"error": "SeaCatAuthError|Credentials have no email address.",
+				"error": "SeaCatAuthError|Credentials have no email address",
 			}
 		else:
 			if not password_reset_url:
@@ -271,13 +271,13 @@ class ChangePasswordHandler(object):
 				email_delivery_result = {
 					"result": "ERROR",
 					"tech_err": "Cannot connect to the email service.",
-					"error": "SeaCatAuthError|Cannot connect to the email service.",
+					"error": "SeaCatAuthError|Cannot connect to the email service",
 				}
 			except exceptions.MessageDeliveryError:
 				email_delivery_result = {
 					"result": "ERROR",
 					"tech_err": "Failed to send password reset link.",
-					"error": "SeaCatAuthError|Failed to send password reset link.",
+					"error": "SeaCatAuthError|Failed to send password reset link",
 				}
 
 		response_data["email_sent"] = email_delivery_result
