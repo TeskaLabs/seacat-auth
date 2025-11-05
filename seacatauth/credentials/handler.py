@@ -408,6 +408,11 @@ class CredentialsHandler(object):
 					reset_url=password_reset_url,
 					new_user=True
 				)
+			except exceptions.ServerCommunicationError:
+				password_reset_response["result"] = "ERROR"
+				password_reset_response["tech_err"] = "Cannot connect to email service"
+				response_data["password_reset"] = password_reset_response
+				return asab.web.rest.json_response(request, response_data)
 			except exceptions.MessageDeliveryError:
 				password_reset_response["result"] = "ERROR"
 				password_reset_response["tech_err"] = "Failed to send password reset link."

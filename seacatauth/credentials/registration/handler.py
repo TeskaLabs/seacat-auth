@@ -204,6 +204,10 @@ class RegistrationHandler(object):
 					tenants=[tenant],
 					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 				)
+			except exceptions.ServerCommunicationError:
+				response_data["result"] = "ERROR"
+				response_data["tech_err"] = "Cannot connect to email service."
+				return asab.web.rest.json_response(request, response_data, status=400)
 			except exceptions.MessageDeliveryError:
 				response_data["result"] = "ERROR"
 				response_data["tech_err"] = "Failed to send invitation link."

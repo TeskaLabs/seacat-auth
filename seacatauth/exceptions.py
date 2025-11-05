@@ -374,3 +374,11 @@ class OAuth2InvalidClient(OAuth2Error):
 	"""
 	def __init__(self, *args, **kwargs):
 		super().__init__("invalid_client", *args, **kwargs)
+
+
+class ServerCommunicationError(SeacatAuthError):
+	"""
+	Failed to communicate with external service
+	"""
+	def __init__(self, message, *args):
+		super().__init__(message, *args)

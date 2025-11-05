@@ -88,33 +88,14 @@ class CommunicationService(asab.Service):
 
 	async def password_reset(self, *, credentials, reset_url, new_user=False):
 		template_id = "welcome_password_reset" if new_user else "password_reset"
-		success = []
-		channels = ["email", "sms"]
-		for channel in channels:
-			try:
-				await self.build_and_send_message(
-					credentials=credentials,
-					template_id=template_id,
-					channel=channel,
-					username=credentials.get("username"),
-					password_reset_url=reset_url,
-				)
-			except exceptions.CommunicationChannelNotAvailableError:
-				L.debug("Channel is not available", struct_data={
-					"channel": channel, "template": template_id, "cid": credentials["_id"]
-				})
-				continue
-			except exceptions.MessageDeliveryError:
-				L.error("Failed to send message via specified channel.", struct_data={
-					"channel": channel, "template": template_id, "cid": credentials["_id"]
-				})
-				continue
-
-			success.append(channel)
-
-		if len(success) == 0:
-			raise exceptions.MessageDeliveryError(
-				"Failed to deliver message on all channels.", template_id=template_id, channel=channels)
+		channel = "email"
+		await self.build_and_send_message(
+			credentials=credentials,
+			template_id=template_id,
+			channel=channel,
+			username=credentials.get("username"),
+			password_reset_url=reset_url,
+		)
 
 
 	async def invitation(self, *, credentials, tenants, registration_uri, expires_at=None):
