@@ -10,7 +10,6 @@ import typing
 from .policy import CredentialsPolicy
 from .providers.abc import CredentialsProviderABC, EditableCredentialsProviderABC
 from .. import AuditLogger, exceptions
-from ..models.const import ResourceId
 
 
 L = logging.getLogger(__name__)
