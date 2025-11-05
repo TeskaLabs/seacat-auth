@@ -28,6 +28,20 @@ class RoleHandler(object):
 		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
+		web_app.router.add_get("/admin/role/*", self.list_global_roles)
+		web_app.router.add_get("/admin/role/*/{role_name}", self.get_global_role)
+		web_app.router.add_post("/admin/role/*/{role_name}", self.create_global_role)
+		web_app.router.add_put("/admin/role/*/{role_name}", self.update_global_role)
+		web_app.router.add_delete("/admin/role/*/{role_name}", self.delete_global_role)
+
+		web_app.router.add_get("/admin/role/{tenant}", self.list_roles)
+		web_app.router.add_get("/admin/role/{tenant}/{role_name}", self.get_role)
+		web_app.router.add_post("/admin/role/{tenant}/{role_name}", self.create_role)
+		web_app.router.add_put("/admin/role/{tenant}/{role_name}", self.update_role)
+		web_app.router.add_delete("/admin/role/{tenant}/{role_name}", self.delete_role)
+
+		# BACK-COMPAT (remove after 2026-04-30)
+		# >>>
 		web_app.router.add_get("/role/*", self.list_global_roles)
 		web_app.router.add_get("/role/*/{role_name}", self.get_global_role)
 		web_app.router.add_post("/role/*/{role_name}", self.create_global_role)
@@ -39,6 +53,7 @@ class RoleHandler(object):
 		web_app.router.add_post("/role/{tenant}/{role_name}", self.create_role)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_role)
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete_role)
+		# <<<
 
 
 	async def list_roles(self, request):
