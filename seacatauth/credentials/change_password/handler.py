@@ -202,7 +202,7 @@ class ChangePasswordHandler(object):
 		try:
 			credentials = await self.CredentialsService.get(credentials_id)
 		except exceptions.CredentialsNotFoundError:
-			L.error("Password reset denied: Credentials not found.", struct_data={"cid": credentials_id})
+			L.error("Password reset failed: Credentials not found.", struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, status=404, data={
 				"result": "ERROR",
 				"tech_err": "Credentials {!r} not found.".format(credentials_id),
@@ -211,7 +211,7 @@ class ChangePasswordHandler(object):
 
 		# Deny password reset to suspended credentials
 		if credentials.get("suspended") is True:
-			L.error("Password reset denied: Credentials suspended.", struct_data={"cid": credentials_id})
+			L.error("Password reset failed: Credentials suspended.", struct_data={"cid": credentials_id})
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
 				"tech_err": "Credentials {!r} are suspended.".format(credentials_id),
@@ -237,7 +237,7 @@ class ChangePasswordHandler(object):
 
 		# Check email communication availability and send email
 		if not email_service_enabled:
-			L.error("Password reset denied: Email service not available.", struct_data={
+			L.log(asab.LOG_NOTICE, "Cannot send password reset email: Email service not available.", struct_data={
 				"cid": credentials_id})
 			email_delivery_result = {
 				"result": "ERROR",
@@ -245,7 +245,7 @@ class ChangePasswordHandler(object):
 				"error": "SeaCatAuthError|Email service not available",
 			}
 		elif not can_email_to_target:
-			L.error("Password reset denied: Credentials have no email address.", struct_data={
+			L.error("Cannot send password reset email: Credentials have no email address.", struct_data={
 				"cid": credentials_id})
 			email_delivery_result = {
 				"result": "ERROR",
@@ -268,12 +268,16 @@ class ChangePasswordHandler(object):
 				url_disclosed = True
 				email_delivery_result = {"result": "OK"}
 			except exceptions.ServerCommunicationError:
+				L.error("Cannot send password reset email: Cannot connect to the email service.", struct_data={
+					"cid": credentials_id})
 				email_delivery_result = {
 					"result": "ERROR",
 					"tech_err": "Cannot connect to the email service.",
 					"error": "SeaCatAuthError|Cannot connect to the email service",
 				}
-			except exceptions.MessageDeliveryError:
+			except exceptions.MessageDeliveryError as e:
+				L.error("Cannot send password reset email: {}".format(e), struct_data={
+					"cid": credentials_id})
 				email_delivery_result = {
 					"result": "ERROR",
 					"tech_err": "Failed to send password reset link.",
