@@ -29,10 +29,10 @@ class RolesHandler(object):
 
 		web_app = app.WebContainer.WebApp
 
-		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/*", self.get_credentials_roles)
-		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*", self.set_credentials_roles)
-		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.assign_credentials_role)
-		web_app.router.add_delete("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.unassign_credentials_role)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/*", self.get_credentials_global_roles)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*", self.set_credentials_global_roles)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.assign_credentials_global_role)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.unassign_credentials_global_role)
 		web_app.router.add_put("/admin/roles/*", self.batch_get_credentials_global_roles)
 
 		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/{tenant}", self.get_credentials_roles)
