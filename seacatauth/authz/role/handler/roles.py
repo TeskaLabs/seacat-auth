@@ -181,6 +181,7 @@ class RolesHandler(object):
 			schema:
 				type: string
 				enum: ["true", "false", "any"]
+			default: "true"
 		-	name: aassignment.editable
 			in: query
 			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
@@ -188,6 +189,7 @@ class RolesHandler(object):
 			schema:
 				type: string
 				enum: ["true", "false", "any"]
+			default: "any"
 		-	name: sdescription
 			in: query
 			description: Sort by the role description.
@@ -464,7 +466,7 @@ class RolesHandler(object):
 		"""
 		return await self.RoleService.list_role_credentials(
 			role_id,
-			page=request.query.get("p"),
-			limit=request.query.get("i"),
+			page=int(request.query.get("p", 1)) - 1,
+			limit=int(request.query["i"]) if "i" in request.query else None,
 			ids_only=asab.utils.string_to_boolean(request.query.get("ids_only")),
 		)

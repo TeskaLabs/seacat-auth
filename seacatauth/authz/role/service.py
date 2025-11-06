@@ -710,7 +710,7 @@ class RoleService(asab.Service):
 		else:
 			data = []
 			for assignment in assignments:
-				credentials = await self.CredentialService.get(assignment["cid"])
+				credentials = await self.CredentialService.get(assignment["c"])
 				credentials["assignment"] = assignment
 				data.append(credentials)
 
