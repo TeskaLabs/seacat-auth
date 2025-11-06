@@ -34,12 +34,14 @@ class RolesHandler(object):
 		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.assign_credentials_global_role)
 		web_app.router.add_delete("/admin/credentials/{credentials_id}/roles/*/{role_name}", self.unassign_credentials_global_role)
 		web_app.router.add_put("/admin/roles/*", self.batch_get_credentials_global_roles)
+		web_app.router.add_get("/admin/role/*/{role_name}/credentials", self.get_global_role_credentials)
 
 		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/{tenant}", self.get_credentials_roles)
 		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/{tenant}", self.set_credentials_roles)
 		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/{tenant}/{role_name}", self.assign_credentials_role)
 		web_app.router.add_delete("/admin/credentials/{credentials_id}/roles/{tenant}/{role_name}", self.unassign_credentials_role)
 		web_app.router.add_put("/admin/roles/{tenant}", self.batch_get_credentials_roles)
+		web_app.router.add_get("/admin/role/{tenant}/{role_name}/credentials", self.get_role_credentials)
 
 		# DEPRECATED, BACKWARD COMPATIBILITY
 		# >>>
@@ -313,14 +315,10 @@ class RolesHandler(object):
 		"""
 		Set credentials' roles
 
-		For given credentials ID, assign listed roles and unassign existing roles that are not in the list
-
-		Cases:
-		1) The requester is superuser AND requested `tenant` is "tenant-name":
-			Roles from "tenant-name/..." + global roles will be un/assigned.
-		2) The requester is not superuser AND requested `tenant` is "tenant-name":
-			Only "tenant-name/..." roles will be un/assigned.
-		ELSE) In other cases the role assignment fails.
+		For given credentials ID, assign listed roles and unassign existing roles that are not in the list.
+		The scope is always a specific tenant + global roles.
+		Caller with superuser access can set both tenant-specific and global roles.
+		Caller without superuser access can set only tenant-specific roles.
 		"""
 		authz = asab.contextvars.Authz.get()
 		tenant_id = asab.contextvars.Tenant.get()
@@ -405,3 +403,71 @@ class RolesHandler(object):
 			role_id=role_id
 		)
 		return asab.web.rest.json_response(request, data={"result": "OK"})
+
+
+	@asab.web.auth.require(ResourceId.ROLE_ACCESS)
+	async def get_role_credentials(self, request):
+		"""
+		Get the list of credentials assigned to a role
+
+		---
+		parameters:
+		-	p:
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	i:
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: ids_only
+			in: query
+			description: Summarize the assignments to any array of credential IDs only
+			schema:
+				type: boolean
+		"""
+		tenant_id = asab.contextvars.Tenant.get()
+		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
+		return await self._get_role_credentials(request, role_id)
+
+
+	@asab.web.auth.require(ResourceId.ROLE_ACCESS)
+	@asab.web.tenant.allow_no_tenant
+	async def get_global_role_credentials(self, request):
+		"""
+		Get the list of credentials assigned to a global role
+
+		---
+		parameters:
+		-	p:
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	i:
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		-	name: ids_only
+			in: query
+			description: Summarize the assignments to any array of credential IDs only
+			schema:
+				type: boolean
+		"""
+		role_id = "*/{}".format(request.match_info["role_name"])
+		return await self._get_role_credentials(request, role_id)
+
+
+	async def _get_role_credentials(self, request, role_id: str):
+		"""
+		Get the list of credentials assigned to a role
+		"""
+		return await self.RoleService.list_role_credentials(
+			role_id,
+			page=request.query.get("p"),
+			limit=request.query.get("i"),
+			ids_only=asab.utils.string_to_boolean(request.query.get("ids_only")),
+		)

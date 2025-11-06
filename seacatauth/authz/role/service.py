@@ -632,30 +632,91 @@ class RoleService(asab.Service):
 			await self.unassign_role(credentials_id, role)
 
 
-	async def list_role_assignments(self, role_id: str | typing.Iterable, page: int = 0, limit: int = None):
+	async def iterate_role_assignments(
+		self,
+		role_id: str,
+		page: int = 0,
+		limit: int | None = None,
+	) -> typing.AsyncIterator[dict]:
 		"""
-		List all role assignments of a specified role
-		"""
-		if isinstance(role_id, str):
-			query_filter = {"r": role_id}
-		else:
-			query_filter = {"r": {"$in": role_id}}
+		Iterate all credentials IDs that are assigned a specified role
 
+		Args:
+			role_id:
+				Role ID to filter by
+			page:
+				Page number (0..N)
+			limit:
+				Page size. If None, return all matching assignments.
+		Yields:
+			Credentials IDs assigned the role
+		"""
+		query_filter = {"r": role_id}
 		collection = self.StorageService.Database[self.CredentialsRolesCollection]
 		cursor = collection.find(query_filter)
-
-		cursor.sort("_c", -1)
+		cursor.sort("_id", 1)
 		if limit is not None:
 			cursor.skip(limit * page)
 			cursor.limit(limit)
-
-		assignments = []
 		async for assignment in cursor:
+			yield assignment
+
+
+	async def count_role_assignments(self, role_id: str) -> int:
+		"""
+		Count all credentials IDs that are assigned a specified role
+
+		Args:
+			role_id:
+				Role ID to filter by
+		Yields:
+			Credentials IDs assigned the role
+		"""
+		query_filter = {"r": role_id}
+		collection = self.StorageService.Database[self.CredentialsRolesCollection]
+		return await collection.count(query_filter)
+
+
+	async def list_role_credentials(
+		self,
+		role_id: str | typing.Iterable,
+		page: int = 0,
+		limit: int = None,
+		ids_only: bool = False,
+	) -> dict:
+		"""
+		List specific role's assigned credentials
+
+		Args:
+			role_id:
+				Role ID or list of role IDs to filter by
+			page:
+				Page number (0..N)
+			limit:
+				Page size. If None, return all matching assignments.
+			ids_only:
+				Summarize the assignments into an array of credential IDs only
+		Returns:
+			dict: A dict with "data" and "count" keys.
+				"data" is a list of credentials objects or, if ids_only is True, a list of credentials IDs only.
+				"count" is the total number of assignments.
+		"""
+		assignments = []
+		async for assignment in self.iterate_role_assignments(role_id, page, limit):
 			assignments.append(assignment)
 
+		if ids_only is True:
+			data = [assignment["c"] for assignment in assignments]
+		else:
+			data = []
+			for assignment in assignments:
+				credentials = await self.CredentialService.get(assignment["cid"])
+				credentials["assignment"] = assignment
+				data.append(credentials)
+
 		return {
-			"data": assignments,
-			"count": await collection.count_documents(query_filter)
+			"data": data,
+			"count": await self.count_role_assignments(role_id)
 		}
 
 
