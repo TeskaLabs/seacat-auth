@@ -698,7 +698,7 @@ class RoleService(asab.Service):
 				Summarize the assignments into an array of credential IDs only
 		Returns:
 			dict: A dict with "data" and "count" keys.
-				"data" is a list of credentials objects or, if ids_only is True, a list of credentials IDs only.
+				"data" is a list of credentials objects or, if ids_only is True, a list of credential IDs only.
 				"count" is the total number of assignments.
 		"""
 		assignments = []
