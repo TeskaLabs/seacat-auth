@@ -42,10 +42,10 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 	```conf
 	[seacatauth:saml:auth_provider_name]
 	idp_metadata_url=https://idp.example.com/federationmetadata.xml
-	entity_id=https://my-seacat-auth.example.com/saml/metadata
+	entity_id=https://my-company.com/auth/saml/metadata
 	key_file=/conf/secret/saml-private-key.pem
 	cert_file=/conf/secret/saml-certificate.pem
-	label=Login with {auth_provider_name} SAML
+	label=MyCompany SAML
 	```
 	"""
 
@@ -55,12 +55,25 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	def _init_saml_client(self):
-		for key in ("entity_id", "idp_metadata_url"):
-			if key not in self.Config:
-				raise ValueError("Missing '{}' in SAML provider configuration.".format(key))
+		entity_id = self.Config.get("entity_id")
+		if not entity_id:
+			entity_id = "{}/saml/metadata".format(self.ExternalAuthenticationService.App.AuthWebUiUrl)
+
+		idp_metadata_url = self.Config.get("idp_metadata_url")
+		if not idp_metadata_url:
+			idp_metadata_url = "/conf/federationmetadata.xml"
+
+		if idp_metadata_url.startswith(("http://", "https://")):
+			metadata = {
+				"remote": [{"url": idp_metadata_url}]
+			}
+		else:
+			metadata = {
+				"local": [idp_metadata_url]
+			}
 
 		config_dict = {
-			"entityid": self.Config["entity_id"],  # Must be registered at IdP
+			"entityid": entity_id,  # Must be registered at IdP
 			"service": {
 				"sp": {
 					"endpoints": {
@@ -80,11 +93,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 					),
 				}
 			},
-			"metadata": {
-				"remote": [{
-					"url": self.Config["idp_metadata_url"]
-				}]
-			},
+			"metadata": metadata,
 		}
 
 		if "key_file" in self.Config and "cert_file" in self.Config:
