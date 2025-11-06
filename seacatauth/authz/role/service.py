@@ -221,7 +221,7 @@ class RoleService(asab.Service):
 			limit: Page size. If None, return all matching roles.
 			sort: List of (field, direction) tuples to sort the results by.
 				Direction is 1 for ascending and -1 for descending.
-				Supported fields are "_id", "description", "assigned" and "assignable".
+				Supported fields are "_id", "description", "assignment.assigned" and "assignment.editable".
 			name_filter: If given, return only roles whose ID contains this substring.
 			description_filter: If given, return only roles whose description contains this substring.
 			resource_filter: If given, return only roles with the given resource.
@@ -302,10 +302,10 @@ class RoleService(asab.Service):
 				tenant_flag_filter=assignable_filter,
 				flag_ids=cred_roles,
 				id_flag_filter=assigned_filter,
-				set_fields={
+				set_fields={"assignment": {
 					"assigned": "$_id_flag",
-					"assignable": "$_tenant_flag",
-				}
+					"editable": "$_tenant_flag",
+				}}
 			))
 			offset = 0
 
@@ -898,7 +898,7 @@ def _sorting_key(
 					keys.append(role.get(field, ""))
 				elif direction == -1:
 					keys.append(ReverseSortingString(role.get(field, "")))
-			elif field in {"assigned", "assignable"}:
-				keys.append(direction * role.get(field, False))
+			elif field in {"assignment.assigned", "assignment.editable"}:
+				keys.append(direction * role.get("assignment", {}).get(field.split(".")[1], False))
 
 	return keys

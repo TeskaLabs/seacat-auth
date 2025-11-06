@@ -96,14 +96,14 @@ class RolesHandler(object):
 				(Only available in expanded mode)
 			schema:
 				type: string
-		-	name: aassigned
+		-	name: aassignment.assigned
 			in: query
 			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
 				type: string
 				enum: ["true", "false", "any"]
-		-	name: aassignable
+		-	name: aassignment.editable
 			in: query
 			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
@@ -117,20 +117,19 @@ class RolesHandler(object):
 			schema:
 				type: string
 				enum: ["a" ,"d"]
-		-	name: sassigned
+		-	name: sassignment.assigned
 			in: query
-			description: Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			description:
+				Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
 				type: string
 				enum: ["a" ,"d"]
-		-	name: sassignable
+		-	name: sassignment.editable
 			in: query
-			description: Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+			description:
+				Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
-			schema:
-				type: string
-				enum: ["a" ,"d"]
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		return await self._get_credentials_roles(request, tenant_id=tenant_id)
@@ -175,18 +174,16 @@ class RolesHandler(object):
 				(Only available in expanded mode)
 			schema:
 				type: string
-		-	name: aassigned
+		-	name: aassignment.assigned
 			in: query
-			description:
-				Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
 				type: string
 				enum: ["true", "false", "any"]
-		-	name: aassignable
+		-	name: aassignment.editable
 			in: query
-			description:
-				Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
 				(Only available in expanded mode)
 			schema:
 				type: string
@@ -198,7 +195,7 @@ class RolesHandler(object):
 			schema:
 				type: string
 				enum: ["a" ,"d"]
-		-	name: sassigned
+		-	name: sassignment.assigned
 			in: query
 			description:
 				Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
@@ -206,7 +203,7 @@ class RolesHandler(object):
 			schema:
 				type: string
 				enum: ["a" ,"d"]
-		-	name: sassignable
+		-	name: sassignment.editable
 			in: query
 			description:
 				Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
@@ -223,8 +220,8 @@ class RolesHandler(object):
 		expand = asab.utils.string_to_boolean(request.query.get("expand", "false"))
 		if not expand:
 			forbidden_params = {
-				"p", "i", "f", "adescription", "aresource", "aassigned", "aassignable",
-				"s_id", "sdescription", "sassigned", "sassignable"
+				"p", "i", "f", "adescription", "aresource", "aassignment.assigned", "aassignment.editable",
+				"s_id", "sdescription", "sassignment.assigned", "sassignment.editable"
 			}
 			if forbidden_params & set(request.query):
 				raise asab.exceptions.ValidationError(
@@ -238,7 +235,7 @@ class RolesHandler(object):
 			page = int(request.query.get("p", 1)) - 1
 			limit = int(request.query["i"]) if "i" in request.query else None
 			sort = []
-			for param in ("s_id", "sdescription", "sassigned", "sassignable"):
+			for param in ("s_id", "sdescription", "sassignment.assigned", "sassignment.editable"):
 				if param in request.query:
 					match request.query[param]:
 						case "a":
@@ -253,7 +250,7 @@ class RolesHandler(object):
 			resource_filter = request.query.get("aresource", None)
 			description_filter = request.query.get("adescription", None)
 
-			assigned_filter = request.query.get("aassigned")
+			assigned_filter = request.query.get("aassignment.assigned")
 			if assigned_filter in (None, ""):
 				assigned_filter = True  # Default to True to show only assigned roles
 			elif assigned_filter in ("all", "any"):
@@ -262,8 +259,8 @@ class RolesHandler(object):
 				assigned_filter = asab.utils.string_to_boolean(assigned_filter)
 
 			assignable_filter = (
-				asab.utils.string_to_boolean(request.query.get("aassignable"))
-				if request.query.get("aassignable") not in (None, "", "all", "any")
+				asab.utils.string_to_boolean(request.query.get("aassignment.editable"))
+				if request.query.get("aassignment.editable") not in (None, "", "all", "any")
 				else None
 			)
 			result = await self.RoleService.list_roles(
