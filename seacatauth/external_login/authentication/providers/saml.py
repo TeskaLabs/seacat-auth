@@ -51,17 +51,39 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 	def __init__(self, external_authentication_svc, config_section_name, config=None):
 		super().__init__(external_authentication_svc, config_section_name, config)
-		self.SamlClient = self._init_saml_client()
+		self.App = self.ExternalAuthenticationService.App
+		self.SamlConfig = self._init_saml_config()
+		self.SamlClient = None
+
+		task_service = self.App.get_service("asab.TaskService")
+		task_service.schedule(self._prepare_saml_client())
 
 
-	def _init_saml_client(self):
-		entity_id = self.Config.get("entity_id")
-		if not entity_id:
-			entity_id = "{}/saml/metadata".format(self.ExternalAuthenticationService.App.AuthWebUiUrl)
+	async def _prepare_saml_client(self):
+		if self.SamlClient is not None:
+			return self.SamlClient
 
-		idp_metadata_url = self.Config.get("idp_metadata_url")
-		if not idp_metadata_url:
-			idp_metadata_url = "/conf/federationmetadata.xml"
+		try:
+			self.SamlClient = saml2.client.Saml2Client(config=self.SamlConfig)
+		except IOError as e:
+			L.error("Cannot load SAML identity provider metadata ({}): {}".format(e.__class__.__name__, e), struct_data={
+				"provider": self.Type,
+			})
+			return None
+
+		return self.SamlClient
+
+
+	def _init_saml_config(self):
+		entity_id = self.Config.get(
+			"entity_id",
+			fallback="{}saml/metadata".format(self.App.AuthWebUiUrl)
+		)
+
+		idp_metadata_url = self.Config.get(
+			"idp_metadata_url",
+			default="/conf/federationmetadata.xml"
+		)
 
 		if idp_metadata_url.startswith(("http://", "https://")):
 			metadata = {
@@ -91,6 +113,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 						self.Config.getboolean("want_assertions_signed") if "want_assertions_signed" in self.Config
 						else True
 					),
+					"http_client_timeout": 5,
 				}
 			},
 			"metadata": metadata,
@@ -103,11 +126,15 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 		config = saml2.config.Config()
 		config.load(config_dict)
-		return saml2.client.Saml2Client(config)
+		return config
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
-		saml_request_id, authn_request = self.SamlClient.prepare_for_authenticate(
+		saml_client = await self._prepare_saml_client()
+		if saml_client is None:
+			raise ExternalLoginError("SAML client is not properly initialized.")
+
+		saml_request_id, authn_request = saml_client.prepare_for_authenticate(
 			binding=saml2.BINDING_HTTP_REDIRECT,
 			relay_state=state["state_id"],
 		)
@@ -122,6 +149,10 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	async def process_auth_callback(self, request: aiohttp.web.Request, payload: dict, state: dict, **kwargs) -> dict:
+		saml_client = await self._prepare_saml_client()
+		if saml_client is None:
+			raise ExternalLoginError("SAML client is not properly initialized.")
+
 		saml_response = payload.get("SAMLResponse")
 		if saml_response is None:
 			L.error("No SAMLResponse in request payload", struct_data={
@@ -130,7 +161,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			raise ExternalLoginError("Malformed SAML response.")
 
 		try:
-			authn_response = self.SamlClient.parse_authn_request_response(
+			authn_response = saml_client.parse_authn_request_response(
 				saml_response,
 				binding=saml2.BINDING_HTTP_POST,
 				outstanding={state["request_id"]: True},
