@@ -28,6 +28,7 @@
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
 ### Fixes
+- Support local SAML federation metadata file and handle timeout on remote metadata file
 - Update ASAB version to v25.43.01 (#526, v25.26.02)
 - Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.26.01)
 - Make sure external login callback is on the sub-path of Auth UI (#522, v25.26.01)
