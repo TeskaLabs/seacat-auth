@@ -18,6 +18,7 @@
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
 
 ### Fixes
+- Support local SAML federation metadata file and handle client initialization errors (#527, v25.38-alpha10)
 - Specific email error responses (#518, v25.38-alpha9)
 - Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha8)
 - Make sure external login callback is on the sub-path of Auth UI (#522, v25.38-alpha7)
