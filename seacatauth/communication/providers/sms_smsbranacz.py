@@ -7,6 +7,7 @@ import hashlib
 import re
 
 from .abc import CommunicationProviderABC
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -104,16 +105,20 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				)
 				return
 
-			async with aiohttp.ClientSession() as session:
-				async with session.get(self.URL, params=url_params) as resp:
-					if resp.status != 200:
-						L.error("SMSBrana.cz responsed with {}".format(resp), await resp.text())
-						raise RuntimeError("SMS delivery failed.")
-					response_body = await resp.text()
+			try:
+				async with aiohttp.ClientSession() as session:
+					async with session.get(self.URL, params=url_params) as resp:
+						if resp.status != 200:
+							L.error("SMSBrana.cz responded with {}".format(resp.status), await resp.text())
+							raise exceptions.MessageDeliveryError("Server responded with error.", channel=self.Channel)
+						response_body = await resp.text()
+			except aiohttp.ClientError as e:
+				L.error("Error connecting to SMSBrana.cz: {}".format(e))
+				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz")
 
 			if "<err>0</err>" not in response_body:
 				L.error("SMS delivery failed. SMSBrana.cz response: {}".format(response_body))
-				raise RuntimeError("SMS delivery failed.")
+				raise exceptions.MessageDeliveryError("Server responded with error.", channel=self.Channel)
 			else:
 				L.log(asab.LOG_NOTICE, "SMS sent")
 
