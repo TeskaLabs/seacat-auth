@@ -6,6 +6,7 @@ import saml2
 import saml2.config
 import saml2.client
 import saml2.response
+import saml2.httpbase
 
 from ...exceptions import ExternalLoginError
 from .abc import ExternalAuthProviderABC
@@ -52,21 +53,26 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 	def __init__(self, external_authentication_svc, config_section_name, config=None):
 		super().__init__(external_authentication_svc, config_section_name, config)
 		self.App = self.ExternalAuthenticationService.App
-		self.SamlConfig = self._init_saml_config()
 		self.SamlClient = None
+		proactor_service = self.App.get_service("asab.ProactorService")
+		proactor_service.schedule(self._prepare_saml_client)
 
-		task_service = self.App.get_service("asab.TaskService")
-		task_service.schedule(self._prepare_saml_client())
 
+	def _prepare_saml_client(self):
+		"""
+		Prepare SAML2 client instance, initializing it if necessary.
 
-	async def _prepare_saml_client(self):
+		Returns:
+			saml2.client.Saml2Client instance or None if initialization failed.
+		"""
 		if self.SamlClient is not None:
 			return self.SamlClient
 
 		try:
-			self.SamlClient = saml2.client.Saml2Client(config=self.SamlConfig)
-		except IOError as e:
-			L.error("Cannot load SAML identity provider metadata ({}): {}".format(e.__class__.__name__, e), struct_data={
+			config = self._init_saml_config()
+			self.SamlClient = saml2.client.Saml2Client(config)
+		except (IOError, saml2.SAMLError) as e:
+			L.error("Cannot load SAML identity provider metadata: {}".format(e), struct_data={
 				"provider": self.Type,
 			})
 			return None
@@ -75,6 +81,12 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	def _init_saml_config(self):
+		"""
+		Initialize SAML2 configuration from provider settings.
+
+		Returns:
+			saml2.config.Config instance
+		"""
 		entity_id = self.Config.get(
 			"entity_id",
 			default="{}saml/metadata".format(self.App.AuthWebUiUrl)
@@ -113,10 +125,10 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 						self.Config.getboolean("want_assertions_signed") if "want_assertions_signed" in self.Config
 						else True
 					),
-					"http_client_timeout": 5,
-				}
+				},
 			},
 			"metadata": metadata,
+			"http_client_timeout": 5,
 		}
 
 		if "key_file" in self.Config and "cert_file" in self.Config:
