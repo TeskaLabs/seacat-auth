@@ -71,8 +71,8 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		try:
 			config = self._init_saml_config()
 			self.SamlClient = saml2.client.Saml2Client(config)
-		except (IOError, saml2.SAMLError) as e:
-			L.error("Cannot load SAML identity provider metadata: {}".format(e), struct_data={
+		except Exception as e:
+			L.error("Cannot load SAML identity provider metadata ({}): {}".format(e.__class__.__name__, e), struct_data={
 				"provider": self.Type,
 			})
 			return None
