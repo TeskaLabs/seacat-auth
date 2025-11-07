@@ -1,6 +1,14 @@
 # CHANGELOG
 
-## v25.26.1
+## v25.26.03
+
+Support local SAML federation metadata file and handle timeout on remote metadata file
+
+## v25.26.02
+
+Updated ASAB version.
+
+## v25.26.01
 
 This patch brings the repository to the same state as v25.38-alpha8.
 
