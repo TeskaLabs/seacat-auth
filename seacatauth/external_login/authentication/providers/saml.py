@@ -142,7 +142,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
-		saml_client = await self._prepare_saml_client()
+		saml_client = self._prepare_saml_client()
 		if saml_client is None:
 			raise ExternalLoginError("SAML client is not properly initialized.")
 
@@ -161,7 +161,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	async def process_auth_callback(self, request: aiohttp.web.Request, payload: dict, state: dict, **kwargs) -> dict:
-		saml_client = await self._prepare_saml_client()
+		saml_client = self._prepare_saml_client()
 		if saml_client is None:
 			raise ExternalLoginError("SAML client is not properly initialized.")
 
