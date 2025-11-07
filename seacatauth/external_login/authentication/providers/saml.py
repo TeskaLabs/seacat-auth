@@ -77,7 +77,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 	def _init_saml_config(self):
 		entity_id = self.Config.get(
 			"entity_id",
-			fallback="{}saml/metadata".format(self.App.AuthWebUiUrl)
+			default="{}saml/metadata".format(self.App.AuthWebUiUrl)
 		)
 
 		idp_metadata_url = self.Config.get(
