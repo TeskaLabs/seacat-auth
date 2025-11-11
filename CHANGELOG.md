@@ -3,6 +3,8 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha10
+- v25.38-alpha9
 - v25.38-alpha8
 - v25.38-alpha7
 - v25.38-alpha6
@@ -17,6 +19,8 @@
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
 
 ### Fixes
+- Support local SAML federation metadata file and handle client initialization errors (#527, v25.38-alpha10)
+- Specific email error responses (#518, v25.38-alpha9)
 - Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha8)
 - Make sure external login callback is on the sub-path of Auth UI (#522, v25.38-alpha7)
 - Opaque external credential IDs (#521, v25.38-alpha6)
@@ -27,6 +31,7 @@
 - External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
+- Refactor OTP handlers, handle 404 errors (#529, v25.38-alpha10)
 - Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
 - Decouple external authentication from external credentials management (#515, v25.38-alpha1)
 

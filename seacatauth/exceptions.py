@@ -95,6 +95,21 @@ class CredentialsNotFoundError(SeacatAuthError, KeyError):
 		)
 		super().__init__(message, *args)
 
+	def rest_payload(self):
+		return {
+			"result": "ERROR",
+			"tech_err": "Credentials {!r} not found.".format(self.CredentialsId),
+			"error": "SeaCatAuthError|Credentials {{ident}} not found",
+			"err_dict": {"ident": self.CredentialsId}
+		}
+
+	def json_response(self, request):
+		return asab.web.rest.json_response(
+			request,
+			status=404,
+			data=self.rest_payload(),
+		)
+
 
 class NotEditableError(SeacatAuthError):
 	"""
@@ -374,3 +389,11 @@ class OAuth2InvalidClient(OAuth2Error):
 	"""
 	def __init__(self, *args, **kwargs):
 		super().__init__("invalid_client", *args, **kwargs)
+
+
+class ServerCommunicationError(SeacatAuthError):
+	"""
+	Failed to communicate with external service
+	"""
+	def __init__(self, message, *args):
+		super().__init__(message, *args)
