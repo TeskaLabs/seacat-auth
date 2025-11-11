@@ -1,5 +1,6 @@
 import typing
 import logging
+import asab
 
 from .. import exceptions
 from ..api import local_authz
@@ -32,7 +33,7 @@ async def build_credentials_authz(
 			resources = await role_service.get_role_resources(role)
 		except exceptions.RoleNotFoundError:
 			# Integrity fix: Detected assignment of a non-existent role, remove it
-			L.warning("Integrity error: Found assignment of a non-existent role.", struct_data={
+			L.log(asab.LOG_NOTICE, "Found assignment of a non-existent role.", struct_data={
 				"role_id": role, "cid": credentials_id})
 			with local_authz(
 				"build_credentials_authz",
