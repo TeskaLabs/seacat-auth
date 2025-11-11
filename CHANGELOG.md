@@ -30,6 +30,7 @@
 - External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
+- Refactor OTP handlers, handle 404 errors (#529, v25.38-alpha10)
 - Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
 - Decouple external authentication from external credentials management (#515, v25.38-alpha1)
 
