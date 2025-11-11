@@ -87,7 +87,7 @@ class RegistrationService(asab.Service):
 
 		if expiration is None:
 			expiration = self.RegistrationExpiration
-		expires_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=expiration)
+		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 		registration_data["exp"] = expires_at
 
 		if invited_by_cid is not None:
