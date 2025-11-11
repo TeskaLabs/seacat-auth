@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha11
 - v25.38-alpha10
 - v25.38-alpha9
 - v25.38-alpha8
@@ -27,11 +28,12 @@
 - Fix pysaml2 dependency (#518, v25.38-alpha4)
 
 ### Features
+- Remove non-existent role assignments at login/authorization (#530, v25.38-alpha11)
 - Filtering credentials by active/suspended status (#517, v25.38-alpha3)
 - External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
-- Refactor OTP handlers, handle 404 errors (#529, v25.38-alpha10)
+- Refactor OTP handlers, handle 404 errors (#529, v25.38-alpha11)
 - Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
 - Decouple external authentication from external credentials management (#515, v25.38-alpha1)
 
