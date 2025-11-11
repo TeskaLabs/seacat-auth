@@ -10,6 +10,7 @@ import asab.contextvars
 from ... import AuditLogger
 from ...api import local_authz
 from ...models.const import ResourceId
+from ..providers.abc import RegistrableCredentialsProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class RegistrationService(asab.Service):
 			raise NotImplementedError("Self-registration has not been implemented yet.")
 
 		# Support only one registrable credential provider for now
-		self.CredentialProvider = self._get_provider()
+		self.CredentialProvider: RegistrableCredentialsProviderABC | None = self._get_provider()
 
 		# Disable service if there is no registrable provider
 		self.Enabled = self.CredentialProvider is not None
@@ -86,7 +87,7 @@ class RegistrationService(asab.Service):
 
 		if expiration is None:
 			expiration = self.RegistrationExpiration
-		expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
+		expires_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=expiration)
 		registration_data["exp"] = expires_at
 
 		if invited_by_cid is not None:
@@ -197,12 +198,12 @@ class RegistrationService(asab.Service):
 		Delete all credentials that have expired registration time
 		"""
 		assert self.Enabled
-		collection = self.StorageService.Database[self.CredentialProvider.CredentialsCollection]
-		query_filter = {"__registration.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
-		result = await collection.delete_many(query_filter)
-		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Expired unregistered credentials deleted", struct_data={
-				"count": result.deleted_count})
+		deleted_count = 0
+		async for credentials in self.CredentialProvider.iterate_expired_unregistered_credentials():
+			await self.CredentialsService.delete_credentials(credentials["_id"])
+			deleted_count += 1
+		if deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Expired unregistered credentials deleted.", struct_data={"count": deleted_count})
 
 
 	async def update_credential_by_registration_code(self, registration_code: str, credential_data: dict):
@@ -331,7 +332,7 @@ class RegistrationService(asab.Service):
 		})
 
 
-	def _get_provider(self, provider_id: str = None):
+	def _get_provider(self, provider_id: str = None) -> RegistrableCredentialsProviderABC | None:
 		"""
 		Locate a provider that supports credentials registration
 
