@@ -6,8 +6,8 @@ import urllib.parse
 import asab
 import asab.storage
 
-from .. import exceptions
-from ..events import EventTypes
+from ... import exceptions
+from ...events import EventTypes
 
 
 L = logging.getLogger(__name__)
