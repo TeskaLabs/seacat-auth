@@ -623,7 +623,7 @@ class RoleService(asab.Service):
 
 	async def iterate_role_assignments(
 		self,
-		role_id: str,
+		role_id: str | typing.Iterable,
 		page: int = 0,
 		limit: int | None = None,
 	) -> typing.AsyncIterator[dict]:
@@ -632,7 +632,7 @@ class RoleService(asab.Service):
 
 		Args:
 			role_id:
-				Role ID to filter by
+				Role ID (or a list) to filter by
 			page:
 				Page number (0..N)
 			limit:
@@ -651,13 +651,13 @@ class RoleService(asab.Service):
 			yield assignment
 
 
-	async def count_role_assignments(self, role_id: str) -> int:
+	async def count_role_assignments(self, role_id: str | typing.Iterable) -> int:
 		"""
 		Count all credentials IDs that are assigned a specified role
 
 		Args:
 			role_id:
-				Role ID to filter by
+				Role ID (or a list) to filter by
 		Yields:
 			Credentials IDs assigned the role
 		"""
