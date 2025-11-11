@@ -270,17 +270,6 @@ class RoleService(asab.Service):
 		]
 
 		offset = (page or 0) * (limit or 0)
-		for i, count in enumerate(counts):
-			if count == 0:
-				# Remove empty views to optimize iteration
-				views[i] = None
-				continue
-
-			if offset >= count:
-				offset -= count
-				views[i] = None
-				continue
-
 		iterators = []
 		for count, view in zip(counts, views):
 			if count == 0:
