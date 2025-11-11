@@ -145,9 +145,9 @@ class RoleView(abc.ABC):
 		"""
 		pipeline = []
 		base_match = self._base_query()
-		if resource_filter:
+		if resource_filter is not None:
 			base_match["resources"] = resource_filter
-		if description_substring:
+		if description_substring is not None:
 			base_match["description"] = {"$regex": re.escape(description_substring)}
 		pipeline.append({"$match": base_match})
 
@@ -160,10 +160,10 @@ class RoleView(abc.ABC):
 		add_fields = {}
 		second_match = {}
 
-		if id_substring:
+		if id_substring is not None:
 			second_match["_public_id"] = {"$regex": re.escape(id_substring)}
 
-		if flag_tenants:
+		if flag_tenants is not None:
 			is_tenant_match = self._is_tenant_match(flag_tenants)
 			if tenant_flag_filter is not None:
 				if is_tenant_match != tenant_flag_filter:
@@ -174,7 +174,7 @@ class RoleView(abc.ABC):
 					pass
 			add_fields["_tenant_flag"] = is_tenant_match
 
-		if flag_ids:
+		if flag_ids is not None:
 			add_fields["_id_flag"] = {
 				"$in": ["$_public_id", flag_ids]
 			}
@@ -190,13 +190,13 @@ class RoleView(abc.ABC):
 		if sort:
 			pipeline.append({"$sort": {k: v for k, v in sort}})
 
-		if offset:
+		if offset is not None:
 			pipeline.append({"$skip": offset})
 
-		if limit:
+		if limit is not None:
 			pipeline.append({"$limit": limit})
 
-		if set_fields:
+		if set_fields is not None:
 			pipeline.append({"$addFields": set_fields})
 
 		return pipeline
