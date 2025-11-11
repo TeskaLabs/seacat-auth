@@ -162,9 +162,10 @@ class SeaCatAuthApplication(asab.Application):
 		from .openidconnect import OpenIdConnectModule
 		self.add_module(OpenIdConnectModule)
 
-		from .authn.otp import OTPHandler, OTPService
+		from .authn.otp import OTPAccountHandler, OTPAdminHandler, OTPService
 		self.OTPService = OTPService(self)
-		self.OTPHandler = OTPHandler(self, self.OTPService)
+		self.OTPAccountHandler = OTPAccountHandler(self, self.OTPService)
+		self.OTPAdminHandler = OTPAdminHandler(self, self.OTPService)
 
 		from .external_login.authentication import (
 			ExternalAuthenticationService,

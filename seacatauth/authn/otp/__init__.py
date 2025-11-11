@@ -1,8 +1,10 @@
 from .service import OTPService
-from .handler import OTPHandler
+from .handler.account import OTPAccountHandler
+from .handler.admin import OTPAdminHandler
 
 
 __all__ = [
 	"OTPService",
-	"OTPHandler"
+	"OTPAccountHandler",
+	"OTPAdminHandler"
 ]
