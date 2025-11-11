@@ -5,7 +5,7 @@ import asab.web.auth
 import asab.web.tenant
 import asab.contextvars
 
-from .. import exceptions
+from ... import exceptions
 from . import schema
 
 
