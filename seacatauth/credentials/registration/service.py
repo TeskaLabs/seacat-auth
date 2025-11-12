@@ -44,11 +44,12 @@ class RegistrationService(asab.Service):
 		# Support only one registrable credential provider for now
 		self.CredentialProvider: RegistrableCredentialsProviderABC | None = self._get_provider()
 
-		# Disable service if there is no registrable provider
-		self.Enabled = self.CredentialProvider is not None
-
-		if self.Enabled:
+		if self.is_enabled():
 			self.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
+
+	def is_enabled(self):
+		return self.CredentialProvider is not None and self.CredentialProvider.RegistrationEnabled
 
 
 	async def initialize(self, app):
@@ -82,7 +83,7 @@ class RegistrationService(asab.Service):
 		:type invited_from_ips: list
 		:return: The ID of the generated invitation.
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		registration_data = {}
 
 		if expiration is None:
@@ -126,7 +127,7 @@ class RegistrationService(asab.Service):
 		Returns:
 			The new registration code
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		credentials = await self.CredentialProvider.get(credentials_id, include=["__registration"])
 		registration_data = credentials.get("__registration")
 		if registration_data is None:
@@ -151,7 +152,7 @@ class RegistrationService(asab.Service):
 		Returns:
 			The credential object without sensitive fields
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		registration_code_hash = hash_registration_code(registration_code)
 		try:
 			credentials = await self.CredentialProvider.get_by(
@@ -187,7 +188,7 @@ class RegistrationService(asab.Service):
 		Args:
 			registration_code: The registration code that was sent to the user
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		registration_code_hash = hash_registration_code(registration_code)
 		credentials = await self.CredentialProvider.get_by("__registration.code", registration_code_hash)
 		await self.CredentialProvider.delete(credentials["_id"])
@@ -197,7 +198,7 @@ class RegistrationService(asab.Service):
 		"""
 		Delete all credentials that have expired registration time
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		deleted_count = 0
 		async for credentials in self.CredentialProvider.iterate_expired_unregistered_credentials():
 			await self.CredentialsService.delete_credentials(credentials["_id"])
@@ -214,7 +215,7 @@ class RegistrationService(asab.Service):
 			registration_code: The registration code that was sent to the user
 			credential_data: a dictionary with the update data
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		for key in credential_data:
 			if key not in ["username", "email", "phone", "password"]:
 				raise asab.exceptions.ValidationError("Updating '{}' not allowed".format(key))
@@ -241,7 +242,7 @@ class RegistrationService(asab.Service):
 		Args:
 			registration_code: The registration code that was sent to the user
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		registration_code_hash = hash_registration_code(registration_code)
 		credentials = await self.CredentialProvider.get_by(
 			"__registration.code", registration_code_hash, include=["__password", "__registration"])
@@ -279,7 +280,7 @@ class RegistrationService(asab.Service):
 		:param registration_code: The registration code that was sent to the user
 		:param credentials_id: The ID of the currently authenticated credentials that will be registered
 		"""
-		assert self.Enabled
+		assert self.is_enabled()
 		reg_credentials = await self.get_credential_by_registration_code(registration_code)
 		reg_credential_id = reg_credentials["_id"]
 		reg_tenants = await self.TenantService.get_tenants(reg_credential_id)
@@ -360,7 +361,7 @@ class RegistrationService(asab.Service):
 
 
 	def format_registration_url(self, registration_code: str) -> str:
-		assert self.Enabled
+		assert self.is_enabled()
 		return self.RegistrationUriFormat.format(
 			auth_webui_base_url=self.AuthWebUIBaseUrl,
 			registration_code=registration_code)
