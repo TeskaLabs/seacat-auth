@@ -138,3 +138,12 @@ class EditableCredentialsProviderABC(CredentialsProviderABC):
 	@abc.abstractmethod
 	async def delete(self, credentials_id) -> typing.Optional[str]:
 		pass
+
+
+class RegistrableCredentialsProviderABC(EditableCredentialsProviderABC):
+
+	RegistrationEnabled = True
+
+	@abc.abstractmethod
+	async def iterate_expired_unregistered_credentials(self) -> typing.AsyncGenerator[dict, None]:
+		raise NotImplementedError()

@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import logging
 import re
@@ -11,7 +12,7 @@ import bson.errors
 import pymongo
 import pymongo.errors
 
-from .abc import EditableCredentialsProviderABC
+from .abc import RegistrableCredentialsProviderABC
 from ... import generic, exceptions
 from ...events import EventTypes
 
@@ -28,7 +29,7 @@ class MongoDBCredentialsService(asab.Service):
 		return MongoDBCredentialsProvider(self.App, provider_id, config_section_name)
 
 
-class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
+class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 	"""
 	Credentials provider with MongoDB backend.
 
@@ -377,3 +378,12 @@ class MongoDBCredentialsProvider(EditableCredentialsProviderABC):
 			raise ValueError("Invalid credentials ID: {}".format(credentials_id))
 
 		return mongodb_id
+
+
+	async def iterate_expired_unregistered_credentials(self) -> typing.AsyncGenerator[dict, None]:
+		coll = await self.MongoDBStorageService.collection(self.CredentialsCollection)
+		cursor = coll.find(
+			filter={"__registration.exp": {"$lt": datetime.datetime.now(datetime.timezone.utc)}},
+		)
+		async for d in cursor:
+			yield self._normalize_credentials(d)
