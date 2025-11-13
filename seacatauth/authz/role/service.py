@@ -228,7 +228,7 @@ class RoleService(asab.Service):
 		tenant_id, _ = self.parse_role_id(role_id)
 		authz = asab.contextvars.Authz.get()
 		if tenant_id:
-			authz.require_tenant_access()
+			authz.require_tenant_access(tenant_id)
 		return await self._get(role_id)
 
 
@@ -441,7 +441,7 @@ class RoleService(asab.Service):
 		tenants: list = None,
 		limit: typing.Optional[int] = None,
 		page: int = 0
-	):
+	) -> typing.List[str]:
 		"""
 		Returns a list of roles assigned to the given `credentials_id`.
 		Includes roles that match the given `tenant` plus global roles.
