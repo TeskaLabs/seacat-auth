@@ -1,6 +1,7 @@
 import typing
 import logging
 import asab
+import typing
 
 from .role.view.propagated_role import global_role_id_to_propagated
 from .. import exceptions
@@ -14,14 +15,25 @@ L = logging.getLogger(__name__)
 async def build_credentials_authz(
 	tenant_service, role_service, credentials_id: str,
 	tenants: typing.Iterable = None, exclude_resources: typing.Iterable = None
-):
+) -> typing.Dict[str, typing.List[str]]:
 	"""
-	Creates a nested 'authz' dict with tenant:resource structure:
-	{
-		'*': ['resourceA', 'resourceB'],
-		'tenantA': ['resourceA', 'resourceB', 'resourceC'],
-		'tenantB': ['resourceA', 'resourceB', 'resourceE', 'resourceD'],
-	}
+	Build authorization mapping for given credentials.
+
+	Args:
+		tenant_service: Tenant service instance.
+		role_service: Role service instance.
+		credentials_id: ID of the credentials to build authz for.
+		tenants: Iterable of tenant IDs to build authz for. If None, only global resources are included.
+		exclude_resources: Iterable of resource IDs to exclude from the result.
+
+	Returns:
+		A dictionary mapping tenant IDs to lists of resource IDs.
+		Example:
+			{
+				'*': ['resourceA', 'resourceB'],
+				'tenantA': ['resourceA', 'resourceB', 'resourceC'],
+				'tenantB': ['resourceA', 'resourceB', 'resourceE', 'resourceD'],
+			}
 	"""
 	exclude_resources = exclude_resources or frozenset()
 
@@ -31,27 +43,26 @@ async def build_credentials_authz(
 	for tenant in {"*", *(tenants or {})}:
 		authz[tenant] = set()
 		roles = await role_service.get_roles_by_credentials(credentials_id, [tenant])
+
+		# Ensure assignment of tenant base role to everybody
 		if (
 			tenant != "*"
-			and len(roles) == 0
 			and role_service.TenantBaseRole is not None
 		):
-			# Integrity fix: User has no role in their assigned tenant, assign them the base role
-			with local_authz(
-				"build_credentials_authz",
-				resources=[ResourceId.SUPERUSER],
-			):
-				try:
-					await role_service.get(role_service.TenantBaseRole)
-				except exceptions.RoleNotFoundError:
-					L.warning("Tenant base role is not ready.", struct_data={"role": role_service.TenantBaseRole})
-					continue
-				L.log(asab.LOG_NOTICE, "Assigning base role to user with no roles in tenant.", struct_data={
-					"tenant": tenant, "cid": credentials_id})
-				tenant_base_role = global_role_id_to_propagated(role_service.TenantBaseRole, tenant)
-				await role_service.assign_role(credentials_id, tenant_base_role)
-				roles.append(tenant_base_role)
+			tenant_base_role = global_role_id_to_propagated(role_service.TenantBaseRole, tenant)
+			if tenant_base_role not in roles:
+				with local_authz(
+					"build_credentials_authz",
+					resources=[ResourceId.SUPERUSER],
+				):
+					try:
+						await role_service.assign_role(credentials_id, tenant_base_role)
+						roles.append(tenant_base_role)
+					except exceptions.RoleNotFoundError:
+						L.warning("Tenant base role is not ready.", struct_data={
+							"role": role_service.TenantBaseRole})
 
+		# Gather resources from all assigned roles
 		for role in roles:
 			try:
 				resources = await role_service.get_role_resources(role)
@@ -71,6 +82,7 @@ async def build_credentials_authz(
 					continue
 				authz[tenant].add(res)
 
+	# Prepare for serialization
 	for tenant in authz:
 		authz[tenant] = list(authz[tenant])
 
