@@ -136,9 +136,17 @@ class SeaCatAuthApplication(asab.Application):
 
 		# Init Login service
 		# depends on: ResourceService, TenantService, RoleService, CredentialService, BatmanService
-		from .authn import AuthenticationService, AuthenticationHandler, M2MIntrospectHandler
+		from .authn import (
+			AuthenticationService,
+			AuthenticationPublicHandler,
+			AuthenticationAccountHandler,
+			AuthenticationAdminHandler,
+			M2MIntrospectHandler
+		)
 		self.AuthenticationService = AuthenticationService(self)
-		self.AuthenticationHandler = AuthenticationHandler(self, self.AuthenticationService)
+		self.AuthenticationPublicHandler = AuthenticationPublicHandler(self, self.AuthenticationService)
+		self.AuthenticationAccountHandler = AuthenticationAccountHandler(self, self.AuthenticationService)
+		self.AuthenticationAdminHandler = AuthenticationAdminHandler(self, self.AuthenticationService)
 		self.M2MIntrospectHandler = M2MIntrospectHandler(
 			self,
 			self.AuthenticationService,
