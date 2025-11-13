@@ -40,15 +40,7 @@ class WebAuthnAdminHandler(object):
 		credentials_id = request.match_info["credentials_id"]
 		wa_credentials = []
 		for credential in await self.WebAuthnService.list_webauthn_credentials(credentials_id, rest_normalize=True):
-			wa_credential = {
-				"id": base64.urlsafe_b64encode(credential["_id"]).decode("ascii").rstrip("="),
-				"name": credential["name"],
-				"sign_count": credential["sc"],
-				"created": credential["_c"],
-			}
-			if "ll" in credential:
-				wa_credential["last_login"] = credential["ll"]
-			wa_credentials.append(wa_credential)
+			wa_credentials.append(credential)
 
 		return asab.web.rest.json_response(request, {
 			"data": wa_credentials,
