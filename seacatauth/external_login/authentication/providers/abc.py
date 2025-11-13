@@ -28,8 +28,6 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 
 		self.ExternalAuthenticationService = external_authentication_svc
 		self.CallbackUrl = self.ExternalAuthenticationService.CallbackUrlTemplate.format(provider_type=self.Type)
-		self.RegisterUnknownAtLogin = self.Config.get("register_unknown_at_login", "false")
-		self.PairUnknownAtLogin = self.Config.get("pair_unknown_at_login", "false")
 
 
 	async def initialize(self, app):
