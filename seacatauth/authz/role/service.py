@@ -441,7 +441,7 @@ class RoleService(asab.Service):
 		tenants: list = None,
 		limit: typing.Optional[int] = None,
 		page: int = 0
-	):
+	) -> typing.List[str]:
 		"""
 		Returns a list of roles assigned to the given `credentials_id`.
 		Includes roles that match the given `tenant` plus global roles.
