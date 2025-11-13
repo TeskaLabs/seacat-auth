@@ -4,6 +4,7 @@ import typing
 
 import aiohttp.web
 import asab
+import asab.utils
 
 
 L = logging.getLogger(__name__)
@@ -28,6 +29,10 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 
 		self.ExternalAuthenticationService = external_authentication_svc
 		self.CallbackUrl = self.ExternalAuthenticationService.CallbackUrlTemplate.format(provider_type=self.Type)
+		self.RegisterUnknownAtLogin = asab.utils.string_to_boolean(
+			self.Config.get("register_unknown_at_login", False))
+		self.PairUnknownAtLogin = asab.utils.string_to_boolean(
+			self.Config.get("pair_unknown_at_login", False))
 
 
 	async def initialize(self, app):

@@ -98,10 +98,7 @@ class ExternalAuthenticationService(asab.Service):
 		"""
 		Check if new credentials from the given external identity provider can be registered.
 		"""
-		return (
-			self.ExternalCredentialsService.RegistrationWebhookUri
-			or self.ExternalCredentialsService.RegistrationService.SelfRegistrationEnabled
-		)
+		return self.ExternalCredentialsService.RegistrationWebhookUri is not None
 
 
 	async def initialize_login_with_ext_provider(
@@ -204,6 +201,8 @@ class ExternalAuthenticationService(asab.Service):
 	) -> aiohttp.web.Response:
 		"""
 		Log the user in using their external account.
+		If the external account is unknown, attempt to pair it with existing credentials
+		or register new credentials if allowed.
 
 		Args:
 			request: The incoming HTTP request.
@@ -250,54 +249,42 @@ class ExternalAuthenticationService(asab.Service):
 				account = await self.ExternalCredentialsService.get_ext_credentials_by_type_and_sub(
 					provider_type, subject_id=user_info["sub"])
 			credentials_id = account["cid"]
+
+			# Get current SSO session (if any) to determine if we are re-logging in or logging in anew
+			try:
+				current_sso_session = await self.CookieService.get_session_by_request_cookie(request)
+			except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+				current_sso_session = None
+			if current_sso_session and current_sso_session.Credentials.Id != credentials_id:
+				# The external account belongs to someone else than who is logged in
+				# Ignore the current SSO session and log in, its cookie will be overwritten
+				current_sso_session = None
+
 		except ExternalAccountNotFoundError as e:
 			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={"query": e.Query})
-			if not self.can_sign_up_new_credentials(provider_type):
-				# Redirect to login page with error message, keep the original redirect uri in the query
-				return self._error_redirect_response(
-					self.LoginUri,
-					result="login_failed",
-					delete_sso_cookie=True,
-					ext_login_error="not_found",
-					redirect_uri=self._get_final_redirect_uri(state)
-				)
-
-			# Create credentials and pair external account
-			try:
-				credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
-					provider_type, user_info, payload)
-			except exceptions.CredentialsRegistrationError as e:
-				L.error("Sign-up with external account failed: {}".format(e))
-				return self._error_redirect_response(
-					self.LoginUri,
-					result="login_failed",
-					delete_sso_cookie=True,
-					redirect_uri=self._get_final_redirect_uri(state)
-				)
-
-			# Log the user in
-			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
-				new_sso_session = await self._login(
-					credentials_id=credentials_id,
-					provider_type=provider_type,
-					current_sso_session=None,
-				)
-
-			return self._success_redirect_response(
-				self._get_final_redirect_uri(state), "signup_success", sso_session=new_sso_session)
-
-		# Get current SSO session (if any) to determine if we are re-logging in or logging in anew
-		try:
-			current_sso_session = await self.CookieService.get_session_by_request_cookie(request)
-		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
+			credentials_id = None
 			current_sso_session = None
+
+		if credentials_id is None and provider.PairUnknownAtLogin:
+			credentials_id = await self._attempt_pair_credentials(provider_type, user_info, payload)
+
+		if (
+			credentials_id is None and provider.RegisterUnknownAtLogin
+			and self.can_sign_up_new_credentials(provider_type)
+		):
+			credentials_id = await self._attempt_register_new_credentials(provider_type, user_info, payload)
+
+		if credentials_id is None:
+			# Redirect to login page with error message, keep the original redirect uri in the query
+			return self._error_redirect_response(
+				self.LoginUri,
+				result="login_failed",
+				delete_sso_cookie=True,
+				ext_login_error="not_found",
+				redirect_uri=self._get_final_redirect_uri(state)
+			)
 
 		# Log the user in
-		if current_sso_session and current_sso_session.Credentials.Id != credentials_id:
-			# The external account belongs to someone else than who is logged in
-			# Ignore the current SSO session and log in, its cookie will be overwritten
-			current_sso_session = None
-
 		with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
 			new_sso_session = await self._login(
 				credentials_id=credentials_id,
@@ -307,6 +294,49 @@ class ExternalAuthenticationService(asab.Service):
 
 		return self._success_redirect_response(
 			self._get_final_redirect_uri(state), "login_success", sso_session=new_sso_session)
+
+
+	async def _attempt_pair_credentials(self, provider_type: str, user_info: typing.Dict, payload: typing.Dict) -> typing.Optional[str]:
+		"""
+		Attempt to locate existing credentials by email and pair the external account with them.
+
+		Args:
+			provider_type: The type of the external identity provider.
+			user_info: The user information obtained from the external provider.
+			payload: The payload containing authorization response data.
+
+		Returns:
+			The located credentials ID if found and paired, otherwise None.
+		"""
+		credentials_id = await self._locate_credentials_by_email(user_info)
+		if credentials_id is not None:
+			# Pair the external account with the located credentials
+			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
+				await self.ExternalCredentialsService.create_ext_credentials(
+					credentials_id, provider_type, user_info)
+		return credentials_id
+
+
+	async def _attempt_register_new_credentials(
+		self,
+		provider_type: str,
+		user_info: typing.Dict,
+		payload: typing.Dict,
+	) -> typing.Optional[str]:
+		"""
+		Attempt to register new credentials using the external account.
+
+		Args:
+			provider_type: The type of the external identity provider.
+			user_info: The user information obtained from the external provider.
+			payload: The payload containing authorization response data.
+
+		Returns:
+			The located credentials ID if found and paired, otherwise None.
+		"""
+		credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
+			provider_type, user_info, payload)
+		return credentials_id
 
 
 	async def _finalize_signup_with_ext_provider(
