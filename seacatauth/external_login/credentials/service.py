@@ -172,7 +172,7 @@ class ExternalCredentialsService(asab.Service):
 		if ext_credentials is None:
 			raise ExternalAccountNotFoundError(query={"type": provider_type, "sub": subject_id})
 
-		ext_credentials = _normalize_ext_credentials(ext_credentials)
+		ext_credentials = self._normalize_ext_credentials(ext_credentials)
 
 		ensure_access_permissions(ext_credentials["cid"])
 
@@ -194,7 +194,7 @@ class ExternalCredentialsService(asab.Service):
 		except KeyError:
 			raise ExternalAccountNotFoundError(query={"_id": ext_credentials_id})
 
-		ext_credentials = _normalize_ext_credentials(ext_credentials)
+		ext_credentials = self._normalize_ext_credentials(ext_credentials)
 
 		ensure_access_permissions(ext_credentials["cid"])
 
@@ -220,7 +220,7 @@ class ExternalCredentialsService(asab.Service):
 
 		ext_credentials = []
 		async for cred in cursor:
-			ext_credentials.append(_normalize_ext_credentials(cred))
+			ext_credentials.append(self._normalize_ext_credentials(cred))
 
 		return ext_credentials
 
@@ -290,19 +290,26 @@ class ExternalCredentialsService(asab.Service):
 
 		return credentials_id
 
+	def _normalize_ext_credentials(self, account: dict):
+		# Normalize old field names
+		if "e" in account and "email" not in account:
+			account["email"] = account["e"]
+		if "s" in account and "sub" not in account:
+			account["sub"] = account["s"]
+		if "t" in account and "type" not in account:
+			account["type"] = account["t"]
 
-def _normalize_ext_credentials(account: dict):
-	# Normalize old field names
-	if "e" in account and "email" not in account:
-		account["email"] = account["e"]
-	if "s" in account and "sub" not in account:
-		account["sub"] = account["s"]
-	if "t" in account and "type" not in account:
-		account["type"] = account["t"]
+		# Add 'label' field for easier identification of the account
+		account["label"] = account.get("email") or account.get("username") or account["sub"]
 
-	# Add 'label' field for easier identification of the account
-	account["label"] = account.get("email") or account.get("username") or account["sub"]
-	return account
+		# Add provider_label if possible
+		provider = self.ExternalAuthenticationService.Providers.get(account["type"])
+		if provider is not None:
+			account["provider_label"] = provider.Label
+		else:
+			account["provider_label"] = account["type"]
+
+		return account
 
 
 def ensure_access_permissions(credentials_id: str):
