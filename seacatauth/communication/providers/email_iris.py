@@ -46,10 +46,9 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 
 	async def is_enabled(self) -> bool:
-		url = "{}{}".format(self.AsabIrisUrl, "features")
 		try:
 			async with self._asab_iris_session() as session:
-				async with session.get(url) as resp:
+				async with session.get("features") as resp:
 					response = await resp.json()
 					if resp.status != 200:
 						L.error("Error response from ASAB Iris: {}".format(response))
@@ -83,10 +82,9 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		}
 		data = asab.web.rest.json.JSONDumper(pretty=False)(email_decl)
 
-		url = "{}{}".format(self.AsabIrisUrl, "send_email")
 		try:
 			async with self._asab_iris_session() as session:
-				async with session.put(url, data=data, headers={"Content-Type": "application/json"}) as resp:
+				async with session.put("send_email", data=data, headers={"Content-Type": "application/json"}) as resp:
 					response = await resp.json()
 					if resp.status == 200:
 						L.log(asab.LOG_NOTICE, "Email sent.")
@@ -108,9 +106,9 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 		discovery_service = self.App.get_service("asab.DiscoveryService")
 		timeout = aiohttp.ClientTimeout(total=self.Timeout)
 		if discovery_service is not None:
-			return discovery_service.session(*args, **kwargs, timeout=timeout)
+			return discovery_service.session(*args, **kwargs, base_url=self.AsabIrisUrl, timeout=timeout)
 		else:
-			return aiohttp.ClientSession(*args, **kwargs, timeout=timeout)
+			return aiohttp.ClientSession(*args, **kwargs, base_url=self.AsabIrisUrl, timeout=timeout)
 
 
 def _get_email_address(credentials: dict) -> str:
