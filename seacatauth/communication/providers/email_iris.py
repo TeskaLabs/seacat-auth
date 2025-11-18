@@ -57,7 +57,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 			L.error("Error connecting to ASAB Iris: {}".format(e))
 			return False
 		except asyncio.TimeoutError:
-			L.error("Error connecting to ASAB Iris: Timeout error")
+			L.error("Error connecting to ASAB Iris: Connection timed out")
 			return False
 
 		enabled_orchestrators = response.get("orchestrators", [])
@@ -95,7 +95,7 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 			L.error("Error connecting to ASAB Iris: {}".format(e))
 			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris")
 		except asyncio.TimeoutError:
-			L.error("Error connecting to ASAB Iris: Timeout error")
+			L.error("Error connecting to ASAB Iris: Connection timed out")
 			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris")
 
 
