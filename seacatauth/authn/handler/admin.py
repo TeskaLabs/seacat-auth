@@ -12,6 +12,19 @@ from ... import exceptions
 L = logging.getLogger(__name__)
 
 
+"""
+usage_count: Number of times the credential was used.
+last_authentication: Timestamp of the last successful authentication.
+created: Timestamp when the credential was created.
+last_failed_authentication: Timestamp of the last failed authentication attempt.
+failed_attempts: Count of consecutive failed authentication attempts.
+last_updated: Timestamp of the last update (e.g., name change, key rotation).
+created_by: Identifier of the user or process that created the credential (if applicable).
+last_ip: IP address (or device info) from which the credential was last used.
+locked: Boolean or timestamp if the credential is locked due to too many failures.
+"""
+
+
 class AuthenticationAdminHandler(object):
 	"""
 	Login and authentication
@@ -24,12 +37,17 @@ class AuthenticationAdminHandler(object):
 		self.App = app
 		self.AuthenticationService = authn_svc
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
+		self.AuthnMethodProviders = {}
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/admin/credentials/{credentials_id}/authn", self.list_authn_methods)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn/{method_id}", self.get_authn_method)
+		web_app.router.add_put("/admin/credentials/{credentials_id}/authn/{method_id}", self.update_authn_method)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/authn/{method_id}", self.delete_authn_method)
 
 
 	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
 	async def list_authn_methods(self, request):
 		"""
 		"""
@@ -62,13 +80,13 @@ class AuthenticationAdminHandler(object):
 				"label": "TOTP",
 			})
 
-		# Add Webauthn credentials
+		# Add Webauthn
 		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(
 			credentials_id, rest_normalize=True)
 		for cred in webauthn_credentials:
 			methods.append({
 				"_id": self._make_authn_method_id("webauthn", cred),
-				"_c": cred.get("_c"),
+				"_c": cred.get("created"),
 				"_m": cred.get("_m"),
 				"_v": cred.get("_v"),
 				"type": "webauthn",
@@ -81,6 +99,9 @@ class AuthenticationAdminHandler(object):
 		for account in ext_accounts:
 			methods.append({
 				"_id": self._make_authn_method_id("external", account),
+				"_c": account.get("_c"),
+				"_m": account.get("_m"),
+				"_v": account.get("_v"),
 				"type": "external",
 				"provider": account.get("type"),
 				"label": "{} - {}".format(account.get("provider_label"), account.get("label")),
@@ -93,6 +114,38 @@ class AuthenticationAdminHandler(object):
 			"data": methods,
 			"count": len(methods),
 		})
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def get_authn_method(self, request):
+		raise NotImplementedError()
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def update_authn_method(self, request):
+		raise NotImplementedError()
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def delete_authn_method(self, request):
+		"""
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		method_id = request.match_info["method_id"]
+
+		authn_method_type, authn_method_internal_id = self._parse_authn_method_id(method_id)
+		authn_method_provider = self.get_authn_method_provider(authn_method_type)
+
+		await authn_method_provider.remove_authn_method(
+			credentials_id,
+			authn_method_type,
+			authn_method_internal_id,
+		)
+
+		return asab.web.rest.json_response(request, {"result": "OK"})
 
 
 	def _make_authn_method_id(self, method_type: str, method_data: dict):
