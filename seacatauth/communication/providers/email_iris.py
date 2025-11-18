@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import aiohttp
 import asab
@@ -24,12 +25,14 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 	ConfigDefaults = {
 		"url": "http://localhost:8896",
 		"template_path": "/Templates/Email/",
+		"timeout": "5",
 	}
 
 	def __init__(self, app, config_section_name, config=None):
 		super().__init__(app, config_section_name, config=config)
 		self.AsabIrisUrl = self.Config.get("url").rstrip("/") + "/"
 		self.TemplateBasePath = self.Config.get("template_path")
+		self.Timeout = self.Config.getfloat("timeout")
 
 
 	async def can_send_to_target(self, credentials: dict) -> bool:
@@ -45,14 +48,17 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 	async def is_enabled(self) -> bool:
 		url = "{}{}".format(self.AsabIrisUrl, "features")
 		try:
-			async with _asab_iris_session(self.App) as session:
+			async with self._asab_iris_session() as session:
 				async with session.get(url) as resp:
 					response = await resp.json()
 					if resp.status != 200:
-						L.error("Error response from ASAB Iris.", struct_data=response)
+						L.error("Error response from ASAB Iris: {}".format(response))
 						return False
 		except aiohttp.ClientError as e:
 			L.error("Error connecting to ASAB Iris: {}".format(e))
+			return False
+		except asyncio.TimeoutError:
+			L.error("Error connecting to ASAB Iris: Timeout error")
 			return False
 
 		enabled_orchestrators = response.get("orchestrators", [])
@@ -79,22 +85,32 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 
 		url = "{}{}".format(self.AsabIrisUrl, "send_email")
 		try:
-			async with _asab_iris_session(self.App) as session:
+			async with self._asab_iris_session() as session:
 				async with session.put(url, data=data, headers={"Content-Type": "application/json"}) as resp:
 					response = await resp.json()
 					if resp.status == 200:
 						L.log(asab.LOG_NOTICE, "Email sent.")
 					else:
-						L.error("Error response from ASAB Iris.", struct_data={
-							"tech_err": response.get("tech_err")})
+						L.error("Error response from ASAB Iris: {}".format(response.get("tech_err") or response))
 						raise exceptions.MessageDeliveryError("Email delivery failed.", channel=self.Channel)
 		except aiohttp.ClientError as e:
 			L.error("Error connecting to ASAB Iris: {}".format(e))
+			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris")
+		except asyncio.TimeoutError:
+			L.error("Error connecting to ASAB Iris: Timeout error")
 			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris")
 
 
 	def _get_template_path(self, template_id: str) -> str:
 		return "{}{}".format(self.TemplateBasePath, TEMPLATE_FILES[template_id])
+
+	def _asab_iris_session(self, *args, **kwargs):
+		discovery_service = self.App.get_service("asab.DiscoveryService")
+		timeout = aiohttp.ClientTimeout(total=self.Timeout)
+		if discovery_service is not None:
+			return discovery_service.session(*args, **kwargs, timeout=timeout)
+		else:
+			return aiohttp.ClientSession(*args, **kwargs, timeout=timeout)
 
 
 def _get_email_address(credentials: dict) -> str:
@@ -102,11 +118,3 @@ def _get_email_address(credentials: dict) -> str:
 	if not email:
 		raise KeyError("Credentials do not contain 'email'.")
 	return email
-
-
-def _asab_iris_session(app, *args, **kwargs):
-	discovery_service = app.get_service("asab.DiscoveryService")
-	if discovery_service is not None:
-		return discovery_service.session(*args, **kwargs)
-	else:
-		return aiohttp.ClientSession(*args, **kwargs)
