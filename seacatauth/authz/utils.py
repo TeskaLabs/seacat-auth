@@ -58,7 +58,7 @@ async def build_credentials_authz(
 
 	# Add tenant-specific resources under their tenant_id
 	for tenant in tenants or []:
-		tenant_resources = set(*global_resources)
+		tenant_resources = set(global_resources)
 		tenant_roles = await role_service.get_roles_by_credentials(credentials_id, [tenant])
 
 		# Gather resources from all assigned roles
