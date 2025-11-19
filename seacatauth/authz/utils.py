@@ -49,8 +49,8 @@ async def build_credentials_authz(
 			L.log(asab.LOG_NOTICE, "Found assignment of a non-existent role.", struct_data={
 				"role_id": role, "cid": credentials_id})
 			with local_authz(
-					"build_credentials_authz",
-					resources=[ResourceId.SUPERUSER],
+				"build_credentials_authz",
+				resources=[ResourceId.SUPERUSER],
 			):
 				await role_service.unassign_role(credentials_id, role)
 			continue
