@@ -41,31 +41,14 @@ async def build_credentials_authz(
 	# Add tenant-specific resources under their tenant_id
 	authz = {}
 	for tenant in {"*", *(tenants or {})}:
-		authz[tenant] = set()
-		roles = await role_service.get_roles_by_credentials(credentials_id, [tenant])
-
-		# Ensure assignment of tenant base role to everybody
-		if (
-			tenant != "*"
-			and role_service.TenantBaseRole is not None
-		):
-			tenant_base_role = global_role_id_to_propagated(role_service.TenantBaseRole, tenant)
-			if tenant_base_role not in roles:
-				with local_authz(
-					"build_credentials_authz",
-					resources=[ResourceId.SUPERUSER],
-				):
-					try:
-						await role_service.assign_role(credentials_id, tenant_base_role)
-						roles.append(tenant_base_role)
-					except exceptions.RoleNotFoundError:
-						L.warning("Tenant base role is not ready.", struct_data={
-							"role": role_service.TenantBaseRole})
+		tenant_resources = set()
+		tenant_roles = await role_service.get_roles_by_credentials(credentials_id, [tenant])
 
 		# Gather resources from all assigned roles
-		for role in roles:
+		for role in tenant_roles:
 			try:
 				resources = await role_service.get_role_resources(role)
+				tenant_resources.update(res for res in resources if res not in exclude_resources)
 			except exceptions.RoleNotFoundError:
 				# Integrity fix: Detected assignment of a non-existent role, remove it
 				L.log(asab.LOG_NOTICE, "Found assignment of a non-existent role.", struct_data={
@@ -77,13 +60,23 @@ async def build_credentials_authz(
 					await role_service.unassign_role(credentials_id, role)
 				continue
 
-			for res in resources:
-				if res in exclude_resources:
-					continue
-				authz[tenant].add(res)
+		# If no resources found, ensure at least tenant base role resources are included (if available)
+		if len(tenant_resources) == 0 and tenant != "*" and role_service.TenantBaseRole is not None:
+			tenant_base_role = global_role_id_to_propagated(role_service.TenantBaseRole, tenant)
+			if tenant_base_role not in tenant_roles:
+				with local_authz(
+					"build_credentials_authz",
+					resources=[ResourceId.SUPERUSER],
+				):
+					try:
+						await role_service.assign_role(credentials_id, tenant_base_role)
+						tenant_roles.append(tenant_base_role)
+						resources = await role_service.get_role_resources(tenant_base_role)
+						tenant_resources.update(res for res in resources if res not in exclude_resources)
+					except exceptions.RoleNotFoundError:
+						L.warning("Tenant base role is not ready.", struct_data={
+							"role": role_service.TenantBaseRole})
 
-	# Prepare for serialization
-	for tenant in authz:
-		authz[tenant] = list(authz[tenant])
+		authz[tenant] = list(tenant_resources)
 
 	return authz
