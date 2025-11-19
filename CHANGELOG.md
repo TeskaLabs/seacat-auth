@@ -3,6 +3,8 @@
 ## v25.26
 
 ### Pre-releases
+- v25.26.04
+- v25.26.03
 - v25.26.02
 - v25.26.01
 - v25.26
@@ -27,10 +29,13 @@
 - Admin tenant invitation path changed to `/admin/tenant/{tenant}/invite`.
   Common user tenant invitation path changed to `/account/tenant/{tenant}/invite` (#501, v25.13-alpha5)
 
-### Fixes
-- Support local SAML federation metadata file and handle timeout on remote metadata file
-- Update ASAB version to v25.43.01 (#526, v25.26.02)
+### Patches
+- Handle timeout and network errors in ASAB Iris (#535, v25.26.04)
+- Support local SAML federation metadata file and handle timeout on remote metadata file (v25.26.03)
 - Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.26.01)
+- Update ASAB version to v25.43.01 (#526, v25.26.02)
+
+### Fixes
 - Make sure external login callback is on the sub-path of Auth UI (#522, v25.26.01)
 - Opaque external credential IDs (#521, v25.26.01)
 - Fix pysaml2 dependency (#518, v25.26.01)
