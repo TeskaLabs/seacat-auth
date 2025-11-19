@@ -93,10 +93,10 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 						raise exceptions.MessageDeliveryError("Email delivery failed.", channel=self.Channel)
 		except aiohttp.ClientError as e:
 			L.error("Error connecting to ASAB Iris: {}".format(e))
-			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris")
-		except asyncio.TimeoutError:
+			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris") from e
+		except asyncio.TimeoutError as e:
 			L.error("Error connecting to ASAB Iris: Connection timed out")
-			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris")
+			raise exceptions.ServerCommunicationError("Error connecting to ASAB Iris") from e
 
 
 	def _get_template_path(self, template_id: str) -> str:
