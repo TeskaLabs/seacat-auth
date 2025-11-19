@@ -118,10 +118,10 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 						response_body = await resp.text()
 			except aiohttp.ClientError as e:
 				L.error("Error connecting to SMSBrana.cz: {}".format(e))
-				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz")
-			except asyncio.TimeoutError:
+				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz") from e
+			except asyncio.TimeoutError as e:
 				L.error("Error connecting to SMSBrana.cz: Connection timed out")
-				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz")
+				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz") from e
 
 			if "<err>0</err>" not in response_body:
 				L.error("SMS delivery failed. SMSBrana.cz response: {}".format(response_body))

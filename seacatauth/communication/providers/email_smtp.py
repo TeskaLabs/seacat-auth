@@ -124,10 +124,10 @@ class SMTPEmailProvider(CommunicationProviderABC):
 				)
 			except ConnectionError as e:
 				L.error("Cannot connect to SMTP server: {}".format(e))
-				raise exceptions.ServerCommunicationError("Error connecting to SMTP server")
-			except asyncio.TimeoutError:
+				raise exceptions.ServerCommunicationError("Error connecting to SMTP server") from e
+			except asyncio.TimeoutError as e:
 				L.error("Cannot connect to SMTP server: Connection timed out")
-				raise exceptions.ServerCommunicationError("Error connecting to SMTP server")
+				raise exceptions.ServerCommunicationError("Error connecting to SMTP server") from e
 
 			L.log(asab.LOG_NOTICE, "Email sent.", struct_data={"result": result[1]})
 
