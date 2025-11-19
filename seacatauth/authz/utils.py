@@ -39,7 +39,7 @@ async def build_credentials_authz(
 	# Add global resources under "*"
 	# Add tenant-specific resources under their tenant_id
 	authz = {}
-	for tenant in {"*", *(tenants or {})}:
+	for tenant in {None, *(tenants or {})}:
 		tenant_resources = set()
 		tenant_roles = await role_service.get_roles_by_credentials(credentials_id, [tenant])
 
@@ -60,7 +60,7 @@ async def build_credentials_authz(
 				continue
 
 		# If no resources found, ensure at least tenant base role resources are included (if available)
-		if len(tenant_resources) == 0 and tenant != "*" and role_service.TenantBaseRole is not None:
+		if len(tenant_resources) == 0 and tenant is not None and role_service.TenantBaseRole is not None:
 			tenant_base_role = global_role_id_to_propagated(role_service.TenantBaseRole, tenant)
 			if tenant_base_role not in tenant_roles:
 				with local_authz(
@@ -76,6 +76,6 @@ async def build_credentials_authz(
 						L.warning("Tenant base role is not ready.", struct_data={
 							"role": role_service.TenantBaseRole})
 
-		authz[tenant] = list(tenant_resources)
+		authz[tenant or "*"] = list(tenant_resources)
 
 	return authz
