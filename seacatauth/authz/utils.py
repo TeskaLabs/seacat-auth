@@ -35,12 +35,30 @@ async def build_credentials_authz(
 			}
 	"""
 	exclude_resources = exclude_resources or frozenset()
-
-	# Add global resources under "*"
-	# Add tenant-specific resources under their tenant_id
 	authz = {}
-	for tenant in {None, *(tenants or {})}:
-		tenant_resources = set()
+
+	# Explicitly gather global resources, add them to all tenants and '*'
+	global_resources = set()
+	global_roles = await role_service.get_roles_by_credentials(credentials_id, [None])
+	for role in global_roles:
+		try:
+			resources = await role_service.get_role_resources(role)
+			global_resources.update(res for res in resources if res not in exclude_resources)
+		except exceptions.RoleNotFoundError:
+			# Integrity fix: Detected assignment of a non-existent role, remove it
+			L.log(asab.LOG_NOTICE, "Found assignment of a non-existent role.", struct_data={
+				"role_id": role, "cid": credentials_id})
+			with local_authz(
+					"build_credentials_authz",
+					resources=[ResourceId.SUPERUSER],
+			):
+				await role_service.unassign_role(credentials_id, role)
+			continue
+	authz["*"] = list(global_resources)
+
+	# Add tenant-specific resources under their tenant_id
+	for tenant in tenants or []:
+		tenant_resources = set(*global_resources)
 		tenant_roles = await role_service.get_roles_by_credentials(credentials_id, [tenant])
 
 		# Gather resources from all assigned roles
@@ -60,7 +78,7 @@ async def build_credentials_authz(
 				continue
 
 		# If no resources found, ensure at least tenant base role resources are included (if available)
-		if len(tenant_resources) == 0 and tenant is not None and role_service.TenantBaseRole is not None:
+		if len(tenant_resources) == 0 and role_service.TenantBaseRole is not None:
 			tenant_base_role = global_role_id_to_propagated(role_service.TenantBaseRole, tenant)
 			if tenant_base_role not in tenant_roles:
 				with local_authz(
@@ -76,6 +94,6 @@ async def build_credentials_authz(
 						L.warning("Tenant base role is not ready.", struct_data={
 							"role": role_service.TenantBaseRole})
 
-		authz[tenant or "*"] = list(tenant_resources)
+		authz[tenant] = list(tenant_resources)
 
 	return authz
