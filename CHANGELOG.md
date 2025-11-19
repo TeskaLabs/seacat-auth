@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha14
 - v25.38-alpha13
 - v25.38-alpha12
 - v25.38-alpha11
@@ -32,6 +33,7 @@
 - Fix pysaml2 dependency (#518, v25.38-alpha4)
 
 ### Features
+- Assign tenant base role at login if the user has no tenant resources (#532, v25.38-alpha12)
 - Remove non-existent role assignments at login/authorization (#530, v25.38-alpha11)
 - Filtering credentials by active/suspended status (#517, v25.38-alpha3)
 - External login with SAML (#516, v25.38-alpha2)
