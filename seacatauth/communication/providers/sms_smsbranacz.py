@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import secrets
@@ -35,6 +36,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 		"password": "",
 		"url": "https://api.smsbrana.cz/smsconnect/http.php",
 		# smsbrana provides a backup server: https://api-backup.smsbrana.cz/smsconnect/http.php
+		"timeout": "5",
 	}
 
 	def __init__(self, app, config_section_name, config=None):
@@ -43,6 +45,8 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 		self.Password = self.Config.get("password")
 		self.TimestampFormat = "%Y%m%dT%H%M%S"
 		self.URL = self.Config.get("url")
+
+		self.Timeout = self.Config.getfloat("timeout")
 
 		if "mock" in self.Config:
 			raise ValueError("To activate mock mode, use 'url=<mocked>' instead of the 'mock' option.")
@@ -106,7 +110,7 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 				return
 
 			try:
-				async with aiohttp.ClientSession() as session:
+				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(self.Timeout)) as session:
 					async with session.get(self.URL, params=url_params) as resp:
 						if resp.status != 200:
 							L.error("SMSBrana.cz responded with {}".format(resp.status), await resp.text())
@@ -114,7 +118,10 @@ class SMSBranaCZProvider(CommunicationProviderABC):
 						response_body = await resp.text()
 			except aiohttp.ClientError as e:
 				L.error("Error connecting to SMSBrana.cz: {}".format(e))
-				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz")
+				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz") from e
+			except asyncio.TimeoutError as e:
+				L.error("Error connecting to SMSBrana.cz: Connection timed out")
+				raise exceptions.ServerCommunicationError("Error connecting to SMSBrana.cz") from e
 
 			if "<err>0</err>" not in response_body:
 				L.error("SMS delivery failed. SMSBrana.cz response: {}".format(response_body))
