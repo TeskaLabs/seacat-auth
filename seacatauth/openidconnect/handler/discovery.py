@@ -121,6 +121,8 @@ class DiscoveryHandler(object):
 	def _oidc_server_metadata(self):
 		data = self._oauth_server_metadata()
 		data.update({
+			"userinfo_endpoint": "{}{}".format(
+				self.OpenIdConnectService.PublicApiBaseUrl, self.OpenIdConnectService.UserInfoPath.lstrip("/")),
 			"subject_types_supported": list(OAuth2.SubjectType),
 			"claims_supported": [
 				"sub", "iss", "exp", "iat", "aud", "azp",
