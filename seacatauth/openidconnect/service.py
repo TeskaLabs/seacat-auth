@@ -52,9 +52,6 @@ class RefreshToken:
 
 class OpenIdConnectService(asab.Service):
 
-	# Bearer token Regex is based on RFC 6750
-	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
-	# Chapter 2.1. Authorization Request Header Field
 	AuthorizePath = "/openidconnect/authorize"
 	TokenPath = "/openidconnect/token"
 	TokenRevokePath = "/openidconnect/token/revoke"
@@ -91,7 +88,7 @@ class OpenIdConnectService(asab.Service):
 					"and has no query or fragment components.")
 		else:
 			# Default fallback option
-			self.Issuer = self.PublicApiBaseUrl.rstrip("/")
+			self.Issuer = self.App.PublicUrl.rstrip("/")
 
 		self.DisableRedirectUriValidation = asab.Config.getboolean(
 			"openidconnect", "_disable_redirect_uri_validation", fallback=False)
