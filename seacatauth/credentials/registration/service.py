@@ -200,9 +200,14 @@ class RegistrationService(asab.Service):
 		"""
 		assert self.is_enabled()
 		deleted_count = 0
-		async for credentials in self.CredentialProvider.iterate_expired_unregistered_credentials():
-			await self.CredentialsService.delete_credentials(credentials["_id"])
-			deleted_count += 1
+		with local_authz(
+			"seacatauth.RegistrationService",
+			resources=[ResourceId.SUPERUSER],
+			tenant=None
+		):
+			async for credentials in self.CredentialProvider.iterate_expired_unregistered_credentials():
+				await self.CredentialsService.delete_credentials(credentials["_id"])
+				deleted_count += 1
 		if deleted_count > 0:
 			L.log(asab.LOG_NOTICE, "Expired unregistered credentials deleted.", struct_data={"count": deleted_count})
 
