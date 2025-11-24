@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha15
 - v25.38-alpha14
 - v25.38-alpha13
 - v25.38-alpha12
@@ -23,6 +24,7 @@
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
 
 ### Fixes
+- Fix invitation cleanup with local authz (#536, v25.38-alpha15)
 - Handle communication timeout and network errors (#534, v25.38-alpha13)
 - Clean up orphaned objects when unregistered credentials expire (#531, v25.38-alpha12)
 - Support local SAML federation metadata file and handle client initialization errors (#527, v25.38-alpha10)
