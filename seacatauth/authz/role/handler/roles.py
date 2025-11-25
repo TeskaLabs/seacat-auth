@@ -168,6 +168,12 @@ class RolesHandler(object):
 				(Only available in expanded mode)
 			schema:
 				type: string
+		-	name: adescription
+			in: query
+			description: Show only roles whose description contains the specified substring
+				(Only available in expanded mode)
+			schema:
+				type: string
 		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource
@@ -190,6 +196,13 @@ class RolesHandler(object):
 				type: string
 				enum: ["true", "false", "any"]
 			default: "any"
+		-	name: s_id
+			in: query
+			description: Sort by the role ID.
+				(Only available in expanded mode)
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		-	name: sdescription
 			in: query
 			description: Sort by the role description.
