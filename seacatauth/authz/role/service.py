@@ -663,7 +663,7 @@ class RoleService(asab.Service):
 		"""
 		query_filter = {"r": role_id}
 		collection = self.StorageService.Database[self.CredentialsRolesCollection]
-		return await collection.count(query_filter)
+		return await collection.count_documents(query_filter)
 
 
 	async def list_role_credentials(

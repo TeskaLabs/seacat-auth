@@ -477,9 +477,10 @@ class RolesHandler(object):
 		"""
 		Get the list of credentials assigned to a role
 		"""
-		return await self.RoleService.list_role_credentials(
+		data = await self.RoleService.list_role_credentials(
 			role_id,
 			page=int(request.query.get("p", 1)) - 1,
 			limit=int(request.query["i"]) if "i" in request.query else None,
-			ids_only=asab.utils.string_to_boolean(request.query.get("ids_only")),
+			ids_only=asab.utils.string_to_boolean(request.query.get("ids_only", "false")),
 		)
+		return asab.web.rest.json_response(request, data)
