@@ -3,6 +3,11 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38-alpha15
+- v25.38-alpha14
+- v25.38-alpha13
+- v25.38-alpha12
+- v25.38-alpha11
 - v25.38-alpha10
 - v25.38-alpha9
 - v25.38-alpha8
@@ -19,6 +24,9 @@
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
 
 ### Fixes
+- Fix invitation cleanup with local authz (#536, v25.38-alpha15)
+- Handle communication timeout and network errors (#534, v25.38-alpha13)
+- Clean up orphaned objects when unregistered credentials expire (#531, v25.38-alpha12)
 - Support local SAML federation metadata file and handle client initialization errors (#527, v25.38-alpha10)
 - Specific email error responses (#518, v25.38-alpha9)
 - Improve ElasticSearch connection reliability with round-robin node selection and automatic failover (#524, v25.38-alpha8)
@@ -27,11 +35,13 @@
 - Fix pysaml2 dependency (#518, v25.38-alpha4)
 
 ### Features
+- Assign tenant base role at login if the user has no tenant resources (#532, v25.38-alpha14)
+- Remove non-existent role assignments at login/authorization (#530, v25.38-alpha11)
 - Filtering credentials by active/suspended status (#517, v25.38-alpha3)
 - External login with SAML (#516, v25.38-alpha2)
 
 ### Refactoring
-- Refactor OTP handlers, handle 404 errors (#529, v25.38-alpha10)
+- Refactor OTP handlers, handle 404 errors (#529, v25.38-alpha11)
 - Rename credentials "status" param to "astatus" (#520, v25.38-alpha5)
 - Decouple external authentication from external credentials management (#515, v25.38-alpha1)
 
