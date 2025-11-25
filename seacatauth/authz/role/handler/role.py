@@ -295,7 +295,10 @@ class RoleHandler(object):
 			sort=sort,
 			name_filter=request.query.get("f", None),
 			description_filter=request.query.get("adescription", None),
-			resource_filter=request.query.get("aresource", None),
+			resource_filter=(
+				request.query.get("aresource", None)
+				or request.query.get("resource", None)  # Back-compat
+			),
 			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false")),
 		)
 		return asab.web.rest.json_response(request, result)
