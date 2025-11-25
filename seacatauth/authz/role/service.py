@@ -162,15 +162,12 @@ class RoleService(asab.Service):
 		return views
 
 
-	async def _get_tenants_where_roles_assignable(self, target_cid: str | None = None) -> typing.Set[str]:
+	async def _get_tenants_where_roles_assignable(self, target_cid: str) -> typing.Set[str]:
 		"""
 		Returns a set of tenants where the caller can assign roles to the target credentials.
 
 		Args:
-			target_cid:
-				Credentials ID of the target user. If None, use the current user.
-				If given, the target user must have access to the current tenant
-				for the current tenant to be included in the result.
+			target_cid: Credentials ID of the target user.
 
 		Returns:
 			Set of tenant IDs where the caller can assign roles to the target user.
