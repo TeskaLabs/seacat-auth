@@ -13,6 +13,10 @@ class FeatureService(asab.Service):
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
 		self.ExternalAuthenticationService = app.get_service("seacatauth.ExternalAuthenticationService")
 
+		# The URL where the user is redirected after login if no other redirection URL is specified
+		self.HomepageUrl = asab.Config.get("general", "homepage_url", fallback=app.PublicUrl)
+
+
 	async def get_features(self):
 		features = {}
 
@@ -42,6 +46,9 @@ class FeatureService(asab.Service):
 		# Profile screen elements
 
 		my_account = {}
+
+		if self.HomepageUrl:
+			my_account["homepage_url"] = self.HomepageUrl
 
 		pair_external_account_uris = [
 			{
