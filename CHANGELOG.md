@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## v25.48
+
+### Pre-releases
+- v25.48-alpha
+
+### Fixes
+
+### Features
+- Extend features response with homepage URL (#537, v25.48-alpha)
+
+### Refactoring
+
+---
+
+
 ## v25.38
 
 ### Pre-releases
