@@ -8,7 +8,6 @@ import logging
 import contextlib
 import aiohttp
 import aiohttp.web
-import asab
 import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
@@ -19,6 +18,7 @@ from .abc import ExternalAuthProviderABC
 
 
 L = logging.getLogger(__name__)
+_JWKS_REFRESH_MAX_AGE_SECONDS = 10 * 60
 
 
 class OAuth2AuthProvider(ExternalAuthProviderABC):
@@ -80,6 +80,8 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			self.NonceLength = self.Config.getint("nonce_length")
 
 		self.JwkSet = None
+		self.JwkSetLastUpdated = None
+		self._jwks_lock = asyncio.Lock()
 
 		# The URL to return to after successful external login
 		# Configurable for debugging purposes
@@ -94,7 +96,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def _on_housekeeping(self, event_name):
-		await self._prepare_jwks(force_reload=True)
+		await self._prepare_jwks(max_age=0)
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
@@ -115,37 +117,53 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		return await self._get_user_info(payload, expected_nonce=state.get("nonce"))
 
 
-	async def _prepare_jwks(self, force_reload=False):
+	async def _prepare_jwks(self, max_age: int | None = None):
+		"""
+		Fetch and prepare the JWK set from the identity provider
+
+		Args:
+			max_age: Number of seconds.
+				If set, the JWK set will only be refreshed if it is older than this value.
+				If None and the JWK set is already loaded, no action is taken.
+		"""
 		if not self.JwksUri:
 			return
-		if self.JwkSet and not force_reload:
-			return
+		async with self._jwks_lock:
+			if self.JwkSet:
+				if max_age is None:
+					return
+				if (
+					self.JwkSetLastUpdated is not None
+					and datetime.datetime.now(datetime.UTC) - self.JwkSetLastUpdated < datetime.timedelta(seconds=max_age)
+				):
+					return
 
-		try:
-			async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-				async with session.get(self.JwksUri) as resp:
-					if resp.status != 200:
-						text = await resp.text()
-						L.error(
-							"Failed to fetch server JWK set: External identity provider responded with error.",
-							struct_data={
-								"provider": self.Type,
-								"status": resp.status,
-								"url": resp.url,
-								"text": text,
-							}
-						)
-						return
-					jwks = await resp.text()
-		except aiohttp.ClientError as e:
-			L.error("Failed to fetch server JWK set: {}".format(e), struct_data={"type": self.Type})
-			return
-		except asyncio.TimeoutError:
-			L.error("Failed to fetch server JWK set: Connection timed out")
-			return
+			try:
+				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+					async with session.get(self.JwksUri) as resp:
+						if resp.status != 200:
+							text = await resp.text()
+							L.error(
+								"Failed to fetch server JWK set: External identity provider responded with error.",
+								struct_data={
+									"provider": self.Type,
+									"status": resp.status,
+									"url": resp.url,
+									"text": text,
+								}
+							)
+							return
+						jwks = await resp.text()
+			except aiohttp.ClientError as e:
+				L.error("Failed to fetch server JWK set: {}".format(e), struct_data={"type": self.Type})
+				return
+			except asyncio.TimeoutError:
+				L.error("Failed to fetch server JWK set: Connection timed out")
+				return
 
-		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
-		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
+			self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
+			self.JwkSetLastUpdated = datetime.datetime.now(datetime.UTC)
+			L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
 
 	def _get_authorize_uri(
@@ -282,8 +300,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			except jwcrypto.jwt.JWTMissingKey:
 				if attempt == 0:
 					# JWK set might be outdated, try to refresh it
-					L.log(asab.LOG_NOTICE, "Missing key in JWK set, refreshing JWKs.", struct_data={"provider": self.Type})
-					await self._prepare_jwks(force_reload=True)
+					await self._prepare_jwks(max_age=_JWKS_REFRESH_MAX_AGE_SECONDS)
 					continue
 				L.error("Missing key in JWK set after refresh.", struct_data={"provider": self.Type})
 				raise ExternalLoginError("Missing key in JWK set.")
