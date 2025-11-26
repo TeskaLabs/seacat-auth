@@ -93,6 +93,10 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		await self._prepare_jwks()
 
 
+	async def _on_housekeeping(self, event_name):
+		await self._prepare_jwks(force_reload=True)
+
+
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
 		if self.NonceLength:
 			nonce = secrets.token_urlsafe(self.NonceLength)
