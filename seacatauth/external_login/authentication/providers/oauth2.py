@@ -1,3 +1,4 @@
+import datetime
 import json
 import secrets
 import typing
@@ -6,6 +7,7 @@ import logging
 import contextlib
 import aiohttp
 import aiohttp.web
+import asab
 import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
@@ -123,7 +125,9 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 							"provider": self.Type,
 							"status": resp.status,
 							"url": resp.url,
-							"text": text})
+							"text": text,
+						}
+					)
 					return
 				jwks = await resp.text()
 		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
@@ -227,9 +231,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			raise ExternalLoginError("No 'id_token' in token response.")
 
 		id_token = token_data["id_token"]
-		await self._prepare_jwks()
-
-		id_token_claims = self._get_verified_claims(id_token, expected_nonce)
+		id_token_claims = await self._get_verified_claims(id_token, expected_nonce)
 		user_info = self._user_data_from_id_token_claims(id_token_claims)
 		user_info["sub"] = str(user_info["sub"])
 		return user_info
@@ -247,24 +249,34 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		return user_info
 
 
-	def _get_verified_claims(self, id_token, expected_nonce: str | None = None):
+	async def _get_verified_claims(self, id_token, expected_nonce: str | None = None) -> dict:
+		await self._prepare_jwks()
 		check_claims = self._get_claims_to_verify()
 		if expected_nonce:
 			check_claims["nonce"] = expected_nonce
-		try:
-			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=check_claims)
-			claims = json.loads(id_token.claims)
-		except jwcrypto.jws.InvalidJWSSignature:
-			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
-			raise ExternalLoginError("Invalid ID token signature.")
-		except jwcrypto.jwt.JWTExpired:
-			L.error("Expired ID token.", struct_data={"provider": self.Type})
-			raise ExternalLoginError("Expired ID token.")
-		except Exception as e:
-			L.error("Error reading ID token claims.", struct_data={
-				"provider": self.Type, "error": str(e)})
-			raise ExternalLoginError("Error reading ID token claims.")
-		return claims
+		for attempt in range(2):
+			try:
+				id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=check_claims)
+				claims = json.loads(id_token.claims)
+				return claims
+			except jwcrypto.jws.InvalidJWSSignature:
+				L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
+				raise ExternalLoginError("Invalid ID token signature.")
+			except jwcrypto.jwt.JWTExpired:
+				L.error("Expired ID token.", struct_data={"provider": self.Type})
+				raise ExternalLoginError("Expired ID token.")
+			except jwcrypto.jwt.JWTMissingKey:
+				if attempt == 0:
+					# JWK set might be outdated, try to refresh it
+					L.log(asab.LOG_NOTICE, "Missing key in JWK set, refreshing JWKs.", struct_data={"provider": self.Type})
+					await self._prepare_jwks(overwrite_current=True)
+					continue
+				L.error("Missing key in JWK set after refresh.", struct_data={"provider": self.Type})
+				raise ExternalLoginError("Missing key in JWK set.")
+			except Exception as e:
+				L.error("Error reading ID token claims.", struct_data={
+					"provider": self.Type, "error": str(e)})
+				raise ExternalLoginError("Error reading ID token claims.")
 
 
 	def _get_claims_to_verify(self) -> dict:
