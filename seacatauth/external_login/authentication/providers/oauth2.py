@@ -92,11 +92,17 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def initialize(self, app):
-		await self._prepare_jwks(force_reload=True)
+		try:
+			await self._prepare_jwks(force_reload=True)
+		except ExternalLoginError:
+			L.warning("Failed to load JWK set during initialization.", struct_data={"type": self.Type})
 
 
 	async def _on_housekeeping(self, event_name):
-		await self._prepare_jwks(force_reload=True)
+		try:
+			await self._prepare_jwks(force_reload=True)
+		except ExternalLoginError:
+			L.warning("Failed to load JWK set during housekeeping.", struct_data={"type": self.Type})
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
@@ -125,7 +131,8 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			force_reload: If True, force reloading the JWK set even if it is already loaded
 		"""
 		if not self.JwksUri:
-			return
+			raise ExternalLoginError("JWKS URI is not configured")
+
 		async with self._jwks_lock:
 			if self.JwkSet and not force_reload:
 				return
@@ -144,14 +151,14 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 									"text": text,
 								}
 							)
-							return
+							raise ExternalLoginError("Failed to fetch server JWK set.")
 						jwks = await resp.text()
 			except aiohttp.ClientError as e:
 				L.error("Failed to fetch server JWK set: {}".format(e), struct_data={"type": self.Type})
-				return
-			except asyncio.TimeoutError:
+				raise ExternalLoginError("Failed to fetch server JWK set.") from e
+			except asyncio.TimeoutError as e:
 				L.error("Failed to fetch server JWK set: Connection timed out")
-				return
+				raise ExternalLoginError("Failed to fetch server JWK set.") from e
 
 			self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
 			self.JwkSetLastUpdated = datetime.datetime.now(datetime.UTC)
