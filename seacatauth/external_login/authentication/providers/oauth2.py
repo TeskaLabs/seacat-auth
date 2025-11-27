@@ -80,7 +80,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			self.NonceLength = self.Config.getint("nonce_length")
 
 		self.JwkSet = None
-		self.JwkSetLastUpdated = None
+		self.JwkSetLastUpdated = datetime.datetime.min.replace(tzinfo=datetime.UTC)
 		self._jwks_lock = asyncio.Lock()
 
 		# The URL to return to after successful external login
