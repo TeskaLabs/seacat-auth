@@ -18,7 +18,7 @@ from .abc import ExternalAuthProviderABC
 
 
 L = logging.getLogger(__name__)
-_JWKS_REFRESH_MAX_AGE_SECONDS = 10 * 60
+_JWKS_REFRESH_MAX_AGE_SECONDS = 5 * 60
 
 
 class OAuth2AuthProvider(ExternalAuthProviderABC):
