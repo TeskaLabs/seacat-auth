@@ -92,7 +92,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def initialize(self, app):
-		await self._prepare_jwks()
+		await self._prepare_jwks(max_age=0)
 
 
 	async def _on_housekeeping(self, event_name):
