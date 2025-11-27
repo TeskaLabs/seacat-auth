@@ -92,11 +92,11 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def initialize(self, app):
-		await self._prepare_jwks(max_age=0)
+		await self._prepare_jwks(force_reload=True)
 
 
 	async def _on_housekeeping(self, event_name):
-		await self._prepare_jwks(max_age=0)
+		await self._prepare_jwks(force_reload=True)
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
@@ -117,26 +117,18 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		return await self._get_user_info(payload, expected_nonce=state.get("nonce"))
 
 
-	async def _prepare_jwks(self, max_age: int | None = None):
+	async def _prepare_jwks(self, force_reload: bool = False):
 		"""
 		Fetch and prepare the JWK set from the identity provider
 
 		Args:
-			max_age: Number of seconds.
-				If set, the JWK set will only be refreshed if it is older than this value.
-				If None and the JWK set is already loaded, no action is taken.
+			force_reload: If True, force reloading the JWK set even if it is already loaded
 		"""
 		if not self.JwksUri:
 			return
 		async with self._jwks_lock:
-			if self.JwkSet:
-				if max_age is None:
-					return
-				if (
-					self.JwkSetLastUpdated is not None
-					and datetime.datetime.now(datetime.UTC) - self.JwkSetLastUpdated < datetime.timedelta(seconds=max_age)
-				):
-					return
+			if self.JwkSet and not force_reload:
+				return
 
 			try:
 				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
@@ -298,9 +290,12 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 				L.error("Expired ID token.", struct_data={"provider": self.Type})
 				raise ExternalLoginError("Expired ID token.")
 			except jwcrypto.jwt.JWTMissingKey:
-				if attempt == 0:
+				if (
+					attempt == 0
+					and datetime.datetime.now(datetime.UTC) - self.JwkSetLastUpdated > datetime.timedelta(seconds=_JWKS_REFRESH_MAX_AGE_SECONDS)
+				):
 					# JWK set might be outdated, try to refresh it
-					await self._prepare_jwks(max_age=_JWKS_REFRESH_MAX_AGE_SECONDS)
+					await self._prepare_jwks(force_reload=True)
 					continue
 				L.error("Missing key in JWK set after refresh.", struct_data={"provider": self.Type})
 				raise ExternalLoginError("Missing key in JWK set.")
