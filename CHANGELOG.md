@@ -3,11 +3,13 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha1
 - v25.48-alpha
 
 ### Fixes
 
 ### Features
+- Reload external login JWK set on MissingKey error (#539, v25.48-alpha1)
 - Extend features response with homepage URL (#537, v25.48-alpha)
 
 ### Refactoring

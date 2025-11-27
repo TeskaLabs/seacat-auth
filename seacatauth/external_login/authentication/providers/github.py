@@ -38,6 +38,9 @@ class GitHubOAuth2AuthProvider(OAuth2AuthProvider):
 		assert self.UserInfoEndpoint not in (None, "")
 		self.UserEmailsURI = self.Config.get("user_emails_endpoint")
 
+	async def _prepare_jwks(self, force_reload: bool = False):
+		pass  # GitHub does not use JWTs for user info
+
 	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		User info is not contained in token response,

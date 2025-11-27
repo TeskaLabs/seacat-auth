@@ -76,7 +76,7 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 				raise ExternalLoginError("Unknown error during authorization flow.")
 
 		id_token = authorize_data.get("id_token")
-		verified_claims = self._get_verified_claims(id_token, expected_nonce)
+		verified_claims = await self._get_verified_claims(id_token, expected_nonce)
 
 		user_info = {
 			"sub": str(verified_claims.get("sub")),

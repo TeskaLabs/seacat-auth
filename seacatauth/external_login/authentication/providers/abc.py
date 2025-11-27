@@ -29,8 +29,14 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 		self.ExternalAuthenticationService = external_authentication_svc
 		self.CallbackUrl = self.ExternalAuthenticationService.CallbackUrlTemplate.format(provider_type=self.Type)
 
+		external_authentication_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
 
 	async def initialize(self, app):
+		pass
+
+
+	async def _on_housekeeping(self, event_name):
 		pass
 
 
