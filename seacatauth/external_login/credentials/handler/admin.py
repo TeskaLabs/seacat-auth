@@ -25,7 +25,7 @@ class ExternalCredentialsAdminHandler(object):
 		self.AuthenticationService = app.get_service("seacatauth.AuthenticationService")
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/admin/ext-login/{credentials_id}", self.list_ext_credentials)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn/ext-login", self.list_ext_credentials)
 		web_app.router.add_get("/admin/ext-login/{ext_credentials_id}", self.get_ext_credentials)
 		web_app.router.add_delete("/admin/ext-login/{ext_credentials_id}", self.remove_ext_credentials)
 
