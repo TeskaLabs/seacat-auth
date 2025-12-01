@@ -82,7 +82,7 @@ class UserInfoHandler(object):
 					scope=["openid"],
 				)
 
-		if "openid" not in session.OAuth2.Scope.split(" "):
+		if "openid" not in session.OAuth2.Scope:
 			L.log(asab.LOG_NOTICE, "Insufficient scope.")
 			return asab.exceptions.NotAuthenticatedError(
 				error="insufficient_scope",
