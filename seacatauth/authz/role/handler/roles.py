@@ -36,6 +36,7 @@ class RolesHandler(object):
 		web_app.router.add_put("/admin/roles/*", self.batch_get_credentials_global_roles)
 		web_app.router.add_get("/admin/role/*/{role_name}/credentials", self.get_global_role_credentials)
 
+		web_app.router.add_get("/admin/credentials/{credentials_id}/roles-filter-options", self.get_credentials_roles_filter_options)
 		web_app.router.add_get("/admin/credentials/{credentials_id}/roles/{tenant}", self.get_credentials_roles)
 		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/{tenant}", self.set_credentials_roles)
 		web_app.router.add_put("/admin/credentials/{credentials_id}/roles/{tenant}/{role_name}", self.assign_credentials_role)
@@ -57,6 +58,17 @@ class RolesHandler(object):
 		web_app.router.add_post("/role_assign/{credentials_id}/{tenant}/{role_name}", self.assign_credentials_role)
 		web_app.router.add_delete("/role_assign/{credentials_id}/{tenant}/{role_name}", self.unassign_credentials_role)
 		# <<<
+
+
+	@asab.web.tenant.allow_no_tenant
+	async def get_credentials_roles_filter_options(self, request):
+		"""
+		Get available filter options for credentials' roles
+		"""
+		return asab.web.rest.json_response(request, {
+			"aassignment.editable": ["true", "false", "any"],
+			"aassignment.assigned": ["true", "false", "any"],
+		})
 
 
 	async def get_credentials_roles(self, request):
