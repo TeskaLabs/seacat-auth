@@ -110,14 +110,14 @@ class RolesHandler(object):
 				type: string
 		-	name: aassignment.assigned
 			in: query
-			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			description: Filter by whether the role is assigned to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
 				enum: ["true", "false", "any"]
 		-	name: aassignment.editable
 			in: query
-			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+			description: Filter by the assignability of the role to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
@@ -132,7 +132,7 @@ class RolesHandler(object):
 		-	name: sassignment.assigned
 			in: query
 			description:
-				Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+				Sort by whether the role is assigned to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
@@ -140,7 +140,7 @@ class RolesHandler(object):
 		-	name: sassignment.editable
 			in: query
 			description:
-				Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+				Sort by the assignability of the role to the credentials.
 				(Only available in expanded mode)
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
@@ -194,7 +194,7 @@ class RolesHandler(object):
 				type: string
 		-	name: aassignment.assigned
 			in: query
-			description: Filter by whether the role is assigned to the credentials specified by the assign_cid parameter.
+			description: Filter by whether the role is assigned to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
@@ -202,7 +202,7 @@ class RolesHandler(object):
 			default: "true"
 		-	name: aassignment.editable
 			in: query
-			description: Filter by the assignability of the role to the credentials specified by the assign_cid parameter.
+			description: Filter by the assignability of the role to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
@@ -225,7 +225,7 @@ class RolesHandler(object):
 		-	name: sassignment.assigned
 			in: query
 			description:
-				Sort by whether the role is assigned to the credentials specified by the assign_cid parameter.
+				Sort by whether the role is assigned to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
@@ -233,7 +233,7 @@ class RolesHandler(object):
 		-	name: sassignment.editable
 			in: query
 			description:
-				Sort by the assignability of the role to the credentials specified by the assign_cid parameter.
+				Sort by the assignability of the role to the credentials.
 				(Only available in expanded mode)
 			schema:
 				type: string
