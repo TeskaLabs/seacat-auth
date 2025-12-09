@@ -799,7 +799,7 @@ class AuthorizeHandler(object):
 		**authorize_params
 	):
 		"""
-		Reply with 404 and provide a link to the login form with a loopback to OIDC/authorize.
+		Redirect to the login form with a loopback to OIDC/authorize.
 		Pass on the query parameters.
 		"""
 		# Get client collection
@@ -820,14 +820,7 @@ class AuthorizeHandler(object):
 			("redirect_uri", callback_uri),
 			("client_id", client_id)]
 		login_url = self._build_login_uri(client_dict, login_query_params)
-		response = aiohttp.web.HTTPNotFound(
-			headers={
-				"Location": login_url,
-				"Refresh": '0;url=' + login_url,
-			},
-			content_type="text/html",
-			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
-		)
+		response = aiohttp.web.HTTPFound(login_url)
 		self.CookieService.delete_session_cookie(response)
 		return response
 
@@ -867,7 +860,6 @@ class AuthorizeHandler(object):
 			("redirect_uri", urllib.parse.quote(callback_uri))
 		]
 		# Add the query params to the #fragment part
-		# TODO: There should be no fragment in redirect URI. Move to regular query.
 		fragment = "{}?{}".format(sfa_url.fragment, urllib.parse.urlencode(auth_url_params, doseq=True))
 
 		sfa_url = urllib.parse.urlunparse((
@@ -879,14 +871,7 @@ class AuthorizeHandler(object):
 			fragment
 		))
 
-		response = aiohttp.web.HTTPFound(
-			sfa_url,
-			headers={
-				"Refresh": "0;url=" + sfa_url,
-			},
-			content_type="text/html",
-			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
-		)
+		response = aiohttp.web.HTTPFound(sfa_url)
 
 		return response
 
