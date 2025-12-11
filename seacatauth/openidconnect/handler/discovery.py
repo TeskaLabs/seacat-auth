@@ -27,11 +27,15 @@ class DiscoveryHandler(object):
 		# https://www.iana.org/assignments/well-known-uris/well-known-uris.xhtml
 		router_private.add_get("/.well-known/oauth-authorization-server", self.oauth_authorization_server)
 		router_private.add_get("/.well-known/openid-configuration", self.oidc_configuration)
+		router_private.add_get("/.well-known/oauth-protected-resource", self.oauth_protected_resource)
+		router_private.add_get("/.well-known/oauth-protected-resource/{resource:.*}", self.oauth_protected_resource)
 
 		# Public endpoints
 		router_public = app.PublicWebContainer.WebApp.router
 		router_public.add_get("/.well-known/oauth-authorization-server", self.oauth_authorization_server)
 		router_public.add_get("/.well-known/openid-configuration", self.oidc_configuration)
+		router_public.add_get("/.well-known/oauth-protected-resource", self.oauth_protected_resource)
+		router_public.add_get("/.well-known/oauth-protected-resource/{resource:.*}", self.oauth_protected_resource)
 
 
 	@asab.web.auth.noauth
@@ -60,6 +64,33 @@ class DiscoveryHandler(object):
 		https://openid.net/specs/openid-connect-discovery-1_0.html
 		"""
 		return asab.web.rest.json_response(request, self._oidc_server_metadata())
+
+
+	@asab.web.auth.noauth
+	@asab.web.tenant.allow_no_tenant
+	async def oauth_protected_resource(self, request):
+		"""
+		OAuth 2.0 Protected Resource Metadata
+
+		The OAuth 2.0 Protected Resource Metadata document is a JSON document that contains
+		information about the OAuth 2.0 Protected Resource's configuration.
+
+		https://datatracker.ietf.org/doc/html/rfc9728
+
+		SeaCat Auth is both the Authorization Server and the Protected Resource server.
+		Therefore, the resource metadata points to itself as the resource server
+		and to the same server as the authorization server.
+		"""
+		public_base_url = self.App.PublicUrl.rstrip("/")
+		if resource_path := request.match_info.get("resource", ""):
+			resource = public_base_url + resource_path
+		else:
+			resource = public_base_url
+		resource_metadata = {
+			"resource": resource,
+			"authorization_servers": [public_base_url],
+		}
+		return asab.web.rest.json_response(request, resource_metadata)
 
 
 	def _oauth_server_metadata(self):
