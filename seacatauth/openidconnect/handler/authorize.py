@@ -691,6 +691,9 @@ class AuthorizeHandler(object):
 		"""
 		Extract authorization type - either 'openid' or 'cookie'.
 		"""
+		# TODO: This logic should happen at the token or cookie endpoint instead.
+		#     The "cookie" scope is not a scope, it does not need to be specified in the authorization request at all.
+		#     The "openid" scope is optional, but if present it enables OIDC features - userinfo, ID token, etc.
 		if "openid" in scope:
 			# OpenID Connect requests MUST contain the openid scope value.
 			# Otherwise, the request is not considered OpenID and its behavior is unspecified
