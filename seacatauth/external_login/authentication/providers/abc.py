@@ -34,8 +34,14 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 		self.PairUnknownAtLogin = asab.utils.string_to_boolean(
 			self.Config.get("pair_unknown_at_login", False))
 
+		external_authentication_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+
 
 	async def initialize(self, app):
+		pass
+
+
+	async def _on_housekeeping(self, event_name):
 		pass
 
 

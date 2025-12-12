@@ -28,6 +28,20 @@ class RoleHandler(object):
 		self.RoleService = role_svc
 
 		web_app = app.WebContainer.WebApp
+		web_app.router.add_get("/admin/role/*", self.list_global_roles)
+		web_app.router.add_get("/admin/role/*/{role_name}", self.get_global_role)
+		web_app.router.add_post("/admin/role/*/{role_name}", self.create_global_role)
+		web_app.router.add_put("/admin/role/*/{role_name}", self.update_global_role)
+		web_app.router.add_delete("/admin/role/*/{role_name}", self.delete_global_role)
+
+		web_app.router.add_get("/admin/role/{tenant}", self.list_roles)
+		web_app.router.add_get("/admin/role/{tenant}/{role_name}", self.get_role)
+		web_app.router.add_post("/admin/role/{tenant}/{role_name}", self.create_role)
+		web_app.router.add_put("/admin/role/{tenant}/{role_name}", self.update_role)
+		web_app.router.add_delete("/admin/role/{tenant}/{role_name}", self.delete_role)
+
+		# BACK-COMPAT (remove after 2026-04-30)
+		# >>>
 		web_app.router.add_get("/role/*", self.list_global_roles)
 		web_app.router.add_get("/role/*/{role_name}", self.get_global_role)
 		web_app.router.add_post("/role/*/{role_name}", self.create_global_role)
@@ -39,6 +53,7 @@ class RoleHandler(object):
 		web_app.router.add_post("/role/{tenant}/{role_name}", self.create_role)
 		web_app.router.add_put("/role/{tenant}/{role_name}", self.update_role)
 		web_app.router.add_delete("/role/{tenant}/{role_name}", self.delete_role)
+		# <<<
 
 
 	async def list_roles(self, request):
@@ -57,9 +72,19 @@ class RoleHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: resource
+		-	name: f
+			in: query
+			description: Name filter (substring match)
+			schema:
+				type: string
+		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource.
+			schema:
+				type: string
+		-	name: adescription
+			in: query
+			description: Description filter (substring match)
 			schema:
 				type: string
 		-	name: exclude_global
@@ -67,9 +92,21 @@ class RoleHandler(object):
 			description: Show only proper tenant roles, without globals.
 			schema:
 				type: boolean
+		-	name: s_id
+			in: query
+			description: Sort by the role ID.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sdescription
+			in: query
+			description: Sort by the role description.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
-		return await self._list(request, tenant_id=tenant_id)
+		return await self._list_roles(request, tenant_id=tenant_id)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -89,13 +126,37 @@ class RoleHandler(object):
 			description: Items per page
 			schema:
 				type: integer
-		-	name: resource
+		-	name: f
+			in: query
+			description: Filter by ID (substring match)
+			schema:
+				type: string
+		-	name: aresource
 			in: query
 			description: Show only roles that contain the specified resource
 			schema:
 				type: string
+		-	name: exclude_global
+			in: query
+			description: Show only proper tenant roles, without globals.
+			schema:
+				type: string
+				enum:
+				- true
+		-	name: s_id
+			in: query
+			description: Sort by the role ID.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
+		-	name: sdescription
+			in: query
+			description: Sort by the role description.
+			schema:
+				type: string
+				enum: ["a" ,"d"]
 		"""
-		return await self._list(request, tenant_id=None)
+		return await self._list_roles(request, tenant_id=None)
 
 
 	async def get_role(self, request):
@@ -214,14 +275,31 @@ class RoleHandler(object):
 		return await self._delete_role(request, role_id)
 
 
-	async def _list(self, request, tenant_id):
-		result = await self.RoleService.list(
+	async def _list_roles(self, request, tenant_id):
+		sort = []
+		for param in ("s_id", "sdescription"):
+			if param in request.query:
+				match request.query[param]:
+					case "a":
+						sort.append((param[1:], 1))
+					case "d":
+						sort.append((param[1:], -1))
+					case _:
+						raise asab.exceptions.ValidationError(
+							"Sorting parameter {!r} must be 'a' (ascending) or 'd' (descending).".format(param))
+
+		result = await self.RoleService.list_roles(
 			tenant_id=tenant_id,
 			page=int(request.query.get("p", 1)) - 1,
 			limit=int(request.query["i"]) if "i" in request.query else None,
+			sort=sort,
 			name_filter=request.query.get("f", None),
-			resource_filter=request.query.get("aresource", None),
-			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false"))
+			description_filter=request.query.get("adescription", None),
+			resource_filter=(
+				request.query.get("aresource", None)
+				or request.query.get("resource", None)  # Back-compat
+			),
+			exclude_global=asab.utils.string_to_boolean(request.query.get("exclude_global", "false")),
 		)
 		return asab.web.rest.json_response(request, result)
 
