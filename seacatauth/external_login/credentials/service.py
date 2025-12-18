@@ -34,6 +34,7 @@ class ExternalCredentialsService(asab.Service):
 
 		self.RegistrationWebhookUri = asab.Config.get(
 			"seacatauth:external_login", "registration_webhook_uri").rstrip("/")
+		app.PubSub.subscribe("Credentials.deleted!", self._on_credentials_deleted)
 
 
 	async def initialize(self, app):
@@ -289,6 +290,16 @@ class ExternalCredentialsService(asab.Service):
 			raise exceptions.CredentialsRegistrationError("Returned credentials ID not found")
 
 		return credentials_id
+
+
+	async def _on_credentials_deleted(self, event_name: str, credentials_id: str):
+		collection = self.StorageService.Database[self.ExternalCredentialsCollection]
+		result = await collection.delete_many({"cid": credentials_id})
+		if result.deleted_count > 0:
+			L.log(asab.LOG_NOTICE, "Deleted external login accounts linked to deleted credentials", struct_data={
+				"credentials_id": credentials_id,
+				"deleted_count": result.deleted_count,
+			})
 
 
 def _normalize_ext_credentials(account: dict):
