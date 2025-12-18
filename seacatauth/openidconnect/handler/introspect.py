@@ -1,13 +1,13 @@
 import datetime
 import urllib
 import logging
-import aiohttp.web
 import asab
 import asab.contextvars
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
 import asab.utils
+import asab.exceptions
 
 from ... import exceptions
 from ...generic import (
@@ -38,6 +38,8 @@ class TokenIntrospectionHandler(object):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.ClientService = app.get_service("seacatauth.ClientService")
 		self.ApiKeyService = app.get_service("seacatauth.ApiKeyService")
+
+		self.ResourceMetadataUrl = app.PublicUrl.rstrip("/") + "/.well-known/oauth-protected-resource"
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_post("/openidconnect/introspect", self.introspect)
@@ -212,17 +214,11 @@ class TokenIntrospectionHandler(object):
 
 		session = await self._authenticate_request(request)
 
-		if session is not None:
-			try:
-				response = await nginx_introspection(request, session, self.OpenIdConnectService.App)
-			except Exception as e:
-				L.exception("Introspection failed: {}".format(e))
-				response = aiohttp.web.HTTPUnauthorized()
-		else:
-			response = aiohttp.web.HTTPUnauthorized()
+		if session is None:
+			return asab.exceptions.NotAuthenticatedError(resource_metadata=self.ResourceMetadataUrl)
 
-		if response.status_code != 200:
-			response.headers["WWW-Authenticate"] = 'Bearer realm="{}"'.format(self.OpenIdConnectService.BearerRealm)
-			return response
-
-		return response
+		try:
+			return await nginx_introspection(request, session, self.OpenIdConnectService.App)
+		except Exception as e:
+			L.exception("Introspection failed: {}".format(e))
+			return asab.exceptions.NotAuthenticatedError(resource_metadata=self.ResourceMetadataUrl)
