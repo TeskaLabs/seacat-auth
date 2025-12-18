@@ -33,6 +33,7 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 			self.Config.get("register_unknown_at_login", False))
 		self.PairUnknownAtLogin = asab.utils.string_to_boolean(
 			self.Config.get("pair_unknown_at_login", False))
+		self.Tenant = self.Config.get("tenant")  # Optional tenant to register/pair unknown users into
 
 		external_authentication_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
