@@ -199,6 +199,14 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			})
 			raise ExternalLoginError("Failed to obtain user metadata from SAML response.") from e
 
+		# Normalize identity claims
+		if attr := _get_attribute(authn_response, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
+			user_identity["email"] = attr[0]
+		if attr := _get_attribute(authn_response, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
+			user_identity["phone"] = attr[0]
+		if attr := _get_attribute(authn_response, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
+			user_identity["username"] = attr[0]
+
 		return user_identity
 
 
