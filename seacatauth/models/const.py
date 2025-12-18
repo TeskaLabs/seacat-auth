@@ -57,6 +57,11 @@ class OAuth2:
 		# TOKEN = "token"
 
 
+	class ResponseMode(enum.StrEnum):
+		QUERY = "query"
+		FRAGMENT = "fragment"
+
+
 	class ApplicationType(enum.StrEnum):
 		WEB = "web"
 		# NATIVE = "native"
@@ -88,6 +93,8 @@ class OAuth2:
 
 
 	class IdTokenSigningAlg(enum.StrEnum):
+		# TODO: The algorithm RS256 MUST be included.
+		#  (https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata)
 		ES256 = "ES256"
 
 

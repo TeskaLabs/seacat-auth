@@ -62,7 +62,7 @@ class OAuth2Data:
 	RefreshToken: typing.Optional[str]
 	IDToken: typing.Optional[str]
 	ClientId: typing.Optional[str]
-	Scope: typing.Optional[str]
+	Scope: typing.Optional[typing.List[str]]
 	Nonce: typing.Optional[str]
 	RedirectUri: typing.Optional[str]
 
