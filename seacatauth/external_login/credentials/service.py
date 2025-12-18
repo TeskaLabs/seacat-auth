@@ -90,9 +90,6 @@ class ExternalCredentialsService(asab.Service):
 			if cp is None:
 				raise exceptions.CredentialsRegistrationError(
 					"Registration disabled: No suitable credential provider", credentials=cred_data)
-			if not self.RegistrationService.SelfRegistrationEnabled:
-				raise exceptions.CredentialsRegistrationError(
-					"Registration without invitation is disabled", credentials=cred_data)
 			try:
 				credentials_id = await cp.create(cred_data)
 			except Exception as e:

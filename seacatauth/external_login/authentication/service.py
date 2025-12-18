@@ -98,7 +98,8 @@ class ExternalAuthenticationService(asab.Service):
 		"""
 		Check if new credentials from the given external identity provider can be registered.
 		"""
-		return self.ExternalCredentialsService.RegistrationWebhookUri is not None
+		provider = self.get_provider(provider_type)
+		return self.ExternalCredentialsService.RegistrationWebhookUri is not None or provider.RegisterUnknownAtLogin
 
 
 	async def initialize_login_with_ext_provider(
@@ -273,6 +274,16 @@ class ExternalAuthenticationService(asab.Service):
 			and self.can_sign_up_new_credentials(provider_type)
 		):
 			credentials_id = await self._attempt_register_new_credentials(provider_type, user_info, payload)
+			if provider.Tenant is not None:
+				tenant_svc = self.App.get_service("seacatauth.TenantService")
+				with local_authz(
+					self.Name,
+					resources={ResourceId.SUPERUSER},
+				):
+					await tenant_svc.assign_tenant(
+						credentials_id,
+						tenant=provider.Tenant,
+					)
 
 		if credentials_id is None:
 			# Redirect to login page with error message, keep the original redirect uri in the query
