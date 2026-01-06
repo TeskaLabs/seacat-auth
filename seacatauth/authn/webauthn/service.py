@@ -31,8 +31,6 @@ asab.Config.add_defaults({
 		#   - Relative or absolute path of a JWT MDS file
 		#   - Empty value or "DISABLED" (disables the metadata service)
 		"metadata_service_url": "https://mds3.fidoalliance.org",
-
-		"reset_on_password_reset": "false",
 	}
 })
 

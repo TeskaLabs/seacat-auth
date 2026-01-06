@@ -30,10 +30,21 @@ class OTPService(asab.Service):
 		)
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+		app.PubSub.subscribe("Credentials.password_reset!", self._on_password_reset)
+		app.PubSub.subscribe("Credentials.deleted!", self._on_credentials_deleted)
 
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_totp_secrets()
+
+
+	async def _on_password_reset(self, event_name: str, credentials_id: str):
+		if asab.Config.getboolean("seacatauth:otp", "reset_on_password_reset"):
+			await self.deactivate_totp(credentials_id)
+
+
+	async def _on_credentials_deleted(self, event_name: str, credentials_id: str):
+		await self.deactivate_totp(credentials_id)
 
 
 	async def deactivate_totp(self, credentials_id: str):

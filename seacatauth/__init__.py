@@ -138,13 +138,17 @@ asab.Config.add_defaults({
 		# Defaults to the hostname of auth webUI if left empty
 		"issuer": "",
 		# Maximum time between generating a TOTP secret and activating it
-		"registration_timeout": "5 m"
+		"registration_timeout": "5 m",
+
+		"reset_on_password_reset": "no",
 	},
 
 	"seacatauth:webauthn": {
 		"relying_party_name": "SeaCat Auth",
 
-		"challenge_timeout": "1 m"
+		"challenge_timeout": "1 m",
+
+		"reset_on_password_reset": "no",
 	},
 
 	"seacatauth:authentication": {
