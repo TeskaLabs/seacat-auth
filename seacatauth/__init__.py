@@ -140,6 +140,7 @@ asab.Config.add_defaults({
 		# Maximum time between generating a TOTP secret and activating it
 		"registration_timeout": "5 m",
 
+		# Deactivate user's TOTP on password reset
 		"reset_on_password_reset": "no",
 	},
 
@@ -148,6 +149,7 @@ asab.Config.add_defaults({
 
 		"challenge_timeout": "1 m",
 
+		# Delete user's WebAuthn credentials on password reset
 		"reset_on_password_reset": "no",
 	},
 
