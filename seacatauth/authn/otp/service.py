@@ -40,11 +40,21 @@ class OTPService(asab.Service):
 
 	async def _on_password_reset(self, event_name: str, credentials_id: str):
 		if asab.Config.getboolean("seacatauth:otp", "reset_on_password_reset"):
-			await self.deactivate_totp(credentials_id)
+			try:
+				await self.deactivate_totp(credentials_id)
+				L.log(asab.LOG_NOTICE, "Deactivated TOTP due to password reset.", struct_data={
+					"cid": credentials_id})
+			except exceptions.TOTPDeactivationError:
+				# TOTP was not active, nothing to do
+				pass
 
 
 	async def _on_credentials_deleted(self, event_name: str, credentials_id: str):
-		await self.deactivate_totp(credentials_id)
+		try:
+			await self.deactivate_totp(credentials_id)
+		except exceptions.TOTPDeactivationError:
+			# TOTP was not active, nothing to do
+			pass
 
 
 	async def deactivate_totp(self, credentials_id: str):
