@@ -187,6 +187,9 @@ class RoleView(abc.ABC):
 		if second_match:
 			pipeline.append({"$match": second_match})
 
+		if set_fields is not None:
+			pipeline.append({"$addFields": set_fields})
+
 		if sort:
 			pipeline.append({"$sort": {k: v for k, v in sort}})
 
@@ -195,9 +198,6 @@ class RoleView(abc.ABC):
 
 		if limit is not None:
 			pipeline.append({"$limit": limit})
-
-		if set_fields is not None:
-			pipeline.append({"$addFields": set_fields})
 
 		return pipeline
 
