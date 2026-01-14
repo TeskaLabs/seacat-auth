@@ -2,7 +2,12 @@ import heapq
 import typing
 
 
-async def amerge_sorted(*iters: typing.AsyncIterable, key: typing.Callable | None = None):
+async def amerge_sorted(
+	*iters: typing.AsyncIterable,
+	key: typing.Callable | None = None,
+	offset: int | None = 0,
+	limit: int | None = None
+) -> typing.AsyncIterable:
 	"""
 	Merge multiple sorted async iterables into a single sorted async iterable.
 
@@ -28,14 +33,19 @@ async def amerge_sorted(*iters: typing.AsyncIterable, key: typing.Callable | Non
 
 	heapq.heapify(heap)
 
+	i = 0
 	while heap:
 		_, idx, value, iterator = heapq.heappop(heap)
-		yield value
+		if i > offset:
+			yield value
 		try:
 			nxt = await anext(iterator)
 			heapq.heappush(heap, (key(nxt), idx, nxt, iterator))
 		except StopAsyncIteration:
 			pass
+		i += 1
+		if limit and i >= (offset or 0) + limit:
+			break
 
 
 class ReverseSortingString(str):
