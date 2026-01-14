@@ -5,7 +5,7 @@ import typing
 async def amerge_sorted(
 	*iters: typing.AsyncIterable,
 	key: typing.Callable | None = None,
-	offset: int | None = 0,
+	offset: int = 0,
 	limit: int | None = None
 ) -> typing.AsyncIterable:
 	"""
@@ -41,11 +41,11 @@ async def amerge_sorted(
 			# Offset not yet reached, skip this item
 			offset -= 1
 		else:
+			if limit is not None and limit <= 0:
+				break
 			yield value
 			if limit is not None:
 				limit -= 1
-				if limit <= 0:
-					break
 
 		# Fetch the next item from the same iterator and push it onto the heap
 		try:
