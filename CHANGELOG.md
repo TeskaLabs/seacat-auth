@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha6
 - v25.48-alpha5
 - v25.48-alpha4
 - v25.48-alpha3
@@ -14,6 +15,7 @@
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Support resetting MFA on password reset (#544, v25.48-alpha6)
 - Update to ElasticSearch v9 (#545, v25.48-alpha4)
 - Add OAuth well-known locations and update introspection responses with WWW-Authenticate header (#541, v25.48-alpha3)
 - Filter options for credentials roles endpoint (#540, v25.48-alpha2)

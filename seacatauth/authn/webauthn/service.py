@@ -78,12 +78,23 @@ class WebAuthnService(asab.Service):
 			self.TaskService.schedule(self._load_fido_metadata())
 
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
+		app.PubSub.subscribe("Credentials.password_reset!", self._on_password_reset)
+		app.PubSub.subscribe("Credentials.deleted!", self._on_credentials_deleted)
 
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
 		if self.FidoMetadataServiceUrl is not None:
 			self.TaskService.schedule(self._load_fido_metadata(force_reload=True))
+
+
+	async def _on_password_reset(self, event_name: str, credentials_id: str):
+		if asab.Config.getboolean("seacatauth:webauthn", "reset_on_password_reset"):
+			await self.delete_all_webauthn_credentials(credentials_id)
+
+
+	async def _on_credentials_deleted(self, event_name: str, credentials_id: str):
+		await self.delete_all_webauthn_credentials(credentials_id)
 
 
 	async def _load_fido_metadata(self, *, force_reload: bool = False):
