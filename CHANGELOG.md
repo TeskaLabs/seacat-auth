@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha5
 - v25.48-alpha4
 - v25.48-alpha3
 - v25.48-alpha2
@@ -10,6 +11,7 @@
 - v25.48-alpha
 
 ### Fixes
+- Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
 - Update to ElasticSearch v9 (#545, v25.48-alpha4)
