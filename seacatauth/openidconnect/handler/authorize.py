@@ -823,7 +823,14 @@ class AuthorizeHandler(object):
 			("redirect_uri", callback_uri),
 			("client_id", client_id)]
 		login_url = self._build_login_uri(client_dict, login_query_params)
-		response = aiohttp.web.HTTPFound(login_url)
+		# Custom 302 response to work around aiohttp.web.HTTPFound's Location header un/quoting issue
+		response = aiohttp.web.Response(
+			status=302,
+			reason="Found",
+			headers={
+				"Location": login_url,
+			},
+		)
 		self.CookieService.delete_session_cookie(response)
 		return response
 
