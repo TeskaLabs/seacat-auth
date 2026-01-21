@@ -2,7 +2,12 @@ import heapq
 import typing
 
 
-async def amerge_sorted(*iters: typing.AsyncIterable, key: typing.Callable | None = None):
+async def amerge_sorted(
+	*iters: typing.AsyncIterable,
+	key: typing.Callable | None = None,
+	offset: int = 0,
+	limit: int | None = None
+) -> typing.AsyncIterable:
 	"""
 	Merge multiple sorted async iterables into a single sorted async iterable.
 
@@ -10,6 +15,8 @@ async def amerge_sorted(*iters: typing.AsyncIterable, key: typing.Callable | Non
 		*iters: The async iterables to merge.
 		key: Optional key function to extract a comparison key from each element.
 			If None, the elements themselves are compared.
+		offset: Number of elements to skip from the start of the merged output.
+		limit: Maximum number of elements to yield from the merged output. If None, yield all elements.
 
 	Yields:
 		Elements from the input iterables in sorted order.
@@ -30,7 +37,17 @@ async def amerge_sorted(*iters: typing.AsyncIterable, key: typing.Callable | Non
 
 	while heap:
 		_, idx, value, iterator = heapq.heappop(heap)
-		yield value
+		if offset > 0:
+			# Offset not yet reached, skip this item
+			offset -= 1
+		else:
+			if limit is not None and limit <= 0:
+				break
+			yield value
+			if limit is not None:
+				limit -= 1
+
+		# Fetch the next item from the same iterator and push it onto the heap
 		try:
 			nxt = await anext(iterator)
 			heapq.heappush(heap, (key(nxt), idx, nxt, iterator))

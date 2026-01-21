@@ -273,13 +273,7 @@ class RoleService(asab.Service):
 				# Skip empty views to optimize iteration
 				continue
 
-			if offset >= count:
-				offset -= count
-				continue
-
 			iterators.append(view.iterate(
-				offset=offset,
-				limit=limit,
 				sort=sort,
 				id_substring=name_filter,
 				description_substring=description_filter,
@@ -293,16 +287,15 @@ class RoleService(asab.Service):
 					"editable": "$_tenant_flag",
 				}}
 			))
-			offset = 0
 
 		roles = []
 		async for role in amerge_sorted(
 			*iterators,
-			key=lambda r: _sorting_key(r, sort)
+			key=lambda r: _sorting_key(r, sort),
+			offset=offset,
+			limit=limit,
 		):
 			roles.append(role)
-			if limit and len(roles) >= limit:
-				break
 
 		result = {
 			"count": sum(counts),
