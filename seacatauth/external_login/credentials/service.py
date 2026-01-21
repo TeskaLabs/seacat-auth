@@ -82,9 +82,9 @@ class ExternalCredentialsService(asab.Service):
 				raise exceptions.CredentialsRegistrationError("Registration webhook is unreachable")
 		else:
 			cred_data = {
-				"username": user_info.get("preferred_username"),
+				"username": user_info.get("username"),
 				"email": user_info.get("email"),
-				"phone": user_info.get("phone_number"),
+				"phone": user_info.get("phone"),
 			}
 			cp = self.RegistrationService.CredentialProvider
 			if cp is None:

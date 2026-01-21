@@ -59,7 +59,7 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	async def _get_raw_auth_claims(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		auth_error = authorize_data.get("error")
 		if auth_error is not None:
 			if auth_error == "user_cancelled_authorize":
@@ -78,19 +78,10 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 		id_token = authorize_data.get("id_token")
 		verified_claims = await self._get_verified_claims(id_token, expected_nonce)
 
-		user_info = {
-			"sub": str(verified_claims.get("sub")),
-			"email": verified_claims.get("email"),
-			"is_proxy_email": bool(verified_claims.get("is_private_email")),
-			"nonce": verified_claims.get("nonce"),
-		}
-
 		# Add optional user data
 		user_data = self._parse_user_data(authorize_data.get("user"))
-		if user_data is not None:
-			user_info.update(user_data)
 
-		return user_info
+		return {**verified_claims, **user_data}
 
 	def _parse_user_data(self, user_json: typing.Optional[str]) -> typing.Optional[dict]:
 		"""
@@ -112,3 +103,13 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 			"first_name": name.get("firstName"),
 			"last_name": name.get("lastName")
 		}
+
+
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		normalized = {
+			"sub": str(claims.get("sub")),
+			"email": claims.get("email"),
+			"is_proxy_email": bool(claims.get("is_private_email")),
+			"nonce": claims.get("nonce"),
+		}
+		return normalized

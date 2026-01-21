@@ -35,6 +35,10 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 			self.Config.get("pair_unknown_at_login", False))
 		self.Tenant = self.Config.get("tenant")  # Optional tenant to register/pair unknown users into
 
+		self.LowercaseSub = asab.utils.string_to_boolean(self.Config.get("lowercase_sub", False))
+		self.LowercaseEmail = asab.utils.string_to_boolean(self.Config.get("lowercase_email", False))
+		self.LowercaseUsername = asab.utils.string_to_boolean(self.Config.get("lowercase_username", False))
+
 		external_authentication_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 

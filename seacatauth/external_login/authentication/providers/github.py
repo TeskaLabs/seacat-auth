@@ -41,7 +41,7 @@ class GitHubOAuth2AuthProvider(OAuth2AuthProvider):
 	async def _prepare_jwks(self, force_reload: bool = False):
 		pass  # GitHub does not use JWTs for user info
 
-	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	async def _get_raw_auth_claims(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		User info is not contained in token response,
 		call to https://api.github.com/user is needed.
@@ -79,19 +79,9 @@ class GitHubOAuth2AuthProvider(OAuth2AuthProvider):
 
 		email = user_data.get("email")
 		if not email:
-			email = await self._get_user_email(authorization)
+			user_data["email"] = await self._get_user_email(authorization)
 
-		user_info = {}
-		if "id" in user_data:
-			user_info["sub"] = str(user_data["id"])
-		if email:
-			user_info["email"] = email
-		if "login" in user_data:
-			user_info["preferred_username"] = user_data["login"]
-		if "name" in user_data:
-			user_info["name"] = user_data["name"]
-
-		return user_info
+		return user_data
 
 	async def _get_user_email(self, authorization):
 		"""
@@ -109,3 +99,15 @@ class GitHubOAuth2AuthProvider(OAuth2AuthProvider):
 		for email_data in emails:
 			if email_data.get("primary"):
 				return email_data.get("email")
+
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		normalized = {
+			"sub": str(claims["id"])
+		}
+		if "email" in claims:
+			normalized["email"] = claims["email"]
+		if "login" in claims:
+			normalized["username"] = claims["login"]
+		if "name" in claims:
+			normalized["name"] = claims["name"]
+		return normalized

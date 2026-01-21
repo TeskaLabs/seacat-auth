@@ -190,24 +190,38 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			})
 			raise ExternalLoginError("SAML authentication failed.")
 
-		user_identity = authn_response.get_identity()
+		user_info = {}
 		try:
-			user_identity["sub"] = authn_response.get_subject().text
+			user_info["sub"] = authn_response.get_subject().text
 		except ValueError as e:
 			L.error("Cannot infer subject ID from SAML authentication response.", struct_data={
 				"provider": self.Type,
 			})
 			raise ExternalLoginError("Failed to obtain user metadata from SAML response.") from e
 
-		# Normalize identity claims
-		if attr := _get_attribute(authn_response, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
-			user_identity["email"] = attr[0]
-		if attr := _get_attribute(authn_response, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
-			user_identity["phone"] = attr[0]
-		if attr := _get_attribute(authn_response, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
-			user_identity["username"] = attr[0]
+		if self.LowercaseSub:
+			user_info["sub"] = user_info["sub"].lower()
 
-		return user_identity
+		attr_dict = {}
+		for stmt in (authn_response.assertion.attribute_statement or []):
+			for attr in (stmt.attribute or []):
+				attr_dict[attr.name] = [
+					v.text
+					for v in (attr.attribute_value or [])
+					if hasattr(v, "text")
+				]
+
+		user_info["_raw"] = attr_dict
+
+		# Normalize identity claims
+		if attr := attr_dict.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
+			user_info["email"] = attr[0].lower() if self.LowercaseEmail else attr[0]
+		if attr := attr_dict.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
+			user_info["phone"] = attr[0]
+		if attr := attr_dict.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
+			user_info["username"] = attr[0].lower() if self.LowercaseUsername else attr[0]
+
+		return user_info
 
 
 def _get_attribute(authn_response: saml2.response.AuthnResponse, attribute_name: str) -> typing.List[str]:
