@@ -37,6 +37,8 @@ class CredentialsService(asab.Service):
 
 		self.IdentFields = self._prepare_ident_fields(asab.Config.get("seacatauth:credentials", "ident_fields"))
 
+		self.Cache = {}
+
 		# Iterate over config and create all providers
 		relevant_sections = [s for s in asab.Config.sections() if s.startswith("seacatauth:credentials:")]
 		providers = []
@@ -319,6 +321,22 @@ class CredentialsService(asab.Service):
 		try:
 			provider = self.get_provider(credentials_id)
 			return await provider.get(credentials_id, include=include)
+		except KeyError:
+			raise exceptions.CredentialsNotFoundError(credentials_id=credentials_id)
+
+
+	async def get_cached(self, credentials_id, include=None) -> dict:
+		'''
+		Find detail of credentials for a credentials_id. Use cache if available.
+		'''
+		try:
+			if credentials_id not in self.Cache:
+				provider = self.get_provider(credentials_id)
+				credential = await provider.get(credentials_id, include=include)
+				self.Cache[credentials_id] = credential
+			else:
+				credential = self.Cache[credentials_id]
+			return credential
 		except KeyError:
 			raise exceptions.CredentialsNotFoundError(credentials_id=credentials_id)
 
