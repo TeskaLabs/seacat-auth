@@ -109,6 +109,8 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 		normalized = {
 			"sub": str(claims["sub"]),
 		}
+		if self.LowercaseSub:
+			normalized["sub"] = normalized["sub"].lower()
 		email = claims.get("email")
 		if email:
 			normalized["email"] = email.lower() if self.LowercaseEmail else email

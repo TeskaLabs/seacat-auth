@@ -103,6 +103,8 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 
 	def _normalize_auth_claims(self, claims: dict) -> dict:
 		normalized = {"sub": str(claims["id"])}
+		if self.LowercaseSub:
+			normalized["sub"] = normalized["sub"].lower()
 		if "email" in claims:
 			normalized["email"] = claims["email"]
 		if "name" in claims:

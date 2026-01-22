@@ -104,6 +104,8 @@ class GitHubOAuth2AuthProvider(OAuth2AuthProvider):
 		normalized = {
 			"sub": str(claims["id"])
 		}
+		if self.LowercaseSub:
+			normalized["sub"] = normalized["sub"].lower()
 		if "email" in claims:
 			normalized["email"] = claims["email"].lower() if self.LowercaseEmail else claims["email"]
 		if "login" in claims:
