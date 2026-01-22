@@ -267,10 +267,12 @@ class ExternalAuthenticationService(asab.Service):
 			current_sso_session = None
 
 		if credentials_id is None and provider.PairUnknownAtLogin:
+			# Attempt to locate existing credentials by email and pair the external account with them
 			credentials_id = await self._attempt_pair_credentials(provider_type, user_info, payload)
 
 		if (
-			credentials_id is None and provider.RegisterUnknownAtLogin
+			credentials_id is None
+			and provider.RegisterUnknownAtLogin
 			and self.can_sign_up_new_credentials(provider_type)
 		):
 			credentials_id = await self._attempt_register_new_credentials(provider_type, user_info, payload)
@@ -323,8 +325,9 @@ class ExternalAuthenticationService(asab.Service):
 		if credentials_id is not None:
 			# Pair the external account with the located credentials
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
-				await self.ExternalCredentialsService.create_ext_credentials(
+				external_account_id = await self.ExternalCredentialsService.create_ext_credentials(
 					credentials_id, provider_type, user_info)
+
 		return credentials_id
 
 
@@ -681,6 +684,37 @@ class ExternalAuthenticationService(asab.Service):
 				cookie_value=sso_session.Cookie.Id,
 			)
 		return response
+
+	async def _locate_credentials_by_email(self, user_info: dict) -> typing.Optional[str]:
+		"""
+		Attempt to locate existing credentials by email from the user info.
+
+		Args:
+			user_info: The user information obtained from the external provider.
+		Returns:
+			The located credentials ID if found, otherwise None.
+		"""
+		email = user_info.get("email")
+		if not email:
+			return None
+
+		cred_svc = self.App.get_service("seacatauth.CredentialsService")
+		try:
+			matches = await cred_svc.locate(ident=email)
+		except exceptions.CredentialsNotFoundError:
+			return None
+
+		match len(matches):
+			case 0:
+				return None
+			case 1:
+				return matches[0]
+			case _:
+				L.warning("Multiple credentials found for email during external account pairing.", struct_data={
+					"email": email,
+					"matches": [m["id"] for m in matches],
+				})
+				return None
 
 
 def _get_auth_callback_state_id(payload: dict) -> str:

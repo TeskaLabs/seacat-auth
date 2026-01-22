@@ -144,7 +144,9 @@ class ExternalCredentialsService(asab.Service):
 		except asab.storage.exceptions.DuplicateError as e:
 			raise asab.exceptions.Conflict("External account already registered") from e
 		L.log(asab.LOG_NOTICE, "External login account added", struct_data={
-			"id": external_account_id,
+			"provider": provider_type,
+			"sub": sub,
+			"ext_account_id": external_account_id,
 			"cid": credentials_id,
 		})
 		return external_account_id
