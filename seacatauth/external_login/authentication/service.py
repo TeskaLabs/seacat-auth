@@ -325,7 +325,7 @@ class ExternalAuthenticationService(asab.Service):
 		if credentials_id is not None:
 			# Pair the external account with the located credentials
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
-				external_account_id = await self.ExternalCredentialsService.create_ext_credentials(
+				await self.ExternalCredentialsService.create_ext_credentials(
 					credentials_id, provider_type, user_info)
 
 		return credentials_id
