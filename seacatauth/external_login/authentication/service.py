@@ -717,11 +717,7 @@ class ExternalAuthenticationService(asab.Service):
 			return None
 
 		cred_svc = self.App.get_service("seacatauth.CredentialsService")
-		try:
-			matches = await cred_svc.locate(ident=email)
-		except exceptions.CredentialsNotFoundError:
-			return None
-
+		matches = await cred_svc.locate(ident=email)
 		match len(matches):
 			case 0:
 				return None
