@@ -1,10 +1,9 @@
 import logging
-import aiohttp
-import aiohttp.web
 import asab
 import asab.web.rest
 import asab.web.auth
 import asab.web.tenant
+import asab.exceptions
 
 from ... import generic
 from ... import exceptions
@@ -51,14 +50,24 @@ class UserInfoHandler(object):
 				session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
 				if session is None:
 					L.log(asab.LOG_NOTICE, "Authentication required.")
-					return self.error_response("invalid_token", "ID token is invalid.")
+					return asab.exceptions.NotAuthenticatedError(
+						error="invalid_token",
+						error_description="Invalid ID token.",
+						realm="asab",
+						scope=["openid"],
+					)
 			except ValueError:
 				try:
 					# Canonical
 					session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 				except exceptions.SessionNotFoundError:
 					L.log(asab.LOG_NOTICE, "Authentication required.")
-					return self.error_response("invalid_token", "Access token is invalid.")
+					return asab.exceptions.NotAuthenticatedError(
+						error="invalid_token",
+						error_description="Missing or invalid access token.",
+						realm="asab",
+						scope=["openid"],
+					)
 
 		else:
 			try:
@@ -66,17 +75,22 @@ class UserInfoHandler(object):
 				session = await self.CookieService.get_session_by_request_cookie(request)
 			except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
 				L.log(asab.LOG_NOTICE, "Authentication required.")
-				return self.error_response("invalid_token", "Cookie is missing or invalid.")
+				return asab.exceptions.NotAuthenticatedError(
+					error="invalid_token",
+					error_description="Missing or invalid cookie.",
+					realm="asab",
+					scope=["openid"],
+				)
+
+		if "openid" not in session.OAuth2.Scope:
+			L.log(asab.LOG_NOTICE, "Insufficient scope.")
+			return asab.exceptions.NotAuthenticatedError(
+				error="insufficient_scope",
+				error_description="Required scope 'openid' is missing.",
+				realm="asab",
+				scope=["openid"],
+			)
 
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
 		return asab.web.rest.json_response(request, userinfo)
-
-
-	def error_response(self, error, error_description):
-		"""
-		OpenID Connect Core 1.0, 5.3.3. Error Response
-		"""
-		return aiohttp.web.Response(headers={
-			"WWW-Authenticate": "error=\"{}\", error_description=\"{}\"".format(error, error_description)
-		}, status=401)

@@ -3,12 +3,24 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha7
+- v25.48-alpha6
+- v25.48-alpha5
+- v25.48-alpha4
+- v25.48-alpha3
+- v25.48-alpha2
 - v25.48-alpha1
 - v25.48-alpha
 
 ### Fixes
+- Fix role pagination and sorting (#546, v25.48-alpha7)
+- Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Support resetting MFA on password reset (#544, v25.48-alpha6)
+- Update to ElasticSearch v9 (#545, v25.48-alpha4)
+- Add OAuth well-known locations and update introspection responses with WWW-Authenticate header (#541, v25.48-alpha3)
+- Filter options for credentials roles endpoint (#540, v25.48-alpha2)
 - Reload external login JWK set on MissingKey error (#539, v25.48-alpha1)
 - Extend features response with homepage URL (#537, v25.48-alpha)
 

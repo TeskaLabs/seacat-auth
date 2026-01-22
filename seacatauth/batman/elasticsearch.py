@@ -452,7 +452,7 @@ class ElasticSearchIntegration(asab.config.Configurable):
 		elastic_user["roles"] = list(elk_roles)
 
 		async with self._with_elasticsearch_nodes(
-			lambda session: session.post("_xpack/security/user/{}".format(username), json=elastic_user)
+			lambda session: session.post("_security/user/{}".format(username), json=elastic_user)
 		) as resp:
 			if 200 <= resp.status < 300:
 				# Everything is alright here
