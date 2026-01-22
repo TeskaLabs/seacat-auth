@@ -131,11 +131,11 @@ class ExternalCredentialsService(asab.Service):
 		if email is not None:
 			upsertor.set("email", email)
 
-		phone = user_info.get("phone_number")
+		phone = user_info.get("phone")
 		if phone is not None:
 			upsertor.set("phone", phone)
 
-		username = user_info.get("preferred_username")
+		username = user_info.get("username")
 		if username is not None:
 			upsertor.set("username", username)
 
