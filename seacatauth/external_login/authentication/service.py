@@ -325,8 +325,19 @@ class ExternalAuthenticationService(asab.Service):
 		if credentials_id is not None:
 			# Pair the external account with the located credentials
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_EDIT}):
-				await self.ExternalCredentialsService.create_ext_credentials(
-					credentials_id, provider_type, user_info)
+				try:
+					await self.ExternalCredentialsService.create_ext_credentials(
+						credentials_id, provider_type, user_info)
+				except asab.exceptions.Conflict:
+					L.error(
+						"Cannot create external credentials: Already registered.",
+						struct_data={
+							"cid": credentials_id,
+							"provider": provider_type,
+							"sub": user_info.get("sub"),
+						}
+					)
+					return None
 
 		return credentials_id
 
@@ -348,8 +359,15 @@ class ExternalAuthenticationService(asab.Service):
 		Returns:
 			The located credentials ID if found and paired, otherwise None.
 		"""
-		credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
-			provider_type, user_info, payload)
+		try:
+			credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
+				provider_type, user_info, payload)
+		except asab.exceptions.Conflict:
+			L.error("Cannot create external credentials: Already registered.", struct_data={
+				"provider": provider_type,
+				"sub": user_info.get("sub"),
+			})
+			return None
 		return credentials_id
 
 
