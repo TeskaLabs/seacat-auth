@@ -269,6 +269,16 @@ class ExternalAuthenticationService(asab.Service):
 		if credentials_id is None and provider.PairUnknownAtLogin:
 			# Attempt to locate existing credentials by email and pair the external account with them
 			credentials_id = await self._attempt_pair_credentials(provider_type, user_info, payload)
+			if provider.Tenant is not None:
+				tenant_svc = self.App.get_service("seacatauth.TenantService")
+				with local_authz(
+					self.Name,
+					resources={ResourceId.SUPERUSER},
+				):
+					await tenant_svc.assign_tenant(
+						credentials_id,
+						tenant=provider.Tenant,
+					)
 
 		if (
 			credentials_id is None
