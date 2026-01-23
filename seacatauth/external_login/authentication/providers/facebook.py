@@ -64,6 +64,7 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
+	@typing.override
 	async def _get_raw_auth_claims(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Info is not contained in token response, call to userinfo_endpoint is needed.
