@@ -269,7 +269,7 @@ class ExternalAuthenticationService(asab.Service):
 		if credentials_id is None and provider.PairUnknownAtLogin:
 			# Attempt to locate existing credentials by email and pair the external account with them
 			credentials_id = await self._attempt_pair_credentials(provider_type, user_info, payload)
-			if provider.Tenant is not None:
+			if credentials_id is not None and provider.Tenant is not None:
 				tenant_svc = self.App.get_service("seacatauth.TenantService")
 				with local_authz(
 					self.Name,
@@ -286,7 +286,7 @@ class ExternalAuthenticationService(asab.Service):
 			and self.can_sign_up_new_credentials(provider_type)
 		):
 			credentials_id = await self._attempt_register_new_credentials(provider_type, user_info, payload)
-			if provider.Tenant is not None:
+			if credentials_id is not None and provider.Tenant is not None:
 				tenant_svc = self.App.get_service("seacatauth.TenantService")
 				with local_authz(
 					self.Name,
@@ -736,7 +736,7 @@ class ExternalAuthenticationService(asab.Service):
 			case _:
 				L.warning("Multiple credentials found for email during external account pairing.", struct_data={
 					"email": email,
-					"matches": [m["id"] for m in matches],
+					"cids": matches,
 				})
 				return None
 
