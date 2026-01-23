@@ -106,7 +106,7 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 		if self.LowercaseSub:
 			normalized["sub"] = normalized["sub"].lower()
 		if "email" in claims:
-			normalized["email"] = claims["email"]
+			normalized["email"] = claims["email"].lower() if self.LowercaseEmail else claims["email"]
 		if "name" in claims:
-			normalized["username"] = claims["name"]
+			normalized["username"] = claims["name"].lower() if self.LowercaseUsername else claims["name"]
 		return normalized
