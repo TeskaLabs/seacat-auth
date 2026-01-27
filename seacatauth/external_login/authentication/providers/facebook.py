@@ -27,6 +27,7 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 	Type = "facebook"
 	ConfigDefaults = {
 		# Facebook uses a custom OAuth implementation. There is no OpenID discovery_uri.
+		# TODO: Update to latest Facebook API version (v24.0 as of Jan 2026)
 		"authorization_endpoint": "https://www.facebook.com/v15.0/dialog/oauth",
 		"token_endpoint": "https://graph.facebook.com/v15.0/oauth/access_token",
 		"userinfo_endpoint": "https://graph.facebook.com/me",
@@ -34,6 +35,7 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 		"scope": "public_profile",
 		"fields": "id,name,email",
 		"label": "Facebook",
+		"assume_email_is_verified": "false",
 	}
 
 	def __init__(self, external_authentication_svc, config_section_name):
@@ -63,7 +65,8 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 			query_string=urllib.parse.urlencode(query_params)
 		)
 
-	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	@typing.override
+	async def _get_raw_auth_claims(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
 		Info is not contained in token response, call to userinfo_endpoint is needed.
 		See the Facebook API Explorer here: https://developers.facebook.com/tools/explorer
@@ -98,12 +101,16 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 					})
 					raise ExternalLoginError("Token request failed.")
 
-		user_info = {}
-		if "id" in data:
-			user_info["sub"] = str(data["id"])
-		if "email" in data:
-			user_info["email"] = data["email"]
-		if "name" in data:
-			user_info["name"] = data["name"]
+		return data
 
-		return user_info
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		normalized = {"sub": str(claims["id"])}
+		if self.LowercaseSub:
+			normalized["sub"] = normalized["sub"].lower()
+		if "email" in claims:
+			normalized["email"] = claims["email"].lower() if self.LowercaseEmail else claims["email"]
+			normalized["email_verified"] = self.AssumeEmailIsVerified
+		if "name" in claims:
+			normalized["username"] = claims["name"].lower() if self.LowercaseUsername else claims["name"]
+
+		return normalized

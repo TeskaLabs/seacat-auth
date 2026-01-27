@@ -120,7 +120,10 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def process_auth_callback(self, request: aiohttp.web.Request, payload: dict, state: dict, **kwargs) -> dict:
-		return await self._get_user_info(payload, expected_nonce=state.get("nonce"))
+		raw_claims = await self._get_raw_auth_claims(payload, expected_nonce=state.get("nonce"))
+		claims = self._normalize_auth_claims(raw_claims)
+		claims["_raw"] = raw_claims
+		return claims
 
 
 	async def _prepare_jwks(self, force_reload: bool = False):
@@ -218,19 +221,9 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 					yield resp
 
 
-	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	async def _get_raw_auth_claims(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
-		Obtain the authenticated user's profile info, with the claims normalized to be in line with
-		OpenID UserInfo response.
-
-		Supported claims:
-		- sub (required)
-		- preferred_username
-		- email
-		- phone_number
-		- name
-		- first_name
-		- last_name
+		Obtain the raw authentication claims including user profile info.
 		"""
 		error = authorize_data.get("error")
 		if error is not None:
@@ -264,8 +257,43 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		id_token = token_data["id_token"]
 		id_token_claims = await self._get_verified_claims(id_token, expected_nonce)
 		user_info = self._user_data_from_id_token_claims(id_token_claims)
-		user_info["sub"] = str(user_info["sub"])
 		return user_info
+
+
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		"""
+		Normalize raw auth claims obtained from the external provider to a unified format.
+
+		Args:
+			claims: The user info dictionary obtained from the external provider.
+
+		Returns:
+			A dictionary containing the normalized claims (sub, username, email, email_verified, phone).
+		"""
+		normalized = {
+			"sub": str(claims["sub"])
+		}
+
+		if self.LowercaseSub:
+			normalized["sub"] = normalized["sub"].lower()
+
+		username = claims.get("preferred_username") or claims.get("username")
+		if username:
+			normalized["username"] = username.lower() if self.LowercaseUsername else username
+
+		email = claims.get("email")
+		if email:
+			normalized["email"] = email.lower() if self.LowercaseEmail else email
+			normalized["email_verified"] = True if self.AssumeEmailIsVerified else claims.get("email_verified", False)
+
+		phone = claims.get("phone_number") or claims.get("phone")
+		if phone:
+			normalized["phone"] = phone
+
+		if "name" in claims:
+			normalized["name"] = claims["name"]
+
+		return normalized
 
 
 	def _user_data_from_id_token_claims(self, id_token_claims: dict):
