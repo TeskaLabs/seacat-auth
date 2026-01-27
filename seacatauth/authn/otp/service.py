@@ -182,7 +182,11 @@ class OTPService(asab.Service):
 		if secret is not None:
 			return secret.decode("ascii")
 
-		credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
+		try:
+			credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
+		except exceptions.CredentialsNotFoundError:
+			return None
+
 		secret = credentials.get("__totp")
 
 		return secret
