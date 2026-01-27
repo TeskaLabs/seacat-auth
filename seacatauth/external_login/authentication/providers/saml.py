@@ -233,6 +233,8 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			user_info["phone"] = attr[0]
 		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
 			user_info["username"] = attr[0].lower() if self.LowercaseUsername else attr[0]
+		if attr := claims.get("http://schemas.microsoft.com/identity/claims/displayname"):
+			user_info["name"] = attr[0]
 
 		return user_info
 
