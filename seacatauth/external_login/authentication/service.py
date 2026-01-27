@@ -268,7 +268,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		if credentials_id is None and provider.PairUnknownAtLogin:
 			# Attempt to locate existing credentials by email and pair the external account with them
-			credentials_id = await self._attempt_pair_credentials(provider_type, user_info, payload)
+			credentials_id = await self._attempt_pair_credentials(provider_type, user_info)
 			if credentials_id is not None and provider.Tenant is not None:
 				tenant_svc = self.App.get_service("seacatauth.TenantService")
 				with local_authz(
@@ -319,14 +319,13 @@ class ExternalAuthenticationService(asab.Service):
 			self._get_final_redirect_uri(state), "login_success", sso_session=new_sso_session)
 
 
-	async def _attempt_pair_credentials(self, provider_type: str, user_info: typing.Dict, payload: typing.Dict) -> typing.Optional[str]:
+	async def _attempt_pair_credentials(self, provider_type: str, user_info: typing.Dict) -> typing.Optional[str]:
 		"""
 		Attempt to locate existing credentials by email and pair the external account with them.
 
 		Args:
 			provider_type: The type of the external identity provider.
 			user_info: The user information obtained from the external provider.
-			payload: The payload containing authorization response data.
 
 		Returns:
 			The located credentials ID if found and paired, otherwise None.
