@@ -330,6 +330,14 @@ class ExternalAuthenticationService(asab.Service):
 		Returns:
 			The located credentials ID if found and paired, otherwise None.
 		"""
+		if user_info.get("email_verified") is not True:
+			L.log(asab.LOG_NOTICE, "Cannot pair external account: Email not verified.", struct_data={
+				"provider": provider_type,
+				"sub": user_info.get("sub"),
+				"email": user_info.get("email"),
+			})
+			return None
+
 		credentials_id = await self._locate_credentials_by_email(user_info)
 		if credentials_id is not None:
 			# Pair the external account with the located credentials
