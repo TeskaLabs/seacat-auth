@@ -36,6 +36,7 @@ _SAML_AMR = {
 
 
 class SamlAuthProvider(ExternalAuthProviderABC):
+	# TODO: Provider is actually tuned for MS Entra ID. For other SAML IdPs, refactoring will be needed.
 	"""
 	Generic SAML 2 login provider
 
@@ -49,6 +50,10 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 	label=MyCompany SAML
 	```
 	"""
+
+	ConfigDefaults = {
+		"assume_email_is_verified": "true",
+	}
 
 	def __init__(self, external_authentication_svc, config_section_name, config=None):
 		super().__init__(external_authentication_svc, config_section_name, config)
@@ -190,16 +195,50 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			})
 			raise ExternalLoginError("SAML authentication failed.")
 
-		user_identity = authn_response.get_identity()
+		raw_claims = await self._get_raw_auth_claims(authn_response)
+		claims = self._normalize_auth_claims(raw_claims)
+		claims["_raw"] = raw_claims
+		return claims
+
+
+	async def _get_raw_auth_claims(self, authn_response: saml2.response.AuthnResponse) -> dict | None:
+		claims = {}
+		for stmt in (authn_response.assertion.attribute_statement or []):
+			for attr in (stmt.attribute or []):
+				if attr.name not in claims:
+					claims[attr.name] = []
+				claims[attr.name].extend([
+					v.text
+					for v in (attr.attribute_value or [])
+					if hasattr(v, "text")
+				])
+
 		try:
-			user_identity["sub"] = authn_response.get_subject().text
+			claims["sub"] = authn_response.get_subject().text
 		except ValueError as e:
 			L.error("Cannot infer subject ID from SAML authentication response.", struct_data={
 				"provider": self.Type,
 			})
 			raise ExternalLoginError("Failed to obtain user metadata from SAML response.") from e
 
-		return user_identity
+		return claims
+
+
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		user_info = {
+			"sub": claims["sub"].lower() if self.LowercaseSub else claims["sub"]
+		}
+		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
+			user_info["email"] = attr[0].lower() if self.LowercaseEmail else attr[0]
+			user_info["email_verified"] = self.AssumeEmailIsVerified
+		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
+			user_info["phone"] = attr[0]
+		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
+			user_info["username"] = attr[0].lower() if self.LowercaseUsername else attr[0]
+		if attr := claims.get("http://schemas.microsoft.com/identity/claims/displayname"):
+			user_info["name"] = attr[0]
+
+		return user_info
 
 
 def _get_attribute(authn_response: saml2.response.AuthnResponse, attribute_name: str) -> typing.List[str]:
