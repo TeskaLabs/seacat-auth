@@ -268,8 +268,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			claims: The user info dictionary obtained from the external provider.
 
 		Returns:
-			A dictionary containing the normalized claims (sub, username, email, email_verified, phone)
-			plus raw data.
+			A dictionary containing the normalized claims (sub, username, email, email_verified, phone).
 		"""
 		normalized = {
 			"sub": str(claims["sub"])
