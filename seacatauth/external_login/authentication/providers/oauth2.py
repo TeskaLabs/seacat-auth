@@ -268,11 +268,10 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			claims: The user info dictionary obtained from the external provider.
 
 		Returns:
-			A dictionary containing the normalized claims (sub, username, email, phone)
+			A dictionary containing the normalized claims (sub, username, email, email_verified, phone)
 			plus raw data.
 		"""
 		normalized = {
-			"_raw": claims,
 			"sub": str(claims["sub"])
 		}
 
@@ -286,6 +285,7 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		email = claims.get("email")
 		if email:
 			normalized["email"] = email.lower() if self.LowercaseEmail else email
+			normalized["email_verified"] = True if self.AssumeEmailIsVerified else claims.get("email_verified", False)
 
 		phone = claims.get("phone_number") or claims.get("phone")
 		if phone:

@@ -114,4 +114,5 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 		email = claims.get("email")
 		if email:
 			normalized["email"] = email.lower() if self.LowercaseEmail else email
+			normalized["email_verified"] = True if self.AssumeEmailIsVerified else claims.get("email_verified", False)
 		return normalized

@@ -35,6 +35,7 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 		"scope": "public_profile",
 		"fields": "id,name,email",
 		"label": "Facebook",
+		"assume_email_is_verified": "false",
 	}
 
 	def __init__(self, external_authentication_svc, config_section_name):
@@ -108,6 +109,8 @@ class FacebookOAuth2AuthProvider(OAuth2AuthProvider):
 			normalized["sub"] = normalized["sub"].lower()
 		if "email" in claims:
 			normalized["email"] = claims["email"].lower() if self.LowercaseEmail else claims["email"]
+			normalized["email_verified"] = self.AssumeEmailIsVerified
 		if "name" in claims:
 			normalized["username"] = claims["name"].lower() if self.LowercaseUsername else claims["name"]
+
 		return normalized

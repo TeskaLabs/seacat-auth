@@ -38,6 +38,7 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 		self.LowercaseSub = asab.utils.string_to_boolean(self.Config.get("lowercase_sub", False))
 		self.LowercaseEmail = asab.utils.string_to_boolean(self.Config.get("lowercase_email", False))
 		self.LowercaseUsername = asab.utils.string_to_boolean(self.Config.get("lowercase_username", False))
+		self.AssumeEmailIsVerified = asab.utils.string_to_boolean(self.Config.get("assume_email_is_verified", False))
 
 		external_authentication_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 

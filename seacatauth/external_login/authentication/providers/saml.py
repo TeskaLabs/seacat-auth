@@ -36,6 +36,7 @@ _SAML_AMR = {
 
 
 class SamlAuthProvider(ExternalAuthProviderABC):
+	# TODO: Provider is actually tuned for MS Entra ID. For other SAML IdPs, refactoring will be needed.
 	"""
 	Generic SAML 2 login provider
 
@@ -49,6 +50,10 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 	label=MyCompany SAML
 	```
 	"""
+
+	ConfigDefaults = {
+		"assume_email_is_verified": "true",
+	}
 
 	def __init__(self, external_authentication_svc, config_section_name, config=None):
 		super().__init__(external_authentication_svc, config_section_name, config)
@@ -223,6 +228,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		}
 		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
 			user_info["email"] = attr[0].lower() if self.LowercaseEmail else attr[0]
+			user_info["email_verified"] = self.AssumeEmailIsVerified
 		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
 			user_info["phone"] = attr[0]
 		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
