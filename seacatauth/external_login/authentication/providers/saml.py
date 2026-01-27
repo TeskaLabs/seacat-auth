@@ -205,11 +205,13 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		claims = {}
 		for stmt in (authn_response.assertion.attribute_statement or []):
 			for attr in (stmt.attribute or []):
-				claims[attr.name] = [
+				if attr.name not in claims:
+					claims[attr.name] = []
+				claims[attr.name].extend([
 					v.text
 					for v in (attr.attribute_value or [])
 					if hasattr(v, "text")
-				]
+				])
 
 		try:
 			claims["sub"] = authn_response.get_subject().text
