@@ -190,35 +190,44 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			})
 			raise ExternalLoginError("SAML authentication failed.")
 
-		user_info = {}
+		raw_claims = await self._get_raw_auth_claims(authn_response)
+		claims = self._normalize_auth_claims(raw_claims)
+		claims["_raw"] = raw_claims
+
+
+	async def _get_raw_auth_claims(self, authn_response: saml2.response.AuthnResponse) -> dict | None:
+		claims = {}
+		for stmt in (authn_response.assertion.attribute_statement or []):
+			for attr in (stmt.attribute or []):
+				claims[attr.name] = [
+					v.text
+					for v in (attr.attribute_value or [])
+					if hasattr(v, "text")
+				]
+
 		try:
-			user_info["sub"] = authn_response.get_subject().text
+			claims["sub"] = authn_response.get_subject().text
 		except ValueError as e:
 			L.error("Cannot infer subject ID from SAML authentication response.", struct_data={
 				"provider": self.Type,
 			})
 			raise ExternalLoginError("Failed to obtain user metadata from SAML response.") from e
 
-		if self.LowercaseSub:
-			user_info["sub"] = user_info["sub"].lower()
+		return claims
 
-		attr_dict = {}
-		for stmt in (authn_response.assertion.attribute_statement or []):
-			for attr in (stmt.attribute or []):
-				attr_dict[attr.name] = [
-					v.text
-					for v in (attr.attribute_value or [])
-					if hasattr(v, "text")
-				]
 
-		user_info["_raw"] = attr_dict
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		user_info = {}
 
 		# Normalize identity claims
-		if attr := attr_dict.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
+		if self.LowercaseSub:
+			user_info["sub"] = claims["sub"].lower()
+
+		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
 			user_info["email"] = attr[0].lower() if self.LowercaseEmail else attr[0]
-		if attr := attr_dict.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
+		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
 			user_info["phone"] = attr[0]
-		if attr := attr_dict.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
+		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"):
 			user_info["username"] = attr[0].lower() if self.LowercaseUsername else attr[0]
 
 		return user_info
