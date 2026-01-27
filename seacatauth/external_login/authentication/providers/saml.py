@@ -193,6 +193,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		raw_claims = await self._get_raw_auth_claims(authn_response)
 		claims = self._normalize_auth_claims(raw_claims)
 		claims["_raw"] = raw_claims
+		return claims
 
 
 	async def _get_raw_auth_claims(self, authn_response: saml2.response.AuthnResponse) -> dict | None:
@@ -217,12 +218,9 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 
 
 	def _normalize_auth_claims(self, claims: dict) -> dict:
-		user_info = {}
-
-		# Normalize identity claims
-		if self.LowercaseSub:
-			user_info["sub"] = claims["sub"].lower()
-
+		user_info = {
+			"sub": claims["sub"].lower() if self.LowercaseSub else claims["sub"]
+		}
 		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"):
 			user_info["email"] = attr[0].lower() if self.LowercaseEmail else attr[0]
 		if attr := claims.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"):
