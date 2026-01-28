@@ -8,7 +8,6 @@ import asab
 import asab.web.rest
 import asab.exceptions
 import asab.contextvars
-import aiohttp.web
 import urllib.parse
 import jwcrypto.jwt
 import jwcrypto.jwk
@@ -27,9 +26,6 @@ from ..session.builders import (
 
 
 L = logging.getLogger(__name__)
-
-
-# TODO: Use JWA algorithms?
 
 
 class AuthorizationCode:
@@ -52,9 +48,6 @@ class RefreshToken:
 
 class OpenIdConnectService(asab.Service):
 
-	# Bearer token Regex is based on RFC 6750
-	# The OAuth 2.0 Authorization Framework: Bearer Token Usage
-	# Chapter 2.1. Authorization Request Header Field
 	AuthorizePath = "/openidconnect/authorize"
 	TokenPath = "/openidconnect/token"
 	TokenRevokePath = "/openidconnect/token/revoke"
@@ -73,7 +66,7 @@ class OpenIdConnectService(asab.Service):
 		self.RBACService = app.get_service("seacatauth.RBACService")
 		self.RoleService = app.get_service("seacatauth.RoleService")
 		self.LastActivityService = app.get_service("seacatauth.LastActivityService")
-		self.PKCE = pkce.PKCE()  # TODO: Restructure. This is OAuth, but not OpenID Connect!
+		self.PKCE = pkce.PKCE()
 
 		self.PublicApiBaseUrl = app.PublicOpenIdConnectApiUrl
 
@@ -91,7 +84,7 @@ class OpenIdConnectService(asab.Service):
 					"and has no query or fragment components.")
 		else:
 			# Default fallback option
-			self.Issuer = self.PublicApiBaseUrl.rstrip("/")
+			self.Issuer = self.App.PublicUrl.rstrip("/")
 
 		self.DisableRedirectUriValidation = asab.Config.getboolean(
 			"openidconnect", "_disable_redirect_uri_validation", fallback=False)
@@ -205,12 +198,6 @@ class OpenIdConnectService(asab.Service):
 			return None
 
 		return session
-
-
-	def check_access_token(self, bearer_token):
-		# TODO: this is not implemented
-		L.error("check_access_token is not implemented", struct_data={"bearer": bearer_token})
-		return aiohttp.web.HTTPNotImplemented()
 
 
 	async def create_oidc_session(
@@ -373,8 +360,9 @@ class OpenIdConnectService(asab.Service):
 			"kid": self.PrivateKey.key_id,
 		}
 
-		# TODO: ID token should always contain info about "what happened during authentication"
-		#   User info is optional and its parts should be included (or not) based on SCOPE
+		# TODO: UserInfo claims != ID token claims
+		#  ID token should always contain info about "what happened during authentication"
+		#  User info is optional and its claims should be included (or not) based on SCOPE
 		payload = await self.build_userinfo(session)
 
 		payload["iat"] = int(datetime.datetime.now(datetime.UTC).timestamp())

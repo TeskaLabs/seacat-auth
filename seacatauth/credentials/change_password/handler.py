@@ -176,6 +176,11 @@ class ChangePasswordHandler(object):
 		# Delete all the credentials' tokens after a successful password change
 		await self.ChangePasswordService.delete_password_reset_tokens_by_cid(credentials_id)
 
+		self.ChangePasswordService.App.PubSub.publish(
+			"Credentials.password_reset!",
+			credentials_id=credentials_id,
+		)
+
 		# Record in audit
 		AuditLogger.log(
 			asab.LOG_NOTICE, "Password reset successful",

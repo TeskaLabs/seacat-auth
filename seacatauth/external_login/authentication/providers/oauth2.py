@@ -1,3 +1,5 @@
+import asyncio
+import datetime
 import json
 import secrets
 import typing
@@ -16,6 +18,7 @@ from .abc import ExternalAuthProviderABC
 
 
 L = logging.getLogger(__name__)
+_JWKS_REFRESH_MAX_AGE_SECONDS = 5 * 60
 
 
 class OAuth2AuthProvider(ExternalAuthProviderABC):
@@ -77,6 +80,8 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			self.NonceLength = self.Config.getint("nonce_length")
 
 		self.JwkSet = None
+		self.JwkSetLastUpdated = datetime.datetime.min.replace(tzinfo=datetime.UTC)
+		self._jwks_lock = asyncio.Lock()
 
 		# The URL to return to after successful external login
 		# Configurable for debugging purposes
@@ -87,7 +92,17 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def initialize(self, app):
-		await self._prepare_jwks()
+		try:
+			await self._prepare_jwks(force_reload=True)
+		except ExternalLoginError:
+			L.warning("Failed to load JWK set during initialization.", struct_data={"type": self.Type})
+
+
+	async def _on_housekeeping(self, event_name):
+		try:
+			await self._prepare_jwks(force_reload=True)
+		except ExternalLoginError:
+			L.warning("Failed to load JWK set during housekeeping.", struct_data={"type": self.Type})
 
 
 	async def prepare_auth_request(self, state: dict, **kwargs) -> typing.Tuple[dict, aiohttp.web.Response]:
@@ -105,29 +120,52 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 
 
 	async def process_auth_callback(self, request: aiohttp.web.Request, payload: dict, state: dict, **kwargs) -> dict:
-		return await self._get_user_info(payload, expected_nonce=state.get("nonce"))
+		raw_claims = await self._get_raw_auth_claims(payload, expected_nonce=state.get("nonce"))
+		claims = self._normalize_auth_claims(raw_claims)
+		claims["_raw"] = raw_claims
+		return claims
 
 
-	async def _prepare_jwks(self, overwrite_current=False):
+	async def _prepare_jwks(self, force_reload: bool = False):
+		"""
+		Fetch and prepare the JWK set from the identity provider
+
+		Args:
+			force_reload: If True, force reloading the JWK set even if it is already loaded
+		"""
 		if not self.JwksUri:
-			return
-		if self.JwkSet and not overwrite_current:
-			return
-		async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-			async with session.get(self.JwksUri) as resp:
-				if resp.status != 200:
-					text = await resp.text()
-					L.error(
-						"Failed to fetch server JWK set: External identity provider responded with error.",
-						struct_data={
-							"provider": self.Type,
-							"status": resp.status,
-							"url": resp.url,
-							"text": text})
-					return
-				jwks = await resp.text()
-		self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
-		L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
+			raise ExternalLoginError("JWKS URI is not configured")
+
+		async with self._jwks_lock:
+			if self.JwkSet and not force_reload:
+				return
+
+			try:
+				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+					async with session.get(self.JwksUri) as resp:
+						if resp.status != 200:
+							text = await resp.text()
+							L.error(
+								"Failed to fetch server JWK set: External identity provider responded with error.",
+								struct_data={
+									"provider": self.Type,
+									"status": resp.status,
+									"url": resp.url,
+									"text": text,
+								}
+							)
+							raise ExternalLoginError("Failed to fetch server JWK set.")
+						jwks = await resp.text()
+			except aiohttp.ClientError as e:
+				L.error("Failed to fetch server JWK set: {}".format(e), struct_data={"type": self.Type})
+				raise ExternalLoginError("Failed to fetch server JWK set.") from e
+			except asyncio.TimeoutError as e:
+				L.error("Failed to fetch server JWK set: Connection timed out")
+				raise ExternalLoginError("Failed to fetch server JWK set.") from e
+
+			self.JwkSet = jwcrypto.jwk.JWKSet.from_json(jwks)
+			self.JwkSetLastUpdated = datetime.datetime.now(datetime.UTC)
+			L.info("Identity provider public JWK set loaded.", struct_data={"type": self.Type})
 
 
 	def _get_authorize_uri(
@@ -183,19 +221,9 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 					yield resp
 
 
-	async def _get_user_info(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
+	async def _get_raw_auth_claims(self, authorize_data: dict, expected_nonce: str | None = None) -> typing.Optional[dict]:
 		"""
-		Obtain the authenticated user's profile info, with the claims normalized to be in line with
-		OpenID UserInfo response.
-
-		Supported claims:
-		- sub (required)
-		- preferred_username
-		- email
-		- phone_number
-		- name
-		- first_name
-		- last_name
+		Obtain the raw authentication claims including user profile info.
 		"""
 		error = authorize_data.get("error")
 		if error is not None:
@@ -227,12 +255,45 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 			raise ExternalLoginError("No 'id_token' in token response.")
 
 		id_token = token_data["id_token"]
-		await self._prepare_jwks()
-
-		id_token_claims = self._get_verified_claims(id_token, expected_nonce)
+		id_token_claims = await self._get_verified_claims(id_token, expected_nonce)
 		user_info = self._user_data_from_id_token_claims(id_token_claims)
-		user_info["sub"] = str(user_info["sub"])
 		return user_info
+
+
+	def _normalize_auth_claims(self, claims: dict) -> dict:
+		"""
+		Normalize raw auth claims obtained from the external provider to a unified format.
+
+		Args:
+			claims: The user info dictionary obtained from the external provider.
+
+		Returns:
+			A dictionary containing the normalized claims (sub, username, email, email_verified, phone).
+		"""
+		normalized = {
+			"sub": str(claims["sub"])
+		}
+
+		if self.LowercaseSub:
+			normalized["sub"] = normalized["sub"].lower()
+
+		username = claims.get("preferred_username") or claims.get("username")
+		if username:
+			normalized["username"] = username.lower() if self.LowercaseUsername else username
+
+		email = claims.get("email")
+		if email:
+			normalized["email"] = email.lower() if self.LowercaseEmail else email
+			normalized["email_verified"] = True if self.AssumeEmailIsVerified else claims.get("email_verified", False)
+
+		phone = claims.get("phone_number") or claims.get("phone")
+		if phone:
+			normalized["phone"] = phone
+
+		if "name" in claims:
+			normalized["name"] = claims["name"]
+
+		return normalized
 
 
 	def _user_data_from_id_token_claims(self, id_token_claims: dict):
@@ -247,24 +308,36 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 		return user_info
 
 
-	def _get_verified_claims(self, id_token, expected_nonce: str | None = None):
+	async def _get_verified_claims(self, id_token, expected_nonce: str | None = None) -> dict:
+		await self._prepare_jwks()
 		check_claims = self._get_claims_to_verify()
 		if expected_nonce:
 			check_claims["nonce"] = expected_nonce
-		try:
-			id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=check_claims)
-			claims = json.loads(id_token.claims)
-		except jwcrypto.jws.InvalidJWSSignature:
-			L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
-			raise ExternalLoginError("Invalid ID token signature.")
-		except jwcrypto.jwt.JWTExpired:
-			L.error("Expired ID token.", struct_data={"provider": self.Type})
-			raise ExternalLoginError("Expired ID token.")
-		except Exception as e:
-			L.error("Error reading ID token claims.", struct_data={
-				"provider": self.Type, "error": str(e)})
-			raise ExternalLoginError("Error reading ID token claims.")
-		return claims
+		for attempt in range(2):
+			try:
+				id_token = jwcrypto.jwt.JWT(jwt=id_token, key=self.JwkSet, check_claims=check_claims)
+				claims = json.loads(id_token.claims)
+				return claims
+			except jwcrypto.jws.InvalidJWSSignature:
+				L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
+				raise ExternalLoginError("Invalid ID token signature.")
+			except jwcrypto.jwt.JWTExpired:
+				L.error("Expired ID token.", struct_data={"provider": self.Type})
+				raise ExternalLoginError("Expired ID token.")
+			except jwcrypto.jwt.JWTMissingKey:
+				if (
+					attempt == 0
+					and datetime.datetime.now(datetime.UTC) - self.JwkSetLastUpdated > datetime.timedelta(seconds=_JWKS_REFRESH_MAX_AGE_SECONDS)
+				):
+					# JWK set might be outdated, try to refresh it
+					await self._prepare_jwks(force_reload=True)
+					continue
+				L.error("Missing key in JWK set after refresh.", struct_data={"provider": self.Type})
+				raise ExternalLoginError("Missing key in JWK set.")
+			except Exception as e:
+				L.error("Error reading ID token claims.", struct_data={
+					"provider": self.Type, "error": str(e)})
+				raise ExternalLoginError("Error reading ID token claims.")
 
 
 	def _get_claims_to_verify(self) -> dict:

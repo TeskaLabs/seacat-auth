@@ -4,6 +4,7 @@ import typing
 
 import aiohttp.web
 import asab
+import asab.utils
 
 
 L = logging.getLogger(__name__)
@@ -28,9 +29,25 @@ class ExternalAuthProviderABC(abc.ABC, asab.Configurable):
 
 		self.ExternalAuthenticationService = external_authentication_svc
 		self.CallbackUrl = self.ExternalAuthenticationService.CallbackUrlTemplate.format(provider_type=self.Type)
+		self.RegisterUnknownAtLogin = asab.utils.string_to_boolean(
+			self.Config.get("register_unknown_at_login", False))
+		self.PairUnknownAtLogin = asab.utils.string_to_boolean(
+			self.Config.get("pair_unknown_at_login", False))
+		self.Tenant = self.Config.get("tenant")  # Optional tenant to register/pair unknown users into
+
+		self.LowercaseSub = asab.utils.string_to_boolean(self.Config.get("lowercase_sub", False))
+		self.LowercaseEmail = asab.utils.string_to_boolean(self.Config.get("lowercase_email", False))
+		self.LowercaseUsername = asab.utils.string_to_boolean(self.Config.get("lowercase_username", False))
+		self.AssumeEmailIsVerified = asab.utils.string_to_boolean(self.Config.get("assume_email_is_verified", False))
+
+		external_authentication_svc.App.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 
 
 	async def initialize(self, app):
+		pass
+
+
+	async def _on_housekeeping(self, event_name):
 		pass
 
 

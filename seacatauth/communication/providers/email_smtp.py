@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import email.mime.multipart
 import email.mime.text
@@ -24,6 +25,7 @@ class SMTPEmailProvider(CommunicationProviderABC):
 		"password": "",
 		"ssl": "no",
 		"starttls": "yes",
+		"timeout": "5",
 	}
 
 	def __init__(self, app, config_section_name, config=None):
@@ -37,6 +39,8 @@ class SMTPEmailProvider(CommunicationProviderABC):
 		self.User = self.Config.get("user")
 		self.Password = self.Config.get("password")
 		self.From = self.Config.get("from")
+
+		self.Timeout = self.Config.getfloat("timeout")
 
 		self.MockMode = (self.Host == "<mocked>")
 		if self.MockMode:
@@ -115,11 +119,15 @@ class SMTPEmailProvider(CommunicationProviderABC):
 					username=self.User if len(self.User) > 0 else None,
 					password=self.Password,
 					use_tls=self.SSL,
-					start_tls=self.StartTLS
+					start_tls=self.StartTLS,
+					timeout=self.Timeout
 				)
 			except ConnectionError as e:
 				L.error("Cannot connect to SMTP server: {}".format(e))
-				raise exceptions.ServerCommunicationError("Error connecting to SMTP server")
+				raise exceptions.ServerCommunicationError("Error connecting to SMTP server") from e
+			except asyncio.TimeoutError as e:
+				L.error("Cannot connect to SMTP server: Connection timed out")
+				raise exceptions.ServerCommunicationError("Error connecting to SMTP server") from e
 
 			L.log(asab.LOG_NOTICE, "Email sent.", struct_data={"result": result[1]})
 
