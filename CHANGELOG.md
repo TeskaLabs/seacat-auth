@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha9
 - v25.48-alpha8
 - v25.48-alpha7
 - v25.48-alpha6
@@ -14,6 +15,7 @@
 - v25.48-alpha
 
 ### Fixes
+- Handle CredentialsNotFoundError when cleaning up OTP secrets (#548, v25.48-alpha9)
 - Fix role pagination and sorting (#546, v25.48-alpha7)
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
