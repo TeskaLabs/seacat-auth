@@ -1,4 +1,6 @@
 import logging
+import typing
+
 import asab
 import asab.web.rest
 import asab.web.auth
@@ -10,19 +12,6 @@ from ... import exceptions
 
 
 L = logging.getLogger(__name__)
-
-
-"""
-usage_count: Number of times the credential was used.
-last_authentication: Timestamp of the last successful authentication.
-created: Timestamp when the credential was created.
-last_failed_authentication: Timestamp of the last failed authentication attempt.
-failed_attempts: Count of consecutive failed authentication attempts.
-last_updated: Timestamp of the last update (e.g., name change, key rotation).
-created_by: Identifier of the user or process that created the credential (if applicable).
-last_ip: IP address (or device info) from which the credential was last used.
-locked: Boolean or timestamp if the credential is locked due to too many failures.
-"""
 
 
 class AuthenticationAdminHandler(object):
@@ -40,10 +29,9 @@ class AuthenticationAdminHandler(object):
 		self.AuthnMethodProviders = {}
 
 		web_app = app.WebContainer.WebApp
-		web_app.router.add_get("/admin/credentials/{credentials_id}/authn", self.list_authn_methods)
-		web_app.router.add_get("/admin/credentials/{credentials_id}/authn/{method_id}", self.get_authn_method)
-		web_app.router.add_put("/admin/credentials/{credentials_id}/authn/{method_id}", self.update_authn_method)
-		web_app.router.add_delete("/admin/credentials/{credentials_id}/authn/{method_id}", self.delete_authn_method)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn-methods", self.list_authn_methods)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn-methods/{method_id}", self.get_authn_method)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/authn-methods/{method_id}", self.delete_authn_method)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -51,64 +39,18 @@ class AuthenticationAdminHandler(object):
 	async def list_authn_methods(self, request):
 		"""
 		"""
-		ext_credentials_svc = self.App.get_service("seacatauth.ExternalCredentialsService")
-		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
-		otp_svc = self.App.get_service("seacatauth.OTPService")
-
 		credentials_id = request.match_info["credentials_id"]
 		try:
-			credentials = await self.CredentialsService.get(credentials_id, include=["__password"])
+			await self.CredentialsService.get(credentials_id, include=["__password"])
 		except exceptions.CredentialsNotFoundError as e:
 			return e.json_response(request)
 
-		methods = []
-
-		# Add password
-		if credentials.get("__password") is not None:
-			methods.append({
-				"_id": self._make_authn_method_id("password", credentials),
-				"type": "password",
-				"label": "Password",
-			})
-
-		# Add OTP
-		has_activated_totp = await otp_svc.has_activated_totp(credentials_id)
-		if has_activated_totp:
-			methods.append({
-				"_id": self._make_authn_method_id("totp", credentials),
-				"type": "totp",
-				"label": "TOTP",
-			})
-
-		# Add Webauthn
-		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(
-			credentials_id, rest_normalize=True)
-		for cred in webauthn_credentials:
-			methods.append({
-				"_id": self._make_authn_method_id("webauthn", cred),
-				"_c": cred.get("created"),
-				"_m": cred.get("_m"),
-				"_v": cred.get("_v"),
-				"type": "webauthn",
-				"label": cred.get("label") or cred.get("name"),
-				"last_login": cred.get("last_login"),
-			})
-
-		# Add external login accounts
-		ext_accounts = await ext_credentials_svc.list_ext_credentials(credentials_id)
-		for account in ext_accounts:
-			methods.append({
-				"_id": self._make_authn_method_id("external", account),
-				"_c": account.get("_c"),
-				"_m": account.get("_m"),
-				"_v": account.get("_v"),
-				"type": "external",
-				"provider": account.get("type"),
-				"label": "{} - {}".format(account.get("provider_label"), account.get("label")),
-				"email": account.get("email"),
-				"username": account.get("username"),
-				"sub": account.get("sub"),
-			})
+		methods = [
+			*await self._list_password_methods(credentials_id),
+			*await self._list_totp_methods(credentials_id),
+			*await self._list_webauthn_methods(credentials_id),
+			*await self._list_ext_credential_methods(credentials_id),
+		]
 
 		return asab.web.rest.json_response(request, {
 			"data": methods,
@@ -119,13 +61,22 @@ class AuthenticationAdminHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
 	async def get_authn_method(self, request):
-		raise NotImplementedError()
+		credentials_id = request.match_info["credentials_id"]
+		method_id = request.match_info["method_id"]
+		authn_method_type, authn_method_internal_id = self._parse_authn_method_id(method_id)
+		match authn_method_type:
+			case "password":
+				data = await self._get_password_method(credentials_id, authn_method_internal_id)
+			case "totp":
+				data = await self._get_totp_method(credentials_id, authn_method_internal_id)
+			case "webauthn":
+				data = await self._get_webauthn_method(credentials_id, authn_method_internal_id)
+			case "external":
+				data = await self._get_ext_credential_method(credentials_id, authn_method_internal_id)
+			case _:
+				raise KeyError()
 
-
-	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require_superuser
-	async def update_authn_method(self, request):
-		raise NotImplementedError()
+		return asab.web.rest.json_response(request, data)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -135,15 +86,19 @@ class AuthenticationAdminHandler(object):
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		method_id = request.match_info["method_id"]
-
 		authn_method_type, authn_method_internal_id = self._parse_authn_method_id(method_id)
-		authn_method_provider = self.get_authn_method_provider(authn_method_type)
-
-		await authn_method_provider.remove_authn_method(
-			credentials_id,
-			authn_method_type,
-			authn_method_internal_id,
-		)
+		match authn_method_type:
+			case "password":
+				# Password removal is not allowed for now
+				return asab.web.rest.json_response(request, {"result": "NOT-ALLOWED"}, status=405)
+			case "totp":
+				await self._remove_totp_method(credentials_id, authn_method_internal_id)
+			case "webauthn":
+				await self._remove_webauthn_method(credentials_id, authn_method_internal_id)
+			case "external":
+				await self._remove_ext_credential_method(credentials_id, authn_method_internal_id)
+			case _:
+				raise ValueError("Unknown authentication method type '{}'".format(authn_method_type))
 
 		return asab.web.rest.json_response(request, {"result": "OK"})
 
@@ -169,15 +124,138 @@ class AuthenticationAdminHandler(object):
 		return parts[0], parts[1]
 
 
-	def get_authn_method_provider(self, authn_method_type: str):
-		match authn_method_type:
-			case "password":
-				return self.App.get_service("seacatauth.CredentialsService")
-			case "totp":
-				return self.App.get_service("seacatauth.OTPService")
-			case "webauthn":
-				return self.App.get_service("seacatauth.WebAuthnService")
-			case "external":
-				return self.App.get_service("seacatauth.ExternalCredentialsService")
-			case _:
-				raise ValueError("Unknown authentication method type '{}'".format(authn_method_type))
+	async def _list_password_methods(self, credentials_id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+		credentials = await self.CredentialsService.get(credentials_id, include=["__password"])
+		if not credentials.get("__password"):
+			return []
+		else:
+			return [self._normalize_password_method(credentials)]
+
+
+	async def _list_totp_methods(self, credentials_id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+		otp_svc = self.App.get_service("seacatauth.OTPService")
+		try:
+			totp = await otp_svc.get_totp(credentials_id)
+		except KeyError:
+			return []
+		return [self._normalize_totp_method(totp)]
+
+
+	async def _list_webauthn_methods(self, credentials_id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+		methods = []
+		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
+		webauthn_credentials = await webauthn_svc.list_webauthn_credentials(
+			credentials_id, rest_normalize=True)
+		for cred in webauthn_credentials:
+			methods.append(self._normalize_webauthn_method(cred))
+		return methods
+
+
+	async def _list_ext_credential_methods(self, credentials_id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+		methods = []
+		ext_credentials_svc = self.App.get_service("seacatauth.ExternalCredentialsService")
+		ext_credentials = await ext_credentials_svc.list_ext_credentials(credentials_id)
+		for ext_credential in ext_credentials:
+			methods.append(self._normalize_ext_credential_method(ext_credential))
+		return methods
+
+
+	async def _get_password_method(self, credentials_id: str, method_id: str) -> typing.Dict[str, typing.Any]:
+		if credentials_id != method_id:
+			raise KeyError()
+		try:
+			credentials = await self.CredentialsService.get(credentials_id, include=["__password"])
+		except exceptions.CredentialsNotFoundError:
+			raise KeyError()
+		if not credentials.get("__password"):
+			raise KeyError()
+		return self._normalize_password_method(credentials)
+
+
+	async def _get_totp_method(self, credentials_id: str, method_id: str) -> typing.Dict[str, typing.Any]:
+		if credentials_id != method_id:
+			raise KeyError()
+		otp_svc = self.App.get_service("seacatauth.OTPService")
+		totp = await otp_svc.get_totp(credentials_id)
+		return self._normalize_totp_method(totp)
+
+
+	async def _get_webauthn_method(self, credentials_id: str, method_id: str):
+		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
+		webauthn_credential = await webauthn_svc.get_webauthn_credential(
+			webauthn_credential_id=method_id, credentials_id=credentials_id, rest_normalize=True)
+		return self._normalize_webauthn_method(webauthn_credential)
+
+
+	async def _get_ext_credential_method(self, credentials_id: str, method_id: str):
+		ext_credentials_svc = self.App.get_service("seacatauth.ExternalCredentialsService")
+		ext_credential = await ext_credentials_svc.get_ext_credentials(method_id)
+		return self._normalize_ext_credential_method(ext_credential)
+
+
+	async def _remove_totp_method(self, credentials_id: str, method_id: str):
+		if credentials_id != method_id:
+			raise KeyError()
+		otp_svc = self.App.get_service("seacatauth.OTPService")
+		await otp_svc.deactivate_totp(credentials_id=method_id)
+
+
+	async def _remove_webauthn_method(self, credentials_id: str, method_id: str):
+		webauthn_svc = self.App.get_service("seacatauth.WebAuthnService")
+		await webauthn_svc.delete_webauthn_credential(
+			webauthn_credential_id=method_id, credentials_id=credentials_id)
+
+
+	async def _remove_ext_credential_method(self, credentials_id: str, method_id: str):
+		ext_credentials_svc = self.App.get_service("seacatauth.ExternalCredentialsService")
+		await ext_credentials_svc.delete_ext_credentials(method_id)
+
+
+	def _normalize_password_method(self, credentials: dict) -> dict:
+		return {
+			"_id": self._make_authn_method_id("password", credentials),
+			"type": "password",
+			"label": "Password",
+		}
+
+
+	def _normalize_totp_method(self, totp: dict) -> dict:
+		return {
+			"_id": self._make_authn_method_id("totp", totp),
+			"_c": totp.get("_c"),
+			"_m": totp.get("_m"),
+			"_v": totp.get("_v"),
+			"type": "totp",
+			"label": "TOTP",
+		}
+
+
+	def _normalize_webauthn_method(self, webauthn_credential: dict) -> dict:
+		return {
+			"_id": self._make_authn_method_id("webauthn", webauthn_credential),
+			"_c": webauthn_credential.get("created"),
+			"_m": webauthn_credential.get("_m"),
+			"_v": webauthn_credential.get("_v"),
+			"type": "webauthn",
+			"label": webauthn_credential.get("label") or webauthn_credential.get("name"),
+			"last_authentication": webauthn_credential.get("last_login"),
+		}
+
+
+	def _normalize_ext_credential_method(self, ext_credential: dict) -> dict:
+		return {
+			"_id": self._make_authn_method_id("external", ext_credential),
+			"_c": ext_credential.get("_c"),
+			"_m": ext_credential.get("_m"),
+			"_v": ext_credential.get("_v"),
+			"type": "external",
+			"label": "{} ({})".format(ext_credential.get("provider_label"), ext_credential.get("label")),
+			"details": {
+				"external": {
+					"provider": ext_credential.get("type"),
+					"email": ext_credential.get("email"),
+					"username": ext_credential.get("username"),
+					"sub": ext_credential.get("sub"),
+				}
+			},
+		}
