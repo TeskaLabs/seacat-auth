@@ -15,7 +15,7 @@ import asab.web.auth
 from .. import exceptions
 from .. import generic
 from ..events import EventTypes
-from ..models import Session
+from ..models import Client, Session
 from ..models.const import OAuth2, ResourceId
 from . import schema
 
@@ -78,7 +78,7 @@ class ClientService(asab.Service):
 			"seacatauth:client", "_allow_insecure_web_client_uris", fallback=False)
 
 		if not self._AllowCustomClientID:
-			schema.CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
+			schema.REGISTER_CLIENT["properties"].pop("preferred_client_id")
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
@@ -111,7 +111,8 @@ class ClientService(asab.Service):
 		page: int = 0,
 		limit: int = None,
 		query_filter: typing.Optional[str | typing.Dict] = None,
-		sort_by: typing.Optional[typing.List[tuple]] = None
+		sort_by: typing.Optional[typing.List[tuple]] = None,
+		raw: bool = False,
 	):
 		collection = self.StorageService.Database[self.ClientCollection]
 
@@ -136,9 +137,10 @@ class ClientService(asab.Service):
 			cursor.limit(limit)
 
 		async for client in cursor:
-			if "__client_secret" in client:
-				client.pop("__client_secret")
-			yield self._normalize_client(client)
+			if raw:
+				yield client
+			else:
+				yield Client(self._normalize_client(client))
 
 
 	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None):
@@ -150,59 +152,54 @@ class ClientService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def get_client(self, client_id: str, normalize: bool = True):
+	async def get_client(self, client_id: str, raw: bool = False):
 		"""
 		Get client metadata
 		"""
 		# Try to get client from cache
 		client = self._get_from_cache(client_id)
-		if client:
-			if normalize:
-				return self._normalize_client(client)
-			else:
-				return client
+		if client is None:
+			# Get from the database
+			client = await self.StorageService.get(self.ClientCollection, client_id)
+			self._store_in_cache(client_id, client)
 
-		# Get from the database
-		client = await self.StorageService.get(self.ClientCollection, client_id)
-		self._store_in_cache(client_id, client)
-
-		if normalize:
-			return self._normalize_client(client)
-		else:
+		if raw:
 			return client
+		else:
+			return Client(self._normalize_client(client))
+
+
+	async def get_oauth_client(self, client_id: str):
+		"""
+		Get client metadata
+		"""
+		client = await self.get_client(client_id)
+		if client.OAuth2 is None:
+			L.error("Client is not an OAuth2 client.", struct_data={"client_id": client_id})
+			raise exceptions.ClientNotFoundError(client_id)
+		return client
 
 
 	async def create_client(
 		self, *,
-		_custom_client_id: str = None,
+		preferred_client_id: str = None,
 		**kwargs
 	):
 		"""
 		Register a new OpenID Connect client
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientRegistration
 		"""
-		if _custom_client_id is not None:
-			client_id = _custom_client_id
-			L.warning("Creating a client with custom ID.", struct_data={"client_id": client_id})
+		if preferred_client_id is not None:
+			client_id = preferred_client_id
 		else:
 			client_id = secrets.token_urlsafe(self.ClientIdLength)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
 
-		client_metadata = {**CLIENT_DEFAULTS, **kwargs}
-		self._check_redirect_uris(**client_metadata)
-		self._check_grant_types(**client_metadata)
+		if kwargs.get("seacatauth_credentials", False):
+			upsertor.set("seacatauth_credentials", True)
 
-		for k in schema.CLIENT_METADATA_SCHEMA:
-			v = client_metadata.get(k)
-			if v is None or (isinstance(v, str) and len(v) == 0):
-				continue
-			if k in TIME_ATTRIBUTES:
-				try:
-					v = asab.utils.convert_to_seconds(v)
-				except ValueError as e:
-					raise asab.exceptions.ValidationError(
-						"{!r} must be either a number or a duration string.".format(k)) from e
-			upsertor.set(k, v)
+		if "oauth" in kwargs:
+			self._prepare_oauth_attributes(upsertor, {**CLIENT_DEFAULTS, **kwargs["oauth"]})
 
 		try:
 			await upsertor.execute(event_type=EventTypes.CLIENT_REGISTERED)
@@ -214,11 +211,26 @@ class ClientService(asab.Service):
 		return client_id
 
 
+	def _prepare_oauth_attributes(self, upsertor, oauth_metadata: dict):
+		self._check_redirect_uris(**oauth_metadata)
+		self._check_grant_types(**oauth_metadata)
+		for k in schema.OAUTH_CLIENT_METADATA_SCHEMA:
+			v = oauth_metadata.get(k)
+			if v is None or (isinstance(v, str) and len(v) == 0):
+				continue
+			if k in TIME_ATTRIBUTES:
+				try:
+					v = asab.utils.convert_to_seconds(v)
+				except ValueError as e:
+					raise asab.exceptions.ValidationError(
+						"{!r} must be either a number or a duration string.".format(k)) from e
+			upsertor.set(k, v)
+
+
 	async def reset_secret(self, client_id: str):
 		"""
 		Set or reset client secret
 		"""
-		# TODO: Use M2M credentials provider.
 		client = await self.get_client(client_id)
 		assert_client_is_editable(client)
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
@@ -238,13 +250,15 @@ class ClientService(asab.Service):
 
 
 	async def update_client(self, client_id: str, **kwargs):
-		client = await self.get_client(client_id, normalize=False)
+		raise NotImplementedError("TODO: Implement client update method")
+
+		client = await self.get_client(client_id)
 		assert_client_is_editable(client)
 		client_update = {
 			k: v
 			for k, v in client.items()
 			if (
-				k in schema.CLIENT_METADATA_SCHEMA
+				k in schema.OAUTH_CLIENT_METADATA_SCHEMA
 				and not k.startswith("_")
 			)
 		}
@@ -256,7 +270,7 @@ class ClientService(asab.Service):
 		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
 
 		for k, v in client_update.items():
-			if k not in schema.CLIENT_METADATA_SCHEMA:
+			if k not in schema.OAUTH_CLIENT_METADATA_SCHEMA:
 				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
 
 			if v is None or (isinstance(v, str) and len(v) == 0):
@@ -653,8 +667,6 @@ class ClientService(asab.Service):
 	def _normalize_client(self, client: dict):
 		client = {**client}  # Do not modify the original client
 		client["client_id"] = client["_id"]
-		if client.get("managed_by"):
-			client["read_only"] = True
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
 		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
 		if client.get("seacatauth_credentials") is True:
@@ -702,11 +714,10 @@ def is_client_confidential(client: dict):
 		return True
 
 
-def assert_client_is_editable(client: dict):
-	if client.get("read_only"):
+def assert_client_is_editable(client: Client):
+	if not client.is_editable():
 		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
 		raise exceptions.NotEditableError("Client is not editable.")
-	return True
 
 
 def _validate_client_attributes(client_dict: dict):
@@ -714,7 +725,7 @@ def _validate_client_attributes(client_dict: dict):
 	Validate client attributes.
 	"""
 	for k, v in client_dict.items():
-		if k not in schema.CLIENT_METADATA_SCHEMA:
+		if k not in schema.OAUTH_CLIENT_METADATA_SCHEMA:
 			raise asab.exceptions.ValidationError("Unexpected attribute: {!r}".format(k))
 
 		if k == "grant_types":

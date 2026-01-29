@@ -133,10 +133,6 @@ class ClientHandler(object):
 
 		https://openid.net/specs/openid-connect-registration-1_0.html
 		"""
-		if "preferred_client_id" in json_data:
-			if not self.ClientService._AllowCustomClientID:
-				raise asab.exceptions.ValidationError("Specifying custom client_id is not allowed.")
-			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
 		client_id = await self.ClientService.create_client(**json_data)
 		client = await self.ClientService.get_client(client_id)
 		response_data = self._rest_normalize(client)

@@ -235,7 +235,7 @@ class AuthenticationHandler(object):
 		if hasattr(login_session.SeacatLogin, "ClientId"):
 			client_svc = self.App.get_service("seacatauth.ClientService")
 			try:
-				client = await client_svc.get_client(login_session.ClientId)
+				client = await client_svc.get_oauth_client(login_session.ClientId)
 				cookie_domain = client.get("cookie_domain")
 			except KeyError:
 				L.error("Client not found.", struct_data={"client_id": login_session.ClientId})
@@ -395,7 +395,7 @@ class AuthenticationHandler(object):
 	async def _get_client_login_key(self, client_id):
 		client_service = self.AuthenticationService.App.get_service("seacatauth.ClientService")
 		try:
-			client = await client_service.get_client(client_id)
+			client = await client_service.get_oauth_client(client_id)
 			login_key = client.get("login_key")
 		except KeyError:
 			login_key = None
@@ -498,7 +498,7 @@ class AuthenticationHandler(object):
 		except aiohttp.web.HTTPForbidden as e:
 			return e
 
-		client_dict = await client_service.get_client(request_data["client_id"])
+		client_dict = await client_service.get_oauth_client(request_data["client_id"])
 		query = {
 			k: v for k, v in request_data.items()
 			if k in AUTHORIZE_PARAMETERS}

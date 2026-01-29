@@ -143,7 +143,7 @@ class CookieService(asab.Service):
 		# Check if the Client exists
 		client_svc = self.App.get_service("seacatauth.ClientService")
 		try:
-			await client_svc.get_client(client_id)
+			await client_svc.get_oauth_client(client_id)
 		except KeyError:
 			raise KeyError("Client '{}' not found".format(client_id))
 

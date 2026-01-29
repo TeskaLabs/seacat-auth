@@ -124,7 +124,7 @@ class TokenIntrospectionHandler(object):
 		client_id = request.query.get("client_id")
 		if client_id is not None:
 			try:
-				client = await self.ClientService.get_client(client_id)
+				client = await self.ClientService.get_oauth_client(client_id)
 			except KeyError:
 				L.error("Client not found.", struct_data={"client_id": client_id})
 				return None
