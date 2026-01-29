@@ -38,6 +38,7 @@ class AuthenticationAdminHandler(object):
 	@asab.web.auth.require_superuser
 	async def list_authn_methods(self, request):
 		"""
+		List authentication methods for given credentials
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		try:
@@ -61,6 +62,9 @@ class AuthenticationAdminHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	@asab.web.auth.require_superuser
 	async def get_authn_method(self, request):
+		"""
+		Get authentication method details
+		"""
 		credentials_id = request.match_info["credentials_id"]
 		method_id = request.match_info["method_id"]
 		authn_method_type, authn_method_internal_id = self._parse_authn_method_id(method_id)
@@ -83,6 +87,7 @@ class AuthenticationAdminHandler(object):
 	@asab.web.auth.require_superuser
 	async def delete_authn_method(self, request):
 		"""
+		Delete authentication method
 		"""
 		credentials_id = request.match_info["credentials_id"]
 		method_id = request.match_info["method_id"]
