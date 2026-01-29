@@ -216,6 +216,7 @@ class AuthenticationAdminHandler(object):
 			"_id": self._make_authn_method_id("password", credentials),
 			"type": "password",
 			"label": "Password",
+			"actions": [],
 		}
 
 
@@ -227,6 +228,7 @@ class AuthenticationAdminHandler(object):
 			"_v": totp.get("_v"),
 			"type": "totp",
 			"label": "TOTP",
+			"actions": ["delete"],
 		}
 
 
@@ -239,6 +241,7 @@ class AuthenticationAdminHandler(object):
 			"type": "webauthn",
 			"label": webauthn_credential.get("label") or webauthn_credential.get("name"),
 			"last_authentication": webauthn_credential.get("last_login"),
+			"actions": ["delete"],
 		}
 
 
@@ -250,6 +253,7 @@ class AuthenticationAdminHandler(object):
 			"_v": ext_credential.get("_v"),
 			"type": "external",
 			"label": "{} ({})".format(ext_credential.get("provider_label"), ext_credential.get("label")),
+			"actions": ["delete"],
 			"details": {
 				"external": {
 					"provider": ext_credential.get("type"),
