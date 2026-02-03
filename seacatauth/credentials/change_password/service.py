@@ -2,6 +2,7 @@ import hashlib
 import logging
 import datetime
 import re
+import typing
 
 import asab
 import asab.exceptions
@@ -189,3 +190,28 @@ class ChangePasswordService(asab.Service):
 		if len(re.findall(r"[^a-zA-Z0-9]", password)) < self.PasswordMinSpecialCount:
 			raise exceptions.WeakPasswordError(
 				"Password must contain at least {} special characters.".format(self.PasswordMinSpecialCount))
+
+
+	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
+		"""
+		Iterate over active authentication methods for requested credentials. Yield password method if it is active.
+		"""
+		try:
+			yield await self.get_authn_method(credentials_id)
+		except KeyError:
+			pass
+
+
+	async def get_authn_method(self, credentials_id: str) -> dict:
+		try:
+			credentials = await self.CredentialsService.get(credentials_id, include=["__password"])
+		except exceptions.CredentialsNotFoundError:
+			raise KeyError()
+		if not credentials.get("__password"):
+			raise KeyError()
+		return {
+			"type": "password",
+			"label": "Password",
+			"cid": credentials_id,
+			"actions": ["reset"],
+		}

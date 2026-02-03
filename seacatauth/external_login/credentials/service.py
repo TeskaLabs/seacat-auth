@@ -1,5 +1,6 @@
 import logging
 import secrets
+import typing
 
 import aiohttp
 import asab
@@ -320,6 +321,23 @@ class ExternalCredentialsService(asab.Service):
 			account["provider_label"] = account["type"]
 
 		return account
+
+
+	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
+		"""
+		Iterate over active authentication methods for requested credentials. Yield external credentials if they are active.
+		"""
+		for external_cred in await self.list_ext_credentials(credentials_id):
+			yield {
+				"id": external_cred.get("_id"),
+				"type": "external",
+				"label": "{} ({})".format(external_cred.get("provider_label"), external_cred.get("label")),
+				"cid": external_cred.get("cid"),
+				"actions": ["delete"],
+				"details": {
+					"external": external_cred
+				}
+			}
 
 
 def ensure_access_permissions(credentials_id: str):

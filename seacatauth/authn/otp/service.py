@@ -174,7 +174,7 @@ class OTPService(asab.Service):
 		"""
 		totp_object: dict = await self.StorageService.get(
 			collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
-		totp_object = totp_object["__totp"].decode("ascii")
+		totp_object["__totp"] = totp_object["__totp"].decode("ascii")
 		return totp_object
 
 	async def get_totp(self, credentials_id: str) -> dict:
@@ -226,3 +226,27 @@ class OTPService(asab.Service):
 			return totp_verifier.verify(request_data['totp'])
 		except KeyError:
 			return False
+
+
+	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
+		"""
+		Iterate over active authentication methods for requested credentials. Yield TOTP method if it is active.
+		"""
+		try:
+			yield await self.get_authn_method(credentials_id)
+		except KeyError:
+			# TOTP is not active, nothing to yield
+			pass
+
+
+	async def get_authn_method(self, credentials_id: str) -> dict:
+		totp = await self.get_totp(credentials_id)
+		return {
+			"type": "totp",
+			"label": "TOTP",
+			"cid": credentials_id,
+			"actions": ["delete"],
+			"details": {
+				"totp": totp
+			}
+		}
