@@ -263,7 +263,8 @@ class TOTPAuthnMethodProvider(AuthnMethodProviderABC):
 			"actions": self.SupportedActions,
 			"details": {
 				"totp": totp
-			}
+			},
+			"created": totp.get("_c"),
 		}
 
 	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):

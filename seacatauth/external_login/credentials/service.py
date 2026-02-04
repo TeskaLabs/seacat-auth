@@ -363,7 +363,8 @@ class ExternalAuthnMethodProvider(AuthnMethodProviderABC):
 			"actions": self.SupportedActions,
 			"details": {
 				"external": external_cred
-			}
+			},
+			"created": external_cred.get("_c"),
 		}
 
 

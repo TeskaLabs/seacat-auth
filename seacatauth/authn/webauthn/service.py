@@ -637,7 +637,8 @@ class WebAuthnMethodProvider(AuthnMethodProviderABC):
 			"actions": self.SupportedActions,
 			"details": {
 				"webauthn": webauthn_cred
-			}
+			},
+			"created": webauthn_cred.get("_c"),
 		}
 
 
