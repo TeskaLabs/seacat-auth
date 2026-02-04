@@ -8,6 +8,7 @@ import asab.storage
 
 from ... import exceptions
 from ...events import EventTypes
+from ..provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -56,6 +57,9 @@ class OTPService(asab.Service):
 			# TOTP was not active, nothing to do
 			pass
 
+	async def initialize(self, app):
+		provider = TOTPAuthnMethodProvider(app, self)
+		await provider.initialize(app)
 
 	async def deactivate_totp(self, credentials_id: str):
 		"""
@@ -228,25 +232,42 @@ class OTPService(asab.Service):
 			return False
 
 
+class TOTPAuthnMethodProvider(AuthnMethodProviderABC):
+	MethodType = "totp"
+	SupportedActions = ["delete"]
+
+	def __init__(self, app, otp_service, *args, **kwargs):
+		super().__init__(app, *args, **kwargs)
+		self.OTPService = otp_service
+
 	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
-		"""
-		Iterate over active authentication methods for requested credentials. Yield TOTP method if it is active.
-		"""
 		try:
-			yield await self.get_authn_method(credentials_id)
+			yield await self.get_authn_method(credentials_id, None)
 		except KeyError:
 			# TOTP is not active, nothing to yield
 			pass
 
+	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		"""
+		Get TOTP authentication method for requested credentials.
+		Raise KeyError if TOTP is not active.
+		"""
+		if method_id is not None:
+			raise KeyError("TOTP is a singleton authentication method; method_id must be None.")
 
-	async def get_authn_method(self, credentials_id: str) -> dict:
-		totp = await self.get_totp(credentials_id)
+		totp = await self.OTPService.get_totp(credentials_id)
 		return {
 			"type": "totp",
 			"label": "TOTP",
 			"cid": credentials_id,
-			"actions": ["delete"],
+			"actions": self.SupportedActions,
 			"details": {
 				"totp": totp
 			}
 		}
+
+	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):
+		if method_id is not None:
+			raise KeyError("TOTP is a singleton authentication method; method_id must be None.")
+
+		await self.OTPService.deactivate_totp(credentials_id)

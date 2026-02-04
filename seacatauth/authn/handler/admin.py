@@ -1,5 +1,4 @@
 import logging
-import typing
 
 import asab
 import asab.web.rest
@@ -26,10 +25,12 @@ class AuthenticationAdminHandler(object):
 		self.App = app
 		self.AuthenticationService = authn_svc
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
-		self.AuthnMethodProviders = {}
 
 		web_app = app.WebContainer.WebApp
 		web_app.router.add_get("/admin/credentials/{credentials_id}/authn-methods", self.list_authn_methods)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn-methods/{method_type}", self.list_authn_methods_by_type)
+		web_app.router.add_get("/admin/credentials/{credentials_id}/authn-methods/{method_type}/{method_id}", self.get_authn_method_by_id)
+		web_app.router.add_delete("/admin/credentials/{credentials_id}/authn-methods/{method_type}/{method_id}", self.delete_authn_method_by_id)
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -44,17 +45,8 @@ class AuthenticationAdminHandler(object):
 		except exceptions.CredentialsNotFoundError as e:
 			return e.json_response(request)
 
-		providers = [
-			self.App.get_service("seacatauth.ChangePasswordService"),
-			self.App.get_service("seacatauth.OTPService"),
-			self.App.get_service("seacatauth.WebAuthnService"),
-			self.App.get_service("seacatauth.ExternalCredentialsService"),
-		]
-
 		methods = []
-		for provider in providers:
-			if provider is None:
-				continue
+		for provider in self.AuthenticationService.AuthnMethodProviders.values():
 			async for method in provider.iterate_authn_methods(credentials_id):
 				methods.append(method)
 
@@ -62,3 +54,64 @@ class AuthenticationAdminHandler(object):
 			"data": methods,
 			"count": len(methods),
 		})
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def list_authn_methods_by_type(self, request):
+		"""
+		List authentication methods of given type for given credentials
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		try:
+			await self.CredentialsService.get(credentials_id, include=["__password"])
+		except exceptions.CredentialsNotFoundError as e:
+			return e.json_response(request)
+
+		methods = []
+		provider = self.AuthenticationService.AuthnMethodProviders.get(request.match_info["method_type"])
+		async for method in provider.iterate_authn_methods(credentials_id):
+			methods.append(method)
+
+		return asab.web.rest.json_response(request, {
+			"data": methods,
+			"count": len(methods),
+		})
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def get_authn_method_by_id(self, request):
+		"""
+		Get authentication method by ID for given credentials.
+		Singleton methods use method_id = "-".
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		provider = self.AuthenticationService.AuthnMethodProviders.get(request.match_info["method_type"])
+		if provider is None:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+		method_id = request.match_info["method_id"]
+		if method_id == "-":
+			method_id = None
+		method = await provider.get_authn_method(credentials_id, method_id)
+		return asab.web.rest.json_response(request, method)
+
+
+	@asab.web.tenant.allow_no_tenant
+	@asab.web.auth.require_superuser
+	async def delete_authn_method_by_id(self, request):
+		"""
+		Delete authentication method by ID for given credentials.
+		Singleton methods use method_id = "-".
+		"""
+		credentials_id = request.match_info["credentials_id"]
+		provider = self.AuthenticationService.AuthnMethodProviders.get(request.match_info["method_type"])
+		if provider is None:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
+		if "delete" not in provider.SupportedActions:
+			return asab.web.rest.json_response(request, {"result": "NOT-ALLOWED"}, status=405)
+		method_id = request.match_info["method_id"]
+		if method_id == "-":
+			method_id = None
+		method = await provider.delete_authn_method(credentials_id, method_id)
+		return asab.web.rest.json_response(request, method)

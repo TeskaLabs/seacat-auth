@@ -129,9 +129,8 @@ class SeaCatAuthApplication(asab.Application):
 		self.BatmanService = BatmanService(self)
 		self.BatmanHandler = BatmanHandler(self, self.BatmanService)
 
-		from .authn.webauthn import WebAuthnService, WebAuthnAdminHandler, WebAuthnAccountHandler
+		from .authn.webauthn import WebAuthnService, WebAuthnAccountHandler
 		self.WebAuthnService = WebAuthnService(self)
-		self.WebAuthnAdminHandler = WebAuthnAdminHandler(self, self.WebAuthnService)
 		self.WebAuthnAccountHandler = WebAuthnAccountHandler(self, self.WebAuthnService)
 
 		# Init Login service
@@ -170,10 +169,9 @@ class SeaCatAuthApplication(asab.Application):
 		from .openidconnect import OpenIdConnectModule
 		self.add_module(OpenIdConnectModule)
 
-		from .authn.otp import OTPAccountHandler, OTPAdminHandler, OTPService
+		from .authn.otp import OTPAccountHandler, OTPService
 		self.OTPService = OTPService(self)
 		self.OTPAccountHandler = OTPAccountHandler(self, self.OTPService)
-		self.OTPAdminHandler = OTPAdminHandler(self, self.OTPService)
 
 		from .external_login.authentication import (
 			ExternalAuthenticationService,
@@ -184,11 +182,9 @@ class SeaCatAuthApplication(asab.Application):
 
 		from .external_login.credentials import (
 			ExternalCredentialsService,
-			ExternalCredentialsAdminHandler,
 			ExternalLoginAccountHandler,
 		)
 		self.ExternalCredentialsService = ExternalCredentialsService(self)
-		self.ExternalLoginAdminHandler = ExternalCredentialsAdminHandler(self, self.ExternalCredentialsService)
 		self.ExternalLoginAccountHandler = ExternalLoginAccountHandler(self, self.ExternalCredentialsService)
 
 		from .feature import FeatureService, FeatureHandler

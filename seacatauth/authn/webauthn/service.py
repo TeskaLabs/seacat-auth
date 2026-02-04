@@ -17,6 +17,7 @@ import cryptography.x509
 
 from ... import exceptions
 from ...events import EventTypes
+from ..provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -169,6 +170,11 @@ class WebAuthnService(asab.Service):
 					n_inserted += 1
 
 		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
+
+
+	async def initialize(self, app):
+		provider = WebAuthnMethodProvider(app, self)
+		await provider.initialize(app)
 
 
 	async def create_webauthn_credential(
@@ -615,6 +621,42 @@ class WebAuthnService(asab.Service):
 					"webauthn": webauthn_cred
 				}
 			}
+
+
+class WebAuthnMethodProvider(AuthnMethodProviderABC):
+	MethodType = "webauthn"
+	MultipleMethodsPerCredentials = True
+	SupportedActions = ["delete"]
+
+	def __init__(self, app, webauthn_service, *args, **kwargs):
+		super().__init__(app, *args, **kwargs)
+		self.WebAuthnService = webauthn_service
+
+	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
+		for webauthn_cred in await self.WebAuthnService.list_webauthn_credentials(credentials_id, rest_normalize=True):
+			yield self._normalize_method(webauthn_cred)
+
+	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		webauthn_cred = await self.WebAuthnService.get_webauthn_credential(
+			credentials_id, webauthn_credential_id=method_id, rest_normalize=True)
+		return self._normalize_method(webauthn_cred)
+
+	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):
+		await self.WebAuthnService.delete_webauthn_credential(
+			credentials_id, webauthn_credential_id=method_id)
+
+	def _normalize_method(self, webauthn_cred: dict) -> dict:
+		return {
+			"id": webauthn_cred.get("_id"),
+			"type": "external",
+			"label": webauthn_cred.get("label"),
+			"cid": webauthn_cred.get("credentials_id"),
+			"status": "active",
+			"actions": self.SupportedActions,
+			"details": {
+				"webauthn": webauthn_cred
+			}
+		}
 
 
 def _normalize_webauthn_credential_response(public_key_credential):

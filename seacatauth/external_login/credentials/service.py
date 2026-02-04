@@ -14,6 +14,7 @@ from ...models.const import ResourceId
 from ..exceptions import (
 	ExternalAccountNotFoundError,
 )
+from ...authn.provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -46,6 +47,9 @@ class ExternalCredentialsService(asab.Service):
 		coll = await self.StorageService.collection(self.ExternalCredentialsCollection)
 		await coll.create_index([("cid", pymongo.ASCENDING)])
 		await coll.create_index([("type", pymongo.ASCENDING), ("sub", pymongo.ASCENDING)])
+
+		provider = ExternalAuthnMethodProvider(app, self)
+		await provider.initialize(app)
 
 
 	async def sign_up_ext_credentials(
@@ -323,21 +327,44 @@ class ExternalCredentialsService(asab.Service):
 		return account
 
 
+class ExternalAuthnMethodProvider(AuthnMethodProviderABC):
+	MethodType = "external"
+	MultipleMethodsPerCredentials = True
+	SupportedActions = ["delete"]
+
+	def __init__(self, app, external_cred_service, *args, **kwargs):
+		super().__init__(app, *args, **kwargs)
+		self.ExternalCredService = external_cred_service
+
 	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
 		"""
 		Iterate over active authentication methods for requested credentials. Yield external credentials if they are active.
 		"""
-		for external_cred in await self.list_ext_credentials(credentials_id):
-			yield {
-				"id": external_cred.get("_id"),
-				"type": "external",
-				"label": "{} ({})".format(external_cred.get("provider_label"), external_cred.get("label")),
-				"cid": external_cred.get("cid"),
-				"actions": ["delete"],
-				"details": {
-					"external": external_cred
-				}
+		for external_cred in await self.ExternalCredService.list_ext_credentials(credentials_id):
+			yield self._normalize_method(external_cred)
+
+	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		external_cred = await self.ExternalCredService.get_ext_credentials(ext_credentials_id=method_id)
+		if external_cred["cid"] != credentials_id:
+			raise KeyError("External credentials do not belong to the requested credentials ID.")
+		return self._normalize_method(external_cred)
+
+	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):
+		# Verify that the method exists and belongs to the credentials
+		await self.get_authn_method(credentials_id, method_id)
+		await self.ExternalCredService.delete_ext_credentials(ext_credentials_id=method_id)
+
+	def _normalize_method(self, external_cred: dict) -> dict:
+		return {
+			"id": external_cred.get("_id"),
+			"type": "external",
+			"label": "{} ({})".format(external_cred.get("provider_label"), external_cred.get("label")),
+			"cid": external_cred.get("cid"),
+			"actions": self.SupportedActions,
+			"details": {
+				"external": external_cred
 			}
+		}
 
 
 def ensure_access_permissions(credentials_id: str):

@@ -10,6 +10,7 @@ import asab.exceptions
 from ... import exceptions
 from ...generic import generate_ergonomic_token
 from ...events import EventTypes
+from ...authn.provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -82,6 +83,11 @@ class ChangePasswordService(asab.Service):
 		await upsertor.execute(event_type=EventTypes.PWD_RESET_TOKEN_CREATED)
 		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"cid": credentials_id})
 		return password_reset_token
+
+
+	async def initialize(self, app):
+		provider = PasswordAuthnMethodProvider(app, self, self.CredentialsService)
+		await provider.initialize(app)
 
 
 	async def delete_password_reset_token(self, password_reset_token: str):
@@ -192,6 +198,15 @@ class ChangePasswordService(asab.Service):
 				"Password must contain at least {} special characters.".format(self.PasswordMinSpecialCount))
 
 
+class PasswordAuthnMethodProvider(AuthnMethodProviderABC):
+	MethodType = "password"
+	SupportedActions = ["reset"]
+
+	def __init__(self, app, password_service, credentials_service, *args, **kwargs):
+		super().__init__(app, *args, **kwargs)
+		self.PasswordService = password_service
+		self.CredentialsService = credentials_service
+
 	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
 		"""
 		Iterate over active authentication methods for requested credentials. Yield password method if it is active.
@@ -201,8 +216,10 @@ class ChangePasswordService(asab.Service):
 		except KeyError:
 			pass
 
+	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		if method_id is not None:
+			raise KeyError("Password is a singleton authentication method; method_id must be None.")
 
-	async def get_authn_method(self, credentials_id: str) -> dict:
 		try:
 			credentials = await self.CredentialsService.get(credentials_id, include=["__password"])
 		except exceptions.CredentialsNotFoundError:
@@ -213,5 +230,5 @@ class ChangePasswordService(asab.Service):
 			"type": "password",
 			"label": "Password",
 			"cid": credentials_id,
-			"actions": ["reset"],
+			"actions": self.SupportedActions,
 		}
