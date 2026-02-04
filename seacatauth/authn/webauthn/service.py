@@ -605,24 +605,6 @@ class WebAuthnService(asab.Service):
 		return True
 
 
-	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
-		"""
-		Iterate over active authentication methods for requested credentials.
-		"""
-		for webauthn_cred in await self.list_webauthn_credentials(credentials_id, rest_normalize=True):
-			yield {
-				"id": webauthn_cred.get("_id"),
-				"type": "external",
-				"label": webauthn_cred.get("label"),
-				"cid": webauthn_cred.get("credentials_id"),
-				"status": "active",
-				"actions": ["delete"],
-				"details": {
-					"webauthn": webauthn_cred
-				}
-			}
-
-
 class WebAuthnMethodProvider(AuthnMethodProviderABC):
 	MethodType = "webauthn"
 	MultipleMethodsPerCredentials = True
