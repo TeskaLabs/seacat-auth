@@ -619,12 +619,16 @@ class WebAuthnMethodProvider(AuthnMethodProviderABC):
 			yield self._normalize_method(webauthn_cred)
 
 	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		if method_id is None:
+			raise KeyError("method_id is required for WebAuthn authentication method")
 		webauthn_credential_id = base64.urlsafe_b64decode(method_id.encode("ascii") + b"==")
 		webauthn_cred = await self.WebAuthnService.get_webauthn_credential(
 			credentials_id, webauthn_credential_id, rest_normalize=True)
 		return self._normalize_method(webauthn_cred)
 
 	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):
+		if method_id is None:
+			raise KeyError("method_id is required for WebAuthn authentication method")
 		webauthn_credential_id = base64.urlsafe_b64decode(method_id.encode("ascii") + b"==")
 		await self.WebAuthnService.delete_webauthn_credential(
 			webauthn_credential_id, credentials_id=credentials_id)
