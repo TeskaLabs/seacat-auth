@@ -70,6 +70,8 @@ class AuthenticationAdminHandler(object):
 
 		methods = []
 		provider = self.AuthenticationService.AuthnMethodProviders.get(request.match_info["method_type"])
+		if provider is None:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		async for method in provider.iterate_authn_methods(credentials_id):
 			methods.append(method)
 
@@ -93,7 +95,10 @@ class AuthenticationAdminHandler(object):
 		method_id = request.match_info["method_id"]
 		if method_id == "-":
 			method_id = None
-		method = await provider.get_authn_method(credentials_id, method_id)
+		try:
+			method = await provider.get_authn_method(credentials_id, method_id)
+		except KeyError:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		return asab.web.rest.json_response(request, method)
 
 
@@ -113,5 +118,8 @@ class AuthenticationAdminHandler(object):
 		method_id = request.match_info["method_id"]
 		if method_id == "-":
 			method_id = None
-		method = await provider.delete_authn_method(credentials_id, method_id)
+		try:
+			method = await provider.delete_authn_method(credentials_id, method_id)
+		except KeyError:
+			return asab.web.rest.json_response(request, {"result": "NOT-FOUND"}, status=404)
 		return asab.web.rest.json_response(request, method)
