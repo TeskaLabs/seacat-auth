@@ -634,7 +634,7 @@ class WebAuthnMethodProvider(AuthnMethodProviderABC):
 			"id": webauthn_cred.get("id"),
 			"type": "webauthn",
 			"label": webauthn_cred.get("label") or webauthn_cred.get("name"),
-			"cid": webauthn_cred.get("credentials_id"),
+			"cid": webauthn_cred.get("cid"),
 			"status": "active",
 			"actions": self.SupportedActions,
 			"details": {
@@ -666,6 +666,7 @@ def rest_normalize_webauthn_credential(wa_credential: dict):
 		"name": wa_credential["name"],
 		"sign_count": wa_credential["sc"],
 		"created": wa_credential["_c"],
+		"cid": wa_credential["cid"],
 	}
 	if "ll" in wa_credential:
 		normalized["last_login"] = wa_credential["ll"]
