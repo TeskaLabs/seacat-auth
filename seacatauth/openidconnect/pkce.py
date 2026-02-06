@@ -4,6 +4,7 @@ import re
 import logging
 import asab.exceptions
 
+from ..models.client import Client
 from ..models.const import OAuth2
 
 
@@ -50,11 +51,11 @@ class PKCE:
 
 	@classmethod
 	def validate_code_challenge_initialization(
-		cls, client: dict, code_challenge: str = None, requested_code_challenge_method: str = None):
+		cls, client: Client, code_challenge: str = None, requested_code_challenge_method: str = None):
 		"""
 		Validate whether the client can use the requested method in authorization
 		"""
-		expected_method = client.get("code_challenge_method", OAuth2.CodeChallengeMethod.NONE)
+		expected_method = client.code_challenge_method or OAuth2.CodeChallengeMethod.NONE
 		if requested_code_challenge_method is None:
 			# If no specific method is requested, default to the pre-configured client value
 			requested_code_challenge_method = expected_method
@@ -62,19 +63,19 @@ class PKCE:
 		# Requested method must be stronger than or equal to the expected method
 		if not OAuth2.CodeChallengeMethod.is_stronger_or_equal(requested_code_challenge_method, expected_method):
 			raise InvalidCodeChallengeMethodError(
-				client_id=client["_id"], code_challenge_method=requested_code_challenge_method)
+				client_id=client.client_id, code_challenge_method=requested_code_challenge_method)
 
 		if requested_code_challenge_method == "none":
 			if code_challenge is not None:
 				raise InvalidCodeChallengeError(
 					"Cannot use non-empty 'code_challenge' when 'code_challenge_method' is 'none'.",
-					client_id=client["_id"],
+					client_id=client.client_id,
 				)
 		else:
 			if code_challenge is None:
 				raise InvalidCodeChallengeError(
 					"Missing 'code_challenge' when 'code_challenge_method' is not 'none'.",
-					client_id=client["_id"],
+					client_id=client.client_id,
 				)
 
 		return requested_code_challenge_method

@@ -2,8 +2,12 @@ import dataclasses
 import typing
 import datetime
 import inspect
+import logging
 
 from .. import generic
+
+
+L = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,7 +29,7 @@ class Client:
 	response_types: typing.Optional[list[str]] = None
 	grant_types: typing.Optional[list[str]] = None
 	token_endpoint_auth_method: typing.Optional[str] = None
-	default_max_age: typing.Optional[typing.Union[str, int]] = None
+	default_max_age: typing.Optional[int] = None
 	code_challenge_method: typing.Optional[str] = None
 	client_id_issued_at: typing.Optional[datetime.datetime] = None
 
@@ -44,7 +48,7 @@ class Client:
 	login_uri: typing.Optional[str] = None
 	authorize_anonymous_users: typing.Optional[bool] = None
 	anonymous_cid: typing.Optional[str] = None
-	session_expiration: typing.Optional[typing.Union[str, int]] = None
+	session_expiration: typing.Optional[int] = None
 	redirect_uri_validation_method: typing.Optional[str] = None
 	seacatauth_credentials: typing.Optional[bool] = None
 	credentials_id: typing.Optional[str] = None
@@ -110,7 +114,7 @@ class Client:
 		"""
 		return self.managed_by is not None
 
-	def authenticate(self, client_secret: str) -> bool:
+	def verify_secret(self, client_secret: str) -> bool:
 		"""
 		Checks if the provided client_secret is valid and not expired.
 		Returns True if valid, False otherwise.
@@ -118,6 +122,7 @@ class Client:
 		if self.client_secret_expires_at is not None:
 			now = datetime.datetime.now(datetime.timezone.utc)
 			if now > self.client_secret_expires_at:
+				L.error("Expired client secret.", struct_data={"client_id": self.client_id})
 				return False
 		if self._client_secret is None:
 			return False

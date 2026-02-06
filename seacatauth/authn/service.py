@@ -312,7 +312,7 @@ class AuthenticationService(asab.Service):
 				continue
 
 			# All factors in a descriptor must pass for the descriptor to pass
-			authenticated = await descriptor.authenticate(login, request_data)
+			authenticated = await descriptor.verify_secret(login, request_data)
 			if authenticated:
 				login.AuthenticatedVia = descriptor.serialize()
 				L.log(

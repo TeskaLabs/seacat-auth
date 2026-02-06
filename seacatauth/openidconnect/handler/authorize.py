@@ -19,6 +19,7 @@ from ..utils import AuthErrorResponseCode, AUTHORIZE_PARAMETERS
 from ..pkce import InvalidCodeChallengeMethodError, InvalidCodeChallengeError
 from ...last_activity import EventCode
 from ...models import const
+from ...models.client import Client
 
 
 L = logging.getLogger(__name__)
@@ -295,7 +296,7 @@ class AuthorizeHandler(object):
 
 		# Authorize the client and check that all the request parameters are valid by the client's settings
 		try:
-			client_dict = await self._validate_client_options(
+			client = await self._validate_client_options(
 				client_id,
 				redirect_uri,
 				response_type=const.OAuth2.ResponseType.CODE
@@ -334,7 +335,7 @@ class AuthorizeHandler(object):
 		if auth_token_type == "openid":
 			try:
 				code_challenge_method = self.OpenIdConnectService.PKCE.validate_code_challenge_initialization(
-					client_dict, code_challenge, code_challenge_method)
+					client, code_challenge, code_challenge_method)
 			except InvalidCodeChallengeMethodError:
 				L.error("Invalid code challenge method.", struct_data={
 					"client_id": client_id, "method": code_challenge_method})
@@ -372,7 +373,7 @@ class AuthorizeHandler(object):
 			if root_session.Session.Type != "root":
 				L.error("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
 				root_session = None
-			elif root_session.is_anonymous() and not client_dict.get("authorize_anonymous_users", False):
+			elif root_session.is_anonymous() and not client.authorize_anonymous_users:
 				L.warning("Not allowed to authorize with anonymous session.", struct_data={
 					"sid": root_session.Id, "client_id": client_id})
 				root_session = None
@@ -380,7 +381,7 @@ class AuthorizeHandler(object):
 		authenticated = root_session is not None and not root_session.is_anonymous()
 		allow_anonymous = "anonymous" in requested_scope
 		if allow_anonymous:
-			if not client_dict.get("authorize_anonymous_users", False):
+			if not client.authorize_anonymous_users:
 				raise OAuthAuthorizeError(
 					AuthErrorResponseCode.InvalidScope, client_id,
 					redirect_uri=redirect_uri,
@@ -388,7 +389,7 @@ class AuthorizeHandler(object):
 					struct_data={"reason": "anonymous_access_not_allowed"})
 			granted_scope.add("anonymous")
 
-		max_age = (max_age and asab.utils.convert_to_seconds(max_age)) or client_dict.get("default_max_age")
+		max_age = (max_age and asab.utils.convert_to_seconds(max_age)) or client.default_max_age
 
 		# Check if we need to redirect to login and authenticate
 		if authenticated:
@@ -541,7 +542,7 @@ class AuthorizeHandler(object):
 				# Use client-defined expiration instead of AuthorizationCode.Expiration so that the session gets
 				# extended properly at the introspection later
 				# TODO: Revise this once cookies are moved to the token collection
-				expiration = client_dict.get("session_expiration")
+				expiration = client.session_expiration
 				new_session = await self.CookieService.create_cookie_client_session(
 					root_session, client_id, requested_scope,
 					nonce=nonce,
@@ -550,7 +551,7 @@ class AuthorizeHandler(object):
 					requested_expiration=expiration
 				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
-				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
+				redirect_uri = await self._build_cookie_entry_redirect_uri(client, redirect_uri)
 			else:
 				raise ValueError("Unexpected auth_token_type: {}".format(auth_token_type))
 
@@ -561,7 +562,7 @@ class AuthorizeHandler(object):
 			# Create algorithmic anonymous session without root
 
 			# Validate the anonymous credentials
-			anonymous_cid = client_dict.get("anonymous_cid")
+			anonymous_cid = client.anonymous_cid
 			try:
 				await self.CredentialsService.get(anonymous_cid)
 			except KeyError:
@@ -599,20 +600,20 @@ class AuthorizeHandler(object):
 
 			if auth_token_type == "openid":
 				new_session = await self.OpenIdConnectService.create_anonymous_oidc_session(
-					anonymous_cid, client_dict, requested_scope,
+					anonymous_cid, client, requested_scope,
 					tenants=[authorized_tenant] if authorized_tenant else None,
 					redirect_uri=redirect_uri,
 					from_info=from_info,
 				)
 			elif auth_token_type == "cookie":
 				new_session = await self.CookieService.create_anonymous_cookie_client_session(
-					anonymous_cid, client_dict, requested_scope,
+					anonymous_cid, client, requested_scope,
 					tenants=[authorized_tenant] if authorized_tenant else None,
 					redirect_uri=redirect_uri,
 					from_info=from_info,
 				)
 				# Cookie flow implicitly redirects to the cookie entry point and puts the final redirect_uri in the query
-				redirect_uri = await self._build_cookie_entry_redirect_uri(client_dict, redirect_uri)
+				redirect_uri = await self._build_cookie_entry_redirect_uri(client, redirect_uri)
 			else:
 				raise ValueError("Unexpected auth_token_type: {!r}".format(auth_token_type))
 
@@ -663,18 +664,18 @@ class AuthorizeHandler(object):
 			)
 
 
-	async def _validate_client_options(self, client_id, redirect_uri, response_type):
+	async def _validate_client_options(self, client_id, redirect_uri, response_type) -> Client:
 		"""
 		Verify that the requested authorization options comply with the client's configuration and permissions.
 		"""
 		try:
-			client_dict = await self.OpenIdConnectService.ClientService.get_client(client_id)
+			client = await self.OpenIdConnectService.ClientService.get_client(client_id)
 		except KeyError as e:
 			raise exceptions.ClientNotFoundError(client_id) from e
 
 		try:
 			await self.OpenIdConnectService.ClientService.validate_client_authorize_options(
-				client=client_dict,
+				client=client,
 				redirect_uri=redirect_uri,
 				response_type=response_type,
 			)
@@ -684,7 +685,7 @@ class AuthorizeHandler(object):
 			L.error("Generic client error: {}".format(e), struct_data={"client_id": client_id})
 			raise OAuthAuthorizeError(
 				AuthErrorResponseCode.InvalidRequest, client_id)
-		return client_dict
+		return client
 
 
 	async def _get_auth_token_type(self, client_id, scope):

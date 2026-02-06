@@ -65,7 +65,7 @@ class M2MIntrospectHandler(object):
 			return None
 
 		# Authenticate request
-		authenticated = await provider.authenticate(
+		authenticated = await provider.verify_secret(
 			credentials_id,
 			{"password": password}
 		)

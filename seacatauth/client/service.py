@@ -114,7 +114,7 @@ class ClientService(asab.Service):
 		limit: int = None,
 		query_filter: typing.Optional[str | typing.Dict] = None,
 		sort_by: typing.Optional[typing.List[tuple]] = None
-	):
+	) -> typing.AsyncIterator[Client]:
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -141,7 +141,7 @@ class ClientService(asab.Service):
 			yield self._deserialize_client(client)
 
 
-	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None):
+	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None) -> int:
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
@@ -170,7 +170,7 @@ class ClientService(asab.Service):
 		self, *,
 		_custom_client_id: str = None,
 		**kwargs
-	):
+	) -> str:
 		"""
 		Register a new OpenID Connect client
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientRegistration
@@ -208,7 +208,7 @@ class ClientService(asab.Service):
 		return client_id
 
 
-	async def reset_secret(self, client_id: str):
+	async def reset_secret(self, client_id: str) -> typing.Tuple[str, typing.Optional[datetime.datetime]]:
 		"""
 		Set or reset client secret
 		"""
@@ -287,7 +287,7 @@ class ClientService(asab.Service):
 		redirect_uri: str,
 		grant_type: str = None,
 		response_type: str = None,
-	):
+	) -> bool:
 		"""
 		Verify that the specified authorization parameters are valid for the client.
 		"""
@@ -304,7 +304,7 @@ class ClientService(asab.Service):
 		return True
 
 
-	async def authenticate_client_request(self, request) -> dict:
+	async def authenticate_client_request(self, request) -> Client:
 		"""
 		Verify client ID and secret.
 
@@ -350,11 +350,11 @@ class ClientService(asab.Service):
 			L.error("No client ID in request.")
 			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
-		client_dict = await self.get_client(client_id)
+		client = await self.get_client(client_id)
 
 		# Check if used authentication method matches the pre-configured one
 		expected_auth_method = (
-			client_dict.token_endpoint_auth_method or OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC)
+			client.token_endpoint_auth_method or OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC)
 		if auth_method != expected_auth_method:
 			L.error("Unexpected client authentication method.", struct_data={
 				"received_auth_method": auth_method,
@@ -368,21 +368,14 @@ class ClientService(asab.Service):
 
 		if auth_method == "none":
 			# Public client - no secret verification required
-			return client_dict
+			return client
 
 		# Check secret expiration
-		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
-		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
-			L.error("Expired client secret.", struct_data={"client_id": client_id})
-			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=client_id)
-
-		# Verify client secret
-		client_secret_hash = client_dict.get("__client_secret", None)
-		if not generic.argon2_verify(client_secret_hash, client_secret):
+		if not client.verify_secret(client_secret):
 			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
-		return client_dict
+		return client
 
 
 	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
@@ -642,20 +635,6 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
-	def _normalize_client(self, client: dict):
-		client = {**client}  # Do not modify the original client
-		client["client_id"] = client["_id"]
-		if client.get("managed_by"):
-			client["read_only"] = True
-		cookie_svc = self.App.get_service("seacatauth.CookieService")
-		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
-		if client.get("seacatauth_credentials") is True:
-			credentials_service = self.App.get_service("seacatauth.CredentialsService")
-			provider = credentials_service.CredentialProviders["client"]
-			client["credentials_id"] = provider._format_credentials_id(client["_id"])
-		return client
-
-
 	def _deserialize_client(self, db_dict: dict) -> Client:
 		"""
 		Convert a database dict to a Client object
@@ -717,8 +696,8 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 	return False
 
 
-def is_client_confidential(client: dict):
-	token_endpoint_auth_method = client.get("token_endpoint_auth_method", OAuth2.TokenEndpointAuthMethod.NONE)
+def is_client_confidential(client: Client):
+	token_endpoint_auth_method = client.token_endpoint_auth_method or OAuth2.TokenEndpointAuthMethod.NONE
 	if token_endpoint_auth_method not in OAuth2.TokenEndpointAuthMethod:
 		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
 
@@ -728,39 +707,8 @@ def is_client_confidential(client: dict):
 		return True
 
 
-def assert_client_is_editable(client: dict):
-	if client.get("read_only"):
+def assert_client_is_editable(client: Client):
+	if client.is_read_only():
 		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
 		raise exceptions.NotEditableError("Client is not editable.")
 	return True
-
-
-def _validate_client_attributes(client_dict: dict):
-	"""
-	Validate client attributes.
-	"""
-	for k, v in client_dict.items():
-		if k not in schema.CLIENT_METADATA_SCHEMA:
-			raise asab.exceptions.ValidationError("Unexpected attribute: {!r}".format(k))
-
-		if k == "grant_types":
-			for grant_type in v:
-				if grant_type not in OAuth2.GrantType:
-					raise asab.exceptions.ValidationError("Invalid grant_type: {!r}".format(grant_type))
-
-		elif k == "response_types":
-			for response_type in v:
-				if response_type not in OAuth2.ResponseType:
-					raise asab.exceptions.ValidationError("Invalid response_type: {!r}".format(response_type))
-
-		elif k == "application_type":
-			if v not in OAuth2.ApplicationType:
-				raise asab.exceptions.ValidationError("Invalid application_type: {!r}".format(v))
-
-		elif k == "token_endpoint_auth_method":
-			if v not in OAuth2.TokenEndpointAuthMethod:
-				raise asab.exceptions.ValidationError("Invalid token_endpoint_auth_method: {!r}".format(v))
-
-		elif k == "redirect_uri_validation_method":
-			if v not in OAuth2.RedirectUriValidationMethod:
-				raise asab.exceptions.ValidationError("Invalid redirect_uri_validation_method: {!r}".format(v))
