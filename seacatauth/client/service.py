@@ -150,17 +150,14 @@ class ClientService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def get_client(self, client_id: str, normalize: bool = True):
+	async def get_client(self, client_id: str, normalize: bool = True) -> Client:
 		"""
 		Get client metadata
 		"""
 		# Try to get client from cache
 		client = self._get_from_cache(client_id)
 		if client:
-			if normalize:
-				return self._normalize_client(client)
-			else:
-				return client
+			return client
 
 		# Get from the database
 		client = await self.StorageService.get(self.ClientCollection, client_id)
@@ -286,7 +283,7 @@ class ClientService(asab.Service):
 
 	async def validate_client_authorize_options(
 		self,
-		client: dict,
+		client: Client,
 		redirect_uri: str,
 		grant_type: str = None,
 		response_type: str = None,
@@ -295,14 +292,14 @@ class ClientService(asab.Service):
 		Verify that the specified authorization parameters are valid for the client.
 		"""
 		if not self.OIDCService.DisableRedirectUriValidation and not validate_redirect_uri(
-			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
-			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
+			redirect_uri, client.redirect_uris, client.redirect_uri_validation_method):
+			raise exceptions.InvalidRedirectURI(client_id=client.client_id, redirect_uri=redirect_uri)
 
-		if grant_type is not None and grant_type not in client["grant_types"]:
-			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
+		if grant_type is not None and grant_type not in client.grant_types:
+			raise exceptions.ClientError(client_id=client.client_id, grant_type=grant_type)
 
-		if response_type not in client["response_types"]:
-			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
+		if response_type not in client.response_types:
+			raise exceptions.ClientError(client_id=client.client_id, response_type=response_type)
 
 		return True
 
@@ -356,10 +353,8 @@ class ClientService(asab.Service):
 		client_dict = await self.get_client(client_id)
 
 		# Check if used authentication method matches the pre-configured one
-		expected_auth_method = client_dict.get(
-			"token_endpoint_auth_method",
-			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
-		)
+		expected_auth_method = (
+			client_dict.token_endpoint_auth_method or OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC)
 		if auth_method != expected_auth_method:
 			L.error("Unexpected client authentication method.", struct_data={
 				"received_auth_method": auth_method,

@@ -236,7 +236,7 @@ class AuthenticationHandler(object):
 			client_svc = self.App.get_service("seacatauth.ClientService")
 			try:
 				client = await client_svc.get_client(login_session.ClientId)
-				cookie_domain = client.get("cookie_domain")
+				cookie_domain = client.cookie_domain
 			except KeyError:
 				L.error("Client not found.", struct_data={"client_id": login_session.ClientId})
 		if cookie_domain is None:
@@ -396,7 +396,7 @@ class AuthenticationHandler(object):
 		client_service = self.AuthenticationService.App.get_service("seacatauth.ClientService")
 		try:
 			client = await client_service.get_client(client_id)
-			login_key = client.get("login_key")
+			login_key = client.login_key
 		except KeyError:
 			login_key = None
 		return login_key

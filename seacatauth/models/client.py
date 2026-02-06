@@ -48,6 +48,7 @@ class Client:
 	redirect_uri_validation_method: typing.Optional[str] = None
 	seacatauth_credentials: typing.Optional[bool] = None
 	credentials_id: typing.Optional[str] = None
+	login_key: typing.Optional[str] = None  # TODO
 
 	# Any extra fields not explicitly listed
 	extra: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
@@ -63,14 +64,14 @@ class Client:
 		return self._raw[key]
 
 	# TEMPORARY
-	def get(self, item):
+	def get(self, __key, __default=None):
 		frame = inspect.currentframe()
 		outer_frames = inspect.getouterframes(frame)
 		# The caller is at index 1
 		if len(outer_frames) > 1:
 			caller = outer_frames[1]
 			print(f"Client.get called from File \"{caller.filename}\", line {caller.lineno}")
-		return self._raw.get(item)
+		return self._raw.get(__key, __default)
 
 	# TEMPORARY
 	def items(self):
