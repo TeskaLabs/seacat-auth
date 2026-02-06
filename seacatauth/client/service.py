@@ -1,5 +1,6 @@
 import base64
 import binascii
+import dataclasses
 import datetime
 import logging
 import re
@@ -17,6 +18,7 @@ from .. import generic
 from ..events import EventTypes
 from ..models import Session
 from ..models.const import OAuth2, ResourceId
+from ..models.client import Client
 from . import schema
 
 
@@ -136,9 +138,7 @@ class ClientService(asab.Service):
 			cursor.limit(limit)
 
 		async for client in cursor:
-			if "__client_secret" in client:
-				client.pop("__client_secret")
-			yield self._normalize_client(client)
+			yield self._deserialize_client(client)
 
 
 	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None):
@@ -164,12 +164,9 @@ class ClientService(asab.Service):
 
 		# Get from the database
 		client = await self.StorageService.get(self.ClientCollection, client_id)
+		client = self._deserialize_client(client)
 		self._store_in_cache(client_id, client)
-
-		if normalize:
-			return self._normalize_client(client)
-		else:
-			return client
+		return client
 
 
 	async def create_client(
@@ -662,6 +659,40 @@ class ClientService(asab.Service):
 			provider = credentials_service.CredentialProviders["client"]
 			client["credentials_id"] = provider._format_credentials_id(client["_id"])
 		return client
+
+
+	def _deserialize_client(self, db_dict: dict) -> Client:
+		"""
+		Convert a database dict to a Client object
+		"""
+		# Known Client fields
+		client_fields = {f.name for f in dataclasses.fields(Client)}
+		kwargs = {}
+		extra = {}
+		for k, v in db_dict.items():
+			if k in client_fields:
+				kwargs[k] = v
+			elif k == "__client_secret":
+				kwargs["_client_secret"] = v
+			else:
+				extra[k] = v
+
+		print("DEBUG extra", extra)
+		kwargs["extra"] = extra
+
+		# Add generated fields
+		kwargs["client_id"] = db_dict["_id"]
+		kwargs["client_id_issued_at"] = db_dict["_c"]
+		cookie_svc = self.App.get_service("seacatauth.CookieService")
+		kwargs["cookie_name"] = cookie_svc.get_cookie_name(db_dict["_id"])
+		if db_dict.get("seacatauth_credentials") is True:
+			credentials_service = self.App.get_service("seacatauth.CredentialsService")
+			provider = credentials_service.CredentialProviders["client"]
+			kwargs["credentials_id"] = provider._format_credentials_id(db_dict["_id"])
+
+		# TEMPORARY
+		kwargs["_raw"] = db_dict
+		return Client(**kwargs)
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):

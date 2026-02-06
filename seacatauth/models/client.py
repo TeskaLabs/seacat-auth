@@ -1,12 +1,15 @@
 import dataclasses
 import typing
 import datetime
+import inspect
 
 from .. import generic
 
 
 @dataclasses.dataclass(frozen=True)
 class Client:
+	_raw: dict  # TEMPORARY. Original raw data from the database, used for integrity checks and updates. Not included in serialization.
+
 	# MongoDB metadata fields
 	_id: str
 	_v: int
@@ -15,7 +18,7 @@ class Client:
 
 	# Canonical OAuth/OIDC attributes
 	client_id: str
-	client_name: str
+	client_name: typing.Optional[str] = None
 	client_uri: typing.Optional[str] = None
 	redirect_uris: typing.Optional[list[str]] = None
 	application_type: typing.Optional[str] = None
@@ -24,9 +27,10 @@ class Client:
 	token_endpoint_auth_method: typing.Optional[str] = None
 	default_max_age: typing.Optional[typing.Union[str, int]] = None
 	code_challenge_method: typing.Optional[str] = None
+	client_id_issued_at: typing.Optional[datetime.datetime] = None
 
 	# Secret and metadata
-	__client_secret: typing.Optional[str] = None
+	_client_secret: typing.Optional[str] = None
 	client_secret_expires_at: typing.Optional[datetime.datetime] = None
 	client_secret_updated_at: typing.Optional[datetime.datetime] = None
 
@@ -47,6 +51,46 @@ class Client:
 
 	# Any extra fields not explicitly listed
 	extra: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+
+	# TEMPORARY
+	def __getitem__(self, key):
+		frame = inspect.currentframe()
+		outer_frames = inspect.getouterframes(frame)
+		# The caller is at index 1
+		if len(outer_frames) > 1:
+			caller = outer_frames[1]
+			print(f"Client.__getitem__ called from File \"{caller.filename}\", line {caller.lineno}")
+		return self._raw[key]
+
+	# TEMPORARY
+	def get(self, item):
+		frame = inspect.currentframe()
+		outer_frames = inspect.getouterframes(frame)
+		# The caller is at index 1
+		if len(outer_frames) > 1:
+			caller = outer_frames[1]
+			print(f"Client.get called from File \"{caller.filename}\", line {caller.lineno}")
+		return self._raw.get(item)
+
+	# TEMPORARY
+	def items(self):
+		frame = inspect.currentframe()
+		outer_frames = inspect.getouterframes(frame)
+		# The caller is at index 1
+		if len(outer_frames) > 1:
+			caller = outer_frames[1]
+			print(f"Client.items called from File \"{caller.filename}\", line {caller.lineno}")
+		return self._raw.items()
+
+	# TEMPORARY
+	def __iter__(self):
+		frame = inspect.currentframe()
+		outer_frames = inspect.getouterframes(frame)
+		# The caller is at index 1
+		if len(outer_frames) > 1:
+			caller = outer_frames[1]
+			print(f"Client.__iter__ called from File \"{caller.filename}\", line {caller.lineno}")
+		return self._raw.__iter__()
 
 	def is_oauth2_client(self) -> bool:
 		"""
@@ -74,9 +118,9 @@ class Client:
 			now = datetime.datetime.now(datetime.timezone.utc)
 			if now > self.client_secret_expires_at:
 				return False
-		if self.__client_secret is None:
+		if self._client_secret is None:
 			return False
-		return generic.argon2_verify(client_secret, self.__client_secret)
+		return generic.argon2_verify(client_secret, self._client_secret)
 
 	def rest_serialize(self) -> dict:
 		"""
@@ -84,10 +128,14 @@ class Client:
 		"""
 		result = {}
 		for k, v in dataclasses.asdict(self).items():
+			if k == "__raw":
+				continue
 			if k == "__client_secret":
 				result["client_secret"] = v is not None
 				continue
 			if v is None:
 				continue
 			result[k] = v
+		if self.is_read_only():
+			result["read_only"] = True
 		return result
