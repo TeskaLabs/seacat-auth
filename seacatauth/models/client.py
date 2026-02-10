@@ -1,7 +1,6 @@
 import dataclasses
 import typing
 import datetime
-import inspect
 import logging
 
 from .. import generic
@@ -59,42 +58,18 @@ class Client:
 
 	# TEMPORARY
 	def __getitem__(self, key):
-		frame = inspect.currentframe()
-		outer_frames = inspect.getouterframes(frame)
-		# The caller is at index 1
-		if len(outer_frames) > 1:
-			caller = outer_frames[1]
-			print(f"Client.__getitem__ called from File \"{caller.filename}\", line {caller.lineno}")
 		return self._raw[key]
 
 	# TEMPORARY
 	def get(self, __key, __default=None):
-		frame = inspect.currentframe()
-		outer_frames = inspect.getouterframes(frame)
-		# The caller is at index 1
-		if len(outer_frames) > 1:
-			caller = outer_frames[1]
-			print(f"Client.get called from File \"{caller.filename}\", line {caller.lineno}")
 		return self._raw.get(__key, __default)
 
 	# TEMPORARY
 	def items(self):
-		frame = inspect.currentframe()
-		outer_frames = inspect.getouterframes(frame)
-		# The caller is at index 1
-		if len(outer_frames) > 1:
-			caller = outer_frames[1]
-			print(f"Client.items called from File \"{caller.filename}\", line {caller.lineno}")
 		return self._raw.items()
 
 	# TEMPORARY
 	def __iter__(self):
-		frame = inspect.currentframe()
-		outer_frames = inspect.getouterframes(frame)
-		# The caller is at index 1
-		if len(outer_frames) > 1:
-			caller = outer_frames[1]
-			print(f"Client.__iter__ called from File \"{caller.filename}\", line {caller.lineno}")
 		return self._raw.__iter__()
 
 	def is_oauth2_client(self) -> bool:
