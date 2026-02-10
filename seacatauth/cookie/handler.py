@@ -11,6 +11,7 @@ import asab.exceptions
 
 from .. import exceptions, AuditLogger
 from .. import generic
+from ..models.client import Client
 from ..models.const import OAuth2
 from ..openidconnect.utils import TokenRequestErrorResponseCode
 
@@ -218,7 +219,7 @@ class CookieHandler(object):
 			return aiohttp.web.HTTPBadRequest()
 
 		# Get anonymous_cid from client
-		anonymous_cid = client.get("anonymous_cid")
+		anonymous_cid = client.anonymous_cid
 		if anonymous_cid is None:
 			L.error("Client has no 'anonymous_cid' configured.", struct_data={"client_id": client_id})
 			return aiohttp.web.HTTPBadRequest()
@@ -260,7 +261,7 @@ class CookieHandler(object):
 				L.exception("Introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 
-		cookie_domain = client.get("cookie_domain") or None
+		cookie_domain = client.cookie_domain or None
 
 		if response.status_code != 200:
 			self.CookieService.delete_session_cookie(response, client_id)
@@ -438,7 +439,7 @@ class CookieHandler(object):
 			redirect_uri = parameters["redirect_uri"]
 		else:
 			# Fallback to client URI or Auth UI
-			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl.rstrip("/")
+			redirect_uri = client.client_uri or self.CookieService.AuthWebUiBaseUrl.rstrip("/")
 
 		# Set track ID if not set yet
 		if session.TrackId is None:
@@ -481,8 +482,8 @@ class CookieHandler(object):
 		session = await self.CookieService.extend_session_expiration(session, client)
 
 		# Construct the response
-		if client.get("cookie_domain") not in (None, ""):
-			cookie_domain = client["cookie_domain"]
+		if client.cookie_domain not in (None, ""):
+			cookie_domain = client.cookie_domain
 		else:
 			cookie_domain = self.CookieService.RootCookieDomain
 
@@ -565,7 +566,7 @@ class CookieHandler(object):
 				return None
 
 		# Validate authentication time if requested
-		max_age = client.get("default_max_age") or None
+		max_age = client.default_max_age
 		if "max_age" in request.query:
 			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
 		if max_age is not None:
@@ -586,7 +587,7 @@ class CookieHandler(object):
 		return session
 
 
-	async def _fetch_webhook_data(self, client, session):
+	async def _fetch_webhook_data(self, client: Client, session):
 		"""
 		Make a webhook request and return the response body.
 		The response should match the following schema:
@@ -602,7 +603,7 @@ class CookieHandler(object):
 		}
 		```
 		"""
-		cookie_webhook_uri = client.get("cookie_webhook_uri")
+		cookie_webhook_uri = client.cookie_webhook_uri
 		if cookie_webhook_uri is None:
 			return None
 		async with aiohttp.ClientSession() as http_session:

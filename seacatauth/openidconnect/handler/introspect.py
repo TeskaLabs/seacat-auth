@@ -120,7 +120,7 @@ class TokenIntrospectionHandler(object):
 			return None
 
 		# Validate client if requested
-		client = {}
+		client = None
 		client_id = request.query.get("client_id")
 		if client_id is not None:
 			try:
@@ -138,7 +138,7 @@ class TokenIntrospectionHandler(object):
 				return None
 
 		# Validate authentication time if requested
-		max_age = client.get("default_max_age") or None
+		max_age = client.default_max_age if client_id is not None else None
 		if "max_age" in request.query:
 			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
 		if max_age is not None:

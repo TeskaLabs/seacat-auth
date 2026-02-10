@@ -10,6 +10,7 @@ import asab.exceptions
 
 from .. import exceptions
 from ..models import Session
+from ..models.client import Client
 
 from ..models.session import CookieData
 from ..session.builders import cookie_session_builder
@@ -169,7 +170,7 @@ class CookieService(asab.Service):
 
 
 	async def create_anonymous_cookie_client_session(
-		self, anonymous_cid: str, client_dict: dict, scope: list,
+		self, anonymous_cid: str, client: Client, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
 		redirect_uri: str = None,
@@ -183,27 +184,27 @@ class CookieService(asab.Service):
 		session = await session_svc.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
-			client_dict=client_dict,
+			client=client,
 			scope=scope,
 			redirect_uri=redirect_uri,
 		)
 
 		session.Cookie = CookieData(
 			Id=session_svc.Algorithmic.serialize(session),
-			Domain=client_dict.get("cookie_domain") or None)
+			Domain=client.cookie_domain)
 
 		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
 			"anonymous": True,
 			"cid": anonymous_cid,
-			"client_id": client_dict["_id"],
+			"client_id": client.client_id,
 			"track_id": track_id,
 			"fi": from_info})
 
 		return session
 
 
-	async def extend_session_expiration(self, session: Session, client: dict = None):
-		expiration = client.get("session_expiration") if client else None
+	async def extend_session_expiration(self, session: Session, client: Client | None = None):
+		expiration = client.session_expiration if client else None
 		if expiration:
 			expiration = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
 		else:

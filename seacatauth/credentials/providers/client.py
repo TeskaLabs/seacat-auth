@@ -82,7 +82,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		except KeyError as e:
 			raise exceptions.CredentialsNotFoundError(credentials_id) from e
 
-		if client.get("seacatauth_credentials", False) is False:
+		if client.seacatauth_credentials is not True:
 			L.debug("Client does not have SeaCat Auth credentials enabled.", struct_data={"client_id": client_id})
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 

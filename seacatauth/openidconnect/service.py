@@ -13,6 +13,7 @@ import jwcrypto.jwt
 import jwcrypto.jwk
 import jwcrypto.jws
 
+from ..models.client import Client
 from ..models.const import ResourceId
 from ..generic import update_url_query_params
 from ..models import Session, const
@@ -225,7 +226,7 @@ class OpenIdConnectService(asab.Service):
 
 
 	async def create_anonymous_oidc_session(
-		self, anonymous_cid: str, client_dict: dict, scope: list,
+		self, anonymous_cid: str, client: Client, scope: list,
 		track_id: bytes = None,
 		tenants: list = None,
 		redirect_uri: list = None,
@@ -234,7 +235,7 @@ class OpenIdConnectService(asab.Service):
 		session = await self.SessionService.Algorithmic.create_anonymous_session(
 			created_at=datetime.datetime.now(datetime.timezone.utc),
 			track_id=track_id,
-			client_dict=client_dict,
+			client=client,
 			scope=scope,
 			redirect_uri=redirect_uri,
 		)
@@ -400,13 +401,13 @@ class OpenIdConnectService(asab.Service):
 		return tenants
 
 
-	def build_authorize_uri(self, client_dict: dict, **query_params):
+	def build_authorize_uri(self, client: Client, **query_params):
 		"""
 		Check if the client has a registered OAuth Authorize URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
 		# TODO: This should be removed. There must be only one authorize endpoint.
-		authorize_uri = client_dict.get("authorize_uri")
+		authorize_uri = client.authorize_uri
 		if authorize_uri is None:
 			authorize_uri = "{}{}".format(self.PublicApiBaseUrl, self.AuthorizePath.lstrip("/"))
 		return update_url_query_params(authorize_uri, **{k: v for k, v in query_params.items() if v is not None})
@@ -462,7 +463,7 @@ class OpenIdConnectService(asab.Service):
 		# Determine the desired access and refresh token expiration time
 		client_id = session.OAuth2.ClientId
 		client = await self.ClientService.get_client(client_id)
-		access_token_expiration = client.get("session_expiration") or AccessToken.Expiration
+		access_token_expiration = client.session_expiration or AccessToken.Expiration
 		access_token_expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
 			seconds=access_token_expiration)
 

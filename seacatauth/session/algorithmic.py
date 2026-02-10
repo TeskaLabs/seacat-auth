@@ -12,6 +12,7 @@ import asab.metrics
 from ..models import Session
 from .. import exceptions
 from ..authz import build_credentials_authz
+from ..models.client import Client
 
 
 L = logging.getLogger(__name__)
@@ -57,15 +58,15 @@ class AlgorithmicSessionProvider:
 
 
 	async def create_anonymous_session(
-		self, created_at, track_id, client_dict, scope,
+		self, created_at, track_id, client: Client, scope,
 		redirect_uri: str = None
 	) -> Session:
-		session = await self._build_anonymous_session(created_at, track_id, client_dict, scope, redirect_uri)
+		session = await self._build_anonymous_session(created_at, track_id, client, scope, redirect_uri)
 		self.AnonymousSessionCounter.add("sessions", 1)
 		return session
 
 	async def _build_anonymous_session(
-		self, created_at, track_id, client_dict, scope,
+		self, created_at, track_id, client: Client, scope,
 		redirect_uri: str = None
 	) -> Session:
 		session_dict = {
@@ -74,12 +75,12 @@ class AlgorithmicSessionProvider:
 			Session.FN.CreatedAt: created_at,
 			Session.FN.ModifiedAt: created_at,
 			Session.FN.Session.TrackId: track_id,
-			Session.FN.OAuth2.ClientId: client_dict["_id"],
+			Session.FN.OAuth2.ClientId: client.client_id,
 			Session.FN.OAuth2.Scope: scope,
-			Session.FN.Credentials.Id: client_dict["anonymous_cid"],
+			Session.FN.Credentials.Id: client.anonymous_cid,
 			Session.FN.Authentication.IsAnonymous: True,
 		}
-		await self._add_session_authz(session_dict, client_dict["anonymous_cid"], scope)
+		await self._add_session_authz(session_dict, client.anonymous_cid, scope)
 		return Session(session_dict)
 
 
@@ -123,12 +124,12 @@ class AlgorithmicSessionProvider:
 			raise exceptions.SessionNotFoundError("Expired algorithmic session token.") from e
 
 		data_dict = json.loads(token.claims)
-		client_dict = await self.ClientService.get_client(data_dict["azp"])
+		client = await self.ClientService.get_client(data_dict["azp"])
 		try:
 			session = await self._build_anonymous_session(
 				created_at=datetime.datetime.fromtimestamp(data_dict["iat"], datetime.timezone.utc),
 				track_id=uuid.UUID(data_dict["track_id"]).bytes,
-				client_dict=client_dict,
+				client=client,
 				scope=data_dict["scope"])
 		except Exception as e:
 			L.error(
