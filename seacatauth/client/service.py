@@ -295,10 +295,10 @@ class ClientService(asab.Service):
 			redirect_uri, client.redirect_uris, client.redirect_uri_validation_method):
 			raise exceptions.InvalidRedirectURI(client_id=client.client_id, redirect_uri=redirect_uri)
 
-		if grant_type is not None and grant_type not in client.grant_types:
+		if grant_type is not None and grant_type not in (client.grant_types or []):
 			raise exceptions.ClientError(client_id=client.client_id, grant_type=grant_type)
 
-		if response_type not in client.response_types:
+		if response_type not in (client.response_types or []):
 			raise exceptions.ClientError(client_id=client.client_id, response_type=response_type)
 
 		return True
@@ -668,15 +668,22 @@ class ClientService(asab.Service):
 		return Client(**kwargs)
 
 
-def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
+def validate_redirect_uri(redirect_uri: str, registered_uris: list | None, validation_method: str = "full_match"):
 	if validation_method is None:
+		# Default to full match if not specified
 		validation_method = "full_match"
 
 	if validation_method == "full_match":
+		if registered_uris is None:
+			L.error("Redirect URI validation method is 'full_match' but no redirect URIs are registered.")
+			return False
 		# Redirect URI must exactly match one of the registered URIs
 		if redirect_uri in registered_uris:
 			return True
 	elif validation_method == "prefix_match":
+		if registered_uris is None:
+			L.error("Redirect URI validation method is 'full_match' but no redirect URIs are registered.")
+			return False
 		# Redirect URI must start with one of the registered URIs and their netloc must match
 		for registered_uri in registered_uris:
 			if redirect_uri == registered_uri:

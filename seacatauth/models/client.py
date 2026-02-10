@@ -101,7 +101,7 @@ class Client:
 				return False
 		if self._client_secret is None:
 			return False
-		return generic.argon2_verify(client_secret, self._client_secret)
+		return generic.argon2_verify(hash=self._client_secret, secret=client_secret)
 
 	def rest_serialize(self) -> dict:
 		"""
@@ -109,10 +109,13 @@ class Client:
 		"""
 		result = {}
 		for k, v in dataclasses.asdict(self).items():
-			if k == "__raw":
-				continue
-			if k == "__client_secret":
-				result["client_secret"] = v is not None
+			if k.startswith("_"):
+				if k in ("_id", "_v", "_c", "_m"):
+					result[k] = v
+				elif k == "_raw":
+					pass
+				elif k == "_client_secret":
+					result["client_secret"] = v is not None
 				continue
 			if v is None:
 				continue
