@@ -640,15 +640,15 @@ class AuthorizeHandler(object):
 			from_info=from_info
 		)
 
-	async def _build_cookie_entry_redirect_uri(self, client_dict, redirect_uri):
+	async def _build_cookie_entry_redirect_uri(self, client: Client, redirect_uri):
 		"""
 		Get the client's configured cookie entry URI and extend it with relevant authorization parameters.
 		"""
-		cookie_entry_uri = client_dict.get("cookie_entry_uri")
+		cookie_entry_uri = client.cookie_entry_uri
 		if cookie_entry_uri is None:
-			L.error("Client has no cookie_entry_uri configured.", struct_data={"client_id": client_dict["_id"]})
+			L.error("Client has no cookie_entry_uri configured.", struct_data={"client_id": client.client_id})
 			raise OAuthAuthorizeError(
-				AuthErrorResponseCode.InvalidRequest, client_dict["_id"],
+				AuthErrorResponseCode.InvalidRequest, client.client_id,
 				redirect_uri=redirect_uri,
 				struct_data={"reason": "cookie_entry_uri_not_configured"}
 			)
@@ -657,7 +657,7 @@ class AuthorizeHandler(object):
 			return "{}?{}".format(
 				cookie_entry_uri,
 				urllib.parse.urlencode([
-					("client_id", client_dict["_id"]),  # TODO: Remove, this should be a client responsibility
+					("client_id", client.client_id),  # TODO: Remove, this should be a client responsibility
 					("grant_type", const.OAuth2.GrantType.AUTHORIZATION_CODE),  # TODO: Remove, this should be a client responsibility
 					("redirect_uri", redirect_uri)],
 				)
@@ -807,11 +807,11 @@ class AuthorizeHandler(object):
 		Pass on the query parameters.
 		"""
 		# Get client collection
-		client_dict = await self.OpenIdConnectService.ClientService.get_client(client_id)
+		client = await self.OpenIdConnectService.ClientService.get_client(client_id)
 
 		# Build redirect uri
 		callback_uri = self.OpenIdConnectService.build_authorize_uri(
-			client_dict=client_dict,
+			client=client,
 			client_id=client_id,
 			response_type=response_type,
 			scope=" ".join(scope),
@@ -823,7 +823,7 @@ class AuthorizeHandler(object):
 		login_query_params = [
 			("redirect_uri", callback_uri),
 			("client_id", client_id)]
-		login_url = self._build_login_uri(client_dict, login_query_params)
+		login_url = self._build_login_uri(client, login_query_params)
 		# Custom 302 response to work around aiohttp.web.HTTPFound's Location header un/quoting issue
 		response = aiohttp.web.Response(
 			status=302,
@@ -854,9 +854,9 @@ class AuthorizeHandler(object):
 		))
 
 		# Gather params which will be passed to the oidc/authorize request called after the OTP setup
-		client_dict = await self.OpenIdConnectService.ClientService.get_client(client_id)
+		client = await self.OpenIdConnectService.ClientService.get_client(client_id)
 		callback_uri = self.OpenIdConnectService.build_authorize_uri(
-			client_dict=client_dict,
+			client=client,
 			client_id=client_id,
 			response_type=response_type,
 			scope=scope,
@@ -945,12 +945,12 @@ class AuthorizeHandler(object):
 		})
 
 
-	def _build_login_uri(self, client_dict, login_query_params):
+	def _build_login_uri(self, client: Client, login_query_params):
 		"""
 		Check if the client has a registered login URI. If not, use the default.
 		Extend the URI with query parameters.
 		"""
-		login_uri = client_dict.get("login_uri")
+		login_uri = client.login_uri
 		if login_uri is None:
 			login_uri = "{}{}".format(self.AuthWebuiBaseUrl, self.LoginPath)
 

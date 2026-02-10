@@ -6,6 +6,7 @@ import asab.web.tenant
 import asab.exceptions
 
 from .. import generic, exceptions
+from ..models.client import Client
 from ..models.const import ResourceId
 from .service import is_client_confidential
 from . import schema
@@ -309,17 +310,3 @@ class ClientHandler(object):
 				data={"result": "ERROR", "tech_err": "Client not found."}
 			)
 		return asab.web.rest.json_response(request, {"result": "OK"})
-
-
-	def _rest_normalize(self, client: dict):
-		rest_data = {
-			k: v
-			for k, v in client.items()
-			if not k.startswith("__")
-		}
-		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
-		if "__client_secret" in client:
-			rest_data["client_secret"] = True
-			if "client_secret_expires_at" in rest_data:
-				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
-		return rest_data

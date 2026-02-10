@@ -252,12 +252,12 @@ class TokenHandler(object):
 	async def _refresh_token_grant(
 		self,
 		request: aiohttp.web.Request,
-		client: dict,
+		client: Client,
 		from_ip: list
 	) -> aiohttp.web.Response:
 
 		form_data = await request.post()
-		client_id = client["_id"]
+		client_id = client.client_id
 
 		# Get session by refresh token
 		try:
@@ -318,12 +318,12 @@ class TokenHandler(object):
 	async def _client_credentials_grant(
 		self,
 		request: aiohttp.web.Request,
-		client: dict,
+		client: Client,
 		from_ip: list
 	) -> aiohttp.web.Response:
 
 		form_data = await request.post()
-		client_id = client["_id"]
+		client_id = client.client_id
 
 		if "scope" not in form_data:
 			AuditLogger.log(

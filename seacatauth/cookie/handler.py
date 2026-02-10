@@ -439,7 +439,7 @@ class CookieHandler(object):
 			redirect_uri = parameters["redirect_uri"]
 		else:
 			# Fallback to client URI or Auth UI
-			redirect_uri = client.get("client_uri") or self.CookieService.AuthWebUiBaseUrl.rstrip("/")
+			redirect_uri = client.client_uri or self.CookieService.AuthWebUiBaseUrl.rstrip("/")
 
 		# Set track ID if not set yet
 		if session.TrackId is None:
@@ -482,8 +482,8 @@ class CookieHandler(object):
 		session = await self.CookieService.extend_session_expiration(session, client)
 
 		# Construct the response
-		if client.get("cookie_domain") not in (None, ""):
-			cookie_domain = client["cookie_domain"]
+		if client.cookie_domain not in (None, ""):
+			cookie_domain = client.cookie_domain
 		else:
 			cookie_domain = self.CookieService.RootCookieDomain
 
@@ -566,7 +566,7 @@ class CookieHandler(object):
 				return None
 
 		# Validate authentication time if requested
-		max_age = client.get("default_max_age") or None
+		max_age = client.default_max_age
 		if "max_age" in request.query:
 			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
 		if max_age is not None:

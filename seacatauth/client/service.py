@@ -215,7 +215,7 @@ class ClientService(asab.Service):
 		# TODO: Use M2M credentials provider.
 		client = await self.get_client(client_id)
 		assert_client_is_editable(client)
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client._v)
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		client_secret_hash = generic.argon2_hash(client_secret)
 		upsertor.set("__client_secret", client_secret_hash)
@@ -247,7 +247,7 @@ class ClientService(asab.Service):
 		self._check_redirect_uris(**client_update)
 		self._check_grant_types(**client_update)
 
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client._v)
 
 		for k, v in client_update.items():
 			if k not in schema.CLIENT_METADATA_SCHEMA:
@@ -709,6 +709,6 @@ def is_client_confidential(client: Client):
 
 def assert_client_is_editable(client: Client):
 	if client.is_read_only():
-		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
+		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client.client_id})
 		raise exceptions.NotEditableError("Client is not editable.")
 	return True
