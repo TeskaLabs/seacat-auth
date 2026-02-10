@@ -651,7 +651,6 @@ class ClientService(asab.Service):
 			else:
 				extra[k] = v
 
-		print("DEBUG extra", extra)
 		kwargs["extra"] = extra
 
 		# Add generated fields
