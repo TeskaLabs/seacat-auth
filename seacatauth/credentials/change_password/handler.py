@@ -66,7 +66,7 @@ class ChangePasswordHandler(object):
 		from_ip = generic.get_request_access_ips(request)
 
 		# Authenticate with the old password
-		authenticated = await self.CredentialsService.verify_secret(
+		authenticated = await self.CredentialsService.authenticate(
 			credentials_id, {"password": old_password})
 		if not authenticated:
 			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: Authentication failed", struct_data={

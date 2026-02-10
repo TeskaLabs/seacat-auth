@@ -187,7 +187,7 @@ class AuthenticationHandler(object):
 
 		access_ips = generic.get_request_access_ips(request)
 
-		authenticated = await self.AuthenticationService.verify_secret(login_session, request_data)
+		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
 			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
