@@ -83,12 +83,12 @@ class ClientHandler(object):
 		async for client in self.ClientService.iterate_clients(
 			page=int(request.query.get("p", 1)) - 1,
 			limit=int(request.query["i"]) if "i" in request.query else None,
-			query_filter=request.query.get("f", None),
+			substring_filter=request.query.get("f", None),
 			sort_by=[("client_name", 1)]
 		):
 			data.append(self._rest_normalize(client))
 
-		count = await self.ClientService.count_clients(request.query.get("f", None))
+		count = await self.ClientService.count_clients(substring_filter=request.query.get("f", None))
 
 		return asab.web.rest.json_response(request, {
 			"data": data,

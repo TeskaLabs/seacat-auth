@@ -55,7 +55,7 @@ class MongoDBClientProvider(ClientProviderABC):
 		limit: int = None,
 		substring_filter: str | None = None,
 		attribute_filter: dict | None = None,
-		sort_by: tuple | None = None,
+		sort_by: list[tuple] | None = None,
 	):
 		coll = await self.StorageService.collection(self.CollectionName)
 		query = {}
@@ -65,15 +65,18 @@ class MongoDBClientProvider(ClientProviderABC):
 			query.update(attribute_filter)
 		cursor = coll.find(query)
 		if sort_by:
-			field, direction = sort_by
-			pymongo_dir = pymongo.ASCENDING if direction == "a" else pymongo.DESCENDING
-			if field == "client_name":
-				cursor = cursor.collation({"locale": "en"})
-			cursor = cursor.sort(field, pymongo_dir)
+			field, direction = sort_by[0]  # TODO: support multiple sort fields
+		else:
+			field, direction = "client_name", "a"
+		pymongo_dir = pymongo.ASCENDING if direction == "a" else pymongo.DESCENDING
+		if field == "client_name":
+			cursor = cursor.collation({"locale": "en"})
+		cursor = cursor.sort(field, pymongo_dir)
 		if limit is not None:
 			cursor = cursor.skip(limit * page).limit(limit)
-		async for client in cursor:
-			yield client
+		async for client_dict in cursor:
+			self._add_provider_attributes(client_dict)
+			yield client_dict
 
 
 	async def count_clients(
@@ -107,6 +110,7 @@ class MongoDBClientProvider(ClientProviderABC):
 
 	async def get_client(self, client_id: str) -> dict:
 		client_dict = await self.StorageService.get(self.CollectionName, client_id)
+		client_dict = self._add_provider_attributes(client_dict)
 		return client_dict
 
 
@@ -134,3 +138,9 @@ class MongoDBClientProvider(ClientProviderABC):
 		result = await coll.delete_one({"_id": client_id})
 		if result.deleted_count == 0:
 			raise KeyError(client_id)
+
+
+	def _add_provider_attributes(self, client_dict: dict) -> dict:
+		client_dict["_provider_id"] = self.ProviderId
+		client_dict["read_only"] = not self.Editable
+		return client_dict

@@ -2,22 +2,21 @@ import base64
 import binascii
 import datetime
 import logging
-import re
 import secrets
 import typing
 import urllib.parse
 import asab.storage.exceptions
 import asab.exceptions
-import pymongo
 import asab.utils
 import asab.web.auth
 
-from .. import exceptions
+from .. import exceptions, AuditLogger
 from .. import generic
-from ..events import EventTypes
+from ..generic import amerge_sorted
 from ..models import Session
 from ..models.const import OAuth2, ResourceId
 from . import schema
+from .provider.abc import ClientProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -33,6 +32,7 @@ CLIENT_DEFAULTS = {
 }
 
 TIME_ATTRIBUTES = {"default_max_age", "session_expiration"}
+DEFAULT_PROVIDER_ID = "default"
 
 
 class ClientService(asab.Service):
@@ -48,7 +48,6 @@ class ClientService(asab.Service):
 
 	def __init__(self, app, service_name="seacatauth.ClientService"):
 		super().__init__(app, service_name)
-		self.StorageService = app.get_service("asab.StorageService")
 		self.OIDCService = None
 		self.ClientSecretExpiration = asab.Config.getseconds(
 			"seacatauth:client", "client_secret_expiration", fallback=None)
@@ -80,100 +79,117 @@ class ClientService(asab.Service):
 		if not self._AllowCustomClientID:
 			schema.CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
 
+		self.ClientProviders: typing.Dict[str, ClientProviderABC] = {}
+
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
+		if len(self.ClientProviders) == 0:
+			self.register_provider(_create_default_provider(app))
 
-		# Create index for case-insensitive alphabetical sorting
-		coll = await self.StorageService.collection(self.ClientCollection)
-		await coll.create_index(
-			[
-				("client_name", pymongo.ASCENDING),
-			],
-			collation={
-				"locale": "en",
-				"strength": 1,
-			}
-		)
+		for provider in self.ClientProviders.values():
+			await provider.initialize(app)
 
 
-	def build_filter(self, match_string: str) -> dict:
-		return {"$or": [
-			{"_id": re.compile("^{}".format(re.escape(match_string)))},
-			{"client_name": re.compile(re.escape(match_string), re.IGNORECASE)},
-		]}
+	def register_provider(self, provider: ClientProviderABC):
+		if provider.ProviderId in self.ClientProviders:
+			raise ValueError("Client provider with ID {!r} is already registered.".format(provider.ProviderId))
+		self.ClientProviders[provider.ProviderId] = provider
 
 
 	async def iterate_clients(
 		self,
 		page: int = 0,
 		limit: int = None,
-		query_filter: typing.Optional[str | typing.Dict] = None,
+		substring_filter: str | None = None,
+		attribute_filter: dict | None = None,
 		sort_by: typing.Optional[typing.List[tuple]] = None
 	):
-		collection = self.StorageService.Database[self.ClientCollection]
-
-		if query_filter is None:
-			query_filter = {}
-		elif isinstance(query_filter, str):
-			query_filter = self.build_filter(query_filter)
-		cursor = collection.find(query_filter)
-
-		if sort_by:
-			if len(sort_by) > 1:
-				L.warning("Multiple sorting parameters are not supported. Only the first one is taken into account.")
-			sort_by = sort_by[0]
-
-			if sort_by[0] == "client_name":
-				# Case-insensitive sorting
-				cursor.collation({"locale": "en"})
-			cursor.sort(*sort_by)
-
-		if limit is not None:
-			cursor.skip(limit * page)
-			cursor.limit(limit)
-
-		async for client in cursor:
-			if "__client_secret" in client:
-				client.pop("__client_secret")
+		iterators = [
+			provider.iterate_clients(
+				page=page,
+				limit=limit,
+				substring_filter=substring_filter,
+				attribute_filter=attribute_filter,
+				sort_by=sort_by,
+			) for provider in self.ClientProviders.values()
+		]
+		offset = (page or 0) * (limit or 0)
+		async for client in amerge_sorted(
+			*iterators,
+			key=lambda c: c.get("client_name", ""),  # TODO: Implement sorting function
+			offset=offset,
+			limit=limit,
+		):
 			yield self._normalize_client(client)
 
 
-	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None):
-		collection = self.StorageService.Database[self.ClientCollection]
-		if query_filter is None:
-			query_filter = {}
-		elif isinstance(query_filter, str):
-			query_filter = self.build_filter(query_filter)
-		return await collection.count_documents(query_filter)
+	async def count_clients(
+		self,
+		substring_filter: str | None = None,
+		attribute_filter: dict | None = None,
+	) -> int | None:
+		total_count = 0
+		for provider in self.ClientProviders.values():
+			count = await provider.count_clients(substring_filter, attribute_filter)
+			if count is None:
+				# Uncountable provider
+				total_count = None
+			elif total_count is not None:
+				total_count += count
+		return total_count
 
 
-	async def get_client(self, client_id: str, normalize: bool = True):
+	async def get_client(self, client_id: str, use_cache: bool = True):
 		"""
 		Get client metadata
 		"""
-		# Try to get client from cache
-		client = self._get_from_cache(client_id)
-		if client:
-			if normalize:
-				return self._normalize_client(client)
-			else:
+		client = await self._get_client_raw(client_id, use_cache)
+		return self._normalize_client(client)
+
+
+	async def _get_client_raw(self, client_id: str, use_cache: bool = True):
+		"""
+		Get raw client metadata
+		"""
+		if use_cache:
+			# Try to get client from cache
+			client = self._get_from_cache(client_id)
+			if client:
 				return client
 
 		# Get from the database
-		client = await self.StorageService.get(self.ClientCollection, client_id)
+		provider_id, internal_client_id = self.parse_client_id(client_id)
+		provider = self.ClientProviders[provider_id]
+		client = await provider.get_client(internal_client_id)
 		self._store_in_cache(client_id, client)
+		return client
 
-		if normalize:
-			return self._normalize_client(client)
+
+	def parse_client_id(self, client_id: str) -> tuple[str, str]:
+		parts = client_id.split(":", 1)
+		if len(parts) == 1:
+			return DEFAULT_PROVIDER_ID, client_id
 		else:
-			return client
+			return parts[0], parts[1]
+
+
+	def get_editable_provider(self) -> ClientProviderABC:
+		default_provider = self.ClientProviders[DEFAULT_PROVIDER_ID]
+		if default_provider.Editable:
+			return default_provider
+		for provider in self.ClientProviders.values():
+			if provider.Editable:
+				return provider
+		raise RuntimeError("No editable client provider is registered.")
 
 
 	async def create_client(
-		self, *,
+		self,
+		provider_id: str = None,
+		*,
 		_custom_client_id: str = None,
 		**kwargs
 	):
@@ -181,110 +197,102 @@ class ClientService(asab.Service):
 		Register a new OpenID Connect client
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientRegistration
 		"""
+		if provider_id:
+			if provider_id not in self.ClientProviders:
+				raise ValueError("No client provider with ID {!r} is registered.".format(provider_id))
+			provider = self.ClientProviders[provider_id]
+		else:
+			provider = self.get_editable_provider()
+
 		if _custom_client_id is not None:
 			client_id = _custom_client_id
 			L.warning("Creating a client with custom ID.", struct_data={"client_id": client_id})
 		else:
 			client_id = secrets.token_urlsafe(self.ClientIdLength)
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id)
 
-		client_metadata = {**CLIENT_DEFAULTS, **kwargs}
-		self._check_redirect_uris(**client_metadata)
-		self._check_grant_types(**client_metadata)
+		client_data = {**CLIENT_DEFAULTS, **kwargs}
+		client_data =self._validate_and_normalize_client_update(current=None, update=client_data)
+		client_id = await provider.create_client(client_id, **client_data)
+		L.log(asab.LOG_NOTICE, "Client created.", struct_data={"client_id": client_id})
+		return client_id
 
-		for k in schema.CLIENT_METADATA_SCHEMA:
-			v = client_metadata.get(k)
-			if v is None or (isinstance(v, str) and len(v) == 0):
-				continue
+
+	def _validate_and_normalize_client_update(self, current: dict | None, update: dict) -> dict:
+		client_data = {**(current or {})}
+		for k, v in update.items():
+			if k not in schema.CLIENT_METADATA_SCHEMA:
+				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
 			if k in TIME_ATTRIBUTES:
 				try:
 					v = asab.utils.convert_to_seconds(v)
 				except ValueError as e:
 					raise asab.exceptions.ValidationError(
 						"{!r} must be either a number or a duration string.".format(k)) from e
-			upsertor.set(k, v)
+			if v == "":
+				v = None
 
-		try:
-			await upsertor.execute(event_type=EventTypes.CLIENT_REGISTERED)
+			client_data[k] = v
 
-		except asab.storage.exceptions.DuplicateError:
-			raise asab.exceptions.Conflict(key="client_id", value=client_id)
-
-		L.log(asab.LOG_NOTICE, "Client created.", struct_data={"client_id": client_id})
-		return client_id
+		self._check_redirect_uris(**client_data)
+		self._check_grant_types(**client_data)
+		return client_data
 
 
 	async def reset_secret(self, client_id: str):
 		"""
 		Set or reset client secret
 		"""
-		# TODO: Use M2M credentials provider.
-		client = await self.get_client(client_id)
+		provider_id, internal_client_id = self.parse_client_id(client_id)
+		try:
+			provider = self.ClientProviders[provider_id]
+			client = await provider.get_client(internal_client_id)
+		except KeyError:
+			raise exceptions.ClientNotFoundError(client_id)
 		assert_client_is_editable(client)
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
+
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		client_secret_hash = generic.argon2_hash(client_secret)
-		upsertor.set("__client_secret", client_secret_hash)
+		update = {
+			"__client_secret": client_secret_hash,
+			"client_secret_updated_at": datetime.datetime.now(datetime.timezone.utc),
+		}
 		if client_secret_expires_at is not None:
-			upsertor.set("client_secret_expires_at", client_secret_expires_at)
+			update["client_secret_expires_at"] = client_secret_expires_at
 
-		upsertor.set("client_secret_updated_at", datetime.datetime.now(datetime.timezone.utc))
-
-		await upsertor.execute(event_type=EventTypes.CLIENT_SECRET_RESET)
+		await provider.update_client(client_id, **update)
+		AuditLogger.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
-		L.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
 
 		return client_secret, client_secret_expires_at
 
 
-	async def update_client(self, client_id: str, **kwargs):
-		client = await self.get_client(client_id, normalize=False)
-		assert_client_is_editable(client)
-		client_update = {
-			k: v
-			for k, v in client.items()
-			if (
-				k in schema.CLIENT_METADATA_SCHEMA
-				and not k.startswith("_")
-			)
-		}
-		client_update.update(kwargs)
+	async def update_client(self, client_id: str, **client_data):
+		provider_id, internal_client_id = self.parse_client_id(client_id)
+		try:
+			provider = self.ClientProviders[provider_id]
+			current_client = await provider.get_client(internal_client_id)
+		except KeyError:
+			raise exceptions.ClientNotFoundError(client_id)
+		assert_client_is_editable(current_client)
 
-		self._check_redirect_uris(**client_update)
-		self._check_grant_types(**client_update)
-
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
-
-		for k, v in client_update.items():
-			if k not in schema.CLIENT_METADATA_SCHEMA:
-				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
-
-			if v is None or (isinstance(v, str) and len(v) == 0):
-				upsertor.unset(k,)
-				continue
-
-			if k in TIME_ATTRIBUTES:
-				try:
-					v = asab.utils.convert_to_seconds(v)
-				except ValueError as e:
-					raise asab.exceptions.ValidationError(
-						"{!r} must be either a number or a duration string.".format(k)) from e
-			upsertor.set(k, v)
-
-		await upsertor.execute(event_type=EventTypes.CLIENT_UPDATED)
+		client_data = self._validate_and_normalize_client_update(current=current_client, update=client_data)
+		await provider.update_client(client_id, **client_data)
+		L.log(asab.LOG_NOTICE, "Client updated.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
-		L.log(asab.LOG_NOTICE, "Client updated.", struct_data={
-			"client_id": client_id,
-			"fields": " ".join(client_update.keys())
-		})
 
 
 	async def delete_client(self, client_id: str):
-		client = await self.get_client(client_id)
-		assert_client_is_editable(client)
-		await self.StorageService.delete(self.ClientCollection, client_id)
-		self._delete_from_cache(client_id)
+		provider_id, internal_client_id = self.parse_client_id(client_id)
+		try:
+			provider = self.ClientProviders[provider_id]
+			current_client = await provider.get_client(internal_client_id)
+		except KeyError:
+			raise exceptions.ClientNotFoundError(client_id)
+		assert_client_is_editable(current_client)
+
+		await provider.delete_client(client_id)
 		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
+		self._delete_from_cache(client_id)
 
 
 	async def validate_client_authorize_options(
@@ -356,7 +364,13 @@ class ClientService(asab.Service):
 			L.error("No client ID in request.")
 			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
-		client_dict = await self.get_client(client_id)
+		# Get provider and client data
+		provider_id, internal_client_id = self.parse_client_id(client_id)
+		try:
+			provider = self.ClientProviders[provider_id]
+			client_dict = await provider.get_client(internal_client_id)
+		except KeyError:
+			raise exceptions.ClientNotFoundError(client_id)
 
 		# Check if used authentication method matches the pre-configured one
 		expected_auth_method = client_dict.get(
@@ -386,6 +400,9 @@ class ClientService(asab.Service):
 
 		# Verify client secret
 		client_secret_hash = client_dict.get("__client_secret", None)
+		if not client_secret_hash:
+			L.error("Client does not have a secret set.", struct_data={"client_id": client_id})
+			raise exceptions.ClientAuthenticationError("Client does not have a secret set.", client_id=client_id)
 		if not generic.argon2_verify(client_secret_hash, client_secret):
 			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
@@ -650,17 +667,19 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
-	def _normalize_client(self, client: dict):
-		client = {**client}  # Do not modify the original client
-		client["client_id"] = client["_id"]
-		if client.get("managed_by"):
+	def _normalize_client(self, raw_client: dict):
+		client = {
+			k: v
+			for k, v in raw_client.items()
+			if not k.startswith("_") or k in {"_id", "_v", "_c", "_m", "_provider_id"}
+		}
+		client["_id"] = client["client_id"] = _build_client_id(client)
+		client = _set_cookie_name(self.App, client)
+		client = _set_credentials_id(self.App, client)
+		if "read_only" not in client and client.get("managed_by"):
 			client["read_only"] = True
-		cookie_svc = self.App.get_service("seacatauth.CookieService")
-		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
-		if client.get("seacatauth_credentials") is True:
-			credentials_service = self.App.get_service("seacatauth.CredentialsService")
-			provider = credentials_service.CredentialProviders["client"]
-			client["credentials_id"] = provider._format_credentials_id(client["_id"])
+		if "__client_secret" in raw_client:
+			client["client_secret"] = True
 		return client
 
 
@@ -703,7 +722,7 @@ def is_client_confidential(client: dict):
 
 
 def assert_client_is_editable(client: dict):
-	if client.get("read_only"):
+	if client.get("read_only") or client.get("managed_by") is not None:
 		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
 		raise exceptions.NotEditableError("Client is not editable.")
 	return True
@@ -738,3 +757,28 @@ def _validate_client_attributes(client_dict: dict):
 		elif k == "redirect_uri_validation_method":
 			if v not in OAuth2.RedirectUriValidationMethod:
 				raise asab.exceptions.ValidationError("Invalid redirect_uri_validation_method: {!r}".format(v))
+
+
+def _create_default_provider(app) -> ClientProviderABC:
+	from .provider.mongodb import MongoDBClientProvider
+	return MongoDBClientProvider(app, provider_id=DEFAULT_PROVIDER_ID)
+
+def _set_credentials_id(app, client: dict) -> dict:
+	if client.get("seacatauth_credentials") is not True:
+		return client
+	credentials_service = app.get_service("seacatauth.CredentialsService")
+	if not credentials_service:
+		return client
+	provider = credentials_service.CredentialProviders["client"]
+	if not provider:
+		return client
+	client["credentials_id"] = provider._format_credentials_id(client["_id"])
+	return client
+
+def _set_cookie_name(app, client: dict) -> dict:
+	cookie_svc = app.get_service("seacatauth.CookieService")
+	client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
+	return client
+
+def _build_client_id(client: dict) -> str:
+	return "{}:{}".format(client["_provider_id"], client["_id"])

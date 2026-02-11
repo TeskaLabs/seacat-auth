@@ -49,7 +49,7 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 
 	async def count(self, filtr: str = None) -> int:
 		client_service = self.App.get_service("seacatauth.ClientService")
-		return await client_service.count_clients(query_filter=self._build_filter(filtr))
+		return await client_service.count_clients(attribute_filter=self._build_filter(filtr))
 
 
 	async def search(self, filter: str = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
