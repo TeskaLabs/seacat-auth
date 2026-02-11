@@ -293,7 +293,7 @@ class CredentialsService(asab.Service):
 
 	def get_provider(self, credentials_id):
 		try:
-			provider_type, provider_id, credentials_subid = credentials_id.split(":", 3)
+			provider_type, provider_id, credentials_subid = credentials_id.split(":", 2)
 		except ValueError:
 			raise KeyError("Provider not found because credentials_id format is incorrect.")
 		provider = self.CredentialProviders.get(provider_id)
