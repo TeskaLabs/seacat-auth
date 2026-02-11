@@ -13,12 +13,14 @@ class MongoDBClientProvider(ClientProviderABC):
 
 	ConfigDefaults = {
 		"mongodb_collection": "cl",
+		"editable": True,
 	}
 
-	def __init__(self, app: asab.Application, provider_id: str, config_section_name: str, config: dict | None = None):
-		super().__init__(app=app, provider_id=provider_id, config_section_name=config_section_name, config=config)
+	def __init__(self, app: asab.Application, provider_id: str, config: dict | None = None):
+		super().__init__(app=app, provider_id=provider_id, config=config)
 		self.StorageService = None
 		self.CollectionName = self.Config.get("mongodb_collection")
+		self.Editable = self.Config.getboolean("editable")
 
 
 	async def initialize(self, app):
@@ -89,6 +91,8 @@ class MongoDBClientProvider(ClientProviderABC):
 
 
 	async def create_client(self, client_id: str | None = None, **client_data) -> str:
+		if not self.Editable:
+			raise RuntimeError("Provider is not editable")
 		if client_id is None:
 			client_id = secrets.token_urlsafe(16)
 		upsertor = self.StorageService.upsertor(self.CollectionName, client_id)
@@ -107,6 +111,8 @@ class MongoDBClientProvider(ClientProviderABC):
 
 
 	async def update_client(self, client_id: str, **client_data):
+		if not self.Editable:
+			raise RuntimeError("Provider is not editable")
 		try:
 			client_stored = await self.get_client(client_id)
 		except KeyError as e:
@@ -122,6 +128,8 @@ class MongoDBClientProvider(ClientProviderABC):
 
 
 	async def delete_client(self, client_id: str):
+		if not self.Editable:
+			raise RuntimeError("Provider is not editable")
 		coll = await self.StorageService.collection(self.CollectionName)
 		result = await coll.delete_one({"_id": client_id})
 		if result.deleted_count == 0:

@@ -7,20 +7,13 @@ import asab
 class ClientProviderABC(asab.Configurable, abc.ABC):
 
 	Type = None
+	Editable = False
 
-	def __init__(self, app: asab.Application, provider_id: str, config_section_name: str, config: dict | None = None):
+	def __init__(self, app: asab.Application, provider_id: str, config: dict | None = None):
+		config_section_name = "seacatauth:client:{}".format(provider_id)
 		super().__init__(config_section_name=config_section_name, config=config)
 		self.App = app
 		self.ProviderId = provider_id
-		self.ConfigSectionName = config_section_name
-
-
-	def register(self, set_default: bool = False):
-		"""
-		Register this provider to the ClientService
-		"""
-		client_svc = self.App.get_service("seacatauth.ClientService")
-		client_svc.register_provider(self, set_default)
 
 
 	async def initialize(self, app):
@@ -30,6 +23,7 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 		pass
 
 
+	@abc.abstractmethod
 	async def iterate_clients(
 		self,
 		page: int = 0,
@@ -55,6 +49,7 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 		raise NotImplementedError()
 
 
+	@abc.abstractmethod
 	async def count_clients(
 		self,
 		substring_filter: str | None = None,
@@ -70,6 +65,26 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 
 		Returns:
 			The number of clients matching the filters, or None if counting is not supported.
+		"""
+		raise NotImplementedError()
+
+
+	@abc.abstractmethod
+	async def get_client(
+		self,
+		client_id: str,
+	) -> dict:
+		"""
+		Get client data by client ID.
+
+		Args:
+			client_id: The ID of the client to retrieve.
+
+		Returns:
+			A dictionary of client data.
+
+		Raises:
+			KeyError: If a client with the given ID does not exist.
 		"""
 		raise NotImplementedError()
 
@@ -91,25 +106,6 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 
 		Raises:
 			asab.storage.exceptions.DuplicateError: If a client with the same ID already exists.
-		"""
-		raise NotImplementedError()
-
-
-	async def get_client(
-		self,
-		client_id: str,
-	) -> dict:
-		"""
-		Get client data by client ID.
-
-		Args:
-			client_id: The ID of the client to retrieve.
-
-		Returns:
-			A dictionary of client data.
-
-		Raises:
-			KeyError: If a client with the given ID does not exist.
 		"""
 		raise NotImplementedError()
 
