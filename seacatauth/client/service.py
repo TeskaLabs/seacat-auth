@@ -211,7 +211,7 @@ class ClientService(asab.Service):
 			client_id = secrets.token_urlsafe(self.ClientIdLength)
 
 		client_data = {**CLIENT_DEFAULTS, **kwargs}
-		client_data =self._validate_and_normalize_client_update(current=None, update=client_data)
+		client_data = self._validate_and_normalize_client_update(current=None, update=client_data)
 		client_id = await provider.create_client(client_id, **client_data)
 		L.log(asab.LOG_NOTICE, "Client created.", struct_data={"client_id": client_id})
 		return client_id
@@ -763,6 +763,7 @@ def _create_default_provider(app) -> ClientProviderABC:
 	from .provider.mongodb import MongoDBClientProvider
 	return MongoDBClientProvider(app, provider_id=DEFAULT_PROVIDER_ID)
 
+
 def _set_credentials_id(app, client: dict) -> dict:
 	if client.get("seacatauth_credentials") is not True:
 		return client
@@ -775,10 +776,12 @@ def _set_credentials_id(app, client: dict) -> dict:
 	client["credentials_id"] = provider._format_credentials_id(client["_id"])
 	return client
 
+
 def _set_cookie_name(app, client: dict) -> dict:
 	cookie_svc = app.get_service("seacatauth.CookieService")
 	client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
 	return client
+
 
 def _build_client_id(client: dict) -> str:
 	return "{}:{}".format(client["_provider_id"], client["_id"])
