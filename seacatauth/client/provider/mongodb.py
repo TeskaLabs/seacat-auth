@@ -51,11 +51,9 @@ class MongoDBClientProvider(ClientProviderABC):
 
 	async def iterate_clients(
 		self,
-		page: int = 0,
-		limit: int = None,
 		substring_filter: str | None = None,
 		attribute_filter: dict | None = None,
-		sort_by: list[tuple] | None = None,
+		sort_by: list[tuple[str, str]] | None = None,
 	):
 		coll = await self.StorageService.collection(self.CollectionName)
 		query = {}

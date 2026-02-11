@@ -26,11 +26,9 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 	@abc.abstractmethod
 	async def iterate_clients(
 		self,
-		page: int = 0,
-		limit: int = None,
 		substring_filter: str | None = None,
 		attribute_filter: dict | None = None,
-		sort_by: typing.Tuple[str, str] | None = None
+		sort_by: list[tuple[str, str]] | None = None,
 	) -> typing.AsyncIterable[dict]:
 		"""
 		Iterate clients.

@@ -109,8 +109,6 @@ class ClientService(asab.Service):
 	):
 		iterators = [
 			provider.iterate_clients(
-				page=page,
-				limit=limit,
 				substring_filter=substring_filter,
 				attribute_filter=attribute_filter,
 				sort_by=sort_by,
