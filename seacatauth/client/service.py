@@ -32,7 +32,6 @@ CLIENT_DEFAULTS = {
 }
 
 TIME_ATTRIBUTES = {"default_max_age", "session_expiration"}
-DEFAULT_PROVIDER_ID = "default"
 
 
 class ClientService(asab.Service):
@@ -46,7 +45,7 @@ class ClientService(asab.Service):
 	ClientSecretLength = 32
 	ClientIdLength = 16
 
-	def __init__(self, app, service_name="seacatauth.ClientService"):
+	def __init__(self, app, service_name="seacatauth.ClientService", create_default_provider=True):
 		super().__init__(app, service_name)
 		self.OIDCService = None
 		self.ClientSecretExpiration = asab.Config.getseconds(
@@ -80,23 +79,29 @@ class ClientService(asab.Service):
 			schema.CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
 
 		self.ClientProviders: typing.Dict[str, ClientProviderABC] = {}
+		self.DefaultProviderId: str | None = None
+		if create_default_provider:
+			from .provider.mongodb import MongoDBClientProvider
+			provider = MongoDBClientProvider(app, provider_id="default")
+			self.register_provider(provider, set_default=True)
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
-		if len(self.ClientProviders) == 0:
-			self.register_provider(_create_default_provider(app))
-
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
 
 
-	def register_provider(self, provider: ClientProviderABC):
+	def register_provider(self, provider: ClientProviderABC, set_default: bool = False):
 		if provider.ProviderId in self.ClientProviders:
 			raise ValueError("Client provider with ID {!r} is already registered.".format(provider.ProviderId))
 		self.ClientProviders[provider.ProviderId] = provider
+		if set_default:
+			if self.DefaultProviderId is not None:
+				raise ValueError("Default client provider is already set to {!r}.".format(self.DefaultProviderId))
+			self.DefaultProviderId = provider.ProviderId
 
 
 	async def iterate_clients(
@@ -177,13 +182,13 @@ class ClientService(asab.Service):
 	def parse_client_id(self, client_id: str) -> tuple[str, str]:
 		parts = client_id.split(":", 1)
 		if len(parts) == 1:
-			return DEFAULT_PROVIDER_ID, client_id
+			return self.DefaultProviderId, client_id
 		else:
 			return parts[0], parts[1]
 
 
 	def get_editable_provider(self) -> ClientProviderABC:
-		default_provider = self.ClientProviders[DEFAULT_PROVIDER_ID]
+		default_provider = self.ClientProviders[self.DefaultProviderId]
 		if default_provider.Editable:
 			return default_provider
 		for provider in self.ClientProviders.values():
@@ -764,11 +769,6 @@ def _validate_client_attributes(client_dict: dict):
 		elif k == "redirect_uri_validation_method":
 			if v not in OAuth2.RedirectUriValidationMethod:
 				raise asab.exceptions.ValidationError("Invalid redirect_uri_validation_method: {!r}".format(v))
-
-
-def _create_default_provider(app) -> ClientProviderABC:
-	from .provider.mongodb import MongoDBClientProvider
-	return MongoDBClientProvider(app, provider_id=DEFAULT_PROVIDER_ID)
 
 
 def _set_credentials_id(app, client: dict) -> dict:
