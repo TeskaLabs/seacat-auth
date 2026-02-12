@@ -89,12 +89,14 @@ class ClientService(asab.Service):
 		for section in asab.Config.sections():
 			if not section.startswith("seacatauth:client:"):
 				continue
-			_, _, provider_type, provider_id = section.split(":", 3)
+			try:
+				_, _, provider_type, provider_id = section.split(":", 3)
+			except ValueError:
+				raise ValueError("Client provider config section name {!r} does not match the pattern 'seacatauth:client:<provider_type>:<provider_id>'".format(section))
 			from .provider import get_provider_by_type
 			provider_class = get_provider_by_type(provider_type)
 			if provider_class is None:
-				L.error("Unknown client provider type in config section {!r}: {}".format(section, provider_type))
-				continue
+				raise ValueError("Unknown client provider type in config section {!r}: {}".format(section, provider_type))
 			self.register_provider(provider_class(self.App, provider_id=provider_id))
 
 
