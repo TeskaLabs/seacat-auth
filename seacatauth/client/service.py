@@ -45,7 +45,7 @@ class ClientService(asab.Service):
 	ClientSecretLength = 32
 	ClientIdLength = 16
 
-	def __init__(self, app, service_name="seacatauth.ClientService", create_default_provider=True):
+	def __init__(self, app, service_name="seacatauth.ClientService"):
 		super().__init__(app, service_name)
 		self.OIDCService = None
 		self.ClientSecretExpiration = asab.Config.getseconds(
@@ -79,35 +79,26 @@ class ClientService(asab.Service):
 			schema.CLIENT_METADATA_SCHEMA.pop("preferred_client_id")
 
 		self.ClientProviders: typing.Dict[str, ClientProviderABC] = {}
-		self.DefaultProviderId: str | None = None
-		if create_default_provider:
-			from .provider.mongodb import MongoDBClientProvider
-			provider = MongoDBClientProvider(app, provider_id="default")
-			self.register_provider(provider, set_default=True)
+		self.DefaultProviderId: str = asab.Config.get("seacatauth:client", "default_provider_id")
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
-		if len(self.ClientProviders) == 0:
-			raise RuntimeError("At least one client provider must be registered.")
-		if self.DefaultProviderId is None:
-			self.DefaultProviderId = next(p for p in self.ClientProviders)
-			L.warning("No default client provider has been set. Using {!r} as the default provider.".format(
-				self.DefaultProviderId))
+		if self.DefaultProviderId not in self.ClientProviders:
+			# If no provider with the default ID is registered, register a MongoDB provider with that ID by default.
+			from .provider.mongodb import MongoDBClientProvider
+			provider = MongoDBClientProvider(app, provider_id=self.DefaultProviderId)
+			self.register_provider(provider)
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
 
 
-	def register_provider(self, provider: ClientProviderABC, set_default: bool = False):
+	def register_provider(self, provider: ClientProviderABC):
 		if provider.ProviderId in self.ClientProviders:
 			raise ValueError("Client provider with ID {!r} is already registered.".format(provider.ProviderId))
 		self.ClientProviders[provider.ProviderId] = provider
-		if set_default:
-			if self.DefaultProviderId is not None:
-				raise ValueError("Default client provider is already set to {!r}.".format(self.DefaultProviderId))
-			self.DefaultProviderId = provider.ProviderId
 
 
 	async def iterate_clients(

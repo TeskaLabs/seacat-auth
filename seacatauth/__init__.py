@@ -61,6 +61,12 @@ asab.Config.add_defaults({
 		# Validity period of local client metadata cache.
 		# Set to "0" to disable cache.
 		"cache_expiration": "30 s",
+
+		# Default client provider ID.
+		# Client IDs that do not include a provider will be handled by the default provider.
+		# If no provider with this ID is explicitly configured, the application will create a default
+		# provider with this ID and default settings.
+		"default_provider_id": "default",
 	},
 
 	"seacatauth:cookie": {
