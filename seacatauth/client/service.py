@@ -165,8 +165,11 @@ class ClientService(asab.Service):
 
 		# Get from the database
 		provider_id, internal_client_id = self.parse_client_id(client_id)
-		provider = self.ClientProviders[provider_id]
-		client = await provider.get_client(internal_client_id)
+		try:
+			provider = self.ClientProviders[provider_id]
+			client = await provider.get_client(internal_client_id)
+		except KeyError:
+			raise exceptions.ClientNotFoundError(client_id)
 		self._store_in_cache(client_id, client)
 		return client
 
