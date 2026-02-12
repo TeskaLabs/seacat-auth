@@ -10,7 +10,7 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 	Editable = False
 
 	def __init__(self, app: asab.Application, provider_id: str, config: dict | None = None):
-		config_section_name = "seacatauth:client:{}".format(provider_id)
+		config_section_name = "seacatauth:client:{}:{}".format(self.Type, provider_id)
 		super().__init__(config_section_name=config_section_name, config=config)
 		self.App = app
 		self.ProviderId = provider_id

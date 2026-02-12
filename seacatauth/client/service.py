@@ -80,8 +80,22 @@ class ClientService(asab.Service):
 
 		self.ClientProviders: typing.Dict[str, ClientProviderABC] = {}
 		self.DefaultProviderId: str = asab.Config.get("seacatauth:client", "default_provider_id")
+		self._create_providers_from_config()
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
+
+
+	def _create_providers_from_config(self):
+		for section in asab.Config.sections():
+			if not section.startswith("seacatauth:client:"):
+				continue
+			_, _, provider_type, provider_id = section.split(":", 3)
+			from .provider import get_provider_by_type
+			provider_class = get_provider_by_type(provider_type)
+			if provider_class is None:
+				L.error("Unknown client provider type in config section {!r}: {}".format(section, provider_type))
+				continue
+			self.register_provider(provider_class(self.App, provider_id=provider_id))
 
 
 	async def initialize(self, app):
