@@ -90,6 +90,12 @@ class ClientService(asab.Service):
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
+		if len(self.ClientProviders) == 0:
+			raise RuntimeError("At least one client provider must be registered.")
+		if self.DefaultProviderId is None:
+			self.DefaultProviderId = next(p for p in self.ClientProviders)
+			L.warning("No default client provider has been set. Using {!r} as the default provider.".format(
+				self.DefaultProviderId))
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
 
