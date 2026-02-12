@@ -243,7 +243,7 @@ class ClientService(asab.Service):
 	def _validate_and_normalize_client_update(self, current: dict | None, update: dict) -> dict:
 		client_data = {
 			k: v
-			for k, v  in current.items()
+			for k, v in current.items()
 			if k in schema.CLIENT_METADATA_SCHEMA
 		}
 		for k, v in update.items():
