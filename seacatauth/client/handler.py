@@ -317,7 +317,8 @@ class ClientHandler(object):
 			for k, v in client.items()
 			if not k.startswith("__")
 		}
-		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
+		if "_c" in client:
+			rest_data["client_id_issued_at"] = int(client["_c"].timestamp())
 		if "__client_secret" in client:
 			rest_data["client_secret"] = True
 			if "client_secret_expires_at" in rest_data:
