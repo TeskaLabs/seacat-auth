@@ -241,11 +241,15 @@ class ClientService(asab.Service):
 
 
 	def _validate_and_normalize_client_update(self, current: dict | None, update: dict) -> dict:
-		client_data = {
-			k: v
-			for k, v in current.items()
-			if k in schema.CLIENT_METADATA_SCHEMA
-		}
+		if current is not None:
+			client_data = {
+				k: v
+				for k, v in current.items()
+				if k in schema.CLIENT_METADATA_SCHEMA
+			}
+		else:
+			client_data = {}
+
 		for k, v in update.items():
 			if k not in schema.CLIENT_METADATA_SCHEMA:
 				raise asab.exceptions.ValidationError("Unexpected argument: {}".format(k))
