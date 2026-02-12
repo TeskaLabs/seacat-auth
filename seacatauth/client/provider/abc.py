@@ -34,8 +34,6 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 		Iterate clients.
 
 		Args:
-			page: Page number (starting from 0)
-			limit: Number of clients per page. If None, return all clients.
 			substring_filter: Substring to filter clients by ID or name. If None, no filtering is applied.
 			attribute_filter: Dictionary of attribute filters. Only clients matching all provided attributes will be returned.
 				If None, no filtering is applied.

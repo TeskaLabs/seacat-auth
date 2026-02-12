@@ -774,7 +774,7 @@ def _set_credentials_id(app, client: dict) -> dict:
 	credentials_service = app.get_service("seacatauth.CredentialsService")
 	if not credentials_service:
 		return client
-	provider = credentials_service.CredentialProviders["client"]
+	provider = credentials_service.CredentialProviders.get("client")
 	if not provider:
 		return client
 	client["credentials_id"] = provider._format_credentials_id(client["_id"])
