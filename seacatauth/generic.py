@@ -12,6 +12,7 @@ import asab.exceptions
 import bcrypt
 import argon2
 import hashlib
+import collections.abc
 
 
 L = logging.getLogger(__name__)
@@ -341,6 +342,7 @@ ergonomic_characters = "23456789abcdefghjkmnpqrstuvxyz"
 
 async def amerge_sorted(
 	*iters: typing.AsyncIterable,
+	iter_meta: collections.abc.Sequence[typing.Any] | None = None,
 	key: typing.Callable | None = None,
 	offset: int = 0,
 	limit: int | None = None
@@ -354,10 +356,14 @@ async def amerge_sorted(
 			If None, the elements themselves are compared.
 		offset: Number of elements to skip from the start of the merged output.
 		limit: Maximum number of elements to yield from the merged output. If None, yield all elements.
+		iter_meta: Optional metadata for each iterator. If provided, must match the number of iterators.
 
 	Yields:
-		Elements from the input iterables in sorted order.
+		Elements from the input iterables in sorted order, optionally with their iterator metadata.
 	"""
+	if iter_meta is not None and len(iter_meta) != len(iters):
+		raise ValueError("iter_meta length must match number of iterables")
+
 	key = key or (lambda x: x)
 	heap = []
 
@@ -380,7 +386,10 @@ async def amerge_sorted(
 		else:
 			if limit is not None and limit <= 0:
 				break
-			yield value
+			if iter_meta is not None:
+				yield value, iter_meta[idx]
+			else:
+				yield value
 			if limit is not None:
 				limit -= 1
 
