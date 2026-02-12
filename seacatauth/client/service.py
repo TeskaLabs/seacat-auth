@@ -107,21 +107,25 @@ class ClientService(asab.Service):
 		attribute_filter: dict | None = None,
 		sort_by: typing.Optional[typing.List[tuple]] = None
 	):
-		iterators = [
-			provider.iterate_clients(
+		iterators = []
+		provider_ids = []
+		for provider_id, provider in self.ClientProviders.items():
+			iterators.append(provider.iterate_clients(
 				substring_filter=substring_filter,
 				attribute_filter=attribute_filter,
 				sort_by=sort_by,
-			) for provider in self.ClientProviders.values()
-		]
+			))
+			provider_ids.append(provider_id)
+
 		offset = (page or 0) * (limit or 0)
-		async for client in amerge_sorted(
+		async for client, provider_id in amerge_sorted(
 			*iterators,
+			iter_meta=provider_ids,
 			key=lambda c: c.get("client_name", ""),  # TODO: Implement sorting function
 			offset=offset,
 			limit=limit,
 		):
-			yield self._normalize_client(client)
+			yield self._normalize_client(provider_id, client)
 
 
 	async def count_clients(
@@ -145,7 +149,8 @@ class ClientService(asab.Service):
 		Get client metadata
 		"""
 		client = await self._get_client_raw(client_id, use_cache)
-		return self._normalize_client(client)
+		provider_id, _ = self.parse_client_id(client_id)
+		return self._normalize_client(provider_id, client)
 
 
 	async def _get_client_raw(self, client_id: str, use_cache: bool = True):
@@ -210,7 +215,8 @@ class ClientService(asab.Service):
 
 		client_data = {**CLIENT_DEFAULTS, **kwargs}
 		client_data = self._validate_and_normalize_client_update(current=None, update=client_data)
-		client_id = await provider.create_client(client_id, **client_data)
+		internal_client_id = await provider.create_client(client_id, **client_data)
+		client_id = _build_client_id(provider.ProviderId, internal_client_id)
 		L.log(asab.LOG_NOTICE, "Client created.", struct_data={"client_id": client_id})
 		return client_id
 
@@ -257,7 +263,7 @@ class ClientService(asab.Service):
 		if client_secret_expires_at is not None:
 			update["client_secret_expires_at"] = client_secret_expires_at
 
-		await provider.update_client(client_id, **update)
+		await provider.update_client(internal_client_id, **update)
 		AuditLogger.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 
@@ -274,7 +280,7 @@ class ClientService(asab.Service):
 		assert_client_is_editable(current_client)
 
 		client_data = self._validate_and_normalize_client_update(current=current_client, update=client_data)
-		await provider.update_client(client_id, **client_data)
+		await provider.update_client(internal_client_id, **client_data)
 		L.log(asab.LOG_NOTICE, "Client updated.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 
@@ -288,7 +294,7 @@ class ClientService(asab.Service):
 			raise exceptions.ClientNotFoundError(client_id)
 		assert_client_is_editable(current_client)
 
-		await provider.delete_client(client_id)
+		await provider.delete_client(internal_client_id)
 		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 
@@ -665,13 +671,13 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
-	def _normalize_client(self, raw_client: dict):
+	def _normalize_client(self, provider_id: str, raw_client: dict):
 		client = {
 			k: v
 			for k, v in raw_client.items()
-			if not k.startswith("_") or k in {"_id", "_v", "_c", "_m", "_provider_id"}
+			if not k.startswith("_") or k in {"_id", "_v", "_c", "_m"}
 		}
-		client["_id"] = client["client_id"] = _build_client_id(client)
+		client["_id"] = client["client_id"] = _build_client_id(provider_id, client["_id"])
 		client = _set_cookie_name(self.App, client)
 		client = _set_credentials_id(self.App, client)
 		if "read_only" not in client and client.get("managed_by"):
@@ -781,5 +787,5 @@ def _set_cookie_name(app, client: dict) -> dict:
 	return client
 
 
-def _build_client_id(client: dict) -> str:
-	return "{}:{}".format(client["_provider_id"], client["_id"])
+def _build_client_id(provider_id: str, internal_client_id: str) -> str:
+	return "{}:{}".format(provider_id, internal_client_id)

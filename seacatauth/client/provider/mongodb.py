@@ -70,8 +70,6 @@ class MongoDBClientProvider(ClientProviderABC):
 		if field == "client_name":
 			cursor = cursor.collation({"locale": "en"})
 		cursor = cursor.sort(field, pymongo_dir)
-		if limit is not None:
-			cursor = cursor.skip(limit * page).limit(limit)
 		async for client_dict in cursor:
 			self._add_provider_attributes(client_dict)
 			yield client_dict
