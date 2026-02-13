@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import secrets
+import typing
 import urllib.parse
 import aiohttp
 import asab.storage
@@ -16,6 +17,7 @@ import cryptography.x509
 
 from ... import exceptions
 from ...events import EventTypes
+from ..provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -168,6 +170,11 @@ class WebAuthnService(asab.Service):
 					n_inserted += 1
 
 		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
+
+
+	async def initialize(self, app):
+		provider = WebAuthnMethodProvider(app, self)
+		await provider.initialize(app)
 
 
 	async def create_webauthn_credential(
@@ -598,6 +605,55 @@ class WebAuthnService(asab.Service):
 		return True
 
 
+class WebAuthnMethodProvider(AuthnMethodProviderABC):
+	MethodType = "webauthn"
+	MultipleMethodsPerCredentials = True
+	SupportedActions = ["delete"]
+
+	def __init__(self, app, webauthn_service, *args, **kwargs):
+		super().__init__(app, *args, **kwargs)
+		self.WebAuthnService = webauthn_service
+
+	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
+		for webauthn_cred in await self.WebAuthnService.list_webauthn_credentials(credentials_id, rest_normalize=True):
+			yield self._normalize_method(webauthn_cred)
+
+	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		if method_id is None:
+			raise KeyError("method_id is required for WebAuthn authentication method")
+		try:
+			webauthn_credential_id = base64.urlsafe_b64decode(method_id.encode("ascii") + b"==")
+		except ValueError:
+			raise KeyError("Invalid method_id format for WebAuthn authentication method")
+		webauthn_cred = await self.WebAuthnService.get_webauthn_credential(
+			credentials_id, webauthn_credential_id, rest_normalize=True)
+		return self._normalize_method(webauthn_cred)
+
+	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):
+		if method_id is None:
+			raise KeyError("method_id is required for WebAuthn authentication method")
+		try:
+			webauthn_credential_id = base64.urlsafe_b64decode(method_id.encode("ascii") + b"==")
+		except ValueError:
+			raise KeyError("Invalid method_id format for WebAuthn authentication method")
+		await self.WebAuthnService.delete_webauthn_credential(
+			webauthn_credential_id, credentials_id=credentials_id)
+
+	def _normalize_method(self, webauthn_cred: dict) -> dict:
+		return {
+			"id": webauthn_cred.get("id"),
+			"type": "webauthn",
+			"label": webauthn_cred.get("label") or webauthn_cred.get("name"),
+			"cid": webauthn_cred.get("cid"),
+			"status": "active",
+			"actions": self.SupportedActions,
+			"details": {
+				"webauthn": webauthn_cred
+			},
+			"created": webauthn_cred.get("created"),
+		}
+
+
 def _normalize_webauthn_credential_response(public_key_credential):
 	"""
 	Modify the WebAuthn response in-place so that it fits the webauthn library methods
@@ -620,6 +676,7 @@ def rest_normalize_webauthn_credential(wa_credential: dict):
 		"name": wa_credential["name"],
 		"sign_count": wa_credential["sc"],
 		"created": wa_credential["_c"],
+		"cid": wa_credential["cid"],
 	}
 	if "ll" in wa_credential:
 		normalized["last_login"] = wa_credential["ll"]
