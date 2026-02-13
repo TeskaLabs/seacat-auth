@@ -807,6 +807,8 @@ def _set_credentials_id(app, client: dict) -> dict:
 
 def _set_cookie_name(app, client: dict) -> dict:
 	cookie_svc = app.get_service("seacatauth.CookieService")
+	if not cookie_svc:
+		return client
 	client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
 	return client
 
