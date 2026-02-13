@@ -3,8 +3,12 @@ import pymongo
 import pymongo.errors
 import secrets
 import asab
+import logging
 
 from .abc import ClientProviderABC
+
+
+L = logging.getLogger(__name__)
 
 
 class MongoDBClientProvider(ClientProviderABC):
@@ -62,10 +66,16 @@ class MongoDBClientProvider(ClientProviderABC):
 		if attribute_filter:
 			query.update(attribute_filter)
 		cursor = coll.find(query)
-		if sort_by:
-			field, direction = sort_by[0]  # TODO: support multiple sort fields
-		else:
+		if not sort_by:
+			# Default sort by client_name ascending
 			field, direction = "client_name", "a"
+		else:
+			if len(sort_by) > 0:
+				L.warning(
+					"Multiple sort fields are not supported, only the first one will be used",
+					struct_data={"sort_by": sort_by}
+				)
+			field, direction = sort_by[0]
 		pymongo_dir = pymongo.ASCENDING if direction == "a" else pymongo.DESCENDING
 		if field == "client_name":
 			cursor = cursor.collation({"locale": "en"})

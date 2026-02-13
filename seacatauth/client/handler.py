@@ -84,7 +84,6 @@ class ClientHandler(object):
 			page=int(request.query.get("p", 1)) - 1,
 			limit=int(request.query["i"]) if "i" in request.query else None,
 			substring_filter=request.query.get("f", None),
-			sort_by=[("client_name", "a")],
 		):
 			data.append(self._rest_normalize(client))
 
