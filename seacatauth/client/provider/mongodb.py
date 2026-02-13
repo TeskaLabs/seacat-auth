@@ -61,10 +61,13 @@ class MongoDBClientProvider(ClientProviderABC):
 	):
 		coll = await self.StorageService.collection(self.CollectionName)
 		query = {}
+		filters = []
 		if substring_filter:
-			query.update(self._build_substring_filter_query(substring_filter))
+			filters.append(self._build_substring_filter_query(substring_filter))
 		if attribute_filter:
-			query.update(attribute_filter)
+			filters.append(attribute_filter)
+		if filters:
+			query["$and"] = filters
 		cursor = coll.find(query)
 		if not sort_by:
 			# Default sort by client_name ascending
