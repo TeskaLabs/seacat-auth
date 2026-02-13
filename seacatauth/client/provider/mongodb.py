@@ -107,7 +107,7 @@ class MongoDBClientProvider(ClientProviderABC):
 			raise RuntimeError("Provider is not editable")
 		if client_id is None:
 			client_id = secrets.token_urlsafe(16)
-		upsertor = self.StorageService.upsertor(self.CollectionName, client_id)
+		upsertor = self.StorageService.upsertor(self.CollectionName, client_id, version=0)
 		for k, v in client_data.items():
 			if v is not None:
 				upsertor.set(k, v)
