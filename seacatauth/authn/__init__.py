@@ -1,11 +1,15 @@
 from .service import AuthenticationService
-from .handler import AuthenticationHandler
+from .handler.public import AuthenticationPublicHandler
+from .handler.account import AuthenticationAccountHandler
+from .handler.admin import AuthenticationAdminHandler
 from .login_descriptor import LoginDescriptor
 from .m2m import M2MIntrospectHandler
 
 __all__ = [
 	"AuthenticationService",
-	"AuthenticationHandler",
+	"AuthenticationPublicHandler",
+	"AuthenticationAccountHandler",
+	"AuthenticationAdminHandler",
 	"LoginDescriptor",
 	"M2MIntrospectHandler",
 ]
