@@ -60,14 +60,7 @@ class MongoDBClientProvider(ClientProviderABC):
 		sort_by: list[tuple[str, str]] | None = None,
 	):
 		coll = await self.StorageService.collection(self.CollectionName)
-		query = {}
-		filters = []
-		if substring_filter:
-			filters.append(self._build_substring_filter_query(substring_filter))
-		if attribute_filter:
-			filters.append(attribute_filter)
-		if filters:
-			query["$and"] = filters
+		query = self._build_query(attribute_filter, substring_filter)
 		cursor = coll.find(query)
 		if not sort_by:
 			# Default sort by client_name ascending
@@ -94,12 +87,19 @@ class MongoDBClientProvider(ClientProviderABC):
 		attribute_filter: dict | None = None,
 	) -> int:
 		coll = await self.StorageService.collection(self.CollectionName)
-		query = {}
-		if substring_filter:
-			query.update(self._build_substring_filter_query(substring_filter))
-		if attribute_filter:
-			query.update(attribute_filter)
+		query = self._build_query(attribute_filter, substring_filter)
 		return await coll.count_documents(query)
+
+	def _build_query(self, attribute_filter: dict, substring_filter: str) -> dict:
+		query = {}
+		filters = []
+		if substring_filter:
+			filters.append(self._build_substring_filter_query(substring_filter))
+		if attribute_filter:
+			filters.append(attribute_filter)
+		if filters:
+			query["$and"] = filters
+		return query
 
 
 	async def create_client(self, client_id: str | None = None, **client_data) -> str:
