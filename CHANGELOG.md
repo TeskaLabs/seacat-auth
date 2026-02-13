@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha11
 - v25.48-alpha10
 - v25.48-alpha9
 - v25.48-alpha8
@@ -21,6 +22,7 @@
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Provider system for ClientService (#550, v25.48-alpha11)
 - Common admin API for authentication methods (#533, v25.48-alpha10)
 - Auto-registration for unknown external accounts (#543, v25.48-alpha8)
 - Support resetting MFA on password reset (#544, v25.48-alpha6)
