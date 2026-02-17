@@ -82,15 +82,6 @@ class UserInfoHandler(object):
 					scope=["openid"],
 				)
 
-		if "openid" not in session.OAuth2.Scope:
-			L.log(asab.LOG_NOTICE, "Insufficient scope.")
-			return asab.exceptions.NotAuthenticatedError(
-				error="insufficient_scope",
-				error_description="Required scope 'openid' is missing.",
-				realm="asab",
-				scope=["openid"],
-			)
-
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
 		return asab.web.rest.json_response(request, userinfo)
