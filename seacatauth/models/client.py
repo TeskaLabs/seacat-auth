@@ -13,48 +13,46 @@ L = logging.getLogger(__name__)
 class Client:
 	_raw: dict  # TEMPORARY. Original raw data from the database, used for integrity checks and updates. Not included in serialization.
 
-	# MongoDB metadata fields
-	_id: str
-	_v: int
-	_c: datetime.datetime
-	_m: datetime.datetime
-
-	# Canonical OAuth/OIDC attributes
+	# OAuth/OIDC attributes
 	client_id: str
-	client_name: typing.Optional[str] = None
-	client_uri: typing.Optional[str] = None
-	redirect_uris: typing.Optional[list[str]] = None
-	application_type: typing.Optional[str] = None
-	response_types: typing.Optional[list[str]] = None
-	grant_types: typing.Optional[list[str]] = None
-	token_endpoint_auth_method: typing.Optional[str] = None
-	default_max_age: typing.Optional[int] = None
-	code_challenge_method: typing.Optional[str] = None
-	client_id_issued_at: typing.Optional[datetime.datetime] = None
+	client_name: str | None = None
+	client_uri: str | None = None
+	redirect_uris: list[str] | None = None
+	application_type: str | None = None
+	response_types: list[str] | None = None
+	grant_types: list[str] | None = None
+	token_endpoint_auth_method: str | None = None
+	default_max_age: int | None = None
+	code_challenge_method: str | None = None
+	client_id_issued_at: datetime.datetime | None = None
+	redirect_uri_validation_method: str | None = None  # NON-CANONICAL
 
 	# Secret and metadata
-	_client_secret: typing.Optional[str] = None
-	client_secret_expires_at: typing.Optional[datetime.datetime] = None
-	client_secret_updated_at: typing.Optional[datetime.datetime] = None
+	_client_secret: str | None = None  # Hashed client secret, not included in serialization.
+	client_secret_expires_at: datetime.datetime | None = None
+	client_secret_updated_at: datetime.datetime | None = None
 
-	# Custom Seacat Auth attributes (NON-CANONICAL)
-	managed_by: typing.Optional[str] = None
-	cookie_name: typing.Optional[str] = None
-	cookie_domain: typing.Optional[str] = None
-	cookie_webhook_uri: typing.Optional[str] = None
-	cookie_entry_uri: typing.Optional[str] = None
-	authorize_uri: typing.Optional[str] = None
-	login_uri: typing.Optional[str] = None
-	authorize_anonymous_users: typing.Optional[bool] = None
-	anonymous_cid: typing.Optional[str] = None
-	session_expiration: typing.Optional[int] = None
-	redirect_uri_validation_method: typing.Optional[str] = None
-	seacatauth_credentials: typing.Optional[bool] = None
-	credentials_id: typing.Optional[str] = None
-	login_key: typing.Optional[str] = None  # TODO
+	# Custom Seacat Auth attributes
+	updated_at: datetime.datetime | None = None
+	version: int | None = None
+	managed_by: str | None = None
+	cookie_domain: str | None = None
+	cookie_webhook_uri: str | None = None
+	cookie_entry_uri: str | None = None
+	authorize_uri: str | None = None
+	login_uri: str | None = None
+	authorize_anonymous_users: bool | None = None
+	anonymous_cid: str | None = None
+	session_expiration: int | None = None
+	seacatauth_credentials: bool | None = None
+	credentials_id: str | None = None
+	login_key: str | None = None  # TODO: Obsolete (?)
+
+	# Fields supplied by ClientService, not the provider
+	cookie_name: str | None = None
 
 	# Any extra fields not explicitly listed
-	extra: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+	extra: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
 	# TEMPORARY
 	def __getitem__(self, key):
