@@ -8,6 +8,7 @@ import asab.storage
 
 from ... import exceptions
 from ...events import EventTypes
+from ..provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -56,6 +57,9 @@ class OTPService(asab.Service):
 			# TOTP was not active, nothing to do
 			pass
 
+	async def initialize(self, app):
+		provider = TOTPAuthnMethodProvider(app, self)
+		await provider.initialize(app)
 
 	async def deactivate_totp(self, credentials_id: str):
 		"""
@@ -168,28 +172,22 @@ class OTPService(asab.Service):
 
 		return secret.decode("ascii")
 
-	async def _get_totp_secret_by_credentials_id(self, credentials_id: str) -> typing.Optional[str]:
+	async def _get_totp(self, credentials_id: str) -> dict:
 		"""
-		Get TOTP secret from `TOTPCollection` by `credentials_id`.
-		Backwards compatibility: if not found, get TOTP from `CredentialsService`.
+		Get raw TOTP object from the DB
 		"""
-		try:
-			totp_object: dict = await self.StorageService.get(collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
-			secret: None | bytes = totp_object.get("__totp")
-		except KeyError:
-			secret = None
+		totp_object: dict = await self.StorageService.get(
+			collection=self.TOTPCollection, obj_id=credentials_id, decrypt=["__totp"])
+		totp_object["__totp"] = totp_object["__totp"].decode("ascii")
+		return totp_object
 
-		if secret is not None:
-			return secret.decode("ascii")
-
-		try:
-			credentials: dict = await self.CredentialsService.get(credentials_id, include=frozenset(["__totp"]))
-		except exceptions.CredentialsNotFoundError:
-			return None
-
-		secret = credentials.get("__totp")
-
-		return secret
+	async def get_totp(self, credentials_id: str) -> dict:
+		"""
+		Get safe TOTP object from the DB (without secret)
+		"""
+		totp_object = await self._get_totp(credentials_id)
+		del totp_object["__totp"]
+		return totp_object
 
 	async def _delete_prepared_totp_secret(self, session_id: str):
 		"""
@@ -211,21 +209,66 @@ class OTPService(asab.Service):
 				"count": result.deleted_count
 			})
 
+
 	async def has_activated_totp(self, credentials_id: str) -> bool:
 		"""
 		Check if the user has TOTP activated from TOTPCollection. (For backward compatibility: check also PreparedTOTPCollection.)
 		"""
-		secret: typing.Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
-		if secret is not None and len(secret) > 0:
+		try:
+			await self._get_totp(credentials_id)
 			return True
-		return False
+		except KeyError:
+			return False
 
 
 	async def verify_request_totp(self, credentials_id, request_data: dict) -> bool:
-		totp_secret: typing.Optional[str] = await self._get_totp_secret_by_credentials_id(credentials_id)
+		totp_object: dict = await self._get_totp(credentials_id)
+		secret = totp_object.get("__totp")
 
 		try:
-			totp_object: pyotp.TOTP = pyotp.TOTP(totp_secret)
-			return totp_object.verify(request_data['totp'])
+			totp_verifier: pyotp.TOTP = pyotp.TOTP(secret)
+			return totp_verifier.verify(request_data['totp'])
 		except KeyError:
 			return False
+
+
+class TOTPAuthnMethodProvider(AuthnMethodProviderABC):
+	MethodType = "totp"
+	SupportedActions = ["delete"]
+
+	def __init__(self, app, otp_service, *args, **kwargs):
+		super().__init__(app, *args, **kwargs)
+		self.OTPService = otp_service
+
+	async def iterate_authn_methods(self, credentials_id: str) -> typing.AsyncGenerator[dict, None]:
+		try:
+			yield await self.get_authn_method(credentials_id, None)
+		except KeyError:
+			# TOTP is not active, nothing to yield
+			pass
+
+	async def get_authn_method(self, credentials_id: str, method_id: str | None = None) -> dict:
+		"""
+		Get TOTP authentication method for requested credentials.
+		Raise KeyError if TOTP is not active.
+		"""
+		if method_id is not None:
+			raise KeyError("TOTP is a singleton authentication method; method_id must be None.")
+
+		totp = await self.OTPService.get_totp(credentials_id)
+		return {
+			"type": "totp",
+			"label": "TOTP",
+			"cid": credentials_id,
+			"actions": self.SupportedActions,
+			"details": {
+				"totp": totp
+			},
+			"created": totp.get("_c"),
+		}
+
+	async def delete_authn_method(self, credentials_id: str, method_id: str | None = None):
+		if method_id is not None:
+			raise KeyError("TOTP is a singleton authentication method; method_id must be None.")
+
+		await self.OTPService.deactivate_totp(credentials_id)

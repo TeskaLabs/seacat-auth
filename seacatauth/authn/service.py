@@ -4,6 +4,7 @@ import logging
 import re
 import urllib.parse
 import asab
+import typing
 
 from .login_descriptor import LoginDescriptor
 from .login_factors import login_factor_builder
@@ -20,6 +21,7 @@ from ..session import (
 )
 
 from ..events import EventTypes
+from .provider import AuthnMethodProviderABC
 
 
 L = logging.getLogger(__name__)
@@ -91,6 +93,8 @@ class AuthenticationService(asab.Service):
 		]
 		self._load_global_descriptors()
 
+		self.AuthnMethodProviders: typing.Dict[str, AuthnMethodProviderABC] = {}
+
 		enforce_factors = asab.Config.get("seacatauth:authentication", "enforce_factors")
 		if len(enforce_factors) > 0:
 			# TODO: not all factors should be allowed as the second factor
@@ -130,6 +134,13 @@ class AuthenticationService(asab.Service):
 			for config
 			in descriptors_config
 		]
+
+
+	def register_authn_method_provider(self, provider: AuthnMethodProviderABC):
+		if provider.MethodType in self.AuthnMethodProviders:
+			raise ValueError("Provider for method '{}' is already registered.".format(provider.MethodType))
+		self.AuthnMethodProviders[provider.MethodType] = provider
+		L.debug("Registered authentication method provider", struct_data={"method_type": provider.MethodType})
 
 
 	async def create_login_session(
