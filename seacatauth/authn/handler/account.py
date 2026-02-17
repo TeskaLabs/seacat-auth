@@ -134,11 +134,11 @@ class AuthenticationAccountHandler(object):
 		except aiohttp.web.HTTPForbidden as e:
 			return e
 
-		client_dict = await client_service.get_client(request_data["client_id"])
+		client = await client_service.get_client(request_data["client_id"])
 		query = {
 			k: v for k, v in request_data.items()
 			if k in AUTHORIZE_PARAMETERS}
-		authorize_uri = oidc_service.build_authorize_uri(client_dict, **query)
+		authorize_uri = oidc_service.build_authorize_uri(client, **query)
 
 		response = aiohttp.web.HTTPFound(
 			authorize_uri,
