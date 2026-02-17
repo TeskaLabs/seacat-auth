@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha11
 - v25.48-alpha10
 - v25.48-alpha9
 - v25.48-alpha8
