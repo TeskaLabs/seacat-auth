@@ -1,5 +1,6 @@
 import base64
 import binascii
+import dataclasses
 import datetime
 import logging
 import re
@@ -17,6 +18,7 @@ from .. import generic
 from ..events import EventTypes
 from ..models import Session
 from ..models.const import OAuth2, ResourceId
+from ..models.client import Client
 from . import schema
 
 
@@ -112,7 +114,7 @@ class ClientService(asab.Service):
 		limit: int = None,
 		query_filter: typing.Optional[str | typing.Dict] = None,
 		sort_by: typing.Optional[typing.List[tuple]] = None
-	):
+	) -> typing.AsyncIterator[Client]:
 		collection = self.StorageService.Database[self.ClientCollection]
 
 		if query_filter is None:
@@ -136,12 +138,10 @@ class ClientService(asab.Service):
 			cursor.limit(limit)
 
 		async for client in cursor:
-			if "__client_secret" in client:
-				client.pop("__client_secret")
-			yield self._normalize_client(client)
+			yield self._deserialize_client(client)
 
 
-	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None):
+	async def count_clients(self, query_filter: typing.Optional[str | typing.Dict] = None) -> int:
 		collection = self.StorageService.Database[self.ClientCollection]
 		if query_filter is None:
 			query_filter = {}
@@ -150,33 +150,27 @@ class ClientService(asab.Service):
 		return await collection.count_documents(query_filter)
 
 
-	async def get_client(self, client_id: str, normalize: bool = True):
+	async def get_client(self, client_id: str, normalize: bool = True) -> Client:
 		"""
 		Get client metadata
 		"""
 		# Try to get client from cache
 		client = self._get_from_cache(client_id)
 		if client:
-			if normalize:
-				return self._normalize_client(client)
-			else:
-				return client
+			return client
 
 		# Get from the database
 		client = await self.StorageService.get(self.ClientCollection, client_id)
+		client = self._deserialize_client(client)
 		self._store_in_cache(client_id, client)
-
-		if normalize:
-			return self._normalize_client(client)
-		else:
-			return client
+		return client
 
 
 	async def create_client(
 		self, *,
 		_custom_client_id: str = None,
 		**kwargs
-	):
+	) -> str:
 		"""
 		Register a new OpenID Connect client
 		https://openid.net/specs/openid-connect-registration-1_0.html#ClientRegistration
@@ -214,14 +208,14 @@ class ClientService(asab.Service):
 		return client_id
 
 
-	async def reset_secret(self, client_id: str):
+	async def reset_secret(self, client_id: str) -> typing.Tuple[str, typing.Optional[datetime.datetime]]:
 		"""
 		Set or reset client secret
 		"""
 		# TODO: Use M2M credentials provider.
 		client = await self.get_client(client_id)
 		assert_client_is_editable(client)
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client._v)
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		client_secret_hash = generic.argon2_hash(client_secret)
 		upsertor.set("__client_secret", client_secret_hash)
@@ -253,7 +247,7 @@ class ClientService(asab.Service):
 		self._check_redirect_uris(**client_update)
 		self._check_grant_types(**client_update)
 
-		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client["_v"])
+		upsertor = self.StorageService.upsertor(self.ClientCollection, obj_id=client_id, version=client._v)
 
 		for k, v in client_update.items():
 			if k not in schema.CLIENT_METADATA_SCHEMA:
@@ -289,28 +283,28 @@ class ClientService(asab.Service):
 
 	async def validate_client_authorize_options(
 		self,
-		client: dict,
+		client: Client,
 		redirect_uri: str,
 		grant_type: str = None,
 		response_type: str = None,
-	):
+	) -> bool:
 		"""
 		Verify that the specified authorization parameters are valid for the client.
 		"""
 		if not self.OIDCService.DisableRedirectUriValidation and not validate_redirect_uri(
-			redirect_uri, client["redirect_uris"], client.get("redirect_uri_validation_method")):
-			raise exceptions.InvalidRedirectURI(client_id=client["_id"], redirect_uri=redirect_uri)
+			redirect_uri, client.redirect_uris, client.redirect_uri_validation_method):
+			raise exceptions.InvalidRedirectURI(client_id=client.client_id, redirect_uri=redirect_uri)
 
-		if grant_type is not None and grant_type not in client["grant_types"]:
-			raise exceptions.ClientError(client_id=client["_id"], grant_type=grant_type)
+		if grant_type is not None and grant_type not in (client.grant_types or []):
+			raise exceptions.ClientError(client_id=client.client_id, grant_type=grant_type)
 
-		if response_type not in client["response_types"]:
-			raise exceptions.ClientError(client_id=client["_id"], response_type=response_type)
+		if response_type not in (client.response_types or []):
+			raise exceptions.ClientError(client_id=client.client_id, response_type=response_type)
 
 		return True
 
 
-	async def authenticate_client_request(self, request) -> dict:
+	async def authenticate_client_request(self, request) -> Client:
 		"""
 		Verify client ID and secret.
 
@@ -356,13 +350,11 @@ class ClientService(asab.Service):
 			L.error("No client ID in request.")
 			raise exceptions.ClientAuthenticationError("No client ID in request.")
 
-		client_dict = await self.get_client(client_id)
+		client = await self.get_client(client_id)
 
 		# Check if used authentication method matches the pre-configured one
-		expected_auth_method = client_dict.get(
-			"token_endpoint_auth_method",
-			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
-		)
+		expected_auth_method = (
+			client.token_endpoint_auth_method or OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC)
 		if auth_method != expected_auth_method:
 			L.error("Unexpected client authentication method.", struct_data={
 				"received_auth_method": auth_method,
@@ -376,21 +368,14 @@ class ClientService(asab.Service):
 
 		if auth_method == "none":
 			# Public client - no secret verification required
-			return client_dict
+			return client
 
 		# Check secret expiration
-		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
-		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
-			L.error("Expired client secret.", struct_data={"client_id": client_id})
-			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=client_id)
-
-		# Verify client secret
-		client_secret_hash = client_dict.get("__client_secret", None)
-		if not generic.argon2_verify(client_secret_hash, client_secret):
+		if not client.verify_secret(client_secret):
 			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
-		return client_dict
+		return client
 
 
 	@asab.web.auth.require(ResourceId.CLIENT_APIKEY_MANAGE)
@@ -650,29 +635,55 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
-	def _normalize_client(self, client: dict):
-		client = {**client}  # Do not modify the original client
-		client["client_id"] = client["_id"]
-		if client.get("managed_by"):
-			client["read_only"] = True
+	def _deserialize_client(self, db_dict: dict) -> Client:
+		"""
+		Convert a database dict to a Client object
+		"""
+		# Known Client fields
+		client_fields = {f.name for f in dataclasses.fields(Client)}
+		kwargs = {}
+		extra = {}
+		for k, v in db_dict.items():
+			if k in client_fields:
+				kwargs[k] = v
+			elif k == "__client_secret":
+				kwargs["_client_secret"] = v
+			else:
+				extra[k] = v
+
+		kwargs["extra"] = extra
+
+		# Add generated fields
+		kwargs["client_id"] = db_dict["_id"]
+		kwargs["client_id_issued_at"] = db_dict["_c"]
 		cookie_svc = self.App.get_service("seacatauth.CookieService")
-		client["cookie_name"] = cookie_svc.get_cookie_name(client["_id"])
-		if client.get("seacatauth_credentials") is True:
+		kwargs["cookie_name"] = cookie_svc.get_cookie_name(db_dict["_id"])
+		if db_dict.get("seacatauth_credentials") is True:
 			credentials_service = self.App.get_service("seacatauth.CredentialsService")
 			provider = credentials_service.CredentialProviders["client"]
-			client["credentials_id"] = provider._format_credentials_id(client["_id"])
-		return client
+			kwargs["credentials_id"] = provider._format_credentials_id(db_dict["_id"])
+
+		# TEMPORARY
+		kwargs["_raw"] = db_dict
+		return Client(**kwargs)
 
 
-def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
+def validate_redirect_uri(redirect_uri: str, registered_uris: list | None, validation_method: str = "full_match"):
 	if validation_method is None:
+		# Default to full match if not specified
 		validation_method = "full_match"
 
 	if validation_method == "full_match":
+		if registered_uris is None:
+			L.error("Redirect URI validation method is 'full_match' but no redirect URIs are registered.")
+			return False
 		# Redirect URI must exactly match one of the registered URIs
 		if redirect_uri in registered_uris:
 			return True
 	elif validation_method == "prefix_match":
+		if registered_uris is None:
+			L.error("Redirect URI validation method is 'full_match' but no redirect URIs are registered.")
+			return False
 		# Redirect URI must start with one of the registered URIs and their netloc must match
 		for registered_uri in registered_uris:
 			if redirect_uri == registered_uri:
@@ -691,8 +702,8 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 	return False
 
 
-def is_client_confidential(client: dict):
-	token_endpoint_auth_method = client.get("token_endpoint_auth_method", OAuth2.TokenEndpointAuthMethod.NONE)
+def is_client_confidential(client: Client):
+	token_endpoint_auth_method = client.token_endpoint_auth_method or OAuth2.TokenEndpointAuthMethod.NONE
 	if token_endpoint_auth_method not in OAuth2.TokenEndpointAuthMethod:
 		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
 
@@ -702,39 +713,8 @@ def is_client_confidential(client: dict):
 		return True
 
 
-def assert_client_is_editable(client: dict):
-	if client.get("read_only"):
-		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
+def assert_client_is_editable(client: Client):
+	if client.is_read_only():
+		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client.client_id})
 		raise exceptions.NotEditableError("Client is not editable.")
 	return True
-
-
-def _validate_client_attributes(client_dict: dict):
-	"""
-	Validate client attributes.
-	"""
-	for k, v in client_dict.items():
-		if k not in schema.CLIENT_METADATA_SCHEMA:
-			raise asab.exceptions.ValidationError("Unexpected attribute: {!r}".format(k))
-
-		if k == "grant_types":
-			for grant_type in v:
-				if grant_type not in OAuth2.GrantType:
-					raise asab.exceptions.ValidationError("Invalid grant_type: {!r}".format(grant_type))
-
-		elif k == "response_types":
-			for response_type in v:
-				if response_type not in OAuth2.ResponseType:
-					raise asab.exceptions.ValidationError("Invalid response_type: {!r}".format(response_type))
-
-		elif k == "application_type":
-			if v not in OAuth2.ApplicationType:
-				raise asab.exceptions.ValidationError("Invalid application_type: {!r}".format(v))
-
-		elif k == "token_endpoint_auth_method":
-			if v not in OAuth2.TokenEndpointAuthMethod:
-				raise asab.exceptions.ValidationError("Invalid token_endpoint_auth_method: {!r}".format(v))
-
-		elif k == "redirect_uri_validation_method":
-			if v not in OAuth2.RedirectUriValidationMethod:
-				raise asab.exceptions.ValidationError("Invalid redirect_uri_validation_method: {!r}".format(v))

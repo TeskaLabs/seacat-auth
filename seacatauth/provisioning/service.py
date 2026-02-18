@@ -166,7 +166,7 @@ class ProvisioningService(asab.Service):
 		if client is None:
 			redirect_uris = set()
 		else:
-			redirect_uris = set(client.get("redirect_uris", []))
+			redirect_uris = set(client.redirect_uris or [])
 
 		if admin_ui_url not in redirect_uris:
 			redirect_uris.add(admin_ui_url)

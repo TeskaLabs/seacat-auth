@@ -86,7 +86,7 @@ class ClientHandler(object):
 			query_filter=request.query.get("f", None),
 			sort_by=[("client_name", 1)]
 		):
-			data.append(self._rest_normalize(client))
+			data.append(client.rest_serialize())
 
 		count = await self.ClientService.count_clients(request.query.get("f", None))
 
@@ -103,8 +103,8 @@ class ClientHandler(object):
 		Get client by client_id
 		"""
 		client_id = request.match_info["client_id"]
-		result = self._rest_normalize(await self.ClientService.get_client(client_id))
-		return asab.web.rest.json_response(request, result)
+		client = await self.ClientService.get_client(client_id)
+		return asab.web.rest.json_response(request, client.rest_serialize())
 
 
 	@asab.web.tenant.allow_no_tenant
@@ -139,7 +139,7 @@ class ClientHandler(object):
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
 		client_id = await self.ClientService.create_client(**json_data)
 		client = await self.ClientService.get_client(client_id)
-		response_data = self._rest_normalize(client)
+		response_data = client.rest_serialize()
 
 		if is_client_confidential(client):
 			# Set a secret for confidential client
@@ -309,17 +309,3 @@ class ClientHandler(object):
 				data={"result": "ERROR", "tech_err": "Client not found."}
 			)
 		return asab.web.rest.json_response(request, {"result": "OK"})
-
-
-	def _rest_normalize(self, client: dict):
-		rest_data = {
-			k: v
-			for k, v in client.items()
-			if not k.startswith("__")
-		}
-		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
-		if "__client_secret" in client:
-			rest_data["client_secret"] = True
-			if "client_secret_expires_at" in rest_data:
-				rest_data["client_secret_expires_at"] = int(rest_data["client_secret_expires_at"].timestamp())
-		return rest_data

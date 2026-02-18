@@ -462,7 +462,7 @@ class AuthenticationService(asab.Service):
 		"""
 		oidc_svc = self.App.get_service("seacatauth.OpenIdConnectService")
 		client_svc = self.App.get_service("seacatauth.ClientService")
-		client_dict = await client_svc.get_client(client_id)
+		client = await client_svc.get_client(client_id)
 
 		# Remove "prompt" and "acr_values" from callback
 		prompt = authorization_query.pop("prompt", None)
@@ -482,7 +482,7 @@ class AuthenticationService(asab.Service):
 		if acr_values:
 			login_query_params.append(("acr_values", acr_values))
 
-		login_url = client_dict.get("login_uri")
+		login_url = client.login_uri
 		if login_url is None:
 			login_url = self.LoginUrl
 
