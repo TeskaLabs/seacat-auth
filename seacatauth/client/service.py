@@ -706,6 +706,8 @@ class ClientService(asab.Service):
 			for k, v in raw_client.items()
 			if not k.startswith("_") or k in {"_id", "_v", "_c", "_m"}
 		}
+		if provider_id == self.DefaultProviderId:
+			client["client_id_aliases"] = [client["_id"]]
 		client["_id"] = client["client_id"] = _build_client_id(provider_id, client["_id"])
 		client = _set_cookie_name(self.App, client)
 		client = _set_credentials_id(self.App, client)
