@@ -58,7 +58,7 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 		- __client_secret: str | None
 			Hashed client secret for confidential clients. Not included in REST API responses, only used internally for
 			authentication and credential management.
-		- client_secfret_issued_at: datetime | None
+		- client_secret_issued_at: datetime | None
 			Timestamp of when the client secret was issued.
 		- client_secret_expires_at: datetime | None
 			When the client secret expires. A value of 0 or None means it does not expire.

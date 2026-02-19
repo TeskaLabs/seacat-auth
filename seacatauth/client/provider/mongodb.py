@@ -66,7 +66,7 @@ class MongoDBClientProvider(ClientProviderABC):
 			# Default sort by client_name ascending
 			field, direction = "client_name", "a"
 		else:
-			if len(sort_by) > 0:
+			if len(sort_by) > 1:
 				L.warning(
 					"Multiple sort fields are not supported, only the first one will be used",
 					struct_data={"sort_by": sort_by}
