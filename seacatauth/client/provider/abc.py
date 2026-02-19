@@ -14,12 +14,14 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 
 	Expected Client Dictionary Attributes:
 	-------------------------------------
-	Each client is represented as a dictionary with attributes defined by the CLIENT_METADATA_SCHEMA (see schema.py).
-	The most relevant and commonly used attributes include:
+	Each client is represented as a dictionary with attributes defined by the CLIENT_METADATA_SCHEMA (see schema.py)
+	plus additional storage-related and custom attributes.
+	For the client to be a valid object, it must have at least a unique _id.
+	Additional attributes are required for OAuth2/OIDC functionality, such as redirect_uris for authorization code flow.
 
 	Storage-related attributes:
 		- _id: str
-			Unique identifier of the client record in the storage backend.
+			REQUIRED Unique identifier of the client record in the storage backend.
 		- _c: datetime | None
 			Creation timestamp of the client record. Used as the value of client_id_issued_at.
 		- _m: datetime | None
@@ -83,9 +85,6 @@ class ClientProviderABC(asab.Configurable, abc.ABC):
 			Whether to create client credentials for this client and enable access control.
 
 	Additional fields may be present depending on the provider implementation and application needs.
-	For a full list and details, see seacatauth/client/schema.py:CLIENT_METADATA_SCHEMA.
-
-	All attributes are optional unless otherwise required by the schema or business logic.
 	"""
 
 	Type = None
