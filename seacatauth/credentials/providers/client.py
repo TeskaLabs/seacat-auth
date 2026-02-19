@@ -49,13 +49,21 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 
 	async def count(self, filtr: str = None) -> int:
 		client_service = self.App.get_service("seacatauth.ClientService")
-		return await client_service.count_clients(query_filter=self._build_filter(filtr))
+		return await client_service.count_clients(
+			substring_filter=filtr,
+			attribute_filter={"seacatauth_credentials": True},
+		)
 
 
 	async def search(self, filter: str = None, sort: dict = None, page: int = 0, limit: int = 0) -> list:
 		client_service = self.App.get_service("seacatauth.ClientService")
 		data = []
-		async for client in client_service.iterate_clients(page, limit, self._build_filter(filter)):
+		async for client in client_service.iterate_clients(
+			page,
+			limit,
+			substring_filter=filter,
+			attribute_filter={"seacatauth_credentials": True},
+		):
 			data.append(self._normalize_credentials(client))
 		return data
 
@@ -65,7 +73,8 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 		async for credentials in client_service.iterate_clients(
 			page=offset // limit if limit else 0,
 			limit=limit,
-			query_filter=self._build_filter(filtr),
+			substring_filter=filtr,
+			attribute_filter={"seacatauth_credentials": True},
 		):
 			yield self._normalize_credentials(credentials)
 
@@ -87,17 +96,6 @@ class ClientCredentialsProvider(CredentialsProviderABC):
 			raise exceptions.CredentialsNotFoundError(credentials_id)
 
 		return self._normalize_credentials(client, include)
-
-
-	def _build_filter(self, id_filter: str) -> dict:
-		client_service = self.App.get_service("seacatauth.ClientService")
-		if id_filter:
-			return {"$and": [
-				{"seacatauth_credentials": True},
-				client_service.build_filter(id_filter),
-			]}
-		else:
-			return {"seacatauth_credentials": True}
 
 
 	def _normalize_credentials(self, db_obj, include=None) -> dict:

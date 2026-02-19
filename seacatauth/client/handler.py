@@ -83,12 +83,11 @@ class ClientHandler(object):
 		async for client in self.ClientService.iterate_clients(
 			page=int(request.query.get("p", 1)) - 1,
 			limit=int(request.query["i"]) if "i" in request.query else None,
-			query_filter=request.query.get("f", None),
-			sort_by=[("client_name", 1)]
+			substring_filter=request.query.get("f", None),
 		):
 			data.append(self._rest_normalize(client))
 
-		count = await self.ClientService.count_clients(request.query.get("f", None))
+		count = await self.ClientService.count_clients(substring_filter=request.query.get("f", None))
 
 		return asab.web.rest.json_response(request, {
 			"data": data,
@@ -317,7 +316,8 @@ class ClientHandler(object):
 			for k, v in client.items()
 			if not k.startswith("__")
 		}
-		rest_data["client_id_issued_at"] = int(rest_data["_c"].timestamp())
+		if "_c" in client:
+			rest_data["client_id_issued_at"] = int(client["_c"].timestamp())
 		if "__client_secret" in client:
 			rest_data["client_secret"] = True
 			if "client_secret_expires_at" in rest_data:

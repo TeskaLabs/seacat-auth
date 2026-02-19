@@ -1,4 +1,5 @@
 import datetime
+import heapq
 import random
 import logging
 import re
@@ -11,6 +12,7 @@ import asab.exceptions
 import bcrypt
 import argon2
 import hashlib
+import collections.abc
 
 
 L = logging.getLogger(__name__)
@@ -336,3 +338,78 @@ def generate_ergonomic_token(length: int):
 
 # These are characters that are safe (prevents confusion with other characters)
 ergonomic_characters = "23456789abcdefghjkmnpqrstuvxyz"
+
+
+async def amerge_sorted(
+	*iters: typing.AsyncIterable,
+	iter_meta: collections.abc.Sequence[typing.Any] | None = None,
+	key: typing.Callable | None = None,
+	offset: int = 0,
+	limit: int | None = None
+) -> typing.AsyncIterable:
+	"""
+	Merge multiple sorted async iterables into a single sorted async iterable.
+
+	Args:
+		*iters: The async iterables to merge.
+		key: Optional key function to extract a comparison key from each element.
+			If None, the elements themselves are compared.
+		offset: Number of elements to skip from the start of the merged output.
+		limit: Maximum number of elements to yield from the merged output. If None, yield all elements.
+		iter_meta: Optional metadata for each iterator. If provided, must match the number of iterators.
+
+	Yields:
+		Elements from the input iterables in sorted order, optionally with their iterator metadata.
+	"""
+	if iter_meta is not None and len(iter_meta) != len(iters):
+		raise ValueError("iter_meta length must match number of iterables")
+
+	key = key or (lambda x: x)
+	heap = []
+
+	# Prime the heap with the first item from each iterator
+	aiterators = [aiter(it) for it in iters]
+	for idx, iterator in enumerate(aiterators):
+		try:
+			first = await anext(iterator)
+			heap.append((key(first), idx, first, iterator))
+		except StopAsyncIteration:
+			pass
+
+	heapq.heapify(heap)
+
+	while heap:
+		_, idx, value, iterator = heapq.heappop(heap)
+		if offset > 0:
+			# Offset not yet reached, skip this item
+			offset -= 1
+		else:
+			if limit is not None and limit <= 0:
+				break
+			if iter_meta is not None:
+				yield value, iter_meta[idx]
+			else:
+				yield value
+			if limit is not None:
+				limit -= 1
+
+		# Fetch the next item from the same iterator and push it onto the heap
+		try:
+			nxt = await anext(iterator)
+			heapq.heappush(heap, (key(nxt), idx, nxt, iterator))
+		except StopAsyncIteration:
+			pass
+
+
+class ReverseSortingString(str):
+	"""
+	Helper class to invert string comparison for sorting in descending order
+	"""
+	def __lt__(self, other):
+		return str.__gt__(self, other)
+	def __le__(self, other):
+		return str.__ge__(self, other)
+	def __gt__(self, other):
+		return str.__lt__(self, other)
+	def __ge__(self, other):
+		return str.__le__(self, other)
