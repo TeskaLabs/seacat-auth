@@ -503,7 +503,6 @@ class CookieHandler(object):
 			cookie_value=session.Cookie.Id,
 			client_id=client_id,
 			cookie_domain=cookie_domain,
-			secure=secure,
 		)
 
 		# Trigger webhook and set custom client response headers
