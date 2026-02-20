@@ -66,7 +66,7 @@ class AuthenticationAccountHandler(object):
 			return e
 
 		response = asab.web.rest.json_response(request, {"result": "OK"})
-		self.CookieService.set_session_cookie(
+		await self.CookieService.set_session_cookie(
 			response=response,
 			cookie_value=session.Cookie.Id,
 		)
@@ -149,7 +149,7 @@ class AuthenticationAccountHandler(object):
 			content_type="text/html",
 			text="""<!doctype html>\n<html lang="en">\n<head></head><body>...</body>\n</html>\n"""
 		)
-		self.CookieService.set_session_cookie(
+		await self.CookieService.set_session_cookie(
 			response=response,
 			cookie_value=session.Cookie.Id,
 			client_id=session.OAuth2.ClientId,

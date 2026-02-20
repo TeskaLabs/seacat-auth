@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha13
 - v25.48-alpha12
 - v25.48-alpha11
 - v25.48-alpha10
@@ -18,6 +19,7 @@
 - v25.48-alpha
 
 ### Fixes
+- Fix cookie introspection with client ID alias resolution (#554, v25.48-alpha13)
 - Reenable userinfo for cookie sessions (#553, v25.48-alpha11)
 - Handle CredentialsNotFoundError when cleaning up OTP secrets (#548, v25.48-alpha9)
 - Fix role pagination and sorting (#546, v25.48-alpha7)
