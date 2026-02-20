@@ -82,6 +82,7 @@ class CookieService(asab.Service):
 		Get Seacat session cookie value from request header
 		"""
 		if client_id is not None:
+			# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
 			client_service = self.App.get_service("seacatauth.ClientService")
 			client = await client_service.get_client(client_id)
 			cookie_name = client.get("cookie_name")
