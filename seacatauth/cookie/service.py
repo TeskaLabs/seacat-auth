@@ -39,7 +39,7 @@ class CookieService(asab.Service):
 		self.CookiePattern = re.compile(
 			"(^{cookie}({client_suffix})?=[^;]*; ?"
 			"|; ?{cookie}({client_suffix})?=[^;]*"
-			"|^{cookie}({client_suffix})?=[^;]*)".format(cookie=self.CookieName, client_suffix=r"_[A-Z8-9]+")
+			"|^{cookie}({client_suffix})?=[^;]*)".format(cookie=self.CookieName, client_suffix=r"_[A-Z2-9]+")
 		)
 		self.CookieSecure = asab.Config.getboolean("seacatauth:cookie", "secure")
 		self.RootCookieDomain = asab.Config.get("seacatauth:cookie", "domain") or None
