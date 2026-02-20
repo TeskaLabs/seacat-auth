@@ -77,11 +77,17 @@ class CookieService(asab.Service):
 		return domain or None
 
 
-	def get_session_cookie_value(self, request, client_id=None):
+	async def get_session_cookie_value(self, request, client_id=None):
 		"""
 		Get Seacat session cookie value from request header
 		"""
-		cookie_name = self.get_cookie_name(client_id)
+		if client_id is not None:
+			client_service = self.App.get_service("seacatauth.ClientService")
+			client = await client_service.get_client(client_id)
+			cookie_name = client.get("cookie_name")
+		else:
+			cookie_name = self.CookieName
+
 		cookie = request.cookies.get(cookie_name)
 		return cookie
 
@@ -93,7 +99,7 @@ class CookieService(asab.Service):
 		To search for root session, keep client_id=None.
 		Root sessions have no client_id attribute, which MongoDB matches as None.
 		"""
-		session_cookie_id = self.get_session_cookie_value(request, client_id)
+		session_cookie_id = await self.get_session_cookie_value(request, client_id)
 		if session_cookie_id is None:
 			raise exceptions.NoCookieError(client_id)
 		return await self.get_session_by_session_cookie_value(session_cookie_id)
