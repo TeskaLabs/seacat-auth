@@ -238,7 +238,7 @@ class AuthenticationPublicHandler(object):
 		if cookie_domain is None:
 			cookie_domain = self.CookieService.RootCookieDomain
 
-		self.CookieService.set_session_cookie(
+		await self.CookieService.set_session_cookie(
 			response=response,
 			cookie_value=session.Cookie.Id,
 			client_id=session.OAuth2.ClientId,
@@ -275,7 +275,7 @@ class AuthenticationPublicHandler(object):
 		else:
 			response = asab.web.rest.json_response(request, {'result': 'OK'})
 
-		self.CookieService.delete_session_cookie(response)
+		await self.CookieService.delete_session_cookie(response)
 
 		# If the current session is impersonated and the original session has a
 		# root cookie, try to restore the original session
@@ -290,7 +290,7 @@ class AuthenticationPublicHandler(object):
 					# Case when the impersonation was started by an M2M session, which has no cookie
 					pass
 				else:
-					self.CookieService.set_session_cookie(
+					await self.CookieService.set_session_cookie(
 						response=response,
 						cookie_value=impersonator_session.Cookie.Id,
 						client_id=impersonator_session.OAuth2.ClientId,

@@ -219,12 +219,18 @@ class CookieService(asab.Service):
 		return await self.SessionService.touch(session, expiration, override_cooldown=True)
 
 
-	def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
+	async def set_session_cookie(self, response, cookie_value, client_id=None, cookie_domain=None, secure=None):
 		"""
 		Add a Set-Cookie header to the response.
 		The cookie serves as a Seacat Auth session identifier and is used for authentication.
 		"""
-		cookie_name = self.get_cookie_name(client_id)
+		if client_id is not None:
+			# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
+			client_service = self.App.get_service("seacatauth.ClientService")
+			client = await client_service.get_client(client_id)
+			cookie_name = client.get("cookie_name")
+		else:
+			cookie_name = self.CookieName
 		cookie_domain = cookie_domain or self.RootCookieDomain
 		if secure is None:
 			secure = self.CookieSecure
@@ -238,9 +244,16 @@ class CookieService(asab.Service):
 		)
 
 
-	def delete_session_cookie(self, response, client_id: typing.Optional[str] = None):
+	async def delete_session_cookie(self, response, client_id: typing.Optional[str] = None):
 		"""
 		Add a Set-Cookie header to the response to unset Seacat Session cookie
+		This method is now async.
 		"""
-		cookie_name = self.get_cookie_name(client_id)
+		if client_id is not None:
+			# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
+			client_service = self.App.get_service("seacatauth.ClientService")
+			client = await client_service.get_client(client_id)
+			cookie_name = client.get("cookie_name")
+		else:
+			cookie_name = self.CookieName
 		response.del_cookie(cookie_name)
