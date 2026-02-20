@@ -54,15 +54,29 @@ class CookieService(asab.Service):
 		self.OpenIdConnectService = self.App.get_service("seacatauth.OpenIdConnectService")
 
 
-	def get_cookie_name(self, client_id: str = None):
-		if client_id is not None:
-			client_id_hash = base64.b32encode(
-				hashlib.sha256(client_id.encode("ascii")).digest()[:10]
-			).decode("ascii")
-			cookie_name = "{}_{}".format(self.CookieName, client_id_hash)
-		else:
-			cookie_name = self.CookieName
-		return cookie_name
+	def build_cookie_name(self, client_id: str) -> str:
+		"""
+		Build cookie name for a given Client ID.
+		The ID must **NOT** be an alias, but the actual Client ID, so that the same cookie name is generated regardless
+		of which alias is used to refer to the Client.
+		"""
+		client_id_hash = base64.b32encode(
+			hashlib.sha256(client_id.encode("ascii")).digest()[:10]
+		).decode("ascii")
+		return "{}_{}".format(self.CookieName, client_id_hash)
+
+
+	async def get_cookie_name(self, client_id: str | None = None) -> str:
+		"""
+		Get cookie name for a given Client ID.
+		"""
+		if client_id is None:
+			return self.CookieName
+
+		# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
+		client_service = self.App.get_service("seacatauth.ClientService")
+		client = await client_service.get_client(client_id)
+		return client.get("cookie_name")
 
 
 	def remove_seacat_cookies_from_request(self, cookie_string):
@@ -81,14 +95,7 @@ class CookieService(asab.Service):
 		"""
 		Get Seacat session cookie value from request header
 		"""
-		if client_id is not None:
-			# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
-			client_service = self.App.get_service("seacatauth.ClientService")
-			client = await client_service.get_client(client_id)
-			cookie_name = client.get("cookie_name")
-		else:
-			cookie_name = self.CookieName
-
+		cookie_name = await self.get_cookie_name(client_id)
 		cookie = request.cookies.get(cookie_name)
 		return cookie
 
@@ -224,13 +231,7 @@ class CookieService(asab.Service):
 		Add a Set-Cookie header to the response.
 		The cookie serves as a Seacat Auth session identifier and is used for authentication.
 		"""
-		if client_id is not None:
-			# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
-			client_service = self.App.get_service("seacatauth.ClientService")
-			client = await client_service.get_client(client_id)
-			cookie_name = client.get("cookie_name")
-		else:
-			cookie_name = self.CookieName
+		cookie_name = await self.get_cookie_name(client_id)
 		cookie_domain = cookie_domain or self.RootCookieDomain
 		if secure is None:
 			secure = self.CookieSecure
@@ -249,11 +250,5 @@ class CookieService(asab.Service):
 		Add a Set-Cookie header to the response to unset Seacat Session cookie
 		This method is now async.
 		"""
-		if client_id is not None:
-			# Make sure Client ID alias is resolved to the actual Client ID, so that the correct cookie name is used.
-			client_service = self.App.get_service("seacatauth.ClientService")
-			client = await client_service.get_client(client_id)
-			cookie_name = client.get("cookie_name")
-		else:
-			cookie_name = self.CookieName
+		cookie_name = await self.get_cookie_name(client_id)
 		response.del_cookie(cookie_name)
