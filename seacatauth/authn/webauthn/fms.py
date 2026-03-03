@@ -162,7 +162,12 @@ class FIDOMetadataService(asab.Service):
 
 
 	async def get_authenticator_metadata(self, verified_registration) -> dict | None:
-		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
+		try:
+			aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
+		except ValueError:
+			L.error("Invalid AAGUID format in registration: {}".format(verified_registration.aaguid))
+			return None
+
 		if aaguid == bytes(16):
 			# Authenticators with other identifiers than AAGUID are not supported
 			metadata = None
