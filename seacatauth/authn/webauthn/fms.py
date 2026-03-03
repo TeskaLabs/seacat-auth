@@ -36,7 +36,7 @@ class FIDOMetadataService(asab.Service):
 
 
 	async def _on_housekeeping(self, event_name):
-		self.TaskService.schedule(self._load_fido_metadata(force_reload=True))
+		self.TaskService.schedule(self._load_fido_metadata())
 
 
 	async def _get_last_fido_mds_etag(self) -> str | None:
@@ -48,16 +48,13 @@ class FIDOMetadataService(asab.Service):
 			return None
 
 
-	async def _load_fido_metadata(self, *, force_reload: bool = False):
+	async def _load_fido_metadata(self):
 		"""
 		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
 		"""
 		coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
 		result = await coll.find_one({}, {"_id": 1})
 		storage_empty = result is None
-
-		if not (storage_empty or force_reload):
-			return
 
 		new_etag = None
 		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
@@ -97,7 +94,10 @@ class FIDOMetadataService(asab.Service):
 				jwt = f.read()
 
 		jwt = jwcrypto.jwt.JWT(jwt=jwt)
-		cert_chain = jwt.token.jose_header.get("x5c", [])
+		cert_chain = jwt.token.jose_header.get("x5c")
+		if not cert_chain:
+			L.error("FIDO Metadata Service JWT is missing x5c header, cannot validate signature.")
+			return
 		leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
 		public_key = leaf_cert.public_key()
 		public_key = public_key.public_bytes(
@@ -121,26 +121,29 @@ class FIDOMetadataService(asab.Service):
 		n_inserted = 0
 		async with await client.start_session() as session:
 			async with session.start_transaction():
-				await collection.delete_many({})
+				await collection.delete_many({}, session=session)
 				for entry in entries:
 					if "aaguid" not in entry:
 						continue
 					aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
 					metadata = entry.get("metadataStatement")
+					if not metadata:
+						continue
 					metadata["_id"] = aaguid
 					try:
-						await collection.insert_one(metadata)
+						await collection.insert_one(metadata, session=session)
 						n_inserted += 1
 					except pymongo.errors.DuplicateKeyError:
 						# Likely a race condition with another instance
-						session.abort_transaction()
+						await session.abort_transaction()
 						break
 				if new_etag is not None:
 					metadata_coll = await self.StorageService.collection(self.CollectionMetadataCollection)
 					await metadata_coll.update_one(
 						{"_id": self.FidoMetadataServiceCollection},
 						{"$set": {"source_etag": new_etag}},
-						upsert=True
+						upsert=True,
+						session=session,
 					)
 
 		L.debug("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted, "etag": new_etag})
@@ -148,7 +151,7 @@ class FIDOMetadataService(asab.Service):
 
 	async def get_authenticator_metadata(self, verified_registration) -> dict | None:
 		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
-		if aaguid == 0:
+		if aaguid == bytes(16):
 			# Authenticators with other identifiers than AAGUID are not supported
 			metadata = None
 		else:
