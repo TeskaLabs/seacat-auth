@@ -120,31 +120,32 @@ class FIDOMetadataService(asab.Service):
 		client = self.StorageService.Client
 		n_inserted = 0
 		async with await client.start_session() as session:
-			async with session.start_transaction():
-				await collection.delete_many({}, session=session)
-				for entry in entries:
-					if "aaguid" not in entry:
-						continue
-					aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
-					metadata = entry.get("metadataStatement")
-					if not metadata:
-						continue
-					metadata["_id"] = aaguid
-					try:
+			try:
+				async with session.start_transaction():
+					await collection.delete_many({}, session=session)
+					for entry in entries:
+						if "aaguid" not in entry:
+							continue
+						aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
+						metadata = entry.get("metadataStatement")
+						if not metadata:
+							continue
+						metadata["_id"] = aaguid
 						await collection.insert_one(metadata, session=session)
 						n_inserted += 1
-					except pymongo.errors.DuplicateKeyError:
-						# Likely a race condition with another instance
-						await session.abort_transaction()
-						break
-				if new_etag is not None:
-					metadata_coll = await self.StorageService.collection(self.CollectionMetadataCollection)
-					await metadata_coll.update_one(
-						{"_id": self.FidoMetadataServiceCollection},
-						{"$set": {"source_etag": new_etag}},
-						upsert=True,
-						session=session,
-					)
+					if new_etag is not None:
+						metadata_coll = await self.StorageService.collection(self.CollectionMetadataCollection)
+						await metadata_coll.update_one(
+							{"_id": self.FidoMetadataServiceCollection},
+							{"$set": {"source_etag": new_etag}},
+							upsert=True,
+							session=session,
+						)
+			except (pymongo.errors.DuplicateKeyError, pymongo.errors.OperationFailure):
+				# Likely a race condition with another instance
+				await session.abort_transaction()
+				L.debug("FIDO Metadata Service: Detected concurrent update, aborting transaction and skipping update.")
+				return
 
 		L.debug("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted, "etag": new_etag})
 
