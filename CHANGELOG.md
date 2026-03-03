@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha10
 - v25.48-alpha9
 - v25.48-alpha8
 - v25.48-alpha7
@@ -15,6 +16,7 @@
 - v25.48-alpha
 
 ### Fixes
+- Abort FIDO MDS update when race condition is encountered (#551, v25.48-alpha10)
 - Handle CredentialsNotFoundError when cleaning up OTP secrets (#548, v25.48-alpha9)
 - Fix role pagination and sorting (#546, v25.48-alpha7)
 - Fix the query in login redirection response (#547, v25.48-alpha5)
