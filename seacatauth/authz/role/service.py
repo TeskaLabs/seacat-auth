@@ -15,7 +15,7 @@ from ...events import EventTypes
 from .view import GlobalRoleView, PropagatedRoleView, CustomTenantRoleView
 from .view.abc import RoleView
 from .view.propagated_role import global_role_id_to_propagated
-from .utils import amerge_sorted, ReverseSortingString
+from ...generic import amerge_sorted, ReverseSortingString
 
 
 L = logging.getLogger(__name__)

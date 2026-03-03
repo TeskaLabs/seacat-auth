@@ -224,7 +224,7 @@ class ExternalAuthenticationService(asab.Service):
 				"state": state["_id"],
 				"error": str(e),
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="login_failed",
 				delete_sso_cookie=True,
@@ -237,7 +237,7 @@ class ExternalAuthenticationService(asab.Service):
 				"state": state["_id"],
 				"error": str(e),
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="login_failed",
 				delete_sso_cookie=True,
@@ -299,7 +299,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		if credentials_id is None:
 			# Redirect to login page with error message, keep the original redirect uri in the query
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="login_failed",
 				delete_sso_cookie=True,
@@ -315,7 +315,7 @@ class ExternalAuthenticationService(asab.Service):
 				current_sso_session=current_sso_session,
 			)
 
-		return self._success_redirect_response(
+		return await self._success_redirect_response(
 			self._get_final_redirect_uri(state), "login_success", sso_session=new_sso_session)
 
 
@@ -416,7 +416,7 @@ class ExternalAuthenticationService(asab.Service):
 				"state": state["_id"],
 				"error": str(e),
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="signup_failed",
 				delete_sso_cookie=True,
@@ -429,7 +429,7 @@ class ExternalAuthenticationService(asab.Service):
 				"state": state["_id"],
 				"error": str(e),
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="signup_failed",
 				delete_sso_cookie=True,
@@ -438,7 +438,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		if not self.can_sign_up_new_credentials(provider_type):
 			L.error("Sign-up with external account not enabled.")
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="signup_failed",
 				delete_sso_cookie=True,
@@ -453,7 +453,7 @@ class ExternalAuthenticationService(asab.Service):
 					provider_type, subject_id=user_info["sub"])
 			L.log(asab.LOG_NOTICE, "Cannot sign up with external account: Account already paired.", struct_data={
 				"provider": provider_type, "sub": user_info.get("sub")})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="signup_failed",
 				delete_sso_cookie=True,
@@ -471,7 +471,7 @@ class ExternalAuthenticationService(asab.Service):
 				provider_type, user_info, payload)
 		except exceptions.CredentialsRegistrationError as e:
 			L.error("Sign-up with external account failed: {}".format(e))
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="signup_failed",
 				delete_sso_cookie=True,
@@ -485,7 +485,7 @@ class ExternalAuthenticationService(asab.Service):
 			current_sso_session=None,
 		)
 
-		return self._success_redirect_response(
+		return await self._success_redirect_response(
 			self._get_final_redirect_uri(state), "signup_success", sso_session=sso_session)
 
 
@@ -517,7 +517,7 @@ class ExternalAuthenticationService(asab.Service):
 				"state": state["_id"],
 				"error": str(e),
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="pairing_failed",
 				redirect_uri=self._get_final_redirect_uri(state),
@@ -529,7 +529,7 @@ class ExternalAuthenticationService(asab.Service):
 				"state": state["_id"],
 				"error": str(e),
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self._get_final_redirect_uri(state),
 				result="pairing_failed",
 			)
@@ -544,7 +544,7 @@ class ExternalAuthenticationService(asab.Service):
 				"sub": user_info.get("sub"),
 				"state": state["_id"],
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="pairing_failed",
 				delete_sso_cookie=True,
@@ -558,7 +558,7 @@ class ExternalAuthenticationService(asab.Service):
 				"sub": user_info.get("sub"),
 				"state": state["_id"],
 			})
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self.LoginUri,
 				result="pairing_failed",
 				delete_sso_cookie=True,
@@ -582,13 +582,13 @@ class ExternalAuthenticationService(asab.Service):
 					"sub": user_info.get("sub"),
 				}
 			)
-			return self._error_redirect_response(
+			return await self._error_redirect_response(
 				self._get_final_redirect_uri(state),
 				result="pairing_failed",
 				ext_login_error="already_exists"
 			)
 
-		return self._success_redirect_response(
+		return await self._success_redirect_response(
 			self._get_final_redirect_uri(state), "pairing_success")
 
 
@@ -687,7 +687,7 @@ class ExternalAuthenticationService(asab.Service):
 			})
 
 
-	def _error_redirect_response(
+	async def _error_redirect_response(
 		self,
 		location: str,
 		result: str = "error",
@@ -700,11 +700,11 @@ class ExternalAuthenticationService(asab.Service):
 			"Refresh": "0;url={}".format(location),
 		})
 		if delete_sso_cookie:
-			self.CookieService.delete_session_cookie(response)
+			await self.CookieService.delete_session_cookie(response)
 		return response
 
 
-	def _success_redirect_response(
+	async def _success_redirect_response(
 		self,
 		location: str,
 		result: str = "success",
@@ -714,7 +714,7 @@ class ExternalAuthenticationService(asab.Service):
 		location = _update_url_query(location, ext_login_result=result, **query_params)
 		response = aiohttp.web.HTTPFound(location)
 		if sso_session:
-			self.CookieService.set_session_cookie(
+			await self.CookieService.set_session_cookie(
 				response,
 				cookie_value=sso_session.Cookie.Id,
 			)

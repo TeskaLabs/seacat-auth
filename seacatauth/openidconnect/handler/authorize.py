@@ -831,7 +831,7 @@ class AuthorizeHandler(object):
 				"Location": login_url,
 			},
 		)
-		self.CookieService.delete_session_cookie(response)
+		await self.CookieService.delete_session_cookie(response)
 		return response
 
 	async def reply_with_factor_setup_redirect(
@@ -969,7 +969,7 @@ class AuthorizeHandler(object):
 
 	def _validate_request_parameters(self, request_parameters):
 		"""
-		Verify the presence of required parameters.
+		Verify the presence of required parameters
 
 		As specified in OAuth 2.0 [RFC6749], Authorization Servers SHOULD ignore unrecognized request parameters.
 		"""
