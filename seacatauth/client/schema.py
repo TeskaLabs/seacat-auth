@@ -5,11 +5,6 @@ from ..models.const import OAuth2
 # TODO: Supported OAuth/OIDC param values should be managed by the OpenIdConnect module, not Client.
 CLIENT_METADATA_SCHEMA = {
 	# The order of the properties is preserved in the UI form
-	"preferred_client_id": {
-		"type": "string",
-		"pattern": "^[-_a-zA-Z0-9]{4,64}$",
-		"description": "Preferred client ID. If not specified, a random ID will be generated.",
-	},
 	"client_name": {  # Can have language tags (e.g. "client_name#cs")
 		"type": "string",
 		"description": "Name of the Client to be presented to the End-User."
@@ -157,7 +152,14 @@ REGISTER_CLIENT = {
 	"type": "object",
 	"required": ["redirect_uris", "client_name"],
 	"additionalProperties": False,
-	"properties": CLIENT_METADATA_SCHEMA,
+	"properties": {
+		"preferred_client_id": {
+			"type": "string",
+			"pattern": "^[-_a-zA-Z0-9]{4,64}$",
+			"description": "Preferred client ID. If not specified, a random ID will be generated.",
+		},
+		**CLIENT_METADATA_SCHEMA
+	},
 	# "patternProperties": {
 	#   # Language-specific metadata with RFC 5646 language tags
 	# 	"^client_name#[-a-zA-Z0-9]+$": {"type": "string"},
