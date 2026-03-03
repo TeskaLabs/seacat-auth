@@ -101,7 +101,7 @@ class WebAuthnService(asab.Service):
 		await self.delete_all_webauthn_credentials(credentials_id)
 
 
-	async def _get_fido_mds_etag(self) -> str | None:
+	async def _get_last_fido_mds_etag(self) -> str | None:
 		coll = await self.StorageService.collection(self.CollectionMetadataCollection)
 		coll_metadata = await coll.find_one(self.FidoMetadataServiceCollection)
 		if coll_metadata is not None:
@@ -117,16 +117,17 @@ class WebAuthnService(asab.Service):
 		if not self.FidoMetadataServiceUrl:
 			return
 
-		if not force_reload:
-			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
-			count = await coll.estimated_document_count()
-			if count > 0:
-				return
+		coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
+		result = await coll.find_one({}, {"_id": 1})
+		storage_empty = result is None
+
+		if not (storage_empty or force_reload):
+			return
 
 		new_etag = None
 		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
 			headers = {}
-			if last_etag := await self._get_fido_mds_etag():
+			if not storage_empty and (last_etag := await self._get_last_fido_mds_etag()):
 				headers["If-None-Match"] = last_etag
 				L.debug("Fetching FIDO metadata from MDS with ETag: {}".format(last_etag), struct_data={
 					"etag": last_etag,
