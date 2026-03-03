@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha15
 - v25.48-alpha14
 - v25.48-alpha13
 - v25.48-alpha12
@@ -28,6 +29,7 @@
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Conditional fetching of FIDO metadata (#555, v25.48-alpha15)
 - Provider system for ClientService (#550, v25.48-alpha12)
 - Common admin API for authentication methods (#533, v25.48-alpha10)
 - Auto-registration for unknown external accounts (#543, v25.48-alpha8)
