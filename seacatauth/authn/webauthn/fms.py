@@ -100,19 +100,23 @@ class FIDOMetadataService(asab.Service):
 				with open(self.FidoMetadataServiceUrl) as f:
 					jwt = f.read()
 
-			jwt = jwcrypto.jwt.JWT(jwt=jwt)
-			cert_chain = jwt.token.jose_header.get("x5c")
-			if not cert_chain:
-				L.error("FIDO Metadata Service JWT is missing x5c header, cannot validate signature.")
+			try:
+				jwt = jwcrypto.jwt.JWT(jwt=jwt)
+				cert_chain = jwt.token.jose_header.get("x5c")
+				if not cert_chain:
+					L.error("FIDO Metadata Service JWT is missing x5c header, cannot validate signature.")
+					return
+				leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
+				public_key = leaf_cert.public_key()
+				public_key = public_key.public_bytes(
+					cryptography.hazmat.primitives.serialization.Encoding.PEM,
+					cryptography.hazmat.primitives.serialization.PublicFormat.PKCS1)
+				public_key = jwcrypto.jwk.JWK.from_pem(public_key)
+				jwt.validate(public_key)
+				entries = json.loads(jwt.claims)["entries"]
+			except Exception as e:
+				L.error("Failed to decode FIDO Metadata Service JWT: {}".format(e))
 				return
-			leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
-			public_key = leaf_cert.public_key()
-			public_key = public_key.public_bytes(
-				cryptography.hazmat.primitives.serialization.Encoding.PEM,
-				cryptography.hazmat.primitives.serialization.PublicFormat.PKCS1)
-			public_key = jwcrypto.jwk.JWK.from_pem(public_key)
-			jwt.validate(public_key)
-			entries = json.loads(jwt.claims)["entries"]
 
 			# FIDO2 authenticators are identified with AAGUID
 			# Other identifiers (AAID, AKI) are not supported at the moment.
