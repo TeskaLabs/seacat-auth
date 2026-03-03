@@ -14,6 +14,7 @@ import webauthn.registration
 import webauthn.helpers.structs
 import cryptography.hazmat.primitives.serialization
 import cryptography.x509
+import pymongo.errors
 
 from ... import exceptions
 from ...events import EventTypes
@@ -112,6 +113,7 @@ class WebAuthnService(asab.Service):
 			if count > 0:
 				return
 
+		# TODO: Optimize - store ETag and use "If-None-Match" header to avoid re-processing the same data
 		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
 			try:
 				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
@@ -166,8 +168,13 @@ class WebAuthnService(asab.Service):
 					aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
 					metadata = entry.get("metadataStatement")
 					metadata["_id"] = aaguid
-					await collection.insert_one(metadata)
-					n_inserted += 1
+					try:
+						await collection.insert_one(metadata)
+						n_inserted += 1
+					except pymongo.errors.DuplicateKeyError:
+						# Likely a race condition with another instance
+						session.abort_transaction()
+						break
 
 		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
 
