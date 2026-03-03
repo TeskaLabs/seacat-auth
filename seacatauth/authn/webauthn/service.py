@@ -40,6 +40,7 @@ class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
 	FidoMetadataServiceCollection = "fms"
+	CollectionMetadataCollection = "_meta"  # Collection to store metadata about other collections
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
@@ -98,6 +99,15 @@ class WebAuthnService(asab.Service):
 		await self.delete_all_webauthn_credentials(credentials_id)
 
 
+	async def _get_fido_mds_etag(self) -> str | None:
+		coll = await self.StorageService.collection(self.CollectionMetadataCollection)
+		coll_metadata = await coll.find_one(self.FidoMetadataServiceCollection)
+		if coll_metadata is not None:
+			return coll_metadata.get("source_etag")
+		else:
+			return None
+
+
 	async def _load_fido_metadata(self, *, force_reload: bool = False):
 		"""
 		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
@@ -111,13 +121,27 @@ class WebAuthnService(asab.Service):
 			if count > 0:
 				return
 
-		# TODO: Optimize - store ETag and use "If-None-Match" header to avoid re-processing the same data
+		new_etag = None
 		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
+			headers = {}
+			if last_etag := await self._get_fido_mds_etag():
+				headers["If-None-Match"] = last_etag
+				L.debug("Fetching FIDO metadata from MDS with ETag: {}".format(last_etag), struct_data={
+					"etag": last_etag,
+				})
+
 			try:
 				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-					async with session.get(self.FidoMetadataServiceUrl) as resp:
-						if resp.status == 200:
+					async with session.get(self.FidoMetadataServiceUrl, headers=headers) as resp:
+						if resp.status == 304:
+							L.debug(
+								"FIDO Metadata Service responded with 304, skipping reload.",
+								struct_data={"etag": resp.headers.get("ETag")}
+							)
+							return
+						elif resp.status == 200:
 							jwt = await resp.text()
+							new_etag = resp.headers.get("ETag")
 						else:
 							text = await resp.text()
 							L.info(
@@ -173,8 +197,15 @@ class WebAuthnService(asab.Service):
 						# Likely a race condition with another instance
 						session.abort_transaction()
 						break
+				if new_etag is not None:
+					metadata_coll = await self.StorageService.collection(self.CollectionMetadataCollection)
+					await metadata_coll.update_one(
+						{"_id": self.FidoMetadataServiceCollection},
+						{"$set": {"source_etag": new_etag}},
+						upsert=True
+					)
 
-		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
+		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted, "etag": new_etag})
 
 
 	async def create_webauthn_credential(
@@ -216,6 +247,7 @@ class WebAuthnService(asab.Service):
 
 		passkey_id = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential created.", struct_data={"passkey_id": passkey_id.hex()})
+
 
 	async def _get_authenticator_metadata(self, verified_registration):
 		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
