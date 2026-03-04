@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha15
 - v25.48-alpha14
 - v25.48-alpha13
 - v25.48-alpha12
@@ -20,7 +21,7 @@
 - v25.48-alpha
 
 ### Fixes
-- Abort FIDO MDS update when race condition is encountered (#551, v25.48-alpha14)
+- Abort FIDO MDS update when race condition is encountered (#551, #555, v25.48-alpha14)
 - Fix cookie introspection with client ID alias resolution (#554, v25.48-alpha13)
 - Reenable userinfo for cookie sessions (#553, v25.48-alpha11)
 - Handle CredentialsNotFoundError when cleaning up OTP secrets (#548, v25.48-alpha9)
@@ -28,6 +29,7 @@
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Conditional fetching of FIDO metadata (#555, v25.48-alpha15)
 - Provider system for ClientService (#550, v25.48-alpha12)
 - Common admin API for authentication methods (#533, v25.48-alpha10)
 - Auto-registration for unknown external accounts (#543, v25.48-alpha8)
