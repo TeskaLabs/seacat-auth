@@ -21,7 +21,7 @@
 - v25.48-alpha
 
 ### Fixes
-- Abort FIDO MDS update when race condition is encountered (#551, v25.48-alpha14)
+- Abort FIDO MDS update when race condition is encountered (#551, #555, v25.48-alpha14)
 - Fix cookie introspection with client ID alias resolution (#554, v25.48-alpha13)
 - Reenable userinfo for cookie sessions (#553, v25.48-alpha11)
 - Handle CredentialsNotFoundError when cleaning up OTP secrets (#548, v25.48-alpha9)
