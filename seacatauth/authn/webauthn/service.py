@@ -5,16 +5,10 @@ import logging
 import secrets
 import typing
 import urllib.parse
-import aiohttp
 import asab.storage
-import jwcrypto.jwt
-import jwcrypto.jwk
 import webauthn
 import webauthn.registration
 import webauthn.helpers.structs
-import cryptography.hazmat.primitives.serialization
-import cryptography.x509
-import pymongo.errors
 
 from ... import exceptions
 from ...events import EventTypes
@@ -41,13 +35,16 @@ asab.Config.add_defaults({
 class WebAuthnService(asab.Service):
 	WebAuthnCredentialCollection = "wa"
 	WebAuthnRegistrationChallengeCollection = "warc"
-	FidoMetadataServiceCollection = "fms"
 
 	def __init__(self, app, service_name="seacatauth.WebAuthnService"):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.CredentialsService = app.get_service("seacatauth.CredentialsService")
-		self.TaskService = app.get_service("asab.TaskService")
+		if asab.Config.get("seacatauth:webauthn", "metadata_service_url") in ("", "DISABLED"):
+			self.FIDOMetadataService = None
+		else:
+			from .fms import FIDOMetadataService
+			self.FIDOMetadataService = FIDOMetadataService(app)
 
 		self.RelyingPartyName = asab.Config.get("seacatauth:webauthn", "relying_party_name")
 
@@ -74,12 +71,6 @@ class WebAuthnService(asab.Service):
 			webauthn.helpers.structs.COSEAlgorithmIdentifier(-7)  # Es256
 		]
 
-		self.FidoMetadataServiceUrl = asab.Config.get("seacatauth:webauthn", "metadata_service_url")
-		if self.FidoMetadataServiceUrl in ("", "DISABLED"):
-			self.FidoMetadataServiceUrl = None
-		else:
-			self.TaskService.schedule(self._load_fido_metadata())
-
 		app.PubSub.subscribe("Application.housekeeping!", self._on_housekeeping)
 		app.PubSub.subscribe("Credentials.password_reset!", self._on_password_reset)
 		app.PubSub.subscribe("Credentials.deleted!", self._on_credentials_deleted)
@@ -87,8 +78,6 @@ class WebAuthnService(asab.Service):
 
 	async def _on_housekeeping(self, event_name):
 		await self._delete_expired_challenges()
-		if self.FidoMetadataServiceUrl is not None:
-			self.TaskService.schedule(self._load_fido_metadata(force_reload=True))
 
 
 	async def _on_password_reset(self, event_name: str, credentials_id: str):
@@ -98,85 +87,6 @@ class WebAuthnService(asab.Service):
 
 	async def _on_credentials_deleted(self, event_name: str, credentials_id: str):
 		await self.delete_all_webauthn_credentials(credentials_id)
-
-
-	async def _load_fido_metadata(self, *, force_reload: bool = False):
-		"""
-		Download and decode FIDO metadata from FIDO Alliance Metadata Service (MDS) and prepare a lookup dictionary.
-		"""
-		if not self.FidoMetadataServiceUrl:
-			return
-
-		if not force_reload:
-			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
-			count = await coll.estimated_document_count()
-			if count > 0:
-				return
-
-		# TODO: Optimize - store ETag and use "If-None-Match" header to avoid re-processing the same data
-		if self.FidoMetadataServiceUrl.startswith("https://") or self.FidoMetadataServiceUrl.startswith("http://"):
-			try:
-				async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-					async with session.get(self.FidoMetadataServiceUrl) as resp:
-						if resp.status == 200:
-							jwt = await resp.text()
-						else:
-							text = await resp.text()
-							L.info(
-								"FIDO Metadata Service responded with error:\n{!r}.".format(text[:1000]),
-								struct_data={"status": resp.status}
-							)
-							return
-			except (TimeoutError, ConnectionError, aiohttp.ClientConnectionError) as e:
-				L.info("FIDO Metadata Service is unreachable ({}: {}).".format(e.__class__.__name__, e))
-				return
-
-		else:
-			# Load from local file
-			with open(self.FidoMetadataServiceUrl) as f:
-				jwt = f.read()
-
-		jwt = jwcrypto.jwt.JWT(jwt=jwt)
-		cert_chain = jwt.token.jose_header.get("x5c", [])
-		leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
-		public_key = leaf_cert.public_key()
-		public_key = public_key.public_bytes(
-			cryptography.hazmat.primitives.serialization.Encoding.PEM,
-			cryptography.hazmat.primitives.serialization.PublicFormat.PKCS1)
-		public_key = jwcrypto.jwk.JWK.from_pem(public_key)
-		jwt.validate(public_key)
-		entries = json.loads(jwt.claims)["entries"]
-
-		# FIDO2 authenticators are identified with AAGUID
-		# Other identifiers (AAID, AKI) are not supported at the moment.
-		for entry in entries:
-			if "aaguid" not in entry:
-				continue
-			aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
-			metadata = entry.get("metadataStatement")
-			metadata["_id"] = aaguid
-
-		collection = await self.StorageService.collection(self.FidoMetadataServiceCollection)
-		client = self.StorageService.Client
-		n_inserted = 0
-		async with await client.start_session() as session:
-			async with session.start_transaction():
-				await collection.delete_many({})
-				for entry in entries:
-					if "aaguid" not in entry:
-						continue
-					aaguid = bytes.fromhex(entry["aaguid"].replace("-", ""))
-					metadata = entry.get("metadataStatement")
-					metadata["_id"] = aaguid
-					try:
-						await collection.insert_one(metadata)
-						n_inserted += 1
-					except pymongo.errors.DuplicateKeyError:
-						# Likely a race condition with another instance
-						session.abort_transaction()
-						break
-
-		L.info("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted})
 
 
 	async def initialize(self, app):
@@ -198,7 +108,11 @@ class WebAuthnService(asab.Service):
 			verified_registration (webauthn.registration.VerifiedRegistration): Verified WebAuthn registration challenge
 			name (str): WebAuthn credential display name
 		"""
-		metadata = await self._get_authenticator_metadata(verified_registration)
+		if self.FIDOMetadataService is not None:
+			metadata = await self.FIDOMetadataService.get_authenticator_metadata(verified_registration)
+		else:
+			metadata = None
+
 		if name is None:
 			if metadata is not None:
 				name = metadata["description"]
@@ -223,16 +137,6 @@ class WebAuthnService(asab.Service):
 
 		passkey_id = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
 		L.log(asab.LOG_NOTICE, "WebAuthn credential created.", struct_data={"passkey_id": passkey_id.hex()})
-
-	async def _get_authenticator_metadata(self, verified_registration):
-		aaguid = bytes.fromhex(verified_registration.aaguid.replace("-", ""))
-		if aaguid == 0:
-			# Authenticators with other identifiers than AAGUID are not supported
-			metadata = None
-		else:
-			coll = await self.StorageService.collection(self.FidoMetadataServiceCollection)
-			metadata = await coll.find_one(aaguid)
-		return metadata
 
 
 	async def get_webauthn_credential(
