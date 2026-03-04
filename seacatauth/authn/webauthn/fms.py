@@ -107,10 +107,9 @@ class FIDOMetadataService(asab.Service):
 					L.error("FIDO Metadata Service JWT is missing x5c header, cannot validate signature.")
 					return
 				leaf_cert = cryptography.x509.load_der_x509_certificate(base64.b64decode(cert_chain[0]))
-				public_key = leaf_cert.public_key()
-				public_key = public_key.public_bytes(
+				public_key = leaf_cert.public_key().public_bytes(
 					cryptography.hazmat.primitives.serialization.Encoding.PEM,
-					cryptography.hazmat.primitives.serialization.PublicFormat.PKCS1)
+					cryptography.hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo)
 				public_key = jwcrypto.jwk.JWK.from_pem(public_key)
 				jwt.validate(public_key)
 				entries = json.loads(jwt.claims)["entries"]
@@ -153,7 +152,8 @@ class FIDOMetadataService(asab.Service):
 								session=session,
 							)
 			except pymongo.errors.OperationFailure as e:
-				if e.details.get("codeName") == "WriteConflict":
+				details = e.details or {}
+				if details.get("codeName") == "WriteConflict":
 					L.debug(
 						"Write conflict while updating FIDO metadata, likely a concurrent update by another app instance."
 					)
