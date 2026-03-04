@@ -130,8 +130,8 @@ class FIDOMetadataService(asab.Service):
 			collection = await self.StorageService.collection(self.FidoMetadataServiceCollection)
 			client = self.StorageService.Client
 			n_inserted = 0
-			async with await client.start_session() as session:
-				try:
+			try:
+				async with await client.start_session() as session:
 					async with session.start_transaction():
 						await collection.delete_many({}, session=session)
 						for entry in entries:
@@ -152,11 +152,14 @@ class FIDOMetadataService(asab.Service):
 								upsert=True,
 								session=session,
 							)
-				except (pymongo.errors.DuplicateKeyError, pymongo.errors.OperationFailure):
-					# Likely a race condition with another instance
-					await session.abort_transaction()
-					L.debug("FIDO Metadata Service: Detected concurrent update, aborting transaction and skipping update.")
-					return
+			except pymongo.errors.OperationFailure as e:
+				if e.details.get("codeName") == "WriteConflict":
+					L.debug(
+						"Write conflict while updating FIDO metadata, likely a concurrent update by another app instance."
+					)
+				else:
+					L.error("Failed to update FIDO metadata in storage: {}".format(e))
+				return
 
 			L.debug("FIDO metadata fetched and stored.", struct_data={"n_inserted": n_inserted, "etag": new_etag})
 
