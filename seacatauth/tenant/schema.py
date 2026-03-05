@@ -2,10 +2,12 @@ _EDITABLE_TENANT_PROPERTIES = {
 	"label": {
 		"type": "string",
 		"description": "Human-palatable tenant name.",
-		"pattern": "^.{,64}$"},  # no newlines allowed
+		"pattern": "^.{,64}$"
+	},
 	"description": {
 		"type": "string",
-		"description": "Extended tenant details."},
+		"description": "Extended tenant details."
+	},
 	"data": {
 		"type": "object",
 		"description":
@@ -17,7 +19,12 @@ _EDITABLE_TENANT_PROPERTIES = {
 		# 		{"type": "number"},
 		# 		{"type": "boolean"},
 		# 		{"type": "null"}]}}
-	}
+	},
+	"managed_by": {
+		"type": "string",
+		"description":
+			"ID of the entity managing this tenant. If not empty, the tenant will not be editable via UI."
+	},
 }
 
 CREATE_TENANT = {
@@ -27,10 +34,13 @@ CREATE_TENANT = {
 	"properties": {
 		"id": {
 			"type": "string",
-			"description": "Unique tenant ID. Can't be changed once the tenant has been created."},
-		**_EDITABLE_TENANT_PROPERTIES},
+			"description": "Unique tenant ID. Can't be changed once the tenant has been created."
+		},
+		**_EDITABLE_TENANT_PROPERTIES
+	},
 	"example": {
-		"id": "acme-corp"}
+		"id": "acme-corp"
+	}
 }
 
 UPDATE_TENANT = {
@@ -42,7 +52,9 @@ UPDATE_TENANT = {
 		"data": {
 			"email": "support@acmecorp.test",
 			"very_corporate": True,
-			"schema": "ECS"}}
+			"schema": "ECS"
+		}
+	}
 }
 
 SET_TENANTS = {
@@ -52,9 +64,12 @@ SET_TENANTS = {
 		"tenants": {
 			"type": "array",
 			"description": "List of the IDs of tenants to be set",
-			"items": {"type": "string"}}},
+			"items": {"type": "string"}
+		}
+	},
 	"example": {
-		"tenants": ["acme-corp", "my-eshop"]}
+		"tenants": ["acme-corp", "my-eshop"]
+	}
 }
 
 GET_TENANTS_BATCH = {
@@ -71,7 +86,8 @@ BULK_ASSIGN_TENANTS = {
 		"credential_ids": {
 			"type": "array",
 			"description": "List of the IDs of credentials to manage.",
-			"items": {"type": "string"}},
+			"items": {"type": "string"}
+		},
 		"tenants": {
 			"type": "object",
 			"description":
@@ -94,7 +110,9 @@ BULK_ASSIGN_TENANTS = {
 		"tenants": {
 			"*": ["*/global-editor"],
 			"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
-			"my-eshop": []}},
+			"my-eshop": []
+		}
+	},
 }
 
 BULK_UNASSIGN_TENANTS = {
@@ -104,7 +122,8 @@ BULK_UNASSIGN_TENANTS = {
 		"credential_ids": {
 			"type": "array",
 			"description": "List of the IDs of credentials to manage.",
-			"items": {"type": "string"}},
+			"items": {"type": "string"}
+		},
 		"tenants": {
 			"type": "object",
 			"description":
@@ -128,5 +147,7 @@ BULK_UNASSIGN_TENANTS = {
 		"tenants": {
 			"*": ["*/global-editor"],
 			"acme-corp": ["acme-corp/user", "acme-corp/supervisor"],
-			"my-eshop": "UNASSIGN-TENANT"}},
+			"my-eshop": "UNASSIGN-TENANT"
+		}
+	},
 }
