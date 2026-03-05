@@ -84,8 +84,8 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 		self, tenant_id: str, *,
 		label: str = None,
 		description: str = None,
+		managed_by: str = None,
 		data: dict = None,
-		creator_id: str = None
 	) -> typing.Optional[str]:
 		u = self.MongoDBStorageService.upsertor(self.TenantsCollection, obj_id=tenant_id, version=0)
 		if label is not None:
@@ -94,8 +94,8 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 			u.set("description", description)
 		if data is not None:
 			u.set("data", data)
-		if creator_id is not None:
-			u.set("created_by", creator_id)
+		if managed_by is not None:
+			u.set("managed_by", managed_by)
 		tenant_id = await u.execute()
 		L.log(asab.LOG_NOTICE, "Tenant created", struct_data={"tenant": tenant_id})
 		return tenant_id
@@ -105,7 +105,8 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 		self, tenant_id: str, *,
 		label: str = None,
 		description: str = None,
-		data: dict = None
+		managed_by: str = None,
+		data: dict = None,
 	) -> typing.Optional[str]:
 		tenant = await self.get(tenant_id)
 		u = self.MongoDBStorageService.upsertor(
@@ -119,6 +120,8 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 			u.set("description", description)
 		if data is not None:
 			u.set("data", data)
+		if managed_by is not None:
+			u.set("managed_by", managed_by)
 		tenant_id = await u.execute()
 
 		L.log(asab.LOG_NOTICE, "Tenant data updated.", struct_data={"tenant": tenant_id})

@@ -89,7 +89,7 @@ class TenantService(asab.Service):
 		label: str = None,
 		description: str = None,
 		data: dict = None,
-		creator_id: str = None
+		managed_by: str = None,
 	):
 		if not self.TenantIdRegex.match(tenant_id):
 			if self.AdditionalIdCharacters:
@@ -109,7 +109,7 @@ class TenantService(asab.Service):
 
 		try:
 			tenant_id = await self.TenantProvider.create(
-				tenant_id, label=label, description=description, data=data, creator_id=creator_id)
+				tenant_id, label=label, description=description, data=data, managed_by=managed_by)
 		except asab.storage.exceptions.DuplicateError:
 			L.error("Tenant with this ID already exists.", struct_data={"tenant": tenant_id})
 			raise asab.exceptions.Conflict(value=tenant_id)
