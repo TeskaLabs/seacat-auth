@@ -160,6 +160,7 @@ class TenantHandler(object):
 			label=json_data.get("label"),
 			description=json_data.get("description"),
 			data=json_data.get("data"),
+			managed_by=json_data.get("managed_by"),
 		)
 
 		if asab.utils.string_to_boolean(request.query.get("assign_me", "false")):
