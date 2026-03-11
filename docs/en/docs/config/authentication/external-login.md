@@ -33,7 +33,7 @@ assume_email_is_verified=true    # Treat email as verified
 User attributes are normalized to: `sub`, `username`, `email`, `phone`, and `name`.
 
 
-# Available External Login Providers
+## Available External Login Providers
 
 SeaCat Auth supports the following external login providers:
 
