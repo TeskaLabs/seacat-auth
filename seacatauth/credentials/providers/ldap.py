@@ -229,7 +229,10 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 			except ldap.NO_SUCH_OBJECT as e:
 				raise KeyError("CN matched no LDAP objects.") from e
 
-		if len(results) > 1:
+		if len(results) == 0:
+			L.error("CN matched no LDAP objects.", struct_data={"CN": cn})
+			raise KeyError("CN matched no LDAP objects.")
+		elif len(results) > 1:
 			L.error("CN matched multiple LDAP objects.", struct_data={"CN": cn})
 			raise KeyError("CN matched multiple LDAP objects.")
 
