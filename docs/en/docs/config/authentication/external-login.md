@@ -37,7 +37,7 @@ User attributes are normalized to: `sub`, `username`, `email`, `phone`, and `nam
 
 SeaCat Auth supports the following external login providers:
 
-- **OAuth2**: Google, Facebook, GitHub, Apple, Office365, MojeID, and other generic OAuth2 providers
+- **OAuth2**: Google, Facebook, GitHub, Apple, Office 365, MojeID, and other generic OAuth2 providers
 - **SAML / MS Entra ID**: Any SAML 2.0-compliant identity provider
 - **OpenID Connect**: Any OIDC-compliant provider
 
@@ -71,7 +71,7 @@ client_id=YOUR_APPLE_CLIENT_ID
 client_secret=YOUR_APPLE_CLIENT_SECRET
 ```
 
-### Office365 (OAuth2)
+### Office 365 (OAuth2)
 ```ini
 [seacatauth:oauth2:office365]
 client_id=YOUR_OFFICE365_CLIENT_ID
@@ -106,6 +106,6 @@ label=MyCompany SAML  # (4)
 ```
 
 1. Identity provider metadata URL or path to a local file.
-2. SAML client ID. This is optional, defaults to `${PUBLIC_URL}/saml/metadata` in not provided.
+2. SAML client ID. This is optional, defaults to `${PUBLIC_URL}/saml/metadata` if not provided.
 3. Client key and certificate paths. Optional, depends on your IdP requirements.
 4. Display name for UI purposes.
