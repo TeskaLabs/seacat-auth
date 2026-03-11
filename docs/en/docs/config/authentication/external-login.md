@@ -27,7 +27,7 @@ assume_email_is_verified=true    # Treat email as verified
 - `register_unknown_at_login`: Auto-register users not yet known to SeaCat Auth.
 - `pair_unknown_at_login`: Pair unknown external accounts with existing users by email.
 - `tenant`: Assign a tenant to new users from this provider.
-- `lowercase_sub`, `lowercase_username`, `lowercase_email`: Normalize these attributes to lowercase if set to `true`.
+- `lowercase_sub`, `lowercase_username`, `lowercase_email`: Normalize these attributes to lowercase if set to `true`. Use these options with caution!
 - `assume_email_is_verified`: Treat email as verified if not provided by the external provider.
 
 User attributes are normalized to: `sub`, `username`, `email`, `phone`, and `name`.
