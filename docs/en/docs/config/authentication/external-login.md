@@ -18,7 +18,7 @@ lowercase_email=true             # Normalize email to lowercase
 idp_metadata_url=https://idp.example.com/metadata
 register_unknown_at_login=true
 pair_unknown_at_login=true
-tenant=teskalabs                 # Assign new users to a tenant
+tenant=teskalabs                 # Assign new SAML users to a tenant
 assume_email_is_verified=true    # Treat email as verified
 ```
 
@@ -38,10 +38,10 @@ User attributes are normalized to: `sub`, `username`, `email`, `phone`, and `nam
 SeaCat Auth supports the following external login providers:
 
 - **OAuth2**: Google, Facebook, GitHub, Apple, Office365, MojeID, and other generic OAuth2 providers
-- **SAML**: Any SAML 2.0-compliant identity provider
+- **SAML / MS Entra ID**: Any SAML 2.0-compliant identity provider
 - **OpenID Connect**: Any OIDC-compliant provider
 
-Below are minimal configuration examples for each supported provider type:
+Below are configuration examples for each supported provider type:
 
 ### Google (OAuth2)
 ```ini
@@ -95,8 +95,17 @@ token_url=PROVIDER_TOKEN_URL
 userinfo_url=PROVIDER_USERINFO_URL
 ```
 
-### SAML Provider
+### SAML / MS Entra ID Provider
 ```ini
-[seacatauth:saml:youridp]
-idp_metadata_url=https://idp.example.com/metadata
+[seacatauth:saml:mycompany]
+idp_metadata_url=https://idp.my-company.com/federationmetadata.xml  # (1)
+entity_id=https://my-company.com/auth/saml/metadata  # (2)
+key_file=/conf/secret/saml-private-key.pem  # (3)
+cert_file=/conf/secret/saml-certificate.pem
+label=MyCompany SAML  # (4)
 ```
+
+1. Identity provider metadata URL or path to a local file.
+2. SAML client ID. This is optional, defaults to `${PUBLIC_URL}/saml/metadata` in not provided.
+3. Client key and certificate paths. Optional, depends on your IdP requirements.
+4. Display name for UI purposes.
