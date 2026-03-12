@@ -226,10 +226,19 @@ class ChangePasswordHandler(object):
 		# Check if password reset link can be disclosed (in email or at least in the response)
 		password_reset_url = None
 		url_disclosed = False
-		can_get_link_in_response = authz.has_superuser_access()
-		email_service_enabled = await self.ChangePasswordService.CommunicationService.is_channel_enabled("email")
-		can_email_to_target = await self.ChangePasswordService.CommunicationService.can_send_to_target(
-			credentials, "email")
+		email_service_enabled: bool | None = None  # None if status cannot be determined due to error
+		can_email_to_target: bool | None = None  # None if status cannot be determined due to error
+		try:
+			email_service_enabled = await self.ChangePasswordService.CommunicationService.is_channel_enabled("email")
+			can_email_to_target = await self.ChangePasswordService.CommunicationService.can_send_to_target(
+				credentials, "email")
+		except exceptions.ServerCommunicationError:
+			L.log(asab.LOG_NOTICE, "Cannot check email service availability: Communication error.", struct_data={
+				"cid": credentials_id})
+
+		can_get_link_in_response: bool = authz.has_superuser_access() or (
+			email_service_enabled is False and can_email_to_target is False
+		)
 
 		# Superusers receive the password reset link in response
 		if can_get_link_in_response:
