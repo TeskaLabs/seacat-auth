@@ -436,12 +436,12 @@ class RolesHandler(object):
 
 		---
 		parameters:
-		-	p:
+		-	name: p
 			in: query
 			description: Page number
 			schema:
 				type: integer
-		-	i:
+		-	name: i
 			in: query
 			description: Items per page
 			schema:
@@ -465,12 +465,12 @@ class RolesHandler(object):
 
 		---
 		parameters:
-		-	p:
+		-	name: p
 			in: query
 			description: Page number
 			schema:
 				type: integer
-		-	i:
+		-	name: i
 			in: query
 			description: Items per page
 			schema:
