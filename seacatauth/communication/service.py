@@ -74,6 +74,15 @@ class CommunicationService(asab.Service):
 
 
 	async def is_channel_enabled(self, channel) -> bool:
+		"""
+		Check if the specified communication channel is enabled and can be used to send messages.
+
+		Returns:
+			True if the channel is enabled, False otherwise.
+
+		Raises:
+			exceptions.ServerCommunicationError: If there was an error communicating with the external service.
+		"""
 		if channel not in self.CommunicationProviders:
 			return False
 		return await self.CommunicationProviders[channel].is_enabled()
