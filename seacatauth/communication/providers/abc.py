@@ -33,6 +33,15 @@ class CommunicationProviderABC(asab.Configurable, abc.ABC):
 
 
 	async def is_enabled(self) -> bool:
+		"""
+		Check if the provider is enabled and can be used to send messages.
+
+		Returns:
+			True if the provider is enabled, False otherwise.
+
+		Raises:
+			exceptions.ServerCommunicationError: If the result cannot be determined due to an error communicating with the external service.
+		"""
 		raise NotImplementedError()
 
 
