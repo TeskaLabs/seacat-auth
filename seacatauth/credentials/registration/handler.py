@@ -137,17 +137,30 @@ class RegistrationHandler(object):
 			expiration: Invitation expiration in seconds
 			access_ips: Source IPs of the invitation request
 			invited_by_cid: Credentials ID of the invitation request
+
+		Returns:
+			HTTP response with the result of the operation and, if successful, a registration URL.
+				The registration URL is only included if the email channel is not available or the user has superuser access.
 		"""
+		if credential_data.get("email") in (None, ""):
+			# Currently, email is the only supported communication channel for invitations, so we require
+			# an email address to be able to send the invitation link.
+			raise asab.exceptions.ValidationError("Email is required in invitation.")
+
 		authz = asab.contextvars.Authz.get()
-		can_send_email = (
-			"email" in credential_data
-			and await self.RegistrationService.CommunicationService.is_channel_enabled("email")
-		)
-		if not (can_send_email or authz.has_superuser_access()):
-			# Cannot send email, cannot return link in response
+		email_service_enabled: bool | None = None  # None if the check failed, True if enabled, False if disabled
+		try:
+			email_service_enabled = await self.RegistrationService.CommunicationService.is_channel_enabled("email")
+		except exceptions.ServerCommunicationError:
+			L.error("Failed to check email channel availability.")
+
+		can_get_link_in_response = authz.has_superuser_access() or email_service_enabled is False
+
+		if email_service_enabled is None and not can_get_link_in_response:
+			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
-				"tech_err": "Sending emails is not supported."
+				"tech_err": "Email service is temporarily unavailable."
 			})
 
 		# Prepare credentials and registration code
@@ -174,7 +187,6 @@ class RegistrationHandler(object):
 					struct_data={"cid": credentials_id, **credential_data}
 				)
 
-
 		# Assign tenant
 		try:
 			await self.RegistrationService.TenantService.assign_tenant(credentials_id, tenant)
@@ -189,13 +201,16 @@ class RegistrationHandler(object):
 		if not already_registered:
 			registration_code = await self.RegistrationService.refresh_registration_code(credentials_id)
 			registration_url = self.RegistrationService.format_registration_url(registration_code)
-			if authz.has_superuser_access():
+			if can_get_link_in_response:
 				response_data["registration_url"] = registration_url
 
-			if not can_send_email:
-				response_data["result"] = "ERROR"
-				response_data["tech_err"] = "Failed to send invitation link."
-				return asab.web.rest.json_response(request, response_data, status=400)
+			if not email_service_enabled:
+				response_data["email_sent"] = {
+					"result": "ERROR",
+					"tech_err": "Email service not available.",
+					"error": "SeaCatAuthError|Email service not available",
+				}
+				return asab.web.rest.json_response(request, response_data)
 
 			try:
 				await self.RegistrationService.CommunicationService.invitation(
@@ -205,13 +220,19 @@ class RegistrationHandler(object):
 					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 				)
 			except exceptions.ServerCommunicationError:
-				response_data["result"] = "ERROR"
-				response_data["tech_err"] = "Cannot connect to email service."
-				return asab.web.rest.json_response(request, response_data, status=400)
+				response_data["email_sent"] = {
+					"result": "ERROR",
+					"tech_err": "Cannot connect to email service.",
+					"error": "SeaCatAuthError|Cannot connect to email service",
+				}
+				return asab.web.rest.json_response(request, response_data)
 			except exceptions.MessageDeliveryError:
-				response_data["result"] = "ERROR"
-				response_data["tech_err"] = "Failed to send invitation link."
-				return asab.web.rest.json_response(request, response_data, status=400)
+				response_data["email_sent"] = {
+					"result": "ERROR",
+					"tech_err": "Failed to send invitation link.",
+					"error": "SeaCatAuthError|Failed to send invitation link",
+				}
+				return asab.web.rest.json_response(request, response_data)
 
 		return asab.web.rest.json_response(request, response_data)
 
