@@ -197,9 +197,14 @@ class ChangePasswordHandler(object):
 	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
-		Send a password reset link to specified user and return it in the response if the caller is superuser.
-		As long as either email communication is successful or the caller is superuser, the result is
-		considered successful.
+		Send a password reset link to the specified user and return it in the response if the caller is superuser or
+		if SMTP service is not enabled. The operation is considered successful if either:
+		- The email with the reset link is successfully sent to the user, or
+		- The link is disclosed in the response.
+
+		If the primary action (reset link creation) fails, the response will indicate failure regardless of email status.
+		If the reset link is created but cannot be delivered (neither emailed nor disclosed), the response will indicate failure.
+		The response includes multi-status details for both link creation and email delivery, as applicable.
 		"""
 		response_data = {}
 		authz = asab.contextvars.Authz.get()
