@@ -246,17 +246,28 @@ class RegistrationHandler(object):
 		authz = asab.contextvars.Authz.get()
 		credentials_id = request.match_info["credentials_id"]
 		credentials = await self.CredentialsService.get(credentials_id, include=["__registration"])
-		can_send_email = await self.RegistrationService.CommunicationService.can_send_to_target(credentials, "email")
-		if not (can_send_email or authz.has_superuser_access()):
-			# Cannot send email, cannot return link in response
-			return asab.web.rest.json_response(request, status=400, data={
-				"result": "ERROR",
-				"tech_err": "Sending emails is not supported."
-			})
 
 		if "__registration" not in credentials:
 			raise asab.exceptions.ValidationError("Credentials already registered.")
-		assert "email" in credentials
+
+		if credentials.get("email") in (None, ""):
+			# Currently, email is the only supported communication channel for invitations, so we require
+			# an email address to be able to send the invitation link.
+			raise asab.exceptions.ValidationError("Email is required in invitation.")
+
+		email_service_enabled: bool | None = None  # None if the check failed, True if enabled, False if disabled
+		try:
+			email_service_enabled = await self.RegistrationService.CommunicationService.is_channel_enabled("email")
+		except exceptions.ServerCommunicationError:
+			L.error("Failed to check email channel availability.")
+
+		can_get_link_in_response = authz.has_superuser_access() or email_service_enabled is False
+		if email_service_enabled is None and not can_get_link_in_response:
+			# Cannot send email, cannot return link in response, no point in trying to send the invitation
+			return asab.web.rest.json_response(request, status=400, data={
+				"result": "ERROR",
+				"tech_err": "Email service is temporarily unavailable."
+			})
 
 		# Extend the expiration
 		expiration = (
@@ -272,13 +283,16 @@ class RegistrationHandler(object):
 		registration_url = self.RegistrationService.format_registration_url(registration_code)
 
 		response_data = {"result": "OK"}
-		if authz.has_superuser_access():
+		if can_get_link_in_response:
 			response_data["registration_url"] = registration_url
 
-		if not can_send_email:
-			response_data["result"] = "ERROR"
-			response_data["tech_err"] = "Failed to send invitation link."
-			return asab.web.rest.json_response(request, response_data, status=400)
+		if not email_service_enabled:
+			response_data["email_sent"] = {
+				"result": "ERROR",
+				"tech_err": "Email service not available.",
+				"error": "SeaCatAuthError|Email service not available",
+			}
+			return asab.web.rest.json_response(request, response_data)
 
 		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
 		try:
@@ -289,9 +303,12 @@ class RegistrationHandler(object):
 				expires_at=expiration,
 			)
 		except exceptions.MessageDeliveryError:
-			response_data["result"] = "ERROR"
-			response_data["tech_err"] = "Failed to send invitation link."
-			return asab.web.rest.json_response(request, response_data, status=400)
+			response_data["email_sent"] = {
+				"result": "ERROR",
+				"tech_err": "Failed to send invitation link.",
+				"error": "SeaCatAuthError|Failed to send invitation link",
+			}
+			return asab.web.rest.json_response(request, response_data)
 
 		return asab.web.rest.json_response(request, response_data)
 
