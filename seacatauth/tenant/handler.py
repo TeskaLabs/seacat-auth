@@ -268,6 +268,19 @@ class TenantHandler(object):
 	async def list_assigned_credentials(self, request):
 		"""
 		List the IDs of credentials assigned to the tenant
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		page = int(request.query.get("p", 1)) - 1
