@@ -371,3 +371,11 @@ class TenantService(asab.Service):
 
 	async def get_assigned_tenant(self, credatials_id: str, tenant: str) -> dict:
 		return await self.TenantProvider.get_assignment(credatials_id, tenant)
+
+
+	async def list_assigned_credentials(self, tenant: str, page: int = 0, limit: int | None = None):
+		assignments = await self.TenantProvider.list_tenant_assignments(tenant, page, limit)
+		return {
+			"data": [assignment["c"] for assignment in assignments["data"]],
+			"count": assignments["count"],
+		}
