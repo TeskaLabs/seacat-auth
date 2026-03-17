@@ -16,9 +16,10 @@ class SMSCodeFactor(LoginFactorABC):
 			if not await self.AuthenticationService.CommunicationService.is_channel_enabled("sms"):
 				# SMS provider is not configured
 				return False
-		except exceptions.ServerCommunicationError:
+		except exceptions.ServerCommunicationError as e:
 			# Unable to determine if SMS provider is enabled, treat as not eligible
-			return False
+			L.error("Unable to determine if SMS code factor is enabled: {}".format(e))
+			raise e
 
 		cred_svc = self.AuthenticationService.CredentialsService
 		cred_id = login_data["credentials_id"]
