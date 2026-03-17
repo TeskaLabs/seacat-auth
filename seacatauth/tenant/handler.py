@@ -128,7 +128,6 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@asab.web.auth.require(ResourceId.TENANT_ACCESS)
 	async def get(self, request):
 		"""
 		Get tenant detail
