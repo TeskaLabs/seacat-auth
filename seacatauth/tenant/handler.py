@@ -286,10 +286,10 @@ class TenantHandler(object):
 		p = request.query.get("p", 1)
 		try:
 			page = int(p) - 1
-		except ValueError:
-			raise asab.exceptions.ValidationError("Invalid 'p' (page) value: {}".format(p))
+		except ValueError as e:
+			raise asab.exceptions.ValidationError("Invalid 'p' (page) value: {}".format(p)) from e
 		if page < 0:
-			raise asab.exceptions.ValidationError("'p' (page) value must be 1 or greater".format(p))
+			raise asab.exceptions.ValidationError("'p' (page) value must be 1 or greater")
 
 		i = request.query.get("i")
 		if i is None:
@@ -297,10 +297,10 @@ class TenantHandler(object):
 		else:
 			try:
 				limit = int(i)
-			except ValueError:
-				raise asab.exceptions.ValidationError("Invalid 'i' (limit) value: {}".format(i))
+			except ValueError as e:
+				raise asab.exceptions.ValidationError("Invalid 'i' (limit) value: {}".format(i)) from e
 			if limit < 0:
-				raise asab.exceptions.ValidationError("'i' (limit) value must be 0 or greater".format(i))
+				raise asab.exceptions.ValidationError("'i' (limit) value must be 0 or greater")
 
 		result = await self.TenantService.list_assigned_credentials(tenant_id, page=page, limit=limit)
 		return asab.web.rest.json_response(request, result)
