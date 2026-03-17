@@ -17,7 +17,6 @@ class SMSCodeFactor(LoginFactorABC):
 				# SMS provider is not configured
 				return False
 		except exceptions.ServerCommunicationError as e:
-			# Unable to determine if SMS provider is enabled, treat as not eligible
 			L.error("Unable to determine if SMS code factor is enabled: {}".format(e))
 			raise e
 
