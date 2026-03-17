@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha19
 - v25.48-alpha18
 - v25.48-alpha17
 - v25.48-alpha16
@@ -33,6 +34,7 @@
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Paginable endpoint for listing tenant's assigned credential IDs (#562, v25.48-alpha19)
 - Document external login configuration (#557, v25.48-alpha18)
 - Add optional `managed_by` field to Tenant object (#556, v25.48-alpha16)
 - Conditional fetching of FIDO metadata (#555, v25.48-alpha15)
