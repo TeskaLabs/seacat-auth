@@ -232,18 +232,14 @@ class ChangePasswordHandler(object):
 		password_reset_url = None
 		url_disclosed = False
 		email_service_enabled: bool | None = None  # None if status cannot be determined due to error
-		can_email_to_target: bool | None = None  # None if status cannot be determined due to error
+		credentials_have_email: bool = credentials.get("email") not in (None, "")
 		try:
 			email_service_enabled = await self.ChangePasswordService.CommunicationService.is_channel_enabled("email")
-			can_email_to_target = await self.ChangePasswordService.CommunicationService.can_send_to_target(
-				credentials, "email")
 		except exceptions.ServerCommunicationError:
 			L.log(asab.LOG_NOTICE, "Cannot check email service availability: Communication error.", struct_data={
 				"cid": credentials_id})
 
-		can_get_link_in_response: bool = authz.has_superuser_access() or (
-			email_service_enabled is False and can_email_to_target is False
-		)
+		can_get_link_in_response: bool = authz.has_superuser_access() or email_service_enabled is False
 
 		# Superusers receive the password reset link in response
 		if can_get_link_in_response:
@@ -263,7 +259,7 @@ class ChangePasswordHandler(object):
 				"tech_err": "Email service not available.",
 				"error": "SeaCatAuthError|Email service not available",
 			}
-		elif not can_email_to_target:
+		elif not credentials_have_email:
 			L.error("Cannot send password reset email: Credentials have no email address.", struct_data={
 				"cid": credentials_id})
 			email_delivery_result = {
