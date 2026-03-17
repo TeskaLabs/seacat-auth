@@ -39,6 +39,8 @@ class TenantHandler(object):
 		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
 		web_app.router.add_delete("/tenant/{tenant}", self.delete)
 
+		web_app.router.add_get("/tenant/{tenant}/credentials", self.list_assigned_credentials)
+
 		web_app.router.add_get("/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
 		web_app.router.add_put("/tenant_assign/{credentials_id}", self.set_tenants)
 		web_app.router.add_post("/tenant_assign/{credentials_id}/{tenant}", self.assign_tenant)
@@ -262,6 +264,19 @@ class TenantHandler(object):
 			tenant_id,
 		)
 		return asab.web.rest.json_response(request, data={"result": "OK"})
+
+
+	async def list_assigned_credentials(self, request):
+		"""
+		List the IDs of credentials assigned to the tenant
+		"""
+		tenant_id = asab.contextvars.Tenant.get()
+		page = int(request.query.get("p", 1)) - 1
+		limit = request.query.get("i")
+		if limit is not None:
+			limit = int(limit)
+		result = await self.TenantService.list_assigned_credentials(tenant_id, page=page, limit=limit)
+		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
