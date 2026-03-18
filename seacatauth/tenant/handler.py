@@ -39,6 +39,8 @@ class TenantHandler(object):
 		web_app.router.add_put("/tenant/{tenant}", self.update_tenant)
 		web_app.router.add_delete("/tenant/{tenant}", self.delete)
 
+		web_app.router.add_get("/tenant/{tenant}/credentials", self.list_assigned_credentials)
+
 		web_app.router.add_get("/tenant_assign/{credentials_id}", self.get_tenants_by_credentials)
 		web_app.router.add_put("/tenant_assign/{credentials_id}", self.set_tenants)
 		web_app.router.add_post("/tenant_assign/{credentials_id}/{tenant}", self.assign_tenant)
@@ -126,7 +128,6 @@ class TenantHandler(object):
 		return asab.web.rest.json_response(request, data=result)
 
 
-	@asab.web.auth.require(ResourceId.TENANT_ACCESS)
 	async def get(self, request):
 		"""
 		Get tenant detail
@@ -262,6 +263,47 @@ class TenantHandler(object):
 			tenant_id,
 		)
 		return asab.web.rest.json_response(request, data={"result": "OK"})
+
+
+	async def list_assigned_credentials(self, request):
+		"""
+		List the IDs of credentials assigned to the tenant
+
+		---
+		parameters:
+		-	name: p
+			in: query
+			description: Page number
+			schema:
+				type: integer
+		-	name: i
+			in: query
+			description: Items per page
+			schema:
+				type: integer
+		"""
+		tenant_id = asab.contextvars.Tenant.get()
+		p = request.query.get("p", 1)
+		try:
+			page = int(p) - 1
+		except ValueError as e:
+			raise asab.exceptions.ValidationError("Invalid 'p' (page) value: {}".format(p)) from e
+		if page < 0:
+			raise asab.exceptions.ValidationError("'p' (page) value must be 1 or greater")
+
+		i = request.query.get("i")
+		if i is None:
+			limit = None
+		else:
+			try:
+				limit = int(i)
+			except ValueError as e:
+				raise asab.exceptions.ValidationError("Invalid 'i' (limit) value: {}".format(i)) from e
+			if limit < 0:
+				raise asab.exceptions.ValidationError("'i' (limit) value must be 0 or greater")
+
+		result = await self.TenantService.list_assigned_credentials(tenant_id, page=page, limit=limit)
+		return asab.web.rest.json_response(request, result)
 
 
 	@asab.web.auth.require(ResourceId.CREDENTIALS_ACCESS)
