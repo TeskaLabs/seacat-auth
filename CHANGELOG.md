@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha20
 - v25.48-alpha19
 - v25.48-alpha18
 - v25.48-alpha17
@@ -49,6 +50,7 @@
 - Extend features response with homepage URL (#537, v25.48-alpha)
 
 ### Refactoring
+- Fix OpenAPI params in role handler (#558, v25.48-alpha20, @eMalinos)
 
 ---
 
