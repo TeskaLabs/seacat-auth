@@ -222,15 +222,15 @@ class RegistrationHandler(object):
 			except exceptions.ServerCommunicationError:
 				response_data["email_sent"] = {
 					"result": "ERROR",
-					"tech_err": "Cannot connect to email service.",
-					"error": "SeaCatAuthError|Cannot connect to email service",
+					"tech_err": "Cannot connect to the email service.",
+					"error": "SeaCatAuthError|Cannot connect to the email service",
 				}
 				return asab.web.rest.json_response(request, response_data)
 			except exceptions.MessageDeliveryError:
 				response_data["email_sent"] = {
 					"result": "ERROR",
-					"tech_err": "Failed to send invitation link.",
-					"error": "SeaCatAuthError|Failed to send invitation link",
+					"tech_err": "Email delivery error.",
+					"error": "SeaCatAuthError|Email delivery error",
 				}
 				return asab.web.rest.json_response(request, response_data)
 

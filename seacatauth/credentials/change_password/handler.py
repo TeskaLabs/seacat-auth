@@ -295,8 +295,8 @@ class ChangePasswordHandler(object):
 					"cid": credentials_id})
 				email_delivery_result = {
 					"result": "ERROR",
-					"tech_err": "Failed to send password reset link.",
-					"error": "SeaCatAuthError|Failed to send password reset link",
+					"tech_err": "Email delivery error.",
+					"error": "SeaCatAuthError|Email delivery error",
 				}
 
 		response_data["email_sent"] = email_delivery_result
