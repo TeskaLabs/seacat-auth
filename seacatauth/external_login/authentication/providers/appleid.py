@@ -83,7 +83,7 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 
 		return {**verified_claims, **user_data}
 
-	def _parse_user_data(self, user_json: typing.Optional[str]) -> typing.Optional[dict]:
+	def _parse_user_data(self, user_json: typing.Optional[str]) -> dict:
 		"""
 		The 'user' data is only available in the request after the first successful authorization with
 		Apple identity provider. Any subsequent authorizations will not have this property. To get it again, the user
@@ -92,12 +92,12 @@ class AppleIDOAuth2AuthProvider(OAuth2AuthProvider):
 		in the id_token at all. 'user' contains the following attributes: firstName, lastName, email
 		"""
 		if user_json is None:
-			return None
+			return {}
 		user_json = json.loads(user_json)
 
 		name = user_json.get("name")
 		if name is None:
-			return None
+			return {}
 
 		return {
 			"first_name": name.get("firstName"),
