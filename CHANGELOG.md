@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha20
 - v25.48-alpha19
 - v25.48-alpha18
 - v25.48-alpha17
@@ -34,6 +35,7 @@
 - Fix the query in login redirection response (#547, v25.48-alpha5)
 
 ### Features
+- Make `client_cookie` a persistent client attribute (#563, v25.48-alpha20)
 - Paginable endpoint for listing tenant's assigned credential IDs (#562, v25.48-alpha19)
 - Document external login configuration (#557, v25.48-alpha18)
 - Add optional `managed_by` field to Tenant object (#556, v25.48-alpha16)
