@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha21
 - v25.48-alpha20
 - v25.48-alpha19
 - v25.48-alpha18
@@ -26,6 +27,7 @@
 - v25.48-alpha
 
 ### Fixes
+- Fix the return value of `_parse_user_data` in AppleID login provider (#559, v25.48-alpha21, @eMalinos)
 - Prevent index error when LDAP result is empty (#560, v25.48-alpha17)
 - Abort FIDO MDS update when race condition is encountered (#551, #555, v25.48-alpha14)
 - Fix cookie introspection with client ID alias resolution (#554, v25.48-alpha13)
