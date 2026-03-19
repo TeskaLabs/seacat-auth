@@ -164,6 +164,10 @@ REGISTER_CLIENT = {
 			"pattern": "^[-_a-zA-Z0-9]{4,64}$",
 			"description": "Preferred client ID. If not specified, a random ID will be generated.",
 		},
+		"provider_id": {
+			"type": "string",
+			"description": "Preferred provider ID that should register the client.",
+		},
 		**CLIENT_METADATA_SCHEMA
 	},
 	# "patternProperties": {
