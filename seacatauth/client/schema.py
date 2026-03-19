@@ -21,7 +21,7 @@ CLIENT_METADATA_SCHEMA = {
 	},
 	"cookie_name": {  # NON-CANONICAL
 		"type": "string",
-		"pattern": "^[a-zA-Z0-9\\._]{,64}$",
+		"pattern": "^[a-zA-Z0-9\\._]{0,64}$",
 		"description":
 			"Name of the client cookie. Defaults to the application's global cookie name plus a string generated from client ID."
 	},
