@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-alpha23
 - v25.48-alpha22
 - v25.48-alpha21
 - v25.48-alpha20
@@ -28,6 +29,7 @@
 - v25.48-alpha
 
 ### Fixes
+- Allow to specify client provider ID at client registration (#564, v25.48-alpha23)
 - Fix the return value of `_parse_user_data` in AppleID login provider (#559, v25.48-alpha21, @eMalinos)
 - Prevent index error when LDAP result is empty (#560, v25.48-alpha17)
 - Abort FIDO MDS update when race condition is encountered (#551, #555, v25.48-alpha14)
