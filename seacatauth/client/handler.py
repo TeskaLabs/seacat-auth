@@ -138,6 +138,12 @@ class ClientHandler(object):
 			json_data["_custom_client_id"] = json_data.pop("preferred_client_id")
 		try:
 			client_id = await self.ClientService.create_client(**json_data)
+		except KeyError:
+			return asab.web.rest.json_response(
+				request,
+				status=404,
+				data={"result": "ERROR", "tech_err": "Provider not found."}
+			)
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
 		client = await self.ClientService.get_client(client_id)
