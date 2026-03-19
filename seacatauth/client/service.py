@@ -223,8 +223,10 @@ class ClientService(asab.Service):
 		"""
 		if provider_id:
 			if provider_id not in self.ClientProviders:
-				raise ValueError("No client provider with ID {!r} is registered.".format(provider_id))
+				raise KeyError("No client provider with ID {!r} is registered.".format(provider_id))
 			provider = self.ClientProviders[provider_id]
+			if not provider.Editable:
+				raise exceptions.NotEditableError("Client provider with ID {!r} is not editable.".format(provider_id))
 		else:
 			provider = self.get_editable_provider()
 
