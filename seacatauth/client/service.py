@@ -808,6 +808,10 @@ def _set_credentials_id(app, client: dict) -> dict:
 
 
 def _set_cookie_name(app, client: dict) -> dict:
+	if client.get("cookie_name") not in (None, ""):
+		# Cookie name is already set, do not override
+		return client
+
 	cookie_svc = app.get_service("seacatauth.CookieService")
 	if not cookie_svc:
 		return client
