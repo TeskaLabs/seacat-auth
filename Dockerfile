@@ -49,7 +49,7 @@ RUN apk add --no-cache  \
     pysaml2 \
     pymongo \
     sentry-sdk \
-    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git@v26.12"
 # There is a broken pydantic dependency in webauthn.
 # Remove the version lock once this is fixed.
 
