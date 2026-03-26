@@ -238,7 +238,6 @@ class RegistrationHandler(object):
 
 
 	@asab.web.tenant.allow_no_tenant
-	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def resend_invitation(self, request):
 		"""
 		Resend invitation to an already invited user and extend the expiration of the invitation.
