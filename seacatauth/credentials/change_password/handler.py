@@ -256,8 +256,8 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id})
 			email_delivery_result = {
 				"result": "ERROR",
-				"tech_err": "Email service not available.",
-				"error": "SeaCatAuthError|Email service not available",
+				"tech_err": "Email service is not enabled.",
+				"error": "SeaCatAuthError|Email service is not enabled",
 			}
 		elif not credentials_have_email:
 			L.error("Cannot send password reset email: Credentials have no email address.", struct_data={
