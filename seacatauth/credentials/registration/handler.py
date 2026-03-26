@@ -234,6 +234,7 @@ class RegistrationHandler(object):
 				}
 				return asab.web.rest.json_response(request, response_data)
 
+		response_data["email_sent"] = {"result": "OK"}
 		return asab.web.rest.json_response(request, response_data)
 
 
@@ -309,6 +310,7 @@ class RegistrationHandler(object):
 			}
 			return asab.web.rest.json_response(request, response_data)
 
+		response_data["email_sent"] = {"result": "OK"}
 		return asab.web.rest.json_response(request, response_data)
 
 
