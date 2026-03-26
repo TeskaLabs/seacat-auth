@@ -51,14 +51,17 @@ class AsabIrisEmailProvider(CommunicationProviderABC):
 				async with session.get("features") as resp:
 					response = await resp.json()
 					if resp.status != 200:
-						L.error("Error response from ASAB Iris: {}".format(response))
-						return False
+						message = "Error response from ASAB Iris"
+						L.error("{}: {}".format(message, response))
+						raise exceptions.ServerCommunicationError(message)
 		except aiohttp.ClientError as e:
-			L.error("Error connecting to ASAB Iris: {}".format(e))
-			return False
+			message = "Error connecting to ASAB Iris"
+			L.error("{}: {}".format(message, e))
+			raise exceptions.ServerCommunicationError(message) from e
 		except asyncio.TimeoutError:
-			L.error("Error connecting to ASAB Iris: Connection timed out")
-			return False
+			message = "Connection to ASAB Iris timed out"
+			L.error(message)
+			raise exceptions.ServerCommunicationError(message) from None
 
 		enabled_orchestrators = response.get("orchestrators", [])
 		return "email" in enabled_orchestrators

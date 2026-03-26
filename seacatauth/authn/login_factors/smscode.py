@@ -1,7 +1,8 @@
 import logging
 
-from .abc import LoginFactorABC
 from ...generic import generate_ergonomic_token
+from ... import exceptions
+from .abc import LoginFactorABC
 
 
 L = logging.getLogger(__name__)
@@ -11,9 +12,13 @@ class SMSCodeFactor(LoginFactorABC):
 	Type = "smscode"
 
 	async def is_eligible(self, login_data) -> bool:
-		if not await self.AuthenticationService.CommunicationService.is_channel_enabled("sms"):
-			# SMS provider is not configured
-			return False
+		try:
+			if not await self.AuthenticationService.CommunicationService.is_channel_enabled("sms"):
+				# SMS provider is not configured
+				return False
+		except exceptions.ServerCommunicationError as e:
+			L.error("Unable to determine if SMS code factor is enabled: {}".format(e))
+			raise e
 
 		cred_svc = self.AuthenticationService.CredentialsService
 		cred_id = login_data["credentials_id"]
