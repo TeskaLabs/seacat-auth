@@ -208,8 +208,8 @@ class RegistrationHandler(object):
 			if not email_service_enabled:
 				response_data["email_sent"] = {
 					"result": "ERROR",
-					"tech_err": "Email service not available.",
-					"error": "SeaCatAuthError|Email service not available",
+					"tech_err": "Email service is not enabled.",
+					"error": "SeaCatAuthError|Email service is not enabled",
 				}
 				return asab.web.rest.json_response(request, response_data)
 
@@ -291,8 +291,8 @@ class RegistrationHandler(object):
 		if not email_service_enabled:
 			response_data["email_sent"] = {
 				"result": "ERROR",
-				"tech_err": "Email service not available.",
-				"error": "SeaCatAuthError|Email service not available",
+				"tech_err": "Email service is not enabled.",
+				"error": "SeaCatAuthError|Email service is not enabled",
 			}
 			return asab.web.rest.json_response(request, response_data)
 
