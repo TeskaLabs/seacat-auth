@@ -160,7 +160,8 @@ class RegistrationHandler(object):
 			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
-				"tech_err": "Email service is temporarily unavailable."
+				"tech_err": "Email service is temporarily unavailable.",
+				"error": "SeaCatAuthError|Email service is temporarily unavailable",
 			})
 
 		# Prepare credentials and registration code
@@ -266,7 +267,8 @@ class RegistrationHandler(object):
 			# Cannot send email, cannot return link in response, no point in trying to send the invitation
 			return asab.web.rest.json_response(request, status=400, data={
 				"result": "ERROR",
-				"tech_err": "Email service is temporarily unavailable."
+				"tech_err": "Email service is temporarily unavailable.",
+				"error": "SeaCatAuthError|Email service is temporarily unavailable",
 			})
 
 		# Extend the expiration
