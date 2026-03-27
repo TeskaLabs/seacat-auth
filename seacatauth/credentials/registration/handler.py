@@ -258,19 +258,36 @@ class RegistrationHandler(object):
 			# an email address to be able to send the invitation link.
 			raise asab.exceptions.ValidationError("Email is required in invitation.")
 
+		email_sent_result = None
 		email_service_enabled: bool | None = None  # None if the check failed, True if enabled, False if disabled
 		try:
 			email_service_enabled = await self.RegistrationService.CommunicationService.is_channel_enabled("email")
 		except exceptions.ServerCommunicationError:
 			L.error("Failed to check email channel availability.")
 
+		# If email service is not enabled, anybody can get the registration link in the response,
+		# otherwise only superusers can get it and regular users must rely on email delivery
 		can_get_link_in_response = authz.has_superuser_access() or email_service_enabled is False
-		if email_service_enabled is None and not can_get_link_in_response:
-			# Cannot send email, cannot return link in response, no point in trying to send the invitation
-			return asab.web.rest.json_response(request, status=400, data={
+
+		if email_service_enabled is False:
+			email_sent_result = {
 				"result": "ERROR",
-				"tech_err": "Email service is temporarily unavailable.",
-				"error": "SeaCatAuthError|Email service is temporarily unavailable",
+				"tech_err": "Email service is not enabled.",
+				"error": "SeaCatAuthError|Email service is not enabled",
+			}
+		elif email_service_enabled is None:
+			email_sent_result = {
+				"result": "ERROR",
+				"tech_err": "Email service is currently unavailable.",
+				"error": "SeaCatAuthError|Email service is currently unavailable",
+			}
+
+		if not (email_service_enabled or can_get_link_in_response):
+			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
+			return asab.web.rest.json_response(request, status=500, data={
+				"result": "ERROR",
+				"tech_err": "Email service is currently unavailable.",
+				"error": "SeaCatAuthError|Email service is currently unavailable",
 			})
 
 		# Extend the expiration
@@ -286,35 +303,31 @@ class RegistrationHandler(object):
 		registration_code = await self.RegistrationService.refresh_registration_code(credentials_id)
 		registration_url = self.RegistrationService.format_registration_url(registration_code)
 
-		response_data = {"result": "OK"}
+		response_data = {
+			"result": "OK",
+			"credentials_id": credentials_id,
+		}
 		if can_get_link_in_response:
 			response_data["registration_url"] = registration_url
 
-		if not email_service_enabled:
-			response_data["email_sent"] = {
-				"result": "ERROR",
-				"tech_err": "Email service is not enabled.",
-				"error": "SeaCatAuthError|Email service is not enabled",
-			}
-			return asab.web.rest.json_response(request, response_data)
+		if email_service_enabled:
+			tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
+			try:
+				await self.RegistrationService.CommunicationService.invitation(
+					credentials=credentials,
+					registration_uri=registration_url,
+					tenants=tenants,
+					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
+				)
+				email_sent_result = {"result": "OK"}
+			except exceptions.MessageDeliveryError:
+				email_sent_result = {
+					"result": "ERROR",
+					"tech_err": "Email delivery error.",
+					"error": "SeaCatAuthError|Email delivery error",
+				}
 
-		tenants = await self.RegistrationService.TenantService.get_tenants(credentials_id)
-		try:
-			await self.RegistrationService.CommunicationService.invitation(
-				credentials=credentials,
-				registration_uri=registration_url,
-				tenants=tenants,
-				expires_at=expiration,
-			)
-		except exceptions.MessageDeliveryError:
-			response_data["email_sent"] = {
-				"result": "ERROR",
-				"tech_err": "Failed to send invitation link.",
-				"error": "SeaCatAuthError|Failed to send invitation link",
-			}
-			return asab.web.rest.json_response(request, response_data)
-
-		response_data["email_sent"] = {"result": "OK"}
+		response_data["email_sent"] = email_sent_result
 		return asab.web.rest.json_response(request, response_data)
 
 
