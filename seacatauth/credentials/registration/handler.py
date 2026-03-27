@@ -148,20 +148,36 @@ class RegistrationHandler(object):
 			raise asab.exceptions.ValidationError("Email is required in invitation.")
 
 		authz = asab.contextvars.Authz.get()
+		email_sent_result = None
 		email_service_enabled: bool | None = None  # None if the check failed, True if enabled, False if disabled
 		try:
 			email_service_enabled = await self.RegistrationService.CommunicationService.is_channel_enabled("email")
 		except exceptions.ServerCommunicationError:
 			L.error("Failed to check email channel availability.")
 
+		# If email service is not enabled, anybody can get the registration link in the response,
+		# otherwise only superusers can get it and regular users must rely on email delivery
 		can_get_link_in_response = authz.has_superuser_access() or email_service_enabled is False
 
-		if email_service_enabled is None and not can_get_link_in_response:
-			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
-			return asab.web.rest.json_response(request, status=400, data={
+		if email_service_enabled is False:
+			email_sent_result = {
 				"result": "ERROR",
-				"tech_err": "Email service is temporarily unavailable.",
-				"error": "SeaCatAuthError|Email service is temporarily unavailable",
+				"tech_err": "Email service is not enabled.",
+				"error": "SeaCatAuthError|Email service is not enabled",
+			}
+		elif email_service_enabled is None:
+			email_sent_result = {
+				"result": "ERROR",
+				"tech_err": "Email service is currently unavailable.",
+				"error": "SeaCatAuthError|Email service is currently unavailable",
+			}
+
+		if not (email_service_enabled or can_get_link_in_response):
+			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
+			return asab.web.rest.json_response(request, status=500, data={
+				"result": "ERROR",
+				"tech_err": "Email service is currently unavailable.",
+				"error": "SeaCatAuthError|Email service is currently unavailable",
 			})
 
 		# Prepare credentials and registration code
@@ -205,37 +221,23 @@ class RegistrationHandler(object):
 			if can_get_link_in_response:
 				response_data["registration_url"] = registration_url
 
-			if not email_service_enabled:
-				response_data["email_sent"] = {
-					"result": "ERROR",
-					"tech_err": "Email service is not enabled.",
-					"error": "SeaCatAuthError|Email service is not enabled",
-				}
-				return asab.web.rest.json_response(request, response_data)
+			if email_service_enabled:
+				try:
+					await self.RegistrationService.CommunicationService.invitation(
+						credentials=credential_data,
+						registration_uri=registration_url,
+						tenants=[tenant],
+						expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
+					)
+					email_sent_result = {"result": "OK"}
+				except exceptions.MessageDeliveryError:
+					email_sent_result = {
+						"result": "ERROR",
+						"tech_err": "Email delivery error.",
+						"error": "SeaCatAuthError|Email delivery error",
+					}
 
-			try:
-				await self.RegistrationService.CommunicationService.invitation(
-					credentials=credential_data,
-					registration_uri=registration_url,
-					tenants=[tenant],
-					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
-				)
-			except exceptions.ServerCommunicationError:
-				response_data["email_sent"] = {
-					"result": "ERROR",
-					"tech_err": "Cannot connect to the email service.",
-					"error": "SeaCatAuthError|Cannot connect to the email service",
-				}
-				return asab.web.rest.json_response(request, response_data)
-			except exceptions.MessageDeliveryError:
-				response_data["email_sent"] = {
-					"result": "ERROR",
-					"tech_err": "Email delivery error.",
-					"error": "SeaCatAuthError|Email delivery error",
-				}
-				return asab.web.rest.json_response(request, response_data)
-
-		response_data["email_sent"] = {"result": "OK"}
+		response_data["email_sent"] = email_sent_result
 		return asab.web.rest.json_response(request, response_data)
 
 
