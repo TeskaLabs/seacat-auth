@@ -19,6 +19,12 @@ CLIENT_METADATA_SCHEMA = {
 		"description":
 			"Domain of the client cookie. Defaults to the application's global cookie domain."
 	},
+	"cookie_name": {  # NON-CANONICAL
+		"type": "string",
+		"pattern": "^[a-zA-Z0-9\\._]{0,64}$",
+		"description":
+			"Name of the client cookie. Defaults to the application's global cookie name plus a string generated from client ID."
+	},
 	"cookie_webhook_uri": {  # NON-CANONICAL
 		"type": "string",
 		"description":
@@ -157,6 +163,10 @@ REGISTER_CLIENT = {
 			"type": "string",
 			"pattern": "^[-_a-zA-Z0-9]{4,64}$",
 			"description": "Preferred client ID. If not specified, a random ID will be generated.",
+		},
+		"provider_id": {
+			"type": "string",
+			"description": "Preferred provider ID that should register the client.",
 		},
 		**CLIENT_METADATA_SCHEMA
 	},
