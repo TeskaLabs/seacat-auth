@@ -178,7 +178,6 @@ class ExternalAuthenticationService(asab.Service):
 			return await self._error_redirect_response(
 				self.LoginUri,
 				result=ExtLoginResult.PAIRING_FAILED,
-				delete_sso_cookie=True,
 				redirect_uri=redirect_uri or self.DefaultRedirectUri
 			)
 
