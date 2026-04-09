@@ -287,8 +287,8 @@ class ChangePasswordHandler(object):
 					"cid": credentials_id})
 				email_delivery_result = {
 					"result": "ERROR",
-					"tech_err": "Cannot connect to the email service.",
-					"error": "SeaCatAuthError|Cannot connect to the email service",
+					"tech_err": "Email service is temporarily unavailable.",
+					"error": "SeaCatAuthError|Email service is temporarily unavailable",
 				}
 			except exceptions.MessageDeliveryError as e:
 				L.error("Cannot send password reset email: {}".format(e), struct_data={

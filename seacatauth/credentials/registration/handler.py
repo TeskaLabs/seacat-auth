@@ -168,7 +168,7 @@ class RegistrationHandler(object):
 		elif email_service_enabled is None:
 			email_sent_result = {
 				"result": "ERROR",
-				"tech_err": "Email service is currently unavailable.",
+				"tech_err": "Email service is temporarily unavailable.",
 				"error": "SeaCatAuthError|Email service is currently unavailable",
 			}
 
@@ -176,7 +176,7 @@ class RegistrationHandler(object):
 			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
 			return asab.web.rest.json_response(request, status=500, data={
 				"result": "ERROR",
-				"tech_err": "Email service is currently unavailable.",
+				"tech_err": "Email service is temporarily unavailable.",
 				"error": "SeaCatAuthError|Email service is currently unavailable",
 			})
 
@@ -230,6 +230,12 @@ class RegistrationHandler(object):
 						expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 					)
 					email_sent_result = {"result": "OK"}
+				except exceptions.ServerCommunicationError:
+					email_sent_result = {
+						"result": "ERROR",
+						"tech_err": "Email service is temporarily unavailable.",
+						"error": "SeaCatAuthError|Email service is temporarily unavailable",
+					}
 				except exceptions.MessageDeliveryError:
 					email_sent_result = {
 						"result": "ERROR",
@@ -278,16 +284,16 @@ class RegistrationHandler(object):
 		elif email_service_enabled is None:
 			email_sent_result = {
 				"result": "ERROR",
-				"tech_err": "Email service is currently unavailable.",
-				"error": "SeaCatAuthError|Email service is currently unavailable",
+				"tech_err": "Email service is temporarily unavailable.",
+				"error": "SeaCatAuthError|Email service is temporarily unavailable",
 			}
 
 		if not (email_service_enabled or can_get_link_in_response):
 			# Cannot send email, cannot return link in response, no point in trying to prepare the invitation
 			return asab.web.rest.json_response(request, status=500, data={
 				"result": "ERROR",
-				"tech_err": "Email service is currently unavailable.",
-				"error": "SeaCatAuthError|Email service is currently unavailable",
+				"tech_err": "Email service is temporarily unavailable.",
+				"error": "SeaCatAuthError|Email service is temporarily unavailable",
 			})
 
 		# Extend the expiration
@@ -320,6 +326,12 @@ class RegistrationHandler(object):
 					expires_at=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expiration)
 				)
 				email_sent_result = {"result": "OK"}
+			except exceptions.ServerCommunicationError:
+				email_sent_result = {
+					"result": "ERROR",
+					"tech_err": "Email service is temporarily unavailable.",
+					"error": "SeaCatAuthError|Email service is temporarily unavailable",
+				}
 			except exceptions.MessageDeliveryError:
 				email_sent_result = {
 					"result": "ERROR",
