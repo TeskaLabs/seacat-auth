@@ -151,10 +151,16 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 		if saml_client is None:
 			raise ExternalLoginError("SAML client is not properly initialized.")
 
-		saml_request_id, authn_request = saml_client.prepare_for_authenticate(
-			binding=saml2.BINDING_HTTP_REDIRECT,
-			relay_state=state["state_id"],
-		)
+		try:
+			saml_request_id, authn_request = saml_client.prepare_for_authenticate(
+				binding=saml2.BINDING_HTTP_REDIRECT,
+				relay_state=state["state_id"],
+			)
+		except Exception as e:
+			L.exception("Cannot prepare SAML authentication request.", struct_data={
+				"provider": self.Type,
+			})
+			raise ExternalLoginError("Failed to prepare SAML authentication request.") from e
 
 		headers = dict(authn_request.get("headers", []))
 		auth_uri = headers.get("Location")
