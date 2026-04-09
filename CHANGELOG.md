@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v26.15
+
+### Pre-releases
+- v26.15-alpha
+
+### Features
+- Always include link in response if SMTP is not configured (#561, v26.15-alpha)
+
+---
+
+
 ## v25.48
 
 ### Pre-releases
