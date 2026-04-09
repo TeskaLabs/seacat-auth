@@ -107,8 +107,21 @@ class ExternalAuthenticationService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> aiohttp.web.Response:
-		response = await self._prepare_external_auth_request(
-			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
+		try:
+			response = await self._prepare_external_auth_request(
+				provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "Failed to initialize login with external account.", struct_data={
+				"provider": provider_type,
+				"error": str(e),
+			})
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result="login_failed",
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
 		L.log(asab.LOG_NOTICE, "Initialized login with external account.", struct_data={
 			"provider": provider_type})
 		return response
@@ -121,9 +134,28 @@ class ExternalAuthenticationService(asab.Service):
 	) -> aiohttp.web.Response:
 		if not self.can_sign_up_new_credentials(provider_type):
 			L.error("Signup with external account is not enabled.")
-			raise exceptions.RegistrationNotOpenError()
-		response = await self._prepare_external_auth_request(
-			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result="signup_disabled",
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
+		try:
+			response = await self._prepare_external_auth_request(
+				provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "Failed to initialize sign-up with external account.", struct_data={
+				"provider": provider_type,
+				"error": str(e),
+			})
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result="signup_failed",
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
 		L.log(asab.LOG_NOTICE, "Initialized sign-up with external account.", struct_data={
 			"provider": provider_type})
 		return response
@@ -135,8 +167,21 @@ class ExternalAuthenticationService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> aiohttp.web.Response:
-		response = await self._prepare_external_auth_request(
-			provider_type, operation=AuthOperation.PairAccount, redirect_uri=redirect_uri)
+		try:
+			response = await self._prepare_external_auth_request(
+				provider_type, operation=AuthOperation.PairAccount, redirect_uri=redirect_uri)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "Failed to initialize pairing external account.", struct_data={
+				"provider": provider_type,
+				"error": str(e),
+			})
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result="pairing_failed",
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
 		L.log(asab.LOG_NOTICE, "Initialized pairing external account.", struct_data={
 			"provider": provider_type})
 		return response
