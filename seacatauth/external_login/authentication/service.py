@@ -11,7 +11,7 @@ from ...last_activity import EventCode
 from ...models import Session
 from ...events import EventTypes
 from ...api import local_authz
-from .utils import AuthOperation
+from .utils import AuthOperation, ExtLoginResult, ExtLoginError
 from .providers.abc import ExternalAuthProviderABC
 from .providers import create_provider
 from ..exceptions import (
@@ -107,8 +107,21 @@ class ExternalAuthenticationService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> aiohttp.web.Response:
-		response = await self._prepare_external_auth_request(
-			provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
+		try:
+			response = await self._prepare_external_auth_request(
+				provider_type, operation=AuthOperation.LogIn, redirect_uri=redirect_uri)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "Failed to initialize login with external account.", struct_data={
+				"provider": provider_type,
+				"error": str(e),
+			})
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result=ExtLoginResult.LOGIN_FAILED,
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
 		L.log(asab.LOG_NOTICE, "Initialized login with external account.", struct_data={
 			"provider": provider_type})
 		return response
@@ -121,13 +134,32 @@ class ExternalAuthenticationService(asab.Service):
 	) -> aiohttp.web.Response:
 		if not self.can_sign_up_new_credentials(provider_type):
 			L.error("Signup with external account is not enabled.")
-			raise exceptions.RegistrationNotOpenError()
-		response = await self._prepare_external_auth_request(
-			provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result=ExtLoginResult.SIGNUP_FAILED,
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri,
+				ext_login_error=ExtLoginError.REGISTRATION_DISABLED,
+			)
+
+		try:
+			response = await self._prepare_external_auth_request(
+				provider_type, operation=AuthOperation.SignUp, redirect_uri=redirect_uri)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "Failed to initialize sign-up with external account.", struct_data={
+				"provider": provider_type,
+				"error": str(e),
+			})
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result=ExtLoginResult.SIGNUP_FAILED,
+				delete_sso_cookie=True,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
 		L.log(asab.LOG_NOTICE, "Initialized sign-up with external account.", struct_data={
 			"provider": provider_type})
 		return response
-
 
 
 	async def initialize_pairing_with_ext_provider(
@@ -135,8 +167,20 @@ class ExternalAuthenticationService(asab.Service):
 		provider_type: str,
 		redirect_uri: typing.Optional[str]
 	) -> aiohttp.web.Response:
-		response = await self._prepare_external_auth_request(
-			provider_type, operation=AuthOperation.PairAccount, redirect_uri=redirect_uri)
+		try:
+			response = await self._prepare_external_auth_request(
+				provider_type, operation=AuthOperation.PairAccount, redirect_uri=redirect_uri)
+		except ExternalLoginError as e:
+			L.log(asab.LOG_NOTICE, "Failed to initialize pairing external account.", struct_data={
+				"provider": provider_type,
+				"error": str(e),
+			})
+			return await self._error_redirect_response(
+				self.LoginUri,
+				result=ExtLoginResult.PAIRING_FAILED,
+				redirect_uri=redirect_uri or self.DefaultRedirectUri
+			)
+
 		L.log(asab.LOG_NOTICE, "Initialized pairing external account.", struct_data={
 			"provider": provider_type})
 		return response
@@ -226,10 +270,10 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="login_failed",
+				result=ExtLoginResult.LOGIN_FAILED,
 				delete_sso_cookie=True,
 				redirect_uri=self._get_final_redirect_uri(state),
-				ext_login_error="access_denied",
+				ext_login_error=ExtLoginError.ACCESS_DENIED,
 			)
 		except ExternalLoginError as e:
 			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
@@ -239,7 +283,7 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="login_failed",
+				result=ExtLoginResult.LOGIN_FAILED,
 				delete_sso_cookie=True,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
@@ -301,9 +345,9 @@ class ExternalAuthenticationService(asab.Service):
 			# Redirect to login page with error message, keep the original redirect uri in the query
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="login_failed",
+				result=ExtLoginResult.LOGIN_FAILED,
 				delete_sso_cookie=True,
-				ext_login_error="not_found",
+				ext_login_error=ExtLoginError.NOT_FOUND,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
 
@@ -316,7 +360,7 @@ class ExternalAuthenticationService(asab.Service):
 			)
 
 		return await self._success_redirect_response(
-			self._get_final_redirect_uri(state), "login_success", sso_session=new_sso_session)
+			self._get_final_redirect_uri(state), ExtLoginResult.LOGIN_SUCCESS, sso_session=new_sso_session)
 
 
 	async def _attempt_pair_credentials(self, provider_type: str, user_info: typing.Dict) -> typing.Optional[str]:
@@ -418,10 +462,10 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="signup_failed",
+				result=ExtLoginResult.SIGNUP_FAILED,
 				delete_sso_cookie=True,
 				redirect_uri=self._get_final_redirect_uri(state),
-				ext_login_error="access_denied",
+				ext_login_error=ExtLoginError.ACCESS_DENIED,
 			)
 		except ExternalLoginError as e:
 			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
@@ -431,7 +475,7 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="signup_failed",
+				result=ExtLoginResult.SIGNUP_FAILED,
 				delete_sso_cookie=True,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
@@ -440,7 +484,7 @@ class ExternalAuthenticationService(asab.Service):
 			L.error("Sign-up with external account not enabled.")
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="signup_failed",
+				result=ExtLoginResult.SIGNUP_FAILED,
 				delete_sso_cookie=True,
 				ext_login_error="registration_disabled",
 				redirect_uri=self._get_final_redirect_uri(state)
@@ -455,9 +499,9 @@ class ExternalAuthenticationService(asab.Service):
 				"provider": provider_type, "sub": user_info.get("sub")})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="signup_failed",
+				result=ExtLoginResult.SIGNUP_FAILED,
 				delete_sso_cookie=True,
-				ext_login_error="already_exists",
+				ext_login_error=ExtLoginError.ALREADY_EXISTS,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
 
@@ -473,7 +517,7 @@ class ExternalAuthenticationService(asab.Service):
 			L.error("Sign-up with external account failed: {}".format(e))
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="signup_failed",
+				result=ExtLoginResult.SIGNUP_FAILED,
 				delete_sso_cookie=True,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
@@ -486,7 +530,7 @@ class ExternalAuthenticationService(asab.Service):
 		)
 
 		return await self._success_redirect_response(
-			self._get_final_redirect_uri(state), "signup_success", sso_session=sso_session)
+			self._get_final_redirect_uri(state), ExtLoginResult.SIGNUP_SUCCESS, sso_session=sso_session)
 
 
 	async def _finalize_pairing_with_ext_provider(
@@ -519,9 +563,9 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="pairing_failed",
+				result=ExtLoginResult.PAIRING_FAILED,
 				redirect_uri=self._get_final_redirect_uri(state),
-				ext_login_error="access_denied",
+				ext_login_error=ExtLoginError.ACCESS_DENIED,
 			)
 		except ExternalLoginError as e:
 			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
@@ -531,7 +575,7 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self._get_final_redirect_uri(state),
-				result="pairing_failed",
+				result=ExtLoginResult.PAIRING_FAILED,
 			)
 
 		# Get current SSO session (if any) to determine if we are re-logging in or logging in anew
@@ -546,9 +590,9 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="pairing_failed",
+				result=ExtLoginResult.PAIRING_FAILED,
 				delete_sso_cookie=True,
-				ext_login_error="not_authenticated",
+				ext_login_error=ExtLoginError.NOT_AUTHENTICATED,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
 
@@ -560,9 +604,9 @@ class ExternalAuthenticationService(asab.Service):
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
-				result="pairing_failed",
+				result=ExtLoginResult.PAIRING_FAILED,
 				delete_sso_cookie=True,
-				ext_login_error="not_authenticated",
+				ext_login_error=ExtLoginError.NOT_AUTHENTICATED,
 				redirect_uri=self._get_final_redirect_uri(state)
 			)
 
@@ -584,12 +628,12 @@ class ExternalAuthenticationService(asab.Service):
 			)
 			return await self._error_redirect_response(
 				self._get_final_redirect_uri(state),
-				result="pairing_failed",
-				ext_login_error="already_exists"
+				result=ExtLoginResult.PAIRING_FAILED,
+				ext_login_error=ExtLoginError.ALREADY_EXISTS,
 			)
 
 		return await self._success_redirect_response(
-			self._get_final_redirect_uri(state), "pairing_success")
+			self._get_final_redirect_uri(state), ExtLoginResult.PAIRING_SUCCESS)
 
 
 	async def _login(
