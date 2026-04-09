@@ -197,9 +197,14 @@ class ChangePasswordHandler(object):
 	@asab.web.auth.require(ResourceId.CREDENTIALS_EDIT)
 	async def admin_request_password_reset(self, request, *, json_data):
 		"""
-		Send a password reset link to specified user and return it in the response if the caller is superuser.
-		As long as either email communication is successful or the caller is superuser, the result is
-		considered successful.
+		Send a password reset link to the specified user and return it in the response if the caller is superuser or
+		if SMTP service is not enabled. The operation is considered successful if either:
+		- The email with the reset link is successfully sent to the user, or
+		- The link is disclosed in the response.
+
+		If the primary action (reset link creation) fails, the response will indicate failure regardless of email status.
+		If the reset link is created but cannot be delivered (neither emailed nor disclosed), the response will indicate failure.
+		The response includes multi-status details for both link creation and email delivery, as applicable.
 		"""
 		response_data = {}
 		authz = asab.contextvars.Authz.get()
@@ -226,10 +231,15 @@ class ChangePasswordHandler(object):
 		# Check if password reset link can be disclosed (in email or at least in the response)
 		password_reset_url = None
 		url_disclosed = False
-		can_get_link_in_response = authz.has_superuser_access()
-		email_service_enabled = await self.ChangePasswordService.CommunicationService.is_channel_enabled("email")
-		can_email_to_target = await self.ChangePasswordService.CommunicationService.can_send_to_target(
-			credentials, "email")
+		email_service_enabled: bool | None = None  # None if status cannot be determined due to error
+		credentials_have_email: bool = credentials.get("email") not in (None, "")
+		try:
+			email_service_enabled = await self.ChangePasswordService.CommunicationService.is_channel_enabled("email")
+		except exceptions.ServerCommunicationError:
+			L.log(asab.LOG_NOTICE, "Cannot check email service availability: Communication error.", struct_data={
+				"cid": credentials_id})
+
+		can_get_link_in_response: bool = authz.has_superuser_access() or email_service_enabled is False
 
 		# Superusers receive the password reset link in response
 		if can_get_link_in_response:
@@ -246,10 +256,10 @@ class ChangePasswordHandler(object):
 				"cid": credentials_id})
 			email_delivery_result = {
 				"result": "ERROR",
-				"tech_err": "Email service not available.",
-				"error": "SeaCatAuthError|Email service not available",
+				"tech_err": "Email service is not enabled.",
+				"error": "SeaCatAuthError|Email service is not enabled",
 			}
-		elif not can_email_to_target:
+		elif not credentials_have_email:
 			L.error("Cannot send password reset email: Credentials have no email address.", struct_data={
 				"cid": credentials_id})
 			email_delivery_result = {
@@ -277,16 +287,16 @@ class ChangePasswordHandler(object):
 					"cid": credentials_id})
 				email_delivery_result = {
 					"result": "ERROR",
-					"tech_err": "Cannot connect to the email service.",
-					"error": "SeaCatAuthError|Cannot connect to the email service",
+					"tech_err": "Email service is temporarily unavailable.",
+					"error": "SeaCatAuthError|Email service is temporarily unavailable",
 				}
 			except exceptions.MessageDeliveryError as e:
 				L.error("Cannot send password reset email: {}".format(e), struct_data={
 					"cid": credentials_id})
 				email_delivery_result = {
 					"result": "ERROR",
-					"tech_err": "Failed to send password reset link.",
-					"error": "SeaCatAuthError|Failed to send password reset link",
+					"tech_err": "Email delivery error.",
+					"error": "SeaCatAuthError|Email delivery error",
 				}
 
 		response_data["email_sent"] = email_delivery_result

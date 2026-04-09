@@ -74,6 +74,15 @@ class CommunicationService(asab.Service):
 
 
 	async def is_channel_enabled(self, channel) -> bool:
+		"""
+		Check if the specified communication channel is enabled and can be used to send messages.
+
+		Returns:
+			True if the channel is enabled, False otherwise.
+
+		Raises:
+			exceptions.ServerCommunicationError: If there was an error communicating with the external service.
+		"""
 		if channel not in self.CommunicationProviders:
 			return False
 		return await self.CommunicationProviders[channel].is_enabled()
@@ -128,6 +137,22 @@ class CommunicationService(asab.Service):
 		locale: str = None,
 		**kwargs
 	):
+		"""
+		Builds a message from the specified template and sends it via the specified channel.
+
+		Args:
+			credentials: The credentials dict containing the necessary information to determine the message recipient.
+			template_id: The ID of the template to use for building the message.
+			channel: The communication channel to use for sending the message.
+			locale: The locale to use for selecting the template. If not specified, the default locale will be used.
+			**kwargs: Additional keyword arguments to pass to the template for rendering.
+
+		Raises:
+			exceptions.CommunicationNotConfiguredError: If the communication service is not properly configured.
+			exceptions.CommunicationChannelNotAvailableError: If the specified channel is not available for the given credentials.
+			exceptions.MessageDeliveryError: If there was an error delivering the message.
+			exceptions.ServerCommunicationError: If there was an error communicating with the external service.
+		"""
 		if not self.is_enabled():
 			raise exceptions.CommunicationNotConfiguredError()
 
