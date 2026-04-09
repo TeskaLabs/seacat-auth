@@ -162,7 +162,6 @@ class ExternalAuthenticationService(asab.Service):
 		return response
 
 
-
 	async def initialize_pairing_with_ext_provider(
 		self,
 		provider_type: str,
