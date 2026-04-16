@@ -93,14 +93,10 @@ class RolesHandler(object):
 		"""
 		Set credentials' roles
 
-		For given credentials ID, assign listed roles and unassign existing roles that are not in the list
-
-		Cases:
-		1) The requester is superuser AND requested `tenant` is "tenant-name":
-			Roles from "tenant-name/..." + global roles will be un/assigned.
-		2) The requester is not superuser AND requested `tenant` is "tenant-name":
-			Only "tenant-name/..." roles will be un/assigned.
-		ELSE) In other cases the role assignment fails.
+		For given credentials ID, assign listed roles and unassign existing roles that are not in the list.
+		The scope is always a specific tenant + global roles.
+		Caller with access to ROLE_ASSIGN_GLOBAL resource can set both tenant-specific and global roles.
+		Caller with access to ROLE_ASSIGN resource can set only tenant-specific roles.
 		"""
 		authz = asab.contextvars.Authz.get()
 		tenant_id = asab.contextvars.Tenant.get()
@@ -108,7 +104,7 @@ class RolesHandler(object):
 		requested_roles = json_data["roles"]
 
 		# Determine whether global roles will be un/assigned
-		if authz.has_superuser_access():
+		if authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
 			include_global = True
 		else:
 			include_global = False
@@ -119,7 +115,7 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def set_credentials_global_roles(self, request, *, json_data):
 		"""
@@ -145,7 +141,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def assign_credentials_global_role(self, request):
 		"""
@@ -173,7 +169,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def unassign_credentials_global_role(self, request):
 		"""
