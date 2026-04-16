@@ -176,8 +176,8 @@ class RoleService(asab.Service):
 		target_tenants = set(await self.TenantService.get_tenants(target_cid))
 
 		authz = asab.contextvars.Authz.get()
-		if authz.has_superuser_access():
-			# Superusers can assign roles in any tenant plus global roles
+		if authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			# Can assign roles in any tenant plus global roles
 			return {None, *target_tenants}
 
 		tenant = asab.contextvars.Tenant.get()
@@ -713,7 +713,7 @@ class RoleService(asab.Service):
 		if tenant_id:
 			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
 		if verify_role:
 			try:
@@ -777,7 +777,7 @@ class RoleService(asab.Service):
 		if tenant_id:
 			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
@@ -799,7 +799,7 @@ class RoleService(asab.Service):
 		if tenant_id:
 			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
 		collection = await self.StorageService.collection(self.CredentialsRolesCollection)
 		result = await collection.delete_many({"r": role_id})
