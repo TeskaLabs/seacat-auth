@@ -347,8 +347,7 @@ class RoleService(asab.Service):
 		if tenant_id:
 			authz.require_tenant_access()
 		else:
-			# Only superusers can create global roles
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_EDIT_GLOBAL)
 
 		# Check existence before creating to prevent shadowing shared roles with tenant roles
 		try:
