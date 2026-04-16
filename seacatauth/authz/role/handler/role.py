@@ -138,7 +138,7 @@ class RoleHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_EDIT_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def create_global_role(self, request, *, json_data):
 		"""
@@ -177,7 +177,7 @@ class RoleHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_EDIT_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def update_global_role(self, request, *, json_data):
 		"""
@@ -204,7 +204,7 @@ class RoleHandler(object):
 		return await self._delete_role(request, role_id)
 
 
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_EDIT_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def delete_global_role(self, request):
 		"""
