@@ -80,12 +80,22 @@ SEACAT_AUTH_RESOURCES = {
 		"description": "Search tenant roles, view role detail and list role bearers.",
 	},
 	ResourceId.ROLE_EDIT: {
-		"description":
-			"Create, edit and delete tenant roles. "
-			"This does not enable the bearer to assign Seacat system resources.",
+		"description": "Create, edit and delete tenant roles.",
 	},
 	ResourceId.ROLE_ASSIGN: {
 		"description": "Assign and unassign tenant roles.",
+	},
+	ResourceId.ROLE_ACCESS_GLOBAL: {
+		"description": "Search global roles, view role detail and list role bearers.",
+		"global_only": True,
+	},
+	ResourceId.ROLE_EDIT_GLOBAL: {
+		"description": "Create, edit and delete global roles.",
+		"global_only": True,
+	},
+	ResourceId.ROLE_ASSIGN_GLOBAL: {
+		"description": "Assign and unassign global roles.",
+		"global_only": True,
 	},
 	ResourceId.APIKEY_ACCESS: {
 		"description": "View API keys.",
