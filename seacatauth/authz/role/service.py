@@ -360,7 +360,11 @@ class RoleService(asab.Service):
 		assert_role_is_editable(role_current)
 
 		# Unassign the role from all credentials
-		await self.delete_role_assignments(role_current)
+		with local_authz(
+			"RoleService",
+			resources=[ResourceId.ROLE_ASSIGN_GLOBAL],
+		):
+			await self.delete_role_assignments(role_current)
 
 		# Delete the role
 		await self.StorageService.delete(self.RoleCollection, role_id)
