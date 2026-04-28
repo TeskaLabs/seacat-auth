@@ -345,7 +345,8 @@ class RoleService(asab.Service):
 		tenant_id, role_name = self.parse_role_id(role_id)
 		self.validate_role_name(role_name)
 		if tenant_id:
-			authz.require_tenant_access()
+			if not authz.has_resource_access(ResourceId.ROLE_EDIT_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_EDIT)
 		else:
 			authz.require_resource_access(ResourceId.ROLE_EDIT_GLOBAL)
 
@@ -711,7 +712,9 @@ class RoleService(asab.Service):
 		authz = asab.contextvars.Authz.get()
 		tenant_id, _ = self.parse_role_id(role_id)
 		if tenant_id:
-			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+			# Require global or tenant permission
+			if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
 			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
@@ -750,6 +753,7 @@ class RoleService(asab.Service):
 		upsertor.set("c", credentials_id)
 		upsertor.set("r", role_id)
 		if tenant != "*":
+			upsertor.set("t", tenant)
 			upsertor.set("t", tenant)
 
 		try:
