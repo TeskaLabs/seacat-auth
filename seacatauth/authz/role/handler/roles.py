@@ -88,7 +88,6 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
-	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def set_credentials_roles(self, request, *, json_data):
 		"""
 		Set credentials' roles
@@ -99,6 +98,9 @@ class RolesHandler(object):
 		Caller with access to ROLE_ASSIGN resource can set only tenant-specific roles.
 		"""
 		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		credentials_id = request.match_info["credentials_id"]
 		requested_roles = json_data["roles"]
@@ -132,6 +134,10 @@ class RolesHandler(object):
 		"""
 		Assign role to credentials
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		await self.RoleService.assign_role(
@@ -155,11 +161,14 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def unassign_credentials_role(self, request):
 		"""
 		Unassign role from credentials
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		await self.RoleService.unassign_role(
