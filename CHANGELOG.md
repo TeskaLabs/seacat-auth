@@ -8,7 +8,7 @@
 - v26.15-alpha
 
 ### Features
--  Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
+- Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
 - Redirect to login when external login initialization fails (#565, v26.15-alpha1)
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
