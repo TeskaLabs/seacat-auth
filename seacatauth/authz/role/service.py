@@ -435,6 +435,7 @@ class RoleService(asab.Service):
 		with local_authz(
 			"RoleService",
 			resources=[ResourceId.ROLE_ASSIGN_GLOBAL],
+			tenant=role_current.get("tenant"),
 		):
 			await self.delete_role_assignments(role_current)
 
