@@ -178,7 +178,6 @@ class RoleHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
-	@asab.web.auth.require(ResourceId.ROLE_EDIT)
 	async def create_role(self, request, *, json_data):
 		"""
 		Create a new role
@@ -193,13 +192,17 @@ class RoleHandler(object):
 			schema:
 				type: string
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_EDIT_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_EDIT)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		return await self._create_role(request, role_id, json_data)
 
 
 	@asab.web.rest.json_schema_handler(schema.CREATE_ROLE)
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_EDIT_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def create_global_role(self, request, *, json_data):
 		"""
@@ -220,11 +223,14 @@ class RoleHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
-	@asab.web.auth.require(ResourceId.ROLE_EDIT)
 	async def update_role(self, request, *, json_data):
 		"""
 		Edit role description and resources
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_EDIT_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_EDIT)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		try:
@@ -238,7 +244,7 @@ class RoleHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.UPDATE_ROLE)
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_EDIT_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def update_global_role(self, request, *, json_data):
 		"""
@@ -255,17 +261,20 @@ class RoleHandler(object):
 			)
 
 
-	@asab.web.auth.require(ResourceId.ROLE_EDIT)
 	async def delete_role(self, request):
 		"""
 		Delete role
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_EDIT_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_EDIT)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		return await self._delete_role(request, role_id)
 
 
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_EDIT_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def delete_global_role(self, request):
 		"""
