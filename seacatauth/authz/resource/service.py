@@ -86,11 +86,11 @@ SEACAT_AUTH_RESOURCES = {
 		"description": "Assign and unassign tenant roles.",
 	},
 	ResourceId.ROLE_EDIT_GLOBAL: {
-		"description": "Create, edit and delete global roles.",
+		"description": "Create, edit and delete global and tenant roles.",
 		"global_only": True,
 	},
 	ResourceId.ROLE_ASSIGN_GLOBAL: {
-		"description": "Assign and unassign global roles.",
+		"description": "Assign and unassign global and tenant roles.",
 		"global_only": True,
 	},
 	ResourceId.APIKEY_ACCESS: {
