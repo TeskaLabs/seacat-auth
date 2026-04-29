@@ -807,7 +807,9 @@ class RoleService(asab.Service):
 		role_id = role["_id"]
 		tenant_id, role_name = self.parse_role_id(role_id)
 		if tenant_id:
-			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+			# Require global or tenant permission
+			if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
 			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
