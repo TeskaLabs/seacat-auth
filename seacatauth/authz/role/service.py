@@ -155,14 +155,6 @@ class RoleService(asab.Service):
 		return views
 
 
-	def _role_tenant_id(self, role_id: str):
-		tenant_id = role_id.split("/")[0]
-		if tenant_id == "*":
-			return None
-		else:
-			return tenant_id
-
-
 	async def list(
 		self,
 		tenant_id: typing.Optional[str] = None,
@@ -251,10 +243,10 @@ class RoleService(asab.Service):
 		tenant_id, role_name = self.parse_role_id(role_id)
 		self.validate_role_name(role_name)
 		if tenant_id:
-			authz.require_tenant_access()
+			if not authz.has_resource_access(ResourceId.ROLE_EDIT_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_EDIT)
 		else:
-			# Only superusers can create global roles
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_EDIT_GLOBAL)
 
 		# Check existence before creating to prevent shadowing shared roles with tenant roles
 		try:
@@ -338,7 +330,12 @@ class RoleService(asab.Service):
 		assert_role_is_editable(role_current)
 
 		# Unassign the role from all credentials
-		await self.delete_role_assignments(role_current)
+		with local_authz(
+			"RoleService",
+			resources=[ResourceId.ROLE_ASSIGN_GLOBAL],
+			tenant=role_current.get("tenant"),
+		):
+			await self.delete_role_assignments(role_current)
 
 		# Delete the role
 		await self.StorageService.delete(self.RoleCollection, role_id)
@@ -557,9 +554,11 @@ class RoleService(asab.Service):
 		authz = asab.contextvars.Authz.get()
 		tenant_id, _ = self.parse_role_id(role_id)
 		if tenant_id:
-			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+			# Require global or tenant permission
+			if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
 		if verify_role:
 			try:
@@ -597,6 +596,7 @@ class RoleService(asab.Service):
 		upsertor.set("r", role_id)
 		if tenant != "*":
 			upsertor.set("t", tenant)
+			upsertor.set("t", tenant)
 
 		try:
 			await upsertor.execute(event_type=EventTypes.ROLE_ASSIGNED)
@@ -621,9 +621,11 @@ class RoleService(asab.Service):
 		authz = asab.contextvars.Authz.get()
 		tenant_id, _ = self.parse_role_id(role_id)
 		if tenant_id:
-			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+			# Require global or tenant permission
+			if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
@@ -643,9 +645,11 @@ class RoleService(asab.Service):
 		role_id = role["_id"]
 		tenant_id, role_name = self.parse_role_id(role_id)
 		if tenant_id:
-			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+			# Require global or tenant permission
+			if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+				authz.require_resource_access(ResourceId.ROLE_ASSIGN)
 		else:
-			authz.require_superuser_access()
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
 
 		collection = await self.StorageService.collection(self.CredentialsRolesCollection)
 		result = await collection.delete_many({"r": role_id})
