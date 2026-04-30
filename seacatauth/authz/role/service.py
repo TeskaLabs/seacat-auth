@@ -155,36 +155,6 @@ class RoleService(asab.Service):
 		return views
 
 
-	async def _get_tenants_where_roles_assignable(self, target_cid: str) -> typing.Set[str]:
-		"""
-		Returns a set of tenants where the caller can assign roles to the target credentials.
-
-		Args:
-			target_cid: Credentials ID of the target user.
-
-		Returns:
-			Set of tenant IDs where the caller can assign roles to the target user.
-			Includes None if the caller can assign global roles.
-		"""
-		target_tenants = set(await self.TenantService.get_tenants(target_cid))
-
-		authz = asab.contextvars.Authz.get()
-		if authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
-			# Can assign roles in any tenant plus global roles
-			return {None, *target_tenants}
-
-		tenant = asab.contextvars.Tenant.get()
-		if tenant not in target_tenants:
-			# Target does not have access to the current tenant, so no editable tenants
-			return set()
-
-		# Current tenant is editable if the user has ROLE_ASSIGN in it
-		if authz.has_resource_access(ResourceId.ROLE_ASSIGN):
-			return {tenant}
-		else:
-			return tenant_id
-
-
 	async def list(
 		self,
 		tenant_id: typing.Optional[str] = None,
