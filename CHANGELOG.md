@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-beta1
 - v25.48-beta
 - v25.48-alpha23
 - v25.48-alpha22
@@ -28,6 +29,9 @@
 - v25.48-alpha2
 - v25.48-alpha1
 - v25.48-alpha
+
+### Patches
+- Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (v25.48-beta1)
 
 ### Fixes
 - Allow to specify client provider ID at client registration (#564, v25.48-alpha23)
