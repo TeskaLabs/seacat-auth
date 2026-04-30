@@ -1,0 +1,8 @@
+"CN=Administrators,CN=Builtin,DC=EXAMPLE,DC=com":
+  tenants:
+    - system
+  roles:
+    - "*/superuser"
+"CN=Enterprise Admins,CN=Users,DC=EXAMPLE,DC=com":
+  tenants:
+    - system
