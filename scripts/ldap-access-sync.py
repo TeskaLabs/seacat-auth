@@ -388,24 +388,26 @@ def main():
                 continue
             print(entry.get("sAMAccountName")[0].decode(), ">", dn)
             cid = credentials_id_from_dn(cfg, dn)
-            current_roles = list_roles(db, cid)
-            current_tenants = list_tenants(db, cid)
             member_of = entry.get("memberOf", [])
+            desired_roles = set()
+            desired_tenants = set()
             for group_dn, mapping in cfg.group_map.items():
                 if group_dn.encode() in member_of:
-                    for tenant in mapping.get("tenants", []):
-                        if tenant not in current_tenants:
-                            assign_tenant(db, cid, tenant)
-                    for role in mapping.get("roles", []):
-                        if role not in current_roles:
-                            assign_role(db, cid, role)
-                else:
-                    for tenant in mapping.get("tenants", []):
-                        if tenant in current_tenants:
-                            unassign_tenant(db, cid, tenant)
-                    for role in mapping.get("roles", []):
-                        if role in current_roles:
-                            unassign_role(db, cid, role)
+                    desired_tenants.update(mapping.get("tenants", []))
+                    desired_roles.update(mapping.get("roles", []))
+
+            current_roles = set(list_roles(db, cid))
+            current_tenants = set(list_tenants(db, cid))
+
+            for tenant in sorted(desired_tenants - current_tenants):
+                assign_tenant(db, cid, tenant)
+            for role in sorted(desired_roles - current_roles):
+                assign_role(db, cid, role)
+
+            for tenant in sorted(current_tenants - desired_tenants):
+                unassign_tenant(db, cid, tenant)
+            for role in sorted(current_roles - desired_roles):
+                unassign_role(db, cid, role)
 
 
 if __name__ == "__main__":
