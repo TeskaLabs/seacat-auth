@@ -286,8 +286,11 @@ def load_ldap_config(config_path):
         Config: The configuration object populated with LDAP settings.
 
     Raises:
+        FileNotFoundError: If ``config_path`` is not a regular file.
         RuntimeError: If no or multiple LDAP provider sections are found.
     """
+    if not os.path.isfile(config_path):
+        raise FileNotFoundError(f"Config file not found: {config_path}")
     parser = configparser.ConfigParser()
     parser.read(config_path)
     ldap_sections = [s for s in parser.sections() if s.startswith('seacatauth:credentials:ldap:')]
@@ -326,10 +329,11 @@ def load_group_map(path):
         dict: The group map as a dictionary.
 
     Raises:
-        RuntimeError: If the file is missing, has an unsupported extension, or PyYAML is not installed for YAML files.
+        FileNotFoundError: If ``path`` is not a regular file.
+        RuntimeError: If the file has an unsupported extension or PyYAML is not installed for YAML files.
     """
     if not os.path.isfile(path):
-        raise RuntimeError(f"Group map file not found: {path}")
+        raise FileNotFoundError(f"Group map file not found: {path}")
     with open(path, 'r', encoding='utf-8') as f:
         if path.endswith('.yaml') or path.endswith('.yml'):
             if yaml is None:
