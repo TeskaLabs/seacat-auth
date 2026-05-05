@@ -433,8 +433,8 @@ def main():
                 if not mapping:
                     continue
                 if group_dn.lower() in member_of:
-                    desired_tenants.update(mapping.get("tenants", []))
-                    desired_roles.update(mapping.get("roles", []))
+                    desired_tenants.update(mapping.get("tenants") or [])
+                    desired_roles.update(mapping.get("roles") or [])
 
             current_roles = set(list_roles(db, cid))
             current_tenants = set(list_tenants(db, cid))
