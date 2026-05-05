@@ -82,6 +82,40 @@ def ldap_client(cfg):
         client.unbind_s()
 
 
+def iter_ldap_search_paged(
+    client,
+    base_dn: str,
+    scope: int,
+    filterstr: str,
+    attrlist: List[str],
+    page_size: int = 500,
+):
+    """Iterate LDAP search results using RFC 2696 paged results.
+
+    This avoids server-side sizeLimit issues when a subtree is large.
+    """
+    paged = ldap.controls.SimplePagedResultsControl(True, size=page_size, cookie=b"")
+    msgid = client.search_ext(base_dn, scope, filterstr, attrlist=attrlist, serverctrls=[paged])
+
+    while True:
+        rtype, rdata, rmsgid, serverctrls = client.result3(msgid)
+        for dn, entry in rdata:
+            if dn:
+                yield dn, entry
+
+        cookie = None
+        for ctrl in serverctrls or []:
+            if ctrl.controlType == ldap.controls.SimplePagedResultsControl.controlType:
+                cookie = ctrl.cookie
+                break
+
+        if not cookie:
+            break
+
+        paged.cookie = cookie
+        msgid = client.search_ext(base_dn, scope, filterstr, attrlist=attrlist, serverctrls=[paged])
+
+
 def _enable_tls(client, cfg):
     """Enable TLS/SSL for an LDAP client using config options.
 
@@ -383,9 +417,13 @@ def main():
     cfg.group_map = load_group_map(args.group_map)
 
     with mongodb_database(cfg) as db, ldap_client(cfg) as client:
-        for dn, entry in client.search_s(cfg.ldap_base_dn, ldap.SCOPE_SUBTREE, cfg.ldap_filter, cfg.ldap_attributes):
-            if not dn:
-                continue
+        for dn, entry in iter_ldap_search_paged(
+            client,
+            cfg.ldap_base_dn,
+            ldap.SCOPE_SUBTREE,
+            cfg.ldap_filter,
+            cfg.ldap_attributes,
+        ):
 
             cid = credentials_id_from_dn(cfg, dn)
             member_of = [s.decode() for s in entry.get("memberOf", [])]
