@@ -1,3 +1,11 @@
+"""Synchronize LDAP group membership to SeaCat Auth roles and tenants in MongoDB.
+
+Run from the repository root (or pass absolute paths)::
+
+    python scripts/ldap-access-sync.py -c /path/to/seacatauth.conf -m /path/to/group-map.yaml
+
+"""
+
 import ldap
 import ldap.resiter
 import ldap.filter
