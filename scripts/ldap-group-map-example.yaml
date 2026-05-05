@@ -2,7 +2,7 @@
   tenants:
     - system
   roles:
-    - "*/superuser"
+    - "*/admin"
 "CN=Enterprise Admins,CN=Users,DC=EXAMPLE,DC=com":
   tenants:
     - system
