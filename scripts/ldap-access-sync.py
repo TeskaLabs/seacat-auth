@@ -153,14 +153,15 @@ def credentials_id_from_dn(cfg, dn: str) -> str:
     )
 
 
-def get_mongodb_db(cfg):
-    """Get a MongoDB database handle using the config.
+@contextlib.contextmanager
+def mongodb_database(cfg):
+    """Open one MongoDB client for the lifetime of the context.
 
     Args:
         cfg (Config): The configuration object with MongoDB URI and database name.
 
-    Returns:
-        pymongo.database.Database: The MongoDB database object.
+    Yields:
+        pymongo.database.Database: The configured database.
 
     Raises:
         RuntimeError: If MongoDB URI or DB is not set in the config.
@@ -168,33 +169,34 @@ def get_mongodb_db(cfg):
     if not cfg.mongodb_uri or not cfg.mongodb_db:
         raise RuntimeError("MongoDB URI or DB not set. Did you call load_mongodb_config()?")
     client = pymongo.MongoClient(cfg.mongodb_uri)
-    return client[cfg.mongodb_db]
+    try:
+        yield client[cfg.mongodb_db]
+    finally:
+        client.close()
 
 
-def list_tenants(cfg, cred_id: str):
+def list_tenants(db, cred_id: str):
     """List all tenants assigned to a given credentials ID.
 
     Args:
-        cfg (Config): The configuration object.
+        db (pymongo.database.Database): MongoDB database handle.
         cred_id (str): The credentials ID.
 
     Returns:
         list[str]: List of tenant IDs.
     """
-    db = get_mongodb_db(cfg)
     collection = db["ct"]
     return [obj["t"] for obj in collection.find({"c": cred_id})]
 
 
-def assign_tenant(cfg, cred_id: str, tenant: str):
+def assign_tenant(db, cred_id: str, tenant: str):
     """Assign a tenant to a credentials ID in MongoDB.
 
     Args:
-        cfg (Config): The configuration object.
+        db (pymongo.database.Database): MongoDB database handle.
         cred_id (str): The credentials ID.
         tenant (str): The tenant ID to assign.
     """
-    db = get_mongodb_db(cfg)
     collection = db["ct"]
     obj_id = "{} {}".format(cred_id, tenant)
     result = collection.update_one(
@@ -206,15 +208,14 @@ def assign_tenant(cfg, cred_id: str, tenant: str):
         print("Assigned tenant {!r} to credentials {!r}".format(tenant, cred_id))
 
 
-def unassign_tenant(cfg, cred_id: str, tenant: str):
+def unassign_tenant(db, cred_id: str, tenant: str):
     """Unassign a tenant from a credentials ID in MongoDB.
 
     Args:
-        cfg (Config): The configuration object.
+        db (pymongo.database.Database): MongoDB database handle.
         cred_id (str): The credentials ID.
         tenant (str): The tenant ID to unassign.
     """
-    db = get_mongodb_db(cfg)
     collection = db["ct"]
     obj_id = "{} {}".format(cred_id, tenant)
     obj = collection.find_one_and_delete({"_id": obj_id})
@@ -222,30 +223,28 @@ def unassign_tenant(cfg, cred_id: str, tenant: str):
         print("Unassigned tenant {!r} from credentials {!r}".format(tenant, cred_id))
 
 
-def list_roles(cfg, cred_id: str):
+def list_roles(db, cred_id: str):
     """List all roles assigned to a given credentials ID.
 
     Args:
-        cfg (Config): The configuration object.
+        db (pymongo.database.Database): MongoDB database handle.
         cred_id (str): The credentials ID.
 
     Returns:
         list[str]: List of role IDs.
     """
-    db = get_mongodb_db(cfg)
     collection = db["cr"]
     return [obj["r"] for obj in collection.find({"c": cred_id})]
 
 
-def assign_role(cfg, cred_id: str, role: str):
+def assign_role(db, cred_id: str, role: str):
     """Assign a role to a credentials ID in MongoDB.
 
     Args:
-        cfg (Config): The configuration object.
+        db (pymongo.database.Database): MongoDB database handle.
         cred_id (str): The credentials ID.
         role (str): The role ID to assign.
     """
-    db = get_mongodb_db(cfg)
     collection = db["cr"]
     obj_id = "{} {}".format(cred_id, role)
     obj = {"c": cred_id, "r": role, "managed_by": "lmio-access-sync"}
@@ -260,15 +259,14 @@ def assign_role(cfg, cred_id: str, role: str):
         print("Assigned role {!r} to credentials {!r}".format(role, cred_id))
 
 
-def unassign_role(cfg, cred_id: str, role: str):
+def unassign_role(db, cred_id: str, role: str):
     """Unassign a role from a credentials ID in MongoDB.
 
     Args:
-        cfg (Config): The configuration object.
+        db (pymongo.database.Database): MongoDB database handle.
         cred_id (str): The credentials ID.
         role (str): The role ID to unassign.
     """
-    db = get_mongodb_db(cfg)
     collection = db["cr"]
     obj_id = "{} {}".format(cred_id, role)
     obj = collection.find_one_and_delete({"_id": obj_id})
@@ -383,30 +381,30 @@ def main():
     cfg = load_mongodb_config(args.config, cfg)
     cfg.group_map = load_group_map(args.group_map)
 
-    with ldap_client(cfg) as client:
+    with mongodb_database(cfg) as db, ldap_client(cfg) as client:
         for dn, entry in client.search_s(cfg.ldap_base_dn, ldap.SCOPE_SUBTREE, cfg.ldap_filter, cfg.ldap_attributes):
             if not dn:
                 continue
             print(entry.get("sAMAccountName")[0].decode(), ">", dn)
             cid = credentials_id_from_dn(cfg, dn)
-            current_roles = list_roles(cfg, cid)
-            current_tenants = list_tenants(cfg, cid)
+            current_roles = list_roles(db, cid)
+            current_tenants = list_tenants(db, cid)
             member_of = entry.get("memberOf", [])
             for group_dn, mapping in cfg.group_map.items():
                 if group_dn.encode() in member_of:
                     for tenant in mapping.get("tenants", []):
                         if tenant not in current_tenants:
-                            assign_tenant(cfg, cid, tenant)
+                            assign_tenant(db, cid, tenant)
                     for role in mapping.get("roles", []):
                         if role not in current_roles:
-                            assign_role(cfg, cid, role)
+                            assign_role(db, cid, role)
                 else:
                     for tenant in mapping.get("tenants", []):
                         if tenant in current_tenants:
-                            unassign_tenant(cfg, cid, tenant)
+                            unassign_tenant(db, cid, tenant)
                     for role in mapping.get("roles", []):
                         if role in current_roles:
-                            unassign_role(cfg, cid, role)
+                            unassign_role(db, cid, role)
 
 
 if __name__ == "__main__":
