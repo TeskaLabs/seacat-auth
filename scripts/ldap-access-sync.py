@@ -409,7 +409,7 @@ def main():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Path to config file', default='/conf/seacatauth.conf')
-    parser.add_argument('-m', '--group-map', help='Path to group map YAML or JSON file', default='/conf/ldap-group-map.conf')
+    parser.add_argument('-m', '--group-map', help='Path to group map YAML or JSON file', default='/conf/ldap-group-map.yaml')
     args = parser.parse_args()
 
     cfg = load_ldap_config(args.config)
