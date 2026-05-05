@@ -386,15 +386,15 @@ def main():
         for dn, entry in client.search_s(cfg.ldap_base_dn, ldap.SCOPE_SUBTREE, cfg.ldap_filter, cfg.ldap_attributes):
             if not dn:
                 continue
-            print(entry.get("sAMAccountName")[0].decode(), ">", dn)
+
             cid = credentials_id_from_dn(cfg, dn)
-            member_of = entry.get("memberOf", [])
+            member_of = [s.decode() for s in entry.get("memberOf", [])]
             desired_roles = set()
             desired_tenants = set()
             for group_dn, mapping in cfg.group_map.items():
                 if not mapping:
                     continue
-                if group_dn.encode() in member_of:
+                if group_dn in member_of:
                     desired_tenants.update(mapping.get("tenants", []))
                     desired_roles.update(mapping.get("roles", []))
 
