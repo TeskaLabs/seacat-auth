@@ -98,7 +98,7 @@ def iter_ldap_search_paged(
     msgid = client.search_ext(base_dn, scope, filterstr, attrlist=attrlist, serverctrls=[paged])
 
     while True:
-        rtype, rdata, rmsgid, serverctrls = client.result3(msgid)
+        _rtype, rdata, _rmsgid, serverctrls = client.result3(msgid)
         for dn, entry in rdata:
             if dn:
                 yield dn, entry
