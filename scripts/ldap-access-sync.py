@@ -128,7 +128,7 @@ def _enable_tls(client, cfg):
     if tls_cafile:
         client.set_option(ldap.OPT_X_TLS_CACERTFILE, tls_cafile)
     # Certificate policy
-    tls_require_cert = getattr(cfg, 'ldap_tls_require_cert', 'never')
+    tls_require_cert = getattr(cfg, 'ldap_tls_require_cert', 'never') or 'never'
     if tls_require_cert == 'never':
         client.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
     elif tls_require_cert == 'demand':
