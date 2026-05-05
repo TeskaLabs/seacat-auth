@@ -26,6 +26,7 @@ except ImportError:
     yaml = None
 
 L = logging.getLogger(__name__)
+MANAGED_BY = "lmio-access-sync"
 
 
 @dataclass
@@ -186,7 +187,7 @@ def list_tenants(db, cred_id: str):
         list[str]: List of tenant IDs.
     """
     collection = db["ct"]
-    return [obj["t"] for obj in collection.find({"c": cred_id})]
+    return [obj["t"] for obj in collection.find({"c": cred_id, "managed_by": MANAGED_BY})]
 
 
 def assign_tenant(db, cred_id: str, tenant: str):
@@ -201,7 +202,7 @@ def assign_tenant(db, cred_id: str, tenant: str):
     obj_id = "{} {}".format(cred_id, tenant)
     result = collection.update_one(
         {"_id": obj_id},
-        {"$set": {"c": cred_id, "t": tenant, "managed_by": "lmio-access-sync"}},
+        {"$set": {"c": cred_id, "t": tenant, "managed_by": MANAGED_BY}},
         upsert=True
     )
     if result and result.did_upsert:
@@ -218,7 +219,7 @@ def unassign_tenant(db, cred_id: str, tenant: str):
     """
     collection = db["ct"]
     obj_id = "{} {}".format(cred_id, tenant)
-    obj = collection.find_one_and_delete({"_id": obj_id})
+    obj = collection.find_one_and_delete({"_id": obj_id, "managed_by": MANAGED_BY})
     if obj:
         print("Unassigned tenant {!r} from credentials {!r}".format(tenant, cred_id))
 
@@ -234,7 +235,7 @@ def list_roles(db, cred_id: str):
         list[str]: List of role IDs.
     """
     collection = db["cr"]
-    return [obj["r"] for obj in collection.find({"c": cred_id})]
+    return [obj["r"] for obj in collection.find({"c": cred_id, "managed_by": MANAGED_BY})]
 
 
 def assign_role(db, cred_id: str, role: str):
@@ -247,7 +248,7 @@ def assign_role(db, cred_id: str, role: str):
     """
     collection = db["cr"]
     obj_id = "{} {}".format(cred_id, role)
-    obj = {"c": cred_id, "r": role, "managed_by": "lmio-access-sync"}
+    obj = {"c": cred_id, "r": role, "managed_by": MANAGED_BY}
     if (tenant := role.split("/")[0]) != "*":
         obj["t"] = tenant.lstrip("~")
     result = collection.update_one(
@@ -269,7 +270,7 @@ def unassign_role(db, cred_id: str, role: str):
     """
     collection = db["cr"]
     obj_id = "{} {}".format(cred_id, role)
-    obj = collection.find_one_and_delete({"_id": obj_id})
+    obj = collection.find_one_and_delete({"_id": obj_id, "managed_by": MANAGED_BY})
     if obj:
         print("Unassigned role {!r} from credentials {!r}".format(role, cred_id))
 
