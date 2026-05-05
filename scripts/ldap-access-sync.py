@@ -377,19 +377,24 @@ def main():
                 continue
             print(entry.get("sAMAccountName")[0].decode(), ">", dn)
             cid = credentials_id_from_dn(cfg, dn)
+            current_roles = list_roles(cfg, cid)
+            current_tenants = list_tenants(cfg, cid)
             member_of = entry.get("memberOf", [])
             for group_dn, mapping in cfg.group_map.items():
                 if group_dn.encode() in member_of:
                     for tenant in mapping.get("tenants", []):
-                        assign_tenant(cfg, cid, tenant)
+                        if tenant not in current_tenants:
+                            assign_tenant(cfg, cid, tenant)
                     for role in mapping.get("roles", []):
-                        assign_role(cfg, cid, role)
+                        if role not in current_roles:
+                            assign_role(cfg, cid, role)
                 else:
                     for tenant in mapping.get("tenants", []):
-                        unassign_tenant(cfg, cid, tenant)
+                        if tenant in current_tenants:
+                            unassign_tenant(cfg, cid, tenant)
                     for role in mapping.get("roles", []):
-                        unassign_role(cfg, cid, role)
-            print()
+                        if role in current_roles:
+                            unassign_role(cfg, cid, role)
 
 
 if __name__ == "__main__":
