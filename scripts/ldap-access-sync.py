@@ -65,9 +65,6 @@ def ldap_client(cfg):
 
     Yields:
         _LDAPObject: An LDAP client object, already bound.
-
-    Raises:
-        NotImplementedError: If LDAPS is requested (not supported).
     """
     client = _LDAPObject(cfg.ldap_uri)
     client.protocol_version = ldap.VERSION3
