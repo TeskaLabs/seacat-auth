@@ -392,6 +392,8 @@ def main():
             desired_roles = set()
             desired_tenants = set()
             for group_dn, mapping in cfg.group_map.items():
+                if not mapping:
+                    continue
                 if group_dn.encode() in member_of:
                     desired_tenants.update(mapping.get("tenants", []))
                     desired_roles.update(mapping.get("roles", []))
