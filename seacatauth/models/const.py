@@ -19,6 +19,8 @@ class ResourceId(enum.StrEnum):
 	ROLE_ACCESS = "seacat:role:access"
 	ROLE_EDIT = "seacat:role:edit"
 	ROLE_ASSIGN = "seacat:role:assign"
+	ROLE_EDIT_GLOBAL = "seacat:role:edit:global"
+	ROLE_ASSIGN_GLOBAL = "seacat:role:assign:global"
 
 	RESOURCE_ACCESS = "seacat:resource:access"
 	RESOURCE_EDIT = "seacat:resource:edit"

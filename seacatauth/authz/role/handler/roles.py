@@ -334,23 +334,25 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
-	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def set_credentials_roles(self, request, *, json_data):
 		"""
 		Set credentials' roles
 
 		For given credentials ID, assign listed roles and unassign existing roles that are not in the list.
 		The scope is always a specific tenant + global roles.
-		Caller with superuser access can set both tenant-specific and global roles.
-		Caller without superuser access can set only tenant-specific roles.
+		Caller with access to ROLE_ASSIGN_GLOBAL resource can set both tenant-specific and global roles.
+		Caller with access to ROLE_ASSIGN resource can set only tenant-specific roles.
 		"""
 		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		credentials_id = request.match_info["credentials_id"]
 		requested_roles = json_data["roles"]
 
 		# Determine whether global roles will be un/assigned
-		if authz.has_superuser_access():
+		if authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
 			include_global = True
 		else:
 			include_global = False
@@ -361,7 +363,7 @@ class RolesHandler(object):
 
 
 	@asab.web.rest.json_schema_handler(schema.SET_CREDENTIALS_ROLES)
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def set_credentials_global_roles(self, request, *, json_data):
 		"""
@@ -378,6 +380,10 @@ class RolesHandler(object):
 		"""
 		Assign role to credentials
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		await self.RoleService.assign_role(
@@ -387,7 +393,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def assign_credentials_global_role(self, request):
 		"""
@@ -401,11 +407,14 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@asab.web.auth.require(ResourceId.ROLE_ASSIGN)
 	async def unassign_credentials_role(self, request):
 		"""
 		Unassign role from credentials
 		"""
+		authz = asab.contextvars.Authz.get()
+		if not authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+
 		tenant_id = asab.contextvars.Tenant.get()
 		role_id = "{}/{}".format(tenant_id, request.match_info["role_name"])
 		await self.RoleService.unassign_role(
@@ -415,7 +424,7 @@ class RolesHandler(object):
 		return asab.web.rest.json_response(request, data={"result": "OK"})
 
 
-	@asab.web.auth.require_superuser
+	@asab.web.auth.require(ResourceId.ROLE_ASSIGN_GLOBAL)
 	@asab.web.tenant.allow_no_tenant
 	async def unassign_credentials_global_role(self, request):
 		"""
