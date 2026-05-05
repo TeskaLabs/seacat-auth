@@ -371,8 +371,8 @@ def main():
     Parses command-line arguments, loads configuration, and synchronizes LDAP users to MongoDB roles and tenants.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', required=True, help='Path to config file')
-    parser.add_argument('-m', '--group-map', required=True, help='Path to group map YAML or JSON file')
+    parser.add_argument('-c', '--config', help='Path to config file', default='/conf/seacatauth.conf')
+    parser.add_argument('-m', '--group-map', help='Path to group map YAML or JSON file', default='/conf/ldap-group-map.conf')
     args = parser.parse_args()
 
     cfg = load_ldap_config(args.config)
