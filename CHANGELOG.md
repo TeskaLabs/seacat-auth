@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48-beta2
 - v25.48-beta1
 - v25.48-beta
 - v25.48-alpha23
@@ -31,6 +32,7 @@
 - v25.48-alpha
 
 ### Patches
+- Update webauthn package (v25.48-beta2)
 - Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (v25.48-beta1)
 
 ### Fixes
