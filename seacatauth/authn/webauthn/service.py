@@ -60,11 +60,16 @@ class WebAuthnService(asab.Service):
 		if self.RelyingPartyId is None:
 			self.RelyingPartyId = str(urllib.parse.urlparse(self.Origin).hostname)
 
-		self.AttestationPreference = asab.Config.get("seacatauth:webauthn", "attestation")
 		# Use "indirect" or "direct" attestation to get metadata about registered authenticators.
 		# Doing so may however impose higher trust requirements on your environment though.
-		if self.AttestationPreference not in {"none", "direct", "indirect", "enterprise"}:
-			raise ValueError("Unsupported WebAuthn 'attestation' value: {!r}".format(self.AttestationPreference))
+		try:
+			self.AttestationPreference = webauthn.helpers.structs.AttestationConveyancePreference(
+				asab.Config.get("seacatauth:webauthn", "attestation")
+			)
+		except ValueError as e:
+			raise ValueError(
+				"Unsupported WebAuthn 'attestation' value: {!r}".format(self.AttestationPreference)
+			) from e
 
 		self.RegistrationTimeout = asab.Config.getseconds("seacatauth:webauthn", "challenge_timeout") * 1000
 		self.SupportedAlgorithms = [
@@ -189,9 +194,9 @@ class WebAuthnService(asab.Service):
 		upsertor.set("cid", credentials_id)
 		upsertor.set("sc", verified_registration.sign_count)
 		upsertor.set("aa", verified_registration.aaguid)
-		upsertor.set("fmt", verified_registration.fmt.value)
+		upsertor.set("fmt", verified_registration.fmt)
 		upsertor.set("uv", verified_registration.user_verified)
-		upsertor.set("ct", verified_registration.credential_type.value)
+		upsertor.set("ct", verified_registration.credential_type)
 		upsertor.set("ao", verified_registration.attestation_object)
 		upsertor.set("rpid", self.RelyingPartyId)
 		upsertor.set("name", name)
@@ -445,7 +450,7 @@ class WebAuthnService(asab.Service):
 		options = webauthn.generate_registration_options(
 			rp_id=self.RelyingPartyId,
 			rp_name=self.RelyingPartyName,
-			user_id=session.Credentials.Id,
+			user_id=session.Credentials.Id.encode(),
 			user_name=user_name,
 			user_display_name=credentials.get("username"),
 			challenge=challenge,
@@ -472,10 +477,14 @@ class WebAuthnService(asab.Service):
 
 		_normalize_webauthn_credential_response(public_key_credential)
 
+		registration_response = webauthn.helpers.structs.AuthenticatorAttestationResponse(
+			client_data_json=public_key_credential["response"]["clientDataJSON"],
+			attestation_object=public_key_credential["response"]["attestationObject"],
+		)
 		registration_credential = webauthn.helpers.structs.RegistrationCredential(
 			id=public_key_credential["id"],
 			raw_id=public_key_credential["rawId"],
-			response=public_key_credential["response"],
+			response=registration_response,
 			# transports=public_key_credential["transports"],  # Optional
 		)
 		verified_registration = webauthn.verify_registration_response(
@@ -540,10 +549,16 @@ class WebAuthnService(asab.Service):
 		"""
 		_normalize_webauthn_credential_response(public_key_credential)
 
+		authentication_response = webauthn.helpers.structs.AuthenticatorAssertionResponse(
+			client_data_json=public_key_credential["response"]["clientDataJSON"],
+			authenticator_data=public_key_credential["response"]["authenticatorData"],
+			signature=public_key_credential["response"]["signature"],
+			user_handle=public_key_credential["response"].get("userHandle"),
+		)
 		authentication_credential = webauthn.helpers.structs.AuthenticationCredential(
 			id=public_key_credential["id"],
 			raw_id=public_key_credential["rawId"],
-			response=public_key_credential["response"],
+			response=authentication_response,
 		)
 
 		authentication_options = json.loads(authentication_options)
