@@ -3,9 +3,13 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha3
 - v26.15-alpha2
 - v26.15-alpha1
 - v26.15-alpha
+
+### Fixes
+- Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
 - Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
