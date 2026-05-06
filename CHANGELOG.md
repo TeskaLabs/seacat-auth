@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38.02
 - v25.38.01
 - v25.38
 - v25.38-beta1
@@ -25,6 +26,9 @@
 ### Breaking changes
 - In the `general` config section, the option `public_seacat_auth_base_url` is renamed 
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
+
+### Patches
+- Update Webauthn package (#573, v25.38.02)
 
 ### Fixes
 - Fix invitation cleanup with local authz (#538, v25.38-beta1)
