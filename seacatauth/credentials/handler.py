@@ -371,55 +371,18 @@ class CredentialsHandler(object):
 
 		if reset_password:
 			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
-			comm_svc = self.App.get_service("seacatauth.CommunicationService")
 			credentials = await self.CredentialsService.get(credentials_id)
-
-			# Check if password reset link can be sent (in email or at least in the response)
 			authz = asab.contextvars.Authz.get()
-			if not (
-				authz.has_superuser_access()
-				or await comm_svc.can_send_to_target(credentials, "email")
-			):
-				L.error("Password reset denied: No way to communicate password reset link.", struct_data={
-					"cid": credentials_id})
-				password_reset_response = {
-					"result": "ERROR",
-					"tech_err": "Password reset link cannot be sent.",
-				}
-				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data)
 
-			password_reset_response = {}
-
-			# Create the password reset link
-			password_reset_url = await change_pwd_svc.init_password_reset(
+			password_reset_response = await change_pwd_svc.admin_request_password_reset(
 				credentials,
+				requester_is_superuser=authz.has_superuser_access(),
 				expiration=json_data.get("expiration"),
+				new_user=True,
 			)
 
-			# Superusers receive the password reset link in response
-			if authz.has_superuser_access():
-				password_reset_response["password_reset_url"] = password_reset_url
-
-			# Email the link to the user
-			try:
-				await comm_svc.password_reset(
-					credentials=credentials,
-					reset_url=password_reset_url,
-					new_user=True
-				)
-			except exceptions.ServerCommunicationError:
-				password_reset_response["result"] = "ERROR"
-				password_reset_response["tech_err"] = "Cannot connect to email service"
-				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data)
-			except exceptions.MessageDeliveryError:
-				password_reset_response["result"] = "ERROR"
-				password_reset_response["tech_err"] = "Failed to send password reset link."
-				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data)
-
-			password_reset_response["result"] = "OK"
+			# Ensure response structure:
+			# {"password_reset": {"result": ..., "password_reset_url": ..., "email_sent": {"result": ...}}}
 			response_data["password_reset"] = password_reset_response
 
 		return asab.web.rest.json_response(request, response_data)
