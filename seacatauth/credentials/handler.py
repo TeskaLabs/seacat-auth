@@ -355,15 +355,13 @@ class CredentialsHandler(object):
 		# Create credentials
 		result = await self.CredentialsService.create_credentials(provider_id, json_data)
 
-		if result["status"] != "OK":
-			result["result"] = result["status"]
+		if result["result"] != "OK":
 			return asab.web.rest.json_response(request, result, status=400)
 
 		credentials_id = result["credentials_id"]
 
 		response_data = {
 			"result": "OK",
-			"status": "OK",  # Backward compatibility
 			"_id": credentials_id,
 			"_type": provider.Type,
 			"_provider_id": provider.ProviderID,
