@@ -382,7 +382,16 @@ class CredentialsHandler(object):
 			)
 
 			# Ensure response structure:
-			# {"password_reset": {"result": ..., "password_reset_url": ..., "email_sent": {"result": ...}}}
+			# {
+			# 	"result": ...,
+			# 	"password_reset": {
+			# 		"result": ...,
+			# 		"password_reset_url": ...,
+			# 		"email_sent": {
+			# 			"result": ...
+			# 		}
+			# 	}
+			# }
 			response_data["password_reset"] = password_reset_response
 
 		return asab.web.rest.json_response(request, response_data)
