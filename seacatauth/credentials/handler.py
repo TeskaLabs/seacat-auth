@@ -347,6 +347,76 @@ class CredentialsHandler(object):
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
+
+		---
+		tags: ["Users and credentials"]
+		responses:
+			200:
+				description:
+					Credentials created. With `passwordlink`, `password_reset` reports reset/email outcomes;
+					HTTP 200 means the record was created (even if the password reset might have failed).
+				schema:
+					type: object
+					required: [result, _id, _type, _provider_id]
+					properties:
+						result:
+							type: string
+							description: Overall outcome of credential creation (typically `OK`).
+						_id:
+							type: string
+							description: Identifier of the new credentials.
+						_type:
+							type: string
+							description: Provider type (e.g. human vs machine credentials).
+						_provider_id:
+							type: string
+							description: Credential provider id.
+						password_reset:
+							type: object
+							description: Present only when `passwordlink` was requested.
+							properties:
+								result:
+									type: string
+									description: Outcome of reset-link creation / disclosure policy.
+								password_reset_url:
+									type: string
+									description: Reset URL returned to the caller when policy allows (e.g. superuser).
+								tech_err:
+									type: string
+									description: Error message for the API
+								error:
+									type: string
+									description: Localizable error message for the UI
+								email_sent:
+									type: object
+									description: Email delivery attempt result and optional error details.
+									properties:
+										result:
+											type: string
+										tech_err:
+											type: string
+											description: Error message for the API
+										error:
+											type: string
+											description: Localizable error message for the UI
+									additionalProperties: true
+							additionalProperties: true
+					additionalProperties: true
+			400:
+				description: Credential creation failed (validation, provider, duplicate key, etc.).
+				schema:
+					type: object
+					description: Error payload; fields vary by failure mode.
+					properties:
+						result:
+							type: string
+						tech_err:
+							type: string
+							description: Error message for the API
+						error:
+							type: string
+							description: Localizable error message for the UI
+					additionalProperties: true
 		"""
 		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
