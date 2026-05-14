@@ -388,7 +388,7 @@ class CredentialsService(asab.Service):
 				}
 			)
 			return {
-				"status": "FAILED",
+				"result": "FAILED",
 				"message": "Provider does not support credentials creation",
 			}
 
@@ -403,8 +403,8 @@ class CredentialsService(asab.Service):
 				"by": agent_cid,
 			})
 			return {
-				"status": "FAILED",
-				"message": "Credentials data does not comply with creation policy",
+				"result": "FAILED",
+				"tech_err": "Credentials data does not comply with creation policy",
 			}
 
 		# Create in provider
@@ -413,15 +413,9 @@ class CredentialsService(asab.Service):
 		except asab.storage.exceptions.DuplicateError as e:
 			L.error("Cannot create credentials: {}".format(e))
 			return {
-				"status": "FAILED",
-				"message": "Cannot create credentials: Duplicate key",
-				"conflict": e.KeyValue
-			}
-		except Exception as e:
-			L.error("Cannot create credentials: {}".format(e))
-			return {
-				"status": "FAILED",
-				"message": "Cannot create credentials",
+				"result": "FAILED",
+				"tech_err": "Credentials already exist",
+				"error": "Credentials already exist",
 			}
 
 		AuditLogger.log(asab.LOG_NOTICE, "Credentials created", struct_data={
@@ -431,7 +425,7 @@ class CredentialsService(asab.Service):
 		self.App.PubSub.publish("Credentials.created!", credentials_id=credentials_id)
 
 		return {
-			"status": "OK",
+			"result": "OK",
 			"credentials_id": credentials_id,
 		}
 
