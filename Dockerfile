@@ -44,14 +44,12 @@ RUN apk add --no-cache  \
     aiomysql \
     jinja2 \
     pyotp \
-    webauthn==1.9.0 \
+    webauthn \
     pyyaml \
     pysaml2 \
     pymongo \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
-# There is a broken pydantic dependency in webauthn.
-# Remove the version lock once this is fixed.
 
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
