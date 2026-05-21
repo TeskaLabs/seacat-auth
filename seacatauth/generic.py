@@ -25,7 +25,7 @@ def get_bearer_token_value(request):
 		return None
 
 	token_type, token_value = token
-	if token_type != "Bearer":
+	if token_type.casefold() != "bearer":
 		L.debug("No Bearer token in Authorization header")
 		return
 

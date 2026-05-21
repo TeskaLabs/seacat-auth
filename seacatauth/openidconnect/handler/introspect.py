@@ -99,7 +99,7 @@ class TokenIntrospectionHandler(object):
 			return None
 
 		token_type, token_value = token
-		if token_type == "Bearer":
+		if token_type.casefold() == "bearer":
 			try:
 				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
 			except exceptions.SessionNotFoundError as e:
@@ -107,7 +107,7 @@ class TokenIntrospectionHandler(object):
 					"token_fingerprint": fingerprint(token_value)})
 				return None
 
-		elif token_type == self.ApiKeyService.TOKEN_TYPE:
+		elif token_type.casefold() == self.ApiKeyService.TOKEN_TYPE.casefold():
 			try:
 				session = await self.ApiKeyService.get_session_by_api_key(token_value)
 			except exceptions.SessionNotFoundError as e:
