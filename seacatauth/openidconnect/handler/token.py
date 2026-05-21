@@ -525,7 +525,7 @@ class TokenHandler(object):
 		auth_header: str = request.headers.get("Authorization", "")
 		if len(body) > 0:
 			token_string = body.decode("ascii")
-		elif auth_header.startswith("Bearer "):
+		elif auth_header.casefold().startswith("bearer "):
 			token_string = request.headers["Authorization"][len("Bearer "):]
 		else:
 			raise asab.exceptions.ValidationError("No ID token found in request body or Authorization header.")

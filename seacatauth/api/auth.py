@@ -44,33 +44,38 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 
 
 	async def authorize(self, request: aiohttp.web.Request) -> Authorization:
-		bearer_token = asab.web.auth.utils.get_bearer_token_from_authorization_header(request)
-		authz = await self._build_authorization(bearer_token)
+		token = asab.web.auth.utils.get_bearer_token_from_authorization_header(request)
+		authz = await self._build_authorization(token)
 		return authz
 
 
-	async def _build_authorization(self, id_token: str) -> Authorization:
+	async def _build_authorization(self, token: typing.Tuple[str, str]) -> Authorization:
 		"""
 		Build authorization from ID token.
 
 		Args:
-			id_token: Base64-encoded JWToken from Authorization header
+			token: Tuple of token type (must be "Bearer") and token value (Base64-encoded ID token)
 
 		Returns:
 			Valid asab.web.auth.Authorization object
 		"""
+		token_type, token_value = token
+		if token_type != "bearer":
+			L.warning("Unsupported Authorization header type: {!r}".format(token_type))
+			raise asab.exceptions.NotAuthenticatedError()
+
 		# Try if the object already exists
-		authz = self.Authorizations.get(id_token)
+		authz = self.Authorizations.get(token)
 		if authz is not None:
 			try:
 				authz.require_valid()
 			except asab.exceptions.NotAuthenticatedError as e:
-				del self.Authorizations[id_token]
+				del self.Authorizations[token]
 				raise e
 			return authz
 
 		# Create a new Authorization object and store it
-		claims = await self._get_claims_from_id_token(id_token)
+		claims = await self._get_claims_from_id_token(token_value)
 
 		# Pair authorization with Seacat Auth session
 		try:
@@ -87,7 +92,7 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 
 		authz = Authorization(claims, session)
 
-		self.Authorizations[id_token] = authz
+		self.Authorizations[token] = authz
 		return authz
 
 
