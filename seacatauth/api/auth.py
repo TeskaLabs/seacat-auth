@@ -60,7 +60,7 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 			Valid asab.web.auth.Authorization object
 		"""
 		token_type, token_value = token
-		if token_type.casefold() != "bearer":
+		if token_type != "bearer":
 			L.warning("Unsupported Authorization header type: {!r}".format(token_type))
 			raise asab.exceptions.NotAuthenticatedError()
 
