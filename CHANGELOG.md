@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha5
 - v26.15-alpha4
 - v26.15-alpha3
 - v26.15-alpha2
@@ -10,6 +11,7 @@
 - v26.15-alpha
 
 ### Fixes
+- Treat HTTP authentication scheme as case-insensitive (#575, v26.15-alpha5)
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
