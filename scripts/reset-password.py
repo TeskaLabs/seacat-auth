@@ -172,7 +172,7 @@ def update_password(db, user_id, password_hash):
         {"_id": user_id},
         {"$set": {"__password": password_hash}}
     )
-    return result.modified_count > 0
+    return result.matched_count > 0
 
 
 def main():
