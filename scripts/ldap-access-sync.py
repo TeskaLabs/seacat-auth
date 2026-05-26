@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Synchronize LDAP group membership to SeaCat Auth roles and tenants in MongoDB.
 
 Run from the repository root (or pass absolute paths)::
