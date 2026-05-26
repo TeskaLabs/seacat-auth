@@ -37,6 +37,9 @@ def load_mongodb_config(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
     parser = configparser.ConfigParser()
     parser.read(config_path)
+    files_read = parser.read(config_path)
+    if not files_read:
+        raise RuntimeError(f"Failed to read config file: {config_path}")
     if 'mongo' not in parser:
         raise RuntimeError(f"Missing [mongo] section in config {config_path}")
     mongodb_uri = parser['mongo'].get('uri')
