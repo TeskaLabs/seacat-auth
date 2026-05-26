@@ -99,7 +99,8 @@ nav:
 
   - Administration guide:
     - admin/index.md
-  
+    - admin/reset-password.md
+
     - Access control:
       - access/index.md
       - access/key-terms.md
