@@ -1,4 +1,6 @@
-"""Reset a user's password via CLI.
+#!/usr/bin/env python3
+"""
+Reset a user's password via CLI.
 
 Run from the repository root (or pass absolute path)::
 
