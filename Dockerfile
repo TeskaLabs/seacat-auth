@@ -72,7 +72,6 @@ RUN apk add --no-cache \
   openldap
 
 COPY --from=builder /venv /venv
-ENV PATH="/venv/bin:$PATH"
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
 COPY ./scripts               /app/seacat-auth/scripts
@@ -85,6 +84,7 @@ COPY ./etc/message_templates /app/seacat-auth/etc/message_templates
 RUN set -ex \
   && mkdir /conf \
   && touch /conf/seacatauth.conf
-  
+
 WORKDIR /app/seacat-auth
+ENV PATH="/app/seacat-auth/scripts:/venv/bin:$PATH"
 CMD ["python3", "seacatauth.py", "-c", "/conf/seacatauth.conf"]
