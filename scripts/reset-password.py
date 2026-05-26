@@ -60,7 +60,7 @@ def mongodb_database(mongodb_uri, mongodb_db):
     Yields:
         pymongo.database.Database: The configured database.
     """
-    client = pymongo.MongoClient(mongodb_uri)
+    client = pymongo.MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
     try:
         yield client[mongodb_db]
     finally:
