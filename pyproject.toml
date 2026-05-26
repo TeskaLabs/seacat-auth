@@ -76,6 +76,17 @@ dev = [
     "flake8",
 ]
 
+# Minimal test dependencies for CI - subset needed to run unit tests
+# This keeps CI fast by not installing all runtime dependencies
+test = [
+    "bson",
+    "pymongo",
+    "bcrypt",
+    "argon2-cffi",
+    "jwcrypto>=0.9.1",
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/TeskaLabs/seacat-auth"
 "Documentation" = "https://docs.teskalabs.com/seacat-auth"
