@@ -45,7 +45,7 @@ COPY seacatauth /app/seacat-auth/seacatauth
 COPY seacatauth.py /app/seacat-auth/seacatauth.py
 
 # Install dependencies from pyproject.toml and install the package
-RUN /venv/bin/pip3 install --no-cache-dir -e .
+RUN /venv/bin/pip3 install --no-cache-dir .
 
 # Verify ASAB version
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
