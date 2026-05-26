@@ -2,9 +2,18 @@
 """
 Reset a user's password via CLI.
 
+The script only works for users in the default MongoDB provider.
+
 Run from the repository root (or pass absolute path)::
 
     python scripts/reset-password.py -c /path/to/seacatauth.conf
+
+The config path is optional and defaults to ``/conf/seacatauth.conf``,
+the same default config path used by the main SeaCat Auth application.
+
+Run inside a Docker container::
+
+    docker exec -it seacat-auth reset-password.py
 
 """
 
