@@ -43,7 +43,7 @@ classifiers = [
     "Topic :: System :: Systems Administration :: Authentication/Directory",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 
 # Dependencies extracted from Dockerfile (line 34-52)
 dependencies = [
