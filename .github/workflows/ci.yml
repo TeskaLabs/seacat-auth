@@ -30,7 +30,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install ".[dev]"
+        pip install flake8
 
     - name: Lint with flake8
       run: |
@@ -54,7 +54,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install ".[test]"
+        pip install bson pymongo bcrypt argon2-cffi "jwcrypto>=0.9.1" "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
 
     - name: Test with unittest
       run: |

@@ -69,15 +69,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Development dependencies - not specified in Dockerfile, add as needed
+# Development dependencies for local development only (not used in CI)
+# CI installs these directly to avoid building packages with system dependencies
 dev = [
     "pytest",
     "pytest-asyncio",
     "flake8",
 ]
 
-# Minimal test dependencies for CI - subset needed to run unit tests
-# This keeps CI fast by not installing all runtime dependencies
+# Test dependencies for local testing only (not used in CI)
 test = [
     "bson",
     "pymongo",
