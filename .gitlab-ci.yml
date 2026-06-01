@@ -50,3 +50,24 @@ build docker-tag:
 
 doc staging:
   stage: Documentation
+  tags:
+    - docker
+  image: 
+    name: squidfunk/mkdocs-material
+    entrypoint: [""]
+  script:
+    - apk update && apk add openssh-client rsync
+    - pip3 install mkdocs-print-site-plugin mkdocs-awesome-pages-plugin mkdocs-glightbox mkdocs-open-in-new-tab
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - mkdir /output
+    - (cd docs/en && mkdocs build --site-dir /output)
+    - (cd docs/cs && mkdocs build --site-dir /output/cs)
+    - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$STAGING_DIR"
+  only:
+    - main
+
+doc production:
+  stage: Documentation
