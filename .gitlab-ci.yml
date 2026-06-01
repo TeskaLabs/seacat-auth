@@ -1,44 +1,52 @@
 stages:
   - Documentation
+  - build
 
-doc staging:
-  stage: Documentation
+
+build docker-main: 
+  stage: build
+  image: pcr.teskalabs.com/docker:25
+
   tags:
-    - docker
-  image: 
-    name: squidfunk/mkdocs-material
-    entrypoint: [""]
-  script:
-    - apk update && apk add openssh-client rsync
-    - pip3 install mkdocs-print-site-plugin mkdocs-awesome-pages-plugin mkdocs-glightbox mkdocs-open-in-new-tab
-    - mkdir -p ~/.ssh
-    - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    - mkdir /output
-    - (cd docs/en && mkdocs build --site-dir /output)
-    - (cd docs/cs && mkdocs build --site-dir /output/cs)
-    - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$STAGING_DIR"
+    # The shell Gitlab runner has to be used for this
+    - shell
+
   only:
     - main
 
-doc production:
-  stage: Documentation
-  tags:
-    - docker
-  image: 
-    name: squidfunk/mkdocs-material
-    entrypoint: [""]
+  before_script:
+    - docker info
+    # We want to run in the clean environment
+    - docker system prune -f
+
   script:
-    - apk update && apk add openssh-client rsync
-    - pip3 install mkdocs-print-site-plugin mkdocs-awesome-pages-plugin mkdocs-glightbox mkdocs-open-in-new-tab
-    - mkdir -p ~/.ssh
-    - echo "$DEPLOY_PRIVATE_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    - mkdir /output
-    - (cd docs/en && mkdocs build --site-dir /output)
-    - (cd docs/cs && mkdocs build --site-dir /output/cs)
-    - rsync -r -a -v -e ssh --delete /output/ "$RSYNC_USER"@"$TARGET_SERVER":"$PRODUCTION_DIR"
+    - docker build -t $DOCKER_REGISTRY_IMAGE --no-cache .
+    - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD" "$DOCKER_REGISTRY"
+    - docker tag $DOCKER_REGISTRY_IMAGE $DOCKER_REGISTRY/$DOCKER_REGISTRY_IMAGE
+    - docker push $DOCKER_REGISTRY/$DOCKER_REGISTRY_IMAGE
+
+
+build docker-tag: 
+  stage: build
+  image: pcr.teskalabs.com/docker:25
+
+  tags:
+    # The shell Gitlab runner has to be used for this
+    - shell
+
   only:
-    - production
+    - tags
+
+  before_script:
+    - docker info
+    # We want to run in the clean environment
+    - docker system prune -f
+
+  script:
+    - docker build -t "${DOCKER_REGISTRY}/${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}" --no-cache .
+    - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD" "$DOCKER_REGISTRY"
+    - docker push "${DOCKER_REGISTRY}/${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+    - docker rmi "${DOCKER_REGISTRY}/${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+
+doc staging:
+  stage: Documentation
