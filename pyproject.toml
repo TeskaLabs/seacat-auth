@@ -1,0 +1,109 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seacat-auth"
+# VERSION: Extracted from CHANGELOG.md (latest: v26.15)
+# Update this to match your current release version
+version = "26.15.0"
+description = "SeaCat Auth is a microservice that provides authentication, authorization, identity management, session management and other access control features."
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "TeskaLabs Ltd", email = "support@teskalabs.com"}
+]
+maintainers = [
+    {name = "TeskaLabs Ltd", email = "support@teskalabs.com"}
+]
+keywords = [
+    "authentication",
+    "authorization",
+    "identity",
+    "session-management",
+    "openid-connect",
+    "oauth2",
+    "rbac",
+    "microservice",
+    "access-control",
+    "webauthn",
+    "2fa",
+    "mfa",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Systems Administration :: Authentication/Directory",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
+requires-python = ">=3.11"
+
+# Dependencies extracted from Dockerfile (line 34-52)
+dependencies = [
+    "aiohttp",
+    "aiosmtplib",
+    "motor",
+    "cryptography",
+    "jwcrypto>=0.9.1",
+    "fastjsonschema",
+    "bcrypt",
+    "argon2_cffi",
+    "python-ldap",
+    "aiomysql",
+    "jinja2",
+    "pyotp",
+    "webauthn",
+    "pyyaml",
+    "pysaml2",
+    "pymongo",
+    "sentry-sdk",
+    # ASAB framework with encryption extras - installed from git (Dockerfile line 52)
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
+]
+
+[project.optional-dependencies]
+# Development dependencies for local development only (not used in CI)
+# CI installs these directly to avoid building packages with system dependencies
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "flake8",
+]
+
+# Test dependencies for local testing only (not used in CI)
+test = [
+    "bson",
+    "pymongo",
+    "bcrypt",
+    "argon2-cffi",
+    "jwcrypto>=0.9.1",
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/TeskaLabs/seacat-auth"
+"Documentation" = "https://docs.teskalabs.com/seacat-auth"
+"Docker Image" = "https://hub.docker.com/r/teskalabs/seacat-auth"
+"Changelog" = "https://github.com/TeskaLabs/seacat-auth/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/TeskaLabs/seacat-auth/issues"
+
+[tool.setuptools]
+packages = ["seacatauth"]
+
+[tool.setuptools.package-data]
+# Include message templates and other static files
+seacatauth = [
+    "../etc/message_templates/**/*",
+    "../CHANGELOG.md",
+]
+
+[tool.flake8]
+# From setup.cfg - flake8 configuration
+ignore = ["W191", "W503", "E117", "E501", "E303", "E301"]
