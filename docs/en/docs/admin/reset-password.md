@@ -16,19 +16,35 @@ The `reset-password.py` script allows administrators to reset a user's password 
 
 ## Running in Docker
 
-The recommended way to run this script is from within the SeaCat Auth Docker container.
+The script is not included in the SeaCat Auth Docker image. To run it, you need to download the script and copy it into a running container.
 
 ### Prerequisites
 
 - A running SeaCat Auth container (in the examples below, the container is named `seacat-auth`)
 - Access to the same MongoDB database that SeaCat Auth is configured to use
 
-### Basic usage
+### Step 1: Download the script
 
-Run the script using `docker exec`:
+Download the script from the GitHub repository:
 
 ```bash
-docker exec -it seacat-auth reset-password.py
+curl -O https://raw.githubusercontent.com/TeskaLabs/seacat-auth/main/scripts/reset-password.py
+```
+
+### Step 2: Copy the script into the container
+
+Copy the downloaded script into the running SeaCat Auth container:
+
+```bash
+docker cp reset-password.py seacat-auth:/tmp/reset-password.py
+```
+
+### Step 3: Execute the script
+
+Run the script inside the container using `docker exec`:
+
+```bash
+docker exec -it seacat-auth python3 /tmp/reset-password.py
 ```
 
 The script will:
@@ -39,10 +55,20 @@ The script will:
 4. Ask for the new password (entered twice for verification)
 5. Update the password hash in the database
 
+### Step 4: Clean up (optional)
+
+Remove the script from the container when done:
+
+```bash
+docker exec seacat-auth rm /tmp/reset-password.py
+```
+
 ### Example session
 
 ```
-$ docker exec -it seacat-auth reset-password.py
+$ curl -O https://raw.githubusercontent.com/TeskaLabs/seacat-auth/main/scripts/reset-password.py
+$ docker cp reset-password.py seacat-auth:/tmp/reset-password.py
+$ docker exec -it seacat-auth python3 /tmp/reset-password.py
 Enter username to reset password for: jsmith
 
 User found:

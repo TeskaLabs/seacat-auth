@@ -10,11 +10,6 @@ Run from the repository root (or pass absolute path)::
 
 The config path is optional and defaults to ``/conf/seacatauth.conf``,
 the same default config path used by the main SeaCat Auth application.
-
-Run inside a Docker container::
-
-    docker exec -it seacat-auth reset-password.py
-
 """
 
 import argparse
