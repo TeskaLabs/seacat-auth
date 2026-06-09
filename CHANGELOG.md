@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha7
 - v26.15-alpha6
 - v26.15-alpha5
 - v26.15-alpha4
@@ -12,6 +13,7 @@
 - v26.15-alpha
 
 ### Fixes
+- Remove password reset script from the Docker container (#578, v26.15-alpha7)
 - Treat HTTP authentication scheme as case-insensitive (#575, v26.15-alpha5)
 - Update webauthn package (#572, v26.15-alpha3)
 
