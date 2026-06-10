@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha8
 - v26.15-alpha7
 - v26.15-alpha6
 - v26.15-alpha5
@@ -18,6 +19,7 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Resources for Kibana default space access (#579, v26.15-alpha8)
 - CLI password reset (#576, v26.15-alpha6)
 - Script for synchronizing LDAP group membership to roles and tenants (#570, v26.15-alpha4)
 - Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
