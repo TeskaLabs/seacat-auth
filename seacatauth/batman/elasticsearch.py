@@ -56,6 +56,14 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	def __init__(self, batman_svc, config_section_name="batman:elasticsearch", config=None):
+		"""
+		Initialize ElasticSearch integration.
+
+		Args:
+			batman_svc: The Batman service instance
+			config_section_name: Configuration section name to read settings from
+			config: Optional configuration override
+		"""
 		super().__init__(config_section_name=config_section_name, config=config)
 
 		# ES connection parameters should be specified in a config section [elasticsearch]
@@ -121,6 +129,10 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def initialize(self):
+		"""
+		Initialize the ElasticSearch integration.
+		Called after the application starts.
+		"""
 		pass
 
 
@@ -159,6 +171,13 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_init(self, event_name):
+		"""
+		Handle Batman.initialized! event.
+		Initialize resources and perform initial sync if needed.
+
+		Args:
+			event_name: The name of the event that triggered this handler
+		"""
 		await self._initialize_resources()
 		# Ensure sync on startup even if housekeeping does not happen; prevent syncing twice
 		if not asab.Config.getboolean("housekeeping", "run_at_startup"):
@@ -166,10 +185,24 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_housekeeping(self, event_name):
+		"""
+		Handle Application.housekeeping! event.
+		Perform full synchronization of all data.
+
+		Args:
+			event_name: The name of the event that triggered this handler
+		"""
 		await self.full_sync()
 
 
 	async def _retry_sync(self, event_name):
+		"""
+		Handle Application.tick/10! event.
+		Retry failed sync operations after a delay.
+
+		Args:
+			event_name: The name of the event that triggered this handler
+		"""
 		if (self.RetrySyncAll is None) or (datetime.datetime.now(datetime.UTC) < self.RetrySyncAll):
 			return
 		self.RetrySyncAll = None
@@ -203,6 +236,15 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_authz_change(self, event_name, credentials_id=None, **kwargs):
+		"""
+		Handle authorization change events (Role.assigned!, Role.unassigned!, Role.updated!,
+		Tenant.assigned!, Tenant.unassigned!, Credentials.updated!).
+		Synchronize credentials to ElasticSearch when authorization changes.
+
+		Args:
+			event_name: The name of the event that triggered this handler
+			credentials_id: The ID of the credentials that changed (optional)
+		"""
 		cred_svc = self.BatmanService.App.get_service("seacatauth.CredentialsService")
 		if not credentials_id:
 			# No specific credentials ID provided, sync all credentials
@@ -230,6 +272,14 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_tenant_created(self, event_name, tenant_id):
+		"""
+		Handle Tenant.created! event.
+		Create index access role and Kibana space for new tenant.
+
+		Args:
+			event_name: The name of the event that triggered this handler
+			tenant_id: The ID of the newly created tenant
+		"""
 		try:
 			await self._upsert_role_for_index_access(tenant_id, "read")
 		except aiohttp.client_exceptions.ClientConnectionError as e:
@@ -242,6 +292,14 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 
 	async def _on_tenant_updated(self, event_name, tenant_id):
+		"""
+		Handle Tenant.updated! event.
+		Update index access role and Kibana space for existing tenant.
+
+		Args:
+			event_name: The name of the event that triggered this handler
+			tenant_id: The ID of the updated tenant
+		"""
 		try:
 			await self._upsert_role_for_index_access(tenant_id, "read")
 		except aiohttp.client_exceptions.ClientConnectionError as e:
@@ -465,9 +523,12 @@ class ElasticSearchIntegration(asab.config.Configurable):
 				)
 
 
-	def _prepare_ignored_usernames(self):
+	def _prepare_ignored_usernames(self) -> frozenset:
 		"""
-		Load usernames that will not be synchronized to avoid conflicts with ELK system users
+		Load usernames that will not be synchronized to avoid conflicts with ELK system users.
+
+		Returns:
+			A frozenset of usernames to ignore during synchronization
 		"""
 		ignore_usernames = re.split(r"\s+", self.Config.get("local_users"), flags=re.MULTILINE)
 		if self.Config.get("username"):
@@ -477,7 +538,18 @@ class ElasticSearchIntegration(asab.config.Configurable):
 
 	def _prepare_session_headers(self, username, password, api_key):
 		"""
-		Prepare HTTP headers for authentication with ElasticSearch / Kibana
+		Prepare HTTP headers for authentication with ElasticSearch / Kibana.
+
+		Args:
+			username: The username for basic authentication
+			password: The password for basic authentication
+			api_key: The API key for API key authentication (mutually exclusive with username/password)
+
+		Returns:
+			A dictionary of HTTP headers
+
+		Raises:
+			ValueError: If both api_key and username are provided
 		"""
 		headers = {}
 		if username != "" and api_key != "":
@@ -511,6 +583,14 @@ class KibanaUtils(asab.config.Configurable):
 	}
 
 	def __init__(self, app, config_section_name="batman:elasticsearch", config=None):
+		"""
+		Initialize Kibana utilities.
+
+		Args:
+			app: The ASAB application instance
+			config_section_name: Configuration section name to read settings from
+			config: Optional configuration override
+		"""
 		super().__init__(config_section_name=config_section_name, config=config)
 
 		# ES connection parameters should be specified in a config section [elasticsearch]
@@ -576,6 +656,9 @@ class KibanaUtils(asab.config.Configurable):
 	def get_kibana_roles_by_authz(self, authz: dict):
 		"""
 		Returns a set of Kibana roles that should be assigned to a user with the provided authorization scope
+
+		Args:
+			authz: Mapping of tenants to resource lists
 		"""
 		roles = set()
 		for tenant_id, authorized_resources in authz.items():
@@ -606,7 +689,18 @@ class KibanaUtils(asab.config.Configurable):
 
 	def _prepare_session_headers(self, username, password, api_key):
 		"""
-		Prepare HTTP headers for authentication with Kibana
+		Prepare HTTP headers for authentication with Kibana.
+
+		Args:
+			username: The username for basic authentication
+			password: The password for basic authentication
+			api_key: The API key for API key authentication (mutually exclusive with username/password)
+
+		Returns:
+			A dictionary of HTTP headers
+
+		Raises:
+			ValueError: If both api_key and username are provided
 		"""
 		headers = {"kbn-xsrf": "kibana"}
 
@@ -861,6 +955,10 @@ class KibanaUtils(asab.config.Configurable):
 
 
 	async def sync_all_spaces_and_roles(self):
+		"""
+		Synchronize all Kibana spaces and roles.
+		Creates roles for Default space access and syncs all tenant spaces.
+		"""
 		assert self.is_enabled()
 
 		# Sync roles for Default space access (global-only resources)
@@ -871,16 +969,45 @@ class KibanaUtils(asab.config.Configurable):
 			await self.sync_space_and_roles(tenant)
 
 
-def get_index_access_role_name(tenant: str, privileges: str):
+def get_index_access_role_name(tenant: str, privileges: str) -> str:
+	"""
+	Generate the ElasticSearch role name for index access.
+
+	Args:
+		tenant: The tenant ID
+		privileges: "read" for read-only access or "all" for read-write access
+
+	Returns:
+		The ElasticSearch role name for index access
+	"""
 	assert privileges in {"read", "all"}
 	return "index_{}_{}".format(tenant, privileges)
 
 
-def get_space_access_role_name(tenant: str, privileges: str):
+def get_space_access_role_name(tenant: str, privileges: str) -> str:
+	"""
+	Generate the Kibana role name for space access.
+
+	Args:
+		tenant: The tenant ID (used to derive the space ID)
+		privileges: "read" for read-only access or "all" for read-write access
+
+	Returns:
+		The Kibana role name for space access
+	"""
 	assert privileges in {"read", "all"}
 	return "space_{}_{}".format(tenant, privileges)
 
 
-def get_default_space_access_role_name(privileges: str):
+def get_default_space_access_role_name(privileges: str) -> str:
+	"""
+	Generate the Kibana role name for Default space access.
+
+	Args:
+		privileges: "read" for read-only access or "all" for read-write access
+
+	Returns:
+		The Kibana role name for Default space access
+	"""
 	assert privileges in {"read", "all"}
 	return "space_default_{}".format(privileges)
