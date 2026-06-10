@@ -1004,8 +1004,10 @@ class KibanaUtils(asab.config.Configurable):
 					for req_index in value:
 						found = False
 						for existing_index in existing_es[key]:
-							if (set(existing_index.get("names", [])) >= set(req_index.get("names", [])) and
-							    set(existing_index.get("privileges", [])) >= set(req_index.get("privileges", []))):
+							if (
+								set(existing_index.get("names", [])) >= set(req_index.get("names", []))
+								and set(existing_index.get("privileges", [])) >= set(req_index.get("privileges", []))
+							):
 								found = True
 								break
 						if not found:
