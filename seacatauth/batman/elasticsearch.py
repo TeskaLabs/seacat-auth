@@ -580,6 +580,7 @@ class KibanaUtils(asab.config.Configurable):
 		"kibana_admin_resource_id": "tools:kibana:admin",  # Admin access to all of Kibana
 		"kibana_default_space_read_resource_id": "tools:kibana:space:default:read",  # Read-only access to "Default" space
 		"kibana_default_space_all_resource_id": "tools:kibana:space:default:all",  # Read-write access to "Default" space
+		"kibana_index_management_resource_id": "tools:kibana:manage_indices",  # Manage all indices
 	}
 
 	def __init__(self, app, config_section_name="batman:elasticsearch", config=None):
@@ -616,6 +617,7 @@ class KibanaUtils(asab.config.Configurable):
 		self.AdminResourceId = self.Config.get("kibana_admin_resource_id")
 		self.DefaultSpaceReadResourceId = self.Config.get("kibana_default_space_read_resource_id")
 		self.DefaultSpaceAllResourceId = self.Config.get("kibana_default_space_all_resource_id")
+		self.IndexManagementResourceId = self.Config.get("kibana_index_management_resource_id")
 
 
 	def is_enabled(self):
@@ -650,6 +652,10 @@ class KibanaUtils(asab.config.Configurable):
 				"description": "Read-write access to the Default space in Kibana",
 				"global_only": True,
 			},
+			self.IndexManagementResourceId: {
+				"description": "Access to Kibana Index Management features for managing indices and index templates",
+				"global_only": True,
+			},
 		}
 
 
@@ -669,6 +675,8 @@ class KibanaUtils(asab.config.Configurable):
 					roles.add(get_default_space_access_role_name("read"))
 				if self.DefaultSpaceAllResourceId in authorized_resources:
 					roles.add(get_default_space_access_role_name("all"))
+				if self.IndexManagementResourceId in authorized_resources:
+					roles.add("kibana_index_management")
 				continue
 			if self.ReadResourceId in authorized_resources:
 				roles.add(get_space_access_role_name(tenant_id, "read"))
@@ -954,16 +962,114 @@ class KibanaUtils(asab.config.Configurable):
 		await self._upsert_role_for_kibana_space(space_id, role_name, privileges)
 
 
+	async def _upsert_index_management_role(self):
+		"""
+		Create or update the Kibana index management role in ElasticSearch.
+		This role grants privileges needed for Kibana Index Management features.
+		"""
+		assert self.is_enabled()
+
+		role_name = "kibana_index_management"
+		required_elasticsearch_privileges = {
+			"cluster": ["monitor", "manage_index_templates"],
+			"indices": [
+				{
+					"names": ["*"],
+					"privileges": ["view_index_metadata", "manage"],
+				}
+			],
+		}
+
+		async with self._kibana_session() as session:
+			async with session.get("{}/api/security/role/{}".format(self.KibanaUrl, role_name)) as resp:
+				if resp.status == 200:
+					role_data = await resp.json()
+				elif resp.status == 404:
+					role_data = None
+				else:
+					text = await resp.text()
+					L.error("Failed to get ElasticSearch role:\n{}".format(text[:1000]), struct_data={
+						"role": role_name})
+					return
+
+		# Check if required privileges are present in role settings
+		def elasticsearch_privileges_match(existing_es, required_es):
+			if not existing_es:
+				return False
+			for key, value in required_es.items():
+				if key == "indices":
+					# Check if indices privileges match
+					if not existing_es.get(key):
+						return False
+					for req_index in value:
+						found = False
+						for existing_index in existing_es[key]:
+							if (set(existing_index.get("names", [])) >= set(req_index.get("names", [])) and
+							    set(existing_index.get("privileges", [])) >= set(req_index.get("privileges", []))):
+								found = True
+								break
+						if not found:
+							return False
+				else:
+					if set(existing_es.get(key, [])) < set(value):
+						return False
+			return True
+
+		existing_es = role_data.get("elasticsearch", {}) if role_data else None
+		if existing_es and elasticsearch_privileges_match(existing_es, required_elasticsearch_privileges):
+			return
+
+		# Update role with required privileges
+		if not role_data:
+			role_data = {}
+		existing_es = role_data.get("elasticsearch", {})
+		es_privileges = {
+			"cluster": list(set(existing_es.get("cluster", []) + required_elasticsearch_privileges["cluster"])),
+			"indices": existing_es.get("indices", []),
+		}
+		# Add or update the indices settings
+		for req_index in required_elasticsearch_privileges["indices"]:
+			existing_idx = None
+			for idx in es_privileges["indices"]:
+				if set(idx.get("names", [])) >= set(req_index["names"]):
+					existing_idx = idx
+					break
+			if existing_idx:
+				existing_idx["privileges"] = list(set(existing_idx.get("privileges", [])) | set(req_index["privileges"]))
+			else:
+				es_privileges["indices"].append(req_index)
+
+		role = {
+			"metadata": role_data.get("metadata", {}),
+			"elasticsearch": es_privileges,
+		}
+
+		async with self._kibana_session() as session:
+			async with session.put(
+				"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
+			) as resp:
+				if not (200 <= resp.status < 300):
+					text = await resp.text()
+					L.error("Failed to update role {!r} with index management privileges:\n{}".format(
+						role_name, text[:1000]))
+					return
+
+		L.info("Added index management privileges to Kibana role.", struct_data={"role": role_name})
+
+
 	async def sync_all_spaces_and_roles(self):
 		"""
 		Synchronize all Kibana spaces and roles.
-		Creates roles for Default space access and syncs all tenant spaces.
+		Creates roles for Default space access, index management, and syncs all tenant spaces.
 		"""
 		assert self.is_enabled()
 
 		# Sync roles for Default space access (global-only resources)
 		for privileges in {"read", "all"}:
 			await self.upsert_role_for_default_space_access(privileges)
+
+		# Sync index management role
+		await self._upsert_index_management_role()
 
 		async for tenant in self.TenantService.iterate():
 			await self.sync_space_and_roles(tenant)
