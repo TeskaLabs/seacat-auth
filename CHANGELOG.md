@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha9
 - v26.15-alpha8
 - v26.15-alpha7
 - v26.15-alpha6
@@ -19,6 +20,7 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Kibana index management resource (#580, v26.15-alpha9)
 - Resources for Kibana default space access (#579, v26.15-alpha8)
 - CLI password reset (#576, v26.15-alpha6)
 - Script for synchronizing LDAP group membership to roles and tenants (#570, v26.15-alpha4)
