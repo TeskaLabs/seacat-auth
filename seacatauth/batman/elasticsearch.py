@@ -744,19 +744,15 @@ class KibanaUtils(asab.config.Configurable):
 		return spaces
 
 
-	async def upsert_role_for_space_access(self, tenant_id: str, privileges: str = "read"):
+	async def _upsert_role_for_kibana_space(self, space_id: str, role_name: str, privileges: str):
 		"""
-		Create or update a Kibana role with Kibana space privileges
+		Internal helper to create or update a Kibana role with space privileges.
 
 		Args:
-			tenant_id: Tenant whose Kibana space is to be accessed
+			space_id: The Kibana space ID
+			role_name: The name of the role to create/update
 			privileges: "read" for read-only access or "all" for read-write access
 		"""
-		assert self.is_enabled()
-		assert privileges in {"read", "all"}
-
-		space_id = self.space_id_from_tenant_id(tenant_id)
-		role_name = get_space_access_role_name(tenant_id, privileges)
 		required_space_settings = {
 			"spaces": [space_id],
 			"base": [privileges]
@@ -808,6 +804,22 @@ class KibanaUtils(asab.config.Configurable):
 			"role": role_name, "space": space_id})
 
 
+	async def upsert_role_for_space_access(self, tenant_id: str, privileges: str = "read"):
+		"""
+		Create or update a Kibana role with Kibana space privileges
+
+		Args:
+			tenant_id: Tenant whose Kibana space is to be accessed
+			privileges: "read" for read-only access or "all" for read-write access
+		"""
+		assert self.is_enabled()
+		assert privileges in {"read", "all"}
+
+		space_id = self.space_id_from_tenant_id(tenant_id)
+		role_name = get_space_access_role_name(tenant_id, privileges)
+		await self._upsert_role_for_kibana_space(space_id, role_name, privileges)
+
+
 	async def sync_space_and_roles(self, tenant: str | dict):
 		"""
 		Sync Kibana space with Seacat tenant, add Kibana space access to ElasticSearch roles
@@ -845,55 +857,8 @@ class KibanaUtils(asab.config.Configurable):
 
 		space_id = "default"
 		role_name = get_default_space_access_role_name(privileges)
-		required_space_settings = {
-			"spaces": [space_id],
-			"base": [privileges]
-		}
+		await self._upsert_role_for_kibana_space(space_id, role_name, privileges)
 
-		async with self._kibana_session() as session:
-			async with session.get("{}/api/security/role/{}".format(self.KibanaUrl, role_name)) as resp:
-				if resp.status == 200:
-					role_data = await resp.json()
-				elif resp.status == 404:
-					role_data = None
-				else:
-					text = await resp.text()
-					L.error("Failed to get ElasticSearch role:\n{}".format(text[:1000]), struct_data={
-						"role": role_name})
-					return
-
-		# Check if space privileges are present in role settings
-		if role_data and role_data.get("kibana"):
-			for space_settings in role_data.get("kibana"):
-				for k, v in required_space_settings.items():
-					if v != space_settings.get(k):
-						break
-				else:
-					return
-
-		# Update space privileges of the role
-		if not role_data:
-			role_data = {}
-		if not role_data.get("kibana"):
-			role_data["kibana"] = []
-		role = {
-			"elasticsearch": role_data.get("elasticsearch", {}),
-			"kibana": role_data.get("kibana"),
-			"metadata": role_data.get("metadata", {}),
-		}
-		role["kibana"].append(required_space_settings)
-		async with self._kibana_session() as session:
-			async with session.put(
-				"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
-			) as resp:
-				if not (200 <= resp.status < 300):
-					text = await resp.text()
-					L.error("Failed to update role {!r} with Kibana Default space access privileges:\n{}".format(
-						role_name, text[:1000]))
-					return
-
-		L.info("Added Default space access privileges to Kibana role.", struct_data={
-			"role": role_name, "space": space_id})
 
 	async def sync_all_spaces_and_roles(self):
 		assert self.is_enabled()
