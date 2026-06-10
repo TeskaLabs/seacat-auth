@@ -506,6 +506,8 @@ class KibanaUtils(asab.config.Configurable):
 		"kibana_read_resource_id": "tools:kibana:read",  # Read-only access to tenant space in Kibana
 		"kibana_all_resource_id": "tools:kibana:all",  # Read-write access to tenant space in Kibana
 		"kibana_admin_resource_id": "tools:kibana:admin",  # Admin access to all of Kibana
+		"kibana_default_space_read_resource_id": "tools:kibana:space:default:read",  # Read-only access to "Default" space
+		"kibana_default_space_all_resource_id": "tools:kibana:space:default:all",  # Read-write access to "Default" space
 	}
 
 	def __init__(self, app, config_section_name="batman:elasticsearch", config=None):
