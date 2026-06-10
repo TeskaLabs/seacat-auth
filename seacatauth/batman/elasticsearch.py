@@ -534,6 +534,8 @@ class KibanaUtils(asab.config.Configurable):
 		self.ReadResourceId = self.Config.get("kibana_read_resource_id")
 		self.AllResourceId = self.Config.get("kibana_all_resource_id")
 		self.AdminResourceId = self.Config.get("kibana_admin_resource_id")
+		self.DefaultSpaceReadResourceId = self.Config.get("kibana_default_space_read_resource_id")
+		self.DefaultSpaceAllResourceId = self.Config.get("kibana_default_space_all_resource_id")
 
 
 	def is_enabled(self):
@@ -560,6 +562,14 @@ class KibanaUtils(asab.config.Configurable):
 					"role in ElasticSearch documentation.",
 				"global_only": True,
 			},
+			self.DefaultSpaceReadResourceId: {
+				"description": "Read-only access to the Default space in Kibana",
+				"global_only": True,
+			},
+			self.DefaultSpaceAllResourceId: {
+				"description": "Read-write access to the Default space in Kibana",
+				"global_only": True,
+			},
 		}
 
 
@@ -572,6 +582,10 @@ class KibanaUtils(asab.config.Configurable):
 			if tenant_id == "*":
 				if self.AdminResourceId in authorized_resources:
 					roles.add("kibana_admin")
+				if self.DefaultSpaceReadResourceId in authorized_resources:
+					roles.add(get_default_space_access_role_name("read"))
+				if self.DefaultSpaceAllResourceId in authorized_resources:
+					roles.add(get_default_space_access_role_name("all"))
 				continue
 			if self.ReadResourceId in authorized_resources:
 				roles.add(get_space_access_role_name(tenant_id, "read"))
@@ -819,8 +833,74 @@ class KibanaUtils(asab.config.Configurable):
 			return
 
 
+	async def upsert_role_for_default_space_access(self, privileges: str = "read"):
+		"""
+		Create or update a Kibana role with Default space privileges
+
+		Args:
+			privileges: "read" for read-only access or "all" for read-write access
+		"""
+		assert self.is_enabled()
+		assert privileges in {"read", "all"}
+
+		space_id = "default"
+		role_name = get_default_space_access_role_name(privileges)
+		required_space_settings = {
+			"spaces": [space_id],
+			"base": [privileges]
+		}
+
+		async with self._kibana_session() as session:
+			async with session.get("{}/api/security/role/{}".format(self.KibanaUrl, role_name)) as resp:
+				if resp.status == 200:
+					role_data = await resp.json()
+				elif resp.status == 404:
+					role_data = None
+				else:
+					text = await resp.text()
+					L.error("Failed to get ElasticSearch role:\n{}".format(text[:1000]), struct_data={
+						"role": role_name})
+					return
+
+		# Check if space privileges are present in role settings
+		if role_data and role_data.get("kibana"):
+			for space_settings in role_data.get("kibana"):
+				for k, v in required_space_settings.items():
+					if v != space_settings.get(k):
+						break
+				else:
+					return
+
+		# Update space privileges of the role
+		if not role_data:
+			role_data = {}
+		if not role_data.get("kibana"):
+			role_data["kibana"] = []
+		role = {
+			"elasticsearch": role_data.get("elasticsearch", {}),
+			"kibana": role_data.get("kibana"),
+			"metadata": role_data.get("metadata", {}),
+		}
+		role["kibana"].append(required_space_settings)
+		async with self._kibana_session() as session:
+			async with session.put(
+				"{}/api/security/role/{}".format(self.KibanaUrl, role_name), json=role
+			) as resp:
+				if not (200 <= resp.status < 300):
+					text = await resp.text()
+					L.error("Failed to update role {!r} with Kibana Default space access privileges:\n{}".format(
+						role_name, text[:1000]))
+					return
+
+		L.info("Added Default space access privileges to Kibana role.", struct_data={
+			"role": role_name, "space": space_id})
+
 	async def sync_all_spaces_and_roles(self):
 		assert self.is_enabled()
+
+		# Sync roles for Default space access (global-only resources)
+		for privileges in {"read", "all"}:
+			await self.upsert_role_for_default_space_access(privileges)
 
 		async for tenant in self.TenantService.iterate():
 			await self.sync_space_and_roles(tenant)
@@ -834,3 +914,8 @@ def get_index_access_role_name(tenant: str, privileges: str):
 def get_space_access_role_name(tenant: str, privileges: str):
 	assert privileges in {"read", "all"}
 	return "space_{}_{}".format(tenant, privileges)
+
+
+def get_default_space_access_role_name(privileges: str):
+	assert privileges in {"read", "all"}
+	return "space_default_{}".format(privileges)
