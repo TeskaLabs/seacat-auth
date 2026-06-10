@@ -971,7 +971,7 @@ class KibanaUtils(asab.config.Configurable):
 
 		role_name = "kibana_index_management"
 		required_elasticsearch_privileges = {
-			"cluster": ["monitor", "manage_index_templates"],
+			"cluster": ["monitor", "manage_index_templates", "manage_ilm"],
 			"indices": [
 				{
 					"names": ["*"],
