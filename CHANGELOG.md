@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha10
 - v26.15-alpha9
 - v26.15-alpha8
 - v26.15-alpha7
@@ -15,6 +16,7 @@
 - v26.15-alpha
 
 ### Fixes
+- Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)
 - Remove password reset script from the Docker container (#578, v26.15-alpha7)
 - Treat HTTP authentication scheme as case-insensitive (#575, v26.15-alpha5)
 - Update webauthn package (#572, v26.15-alpha3)
