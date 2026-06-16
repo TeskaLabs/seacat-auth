@@ -75,7 +75,7 @@ RUN apk add --no-cache \
 COPY --from=builder /venv /venv
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
-COPY ./seacatauth/scripts/ldap-access-sync.py  /app/seacat-auth/scripts/ldap-access-sync.py
+COPY ./scripts/ldap-access-sync.py  /app/seacat-auth/scripts/ldap-access-sync.py
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
 COPY ./CHANGELOG.md          /app/seacat-auth/CHANGELOG.md
 COPY --from=builder /app/seacat-auth/MANIFEST.json /app/seacat-auth/MANIFEST.json
