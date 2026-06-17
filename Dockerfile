@@ -1,5 +1,5 @@
 # ---- Build stage ----
-FROM alpine:3.21 AS builder
+FROM alpine:3.24 AS builder
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
@@ -16,7 +16,7 @@ RUN apk add --no-cache \
   xmlsec \
   openldap
 
-# Create build environment so that dependencies like aiohttp can be build
+# Create build environment so that dependencies like aiohttp can be built
 # Run all as a single command in order to reduce image size --virtual buildenv
 RUN apk add --no-cache  \
     git \
@@ -28,34 +28,28 @@ RUN apk add --no-cache  \
     musl-dev \
     openldap-dev \
     rust \
-    cargo \
-&& python3 -m venv /venv \
-&& /venv/bin/pip3 install --upgrade pip \
-&& /venv/bin/pip3 install --no-cache-dir \
-    aiohttp \
-    aiosmtplib \
-    motor \
-    cryptography \
-    jwcrypto>=0.9.1 \
-    fastjsonschema \
-    bcrypt \
-    argon2_cffi \
-    python-ldap \
-    aiomysql \
-    jinja2 \
-    pyotp \
-    webauthn \
-    pyyaml \
-    pysaml2 \
-    pymongo \
-    sentry-sdk \
-    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
+    cargo
 
-RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
+# Create virtual environment
+RUN python3 -m venv /venv \
+    && /venv/bin/pip3 install --upgrade pip
 
 RUN mkdir -p /app/seacat-auth
 RUN mkdir -p /app/seacat-auth/scripts
 WORKDIR /app/seacat-auth
+
+# Copy project metadata files first for better layer caching
+COPY README.md pyproject.toml /app/seacat-auth/
+
+# Copy the source code
+COPY seacatauth /app/seacat-auth/seacatauth
+COPY seacatauth.py /app/seacat-auth/seacatauth.py
+
+# Install using pip with pyproject.toml (includes all main deps + ldap extra)
+RUN /venv/bin/pip3 install --no-cache-dir ".[ldap]"
+
+# Verify ASAB version
+RUN /venv/bin/python -c "import asab; print(asab.__version__)"
 
 # Create MANIFEST.json in the working directory
 # The manifest script requires git to be installed
@@ -64,7 +58,7 @@ RUN /venv/bin/asab-manifest.py ./MANIFEST.json
 
 
 # ---- Runtime stage ----
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache \
   python3 \

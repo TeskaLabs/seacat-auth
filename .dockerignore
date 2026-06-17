@@ -1,3 +1,26 @@
 doc
 example
 .github
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# pip cache
+.cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Development artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Poetry
+.poetry/
+poetry.toml

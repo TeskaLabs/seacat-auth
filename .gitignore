@@ -8,6 +8,16 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
+
+# Poetry cache and config
+.poetry/
+poetry.toml
 
 # Unit test / coverage reports
 htmlcov/

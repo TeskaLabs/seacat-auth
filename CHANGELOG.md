@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha12
 - v26.15-alpha11
 - ~~v26.15-alpha10~~
 - ~~v26.15-alpha9~~
@@ -31,6 +32,9 @@
 - Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
 - Redirect to login when external login initialization fails (#565, v26.15-alpha1)
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
+
+### Refactoring
+- Add pyproject.toml, add Python 3.14 support, update CI (#577, v26.15-alpha12)
 
 ---
 
