@@ -79,7 +79,6 @@ dev = [
 
 # Test dependencies for local testing only (not used in CI)
 test = [
-    "bson",
     "pymongo",
     "bcrypt",
     "argon2-cffi",
