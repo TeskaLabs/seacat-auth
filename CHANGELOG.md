@@ -3,6 +3,11 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha11
+- ~~v26.15-alpha10~~
+- ~~v26.15-alpha9~~
+- ~~v26.15-alpha8~~
+- ~~v26.15-alpha7~~
 - v26.15-alpha6
 - v26.15-alpha5
 - v26.15-alpha4
@@ -12,10 +17,15 @@
 - v26.15-alpha
 
 ### Fixes
+- Fix failing docker image build (#582, v26.15-alpha11)
+- Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)
+- Remove password reset script from the Docker container (#578, v26.15-alpha7)
 - Treat HTTP authentication scheme as case-insensitive (#575, v26.15-alpha5)
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Kibana index management resource (#580, v26.15-alpha9)
+- Resources for Kibana default space access (#579, v26.15-alpha8)
 - CLI password reset (#576, v26.15-alpha6)
 - Script for synchronizing LDAP group membership to roles and tenants (#570, v26.15-alpha4)
 - Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)

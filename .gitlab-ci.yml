@@ -1,5 +1,52 @@
 stages:
   - Documentation
+  - build
+
+
+build docker-main: 
+  stage: build
+  image: pcr.teskalabs.com/docker:25
+
+  tags:
+    # The shell Gitlab runner has to be used for this
+    - shell
+
+  only:
+    - main
+
+  before_script:
+    - docker info
+    # We want to run in the clean environment
+    - docker system prune -f
+
+  script:
+    - docker build -t $DOCKER_REGISTRY_IMAGE --no-cache .
+    - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD" "$DOCKER_REGISTRY"
+    - docker tag $DOCKER_REGISTRY_IMAGE $DOCKER_REGISTRY/$DOCKER_REGISTRY_IMAGE
+    - docker push $DOCKER_REGISTRY/$DOCKER_REGISTRY_IMAGE
+
+
+build docker-tag: 
+  stage: build
+  image: pcr.teskalabs.com/docker:25
+
+  tags:
+    # The shell Gitlab runner has to be used for this
+    - shell
+
+  only:
+    - tags
+
+  before_script:
+    - docker info
+    # We want to run in the clean environment
+    - docker system prune -f
+
+  script:
+    - docker build -t "${DOCKER_REGISTRY}/${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}" --no-cache .
+    - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD" "$DOCKER_REGISTRY"
+    - docker push "${DOCKER_REGISTRY}/${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+    - docker rmi "${DOCKER_REGISTRY}/${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
 
 doc staging:
   stage: Documentation

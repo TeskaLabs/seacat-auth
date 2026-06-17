@@ -34,7 +34,8 @@ RUN apk add --no-cache  \
 RUN python3 -m venv /venv \
     && /venv/bin/pip3 install --upgrade pip
 
-# Set working directory for the build
+RUN mkdir -p /app/seacat-auth
+RUN mkdir -p /app/seacat-auth/scripts
 WORKDIR /app/seacat-auth
 
 # Copy project metadata files first for better layer caching
@@ -68,7 +69,7 @@ RUN apk add --no-cache \
 COPY --from=builder /venv /venv
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
-COPY ./scripts               /app/seacat-auth/scripts
+COPY ./scripts/ldap-access-sync.py  /app/seacat-auth/scripts/ldap-access-sync.py
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
 COPY ./CHANGELOG.md          /app/seacat-auth/CHANGELOG.md
 COPY --from=builder /app/seacat-auth/MANIFEST.json /app/seacat-auth/MANIFEST.json
