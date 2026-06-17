@@ -39,17 +39,17 @@ RUN mkdir -p /app/seacat-auth/scripts
 WORKDIR /app/seacat-auth
 
 # Copy project metadata files first for better layer caching
-COPY pyproject.toml README.md CHANGELOG.md /app/seacat-auth/
+COPY README.md pyproject.toml /app/seacat-auth/
 
 # Copy the source code
 COPY seacatauth /app/seacat-auth/seacatauth
 COPY seacatauth.py /app/seacat-auth/seacatauth.py
 
-# Install dependencies from pyproject.toml and install the package
-RUN /venv/bin/pip3 install --no-cache-dir .
+# Install using pip with pyproject.toml (includes all main deps + ldap extra)
+RUN /venv/bin/pip3 install --no-cache-dir ".[ldap]"
 
 # Verify ASAB version
-RUN cat /venv/lib/python3.*/site-packages/asab/__version__.py
+RUN /venv/bin/python -c "import asab; print(asab.__version__)"
 
 # Create MANIFEST.json in the working directory
 # The manifest script requires git to be installed
