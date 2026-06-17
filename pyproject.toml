@@ -37,7 +37,7 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Systems Administration :: Authentication/Directory",
@@ -64,7 +64,6 @@ dependencies = [
     "pysaml2",
     "pymongo",
     "sentry-sdk",
-    # ASAB framework with encryption extras - installed from git (Dockerfile line 52)
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
 ]
 
