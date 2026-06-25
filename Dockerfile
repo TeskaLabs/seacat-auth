@@ -54,13 +54,10 @@ RUN apk add --no-cache  \
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
-RUN mkdir -p /app/seacat-auth/scripts
-WORKDIR /app/seacat-auth
+COPY . /app/seacat-auth
 
-# Create MANIFEST.json in the working directory
-# The manifest script requires git to be installed
-COPY ./.git /app/seacat-auth/.git
-RUN /venv/bin/asab-manifest.py ./MANIFEST.json
+# The manifest script needs the entire repo in a clean state (to avoid the -dirty tag)
+RUN (cd /app/seacat-auth && /venv/bin/asab-manifest.py ./MANIFEST.json)
 
 
 # ---- Runtime stage ----
