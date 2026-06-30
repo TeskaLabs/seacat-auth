@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48.01
 - v25.48-beta2
 - v25.48-beta1
 - v25.48-beta
@@ -32,6 +33,8 @@
 - v25.48-alpha
 
 ### Patches
+- Add LDAP sync script (!585, v25.48.01)
+- Enable docker push to PCR (!585, v25.48.01)
 - Update webauthn package (v25.48-beta2)
 - Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (v25.48-beta1)
 
@@ -91,6 +94,11 @@
 ### Breaking changes
 - In the `general` config section, the option `public_seacat_auth_base_url` is renamed 
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
+
+### Patches
+- Add LDAP sync script (!XXX, v25.38.03)
+- Enable docker push to PCR (!XXX, v25.38.03)
+- Update Webauthn package (!XXX, v25.38.02)
 
 ### Fixes
 - Fix invitation cleanup with local authz (#536, v25.38-alpha15)
@@ -428,8 +436,6 @@
 - `v24.17-alpha6`
 - `v24.17-alpha5`
 - `v24.17-alpha4`
-- `v24.17-alpha3`
-- `v24.17-alpha2`
 - `v24.17-beta1`
 - `v24.17-alpha1`
 
@@ -471,8 +477,8 @@
 - `v24.06-alpha9`
 - `v24.06-alpha8`
 - `v24.06-beta2`
-- `v24.06-alpha7.2`
 - `v24.06-beta`
+- `v24.06-alpha7.2`
 - `v24.06-alpha6`
 - `v24.06-alpha5`
 - `v24.06-alpha4`
@@ -506,6 +512,9 @@
 
 
 ## v23.47
+
+### Compatibility
+- ASAB WebUI v24.47 and later
 
 ### Pre-releases
 - `v23.47-beta2`
@@ -729,6 +738,7 @@
 
 ---
 
+
 ## v23.23-beta
 
 ### Fix
@@ -857,7 +867,7 @@
 - Authorize endpoint no longer authorizes unregistered clients (#137, PLUM Sprint 230113)
 - Introspecting a cookie-based client session requires client_id in query (#137, PLUM Sprint 230113)
 
-# Fix
+### Fix
 - Remove set_cookie from authorize response (#125, PLUM Sprint 221202)
 - Attempts to access a nonexistent tenant result in 403 (#133, #138, PLUM Sprint 221216)
 - Fixed default registration expiration (#142, PLUM Sprint 230113)
@@ -1203,7 +1213,7 @@
 ### Refactoring
 - Session cookie value is encrypted on backend (!196, PLUM Sprint 211023)
 - Specific error responses from password reset (!203, PLUM Sprint 211119)
-- Removed support for loading roles from file (!203, PLUM Sprint 211119)
+- Removed support for loading roles from file (!203, PLUM Sprint 211217)
 - Change URL for external login deletion (!207, PLUM Sprint 211119)
 
 ---
