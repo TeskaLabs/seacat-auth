@@ -54,6 +54,7 @@ RUN apk add --no-cache  \
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
+RUN mkdir -p /app/seacat-auth/scripts
 WORKDIR /app/seacat-auth
 
 # Create MANIFEST.json in the working directory
@@ -72,9 +73,9 @@ RUN apk add --no-cache \
   openldap
 
 COPY --from=builder /venv /venv
-ENV PATH="/venv/bin:$PATH"
 
 COPY ./seacatauth            /app/seacat-auth/seacatauth
+COPY ./scripts/ldap-access-sync.py  /app/seacat-auth/scripts/ldap-access-sync.py
 COPY ./seacatauth.py         /app/seacat-auth/seacatauth.py
 COPY ./CHANGELOG.md          /app/seacat-auth/CHANGELOG.md
 COPY --from=builder /app/seacat-auth/MANIFEST.json /app/seacat-auth/MANIFEST.json
@@ -84,6 +85,7 @@ COPY ./etc/message_templates /app/seacat-auth/etc/message_templates
 RUN set -ex \
   && mkdir /conf \
   && touch /conf/seacatauth.conf
-  
+
 WORKDIR /app/seacat-auth
+ENV PATH="/app/seacat-auth/scripts:/venv/bin:$PATH"
 CMD ["python3", "seacatauth.py", "-c", "/conf/seacatauth.conf"]
