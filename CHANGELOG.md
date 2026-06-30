@@ -3,6 +3,7 @@
 ## v25.38
 
 ### Pre-releases
+- v25.38.03
 - v25.38.02
 - v25.38.01
 - v25.38
@@ -28,6 +29,7 @@
   to `auth_webui_api_base_url` and its default value is updated (#522, v25.38-alpha7)
 
 ### Patches
+- Add LDAP sync script (#584, v25.38.03)
 - Update Webauthn package (#573, v25.38.02)
 
 ### Fixes
