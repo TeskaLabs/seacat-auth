@@ -30,6 +30,7 @@
 
 ### Patches
 - Add LDAP sync script (#584, v25.38.03)
+- Enable docker push to PCR (#584, v25.38.03)
 - Update Webauthn package (#573, v25.38.02)
 
 ### Fixes
