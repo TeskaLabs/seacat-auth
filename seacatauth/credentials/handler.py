@@ -78,7 +78,28 @@ class CredentialsHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	async def list_providers(self, request):
 		"""
-		Get credential providers and their metadata
+		List credential providers
+
+		Returns a list of all configured credential providers and their metadata.
+		Providers include internal (htpasswd, mongodb, etc.) and external (LDAP, etc.) sources.
+
+		Example response:
+		```json
+		{
+			"htpasswd:local": {
+				"type": "htpasswd",
+				"provider_id": "htpasswd:local"
+			},
+			"mongodb:default": {
+				"type": "mongodb",
+				"provider_id": "mongodb:default"
+			}
+		}
+		```
+		---
+		responses:
+			200:
+				description: List of credential providers
 		"""
 		providers = {}
 		for provider_id in self.CredentialsService.CredentialProviders:
@@ -89,7 +110,31 @@ class CredentialsHandler(object):
 	@asab.web.tenant.allow_no_tenant
 	async def get_provider_info(self, request):
 		"""
-		Get the metadata of the requested credential provider.
+		Get credential provider details
+
+		Returns detailed metadata about a specific credential provider.
+
+		Example response:
+		```json
+		{
+			"result": "OK",
+			"type": "mongodb",
+			"provider_id": "mongodb:default"
+		}
+		```
+		---
+		parameters:
+		-	name: provider_id
+			in: path
+			description: ID of the credential provider
+			required: true
+			schema:
+				type: string
+		responses:
+			200:
+				description: Provider metadata retrieved successfully
+			404:
+				description: Provider not found
 		"""
 		provider_id = request.match_info["provider_id"]
 		data = self.CredentialsService.get_provider_info(provider_id)
@@ -347,6 +392,48 @@ class CredentialsHandler(object):
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
+
+		Creates new user credentials in the specified provider.
+		Optionally sends a password reset link to the new user.
+
+		Example body:
+		```json
+		{
+			"username": "john.doe",
+			"email": "john.doe@example.com",
+			"phone": "+1234567890",
+			"password": "SecureP@ssw0rd",
+			"passwordlink": false
+		}
+		```
+
+		Example response:
+		```json
+		{
+			"result": "OK",
+			"status": "OK",
+			"_id": "mongodb:default:abc123def456",
+			"_type": "mongodb",
+			"_provider_id": "mongodb:default"
+		}
+		```
+		---
+		parameters:
+		-	name: provider
+			in: path
+			description: ID of the credential provider to create the credentials in
+			required: true
+			schema:
+				type: string
+		responses:
+			200:
+				description: Credentials created successfully
+			400:
+				description: Invalid request data or credentials already exist
+			403:
+				description: Insufficient permissions to create credentials
+			404:
+				description: Provider not found
 		"""
 		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
