@@ -1,0 +1,18 @@
+meta {
+  name: OIDC Discovery
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{PUBLIC_URL}}/.well-known/openid-configuration
+  body: none
+  auth: none
+}
+
+docs {
+  OpenID Connect Provider Metadata.
+  
+  Returns the OpenID Connect discovery document containing all OAuth/OIDC endpoints,
+  supported scopes, claims, and other configuration information.
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Search tenants
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{BASE_URL}}/tenants
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~p: 1
+  ~i: 10
+  ~f: 
+}
+
+docs {
+  Search tenants with pagination and filtering.
+  
+  Results include only tenants that the current session is authorized to access.
+  To search all tenants, access to `authz:tenant:access` resource is required.
+}

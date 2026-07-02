@@ -1,0 +1,21 @@
+meta {
+  name: Get tenant
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{BASE_URL}}/tenant/{{tenant_id}}
+  body: none
+  auth: inherit
+}
+
+params:path {
+  tenant_id: acme-corp
+}
+
+docs {
+  Get detailed information about a specific tenant.
+  
+  Returns tenant details including label, description, and custom data.
+}

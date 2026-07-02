@@ -1,0 +1,23 @@
+meta {
+  name: List clients
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{BASE_URL}}/admin/client
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~p: 1
+  ~i: 10
+  ~f: 
+}
+
+docs {
+  List registered OAuth2/OIDC clients with pagination and filtering.
+  
+  Returns client metadata including redirect URIs, grant types, and response types.
+}

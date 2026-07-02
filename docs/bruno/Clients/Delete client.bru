@@ -1,0 +1,21 @@
+meta {
+  name: Delete client
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{BASE_URL}}/admin/client/{{client_id}}
+  body: none
+  auth: inherit
+}
+
+params:path {
+  client_id: my-app-client-id
+}
+
+docs {
+  Delete an OAuth2/OIDC client.
+  
+  This action permanently removes the client and all its associated tokens.
+}
