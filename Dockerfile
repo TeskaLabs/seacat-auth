@@ -1,5 +1,5 @@
 # ---- Build stage ----
-FROM alpine:3.21 AS builder
+FROM alpine:3.22 AS builder
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
@@ -61,7 +61,7 @@ RUN (cd /app/seacat-auth && /venv/bin/asab-manifest.py ./MANIFEST.json)
 
 
 # ---- Runtime stage ----
-FROM alpine:3.21
+FROM alpine:3.22
 
 RUN apk add --no-cache \
   python3 \
