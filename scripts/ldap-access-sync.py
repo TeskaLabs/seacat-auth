@@ -336,7 +336,12 @@ def load_ldap_config(config_path):
     cfg.ldap_uri = parser[section].get('uri')
     cfg.ldap_base_dn = parser[section].get('base')
     cfg.ldap_filter = parser[section].get('filter')
-    cfg.ldap_attributes = parser[section].get('attributes', 'mail mobile userAccountControl displayName memberOf sAMAccountName').split()
+    cfg.ldap_attributes = parser[section].get(
+        'attributes',
+        'mail mobile userAccountControl displayName memberOf sAMAccountName'
+    ).split()
+    if 'memberOf' not in cfg.ldap_attributes:
+        cfg.ldap_attributes.append('memberOf')
     cfg.ldap_network_timeout = int(parser[section].get('network_timeout', '5'))
     cfg.cred_id_prefix = section.replace('seacatauth:credentials:', '') + ':'
     # Load TLS/SSL options
@@ -425,6 +430,7 @@ def main():
 
             cid = credentials_id_from_dn(cfg, dn)
             member_of = [s.decode().lower() for s in entry.get("memberOf", [])]
+
             desired_roles = set()
             desired_tenants = set()
             for group_dn, mapping in cfg.group_map.items():
