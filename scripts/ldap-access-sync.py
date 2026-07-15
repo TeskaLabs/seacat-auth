@@ -338,7 +338,7 @@ def load_ldap_config(config_path):
     cfg.ldap_filter = parser[section].get('filter')
     cfg.ldap_attributes = parser[section].get(
         'attributes',
-        'mail mobile userAccountControl displayName memberOf sAMAccountName'
+        'mail memberOf sAMAccountName'
     ).split()
     if 'memberOf' not in cfg.ldap_attributes:
         cfg.ldap_attributes.append('memberOf')
