@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Pre-releases
+- v26.15-alpha13
 - v26.15-alpha12
 - v26.15-alpha11
 - ~~v26.15-alpha10~~
@@ -18,6 +19,7 @@
 - v26.15-alpha
 
 ### Fixes
+- Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
 - Remove version dirtiness (#583, v26.15-alpha12)
 - Fix failing docker image build (#582, v26.15-alpha11)
 - Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)

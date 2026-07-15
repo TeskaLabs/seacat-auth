@@ -336,7 +336,12 @@ def load_ldap_config(config_path):
     cfg.ldap_uri = parser[section].get('uri')
     cfg.ldap_base_dn = parser[section].get('base')
     cfg.ldap_filter = parser[section].get('filter')
-    cfg.ldap_attributes = parser[section].get('attributes', 'mail mobile userAccountControl displayName memberOf sAMAccountName').split()
+    cfg.ldap_attributes = parser[section].get(
+        'attributes',
+        'mail memberOf sAMAccountName'
+    ).split()
+    if 'memberOf' not in cfg.ldap_attributes:
+        cfg.ldap_attributes.append('memberOf')
     cfg.ldap_network_timeout = int(parser[section].get('network_timeout', '5'))
     cfg.cred_id_prefix = section.replace('seacatauth:credentials:', '') + ':'
     # Load TLS/SSL options
@@ -415,6 +420,9 @@ def main():
     cfg.group_map = load_group_map(args.group_map)
 
     with mongodb_database(cfg) as db, ldap_client(cfg) as client:
+        user_count = 0
+        seen_groups = set()
+
         for dn, entry in iter_ldap_search_paged(
             client,
             cfg.ldap_base_dn,
@@ -422,12 +430,14 @@ def main():
             cfg.ldap_filter,
             cfg.ldap_attributes,
         ):
-
+            user_count += 1
             cid = credentials_id_from_dn(cfg, dn)
             member_of = [s.decode().lower() for s in entry.get("memberOf", [])]
             desired_roles = set()
             desired_tenants = set()
             for group_dn, mapping in cfg.group_map.items():
+                if group_dn.lower() in member_of:
+                    seen_groups.add(group_dn.lower())
                 if not mapping:
                     continue
                 if group_dn.lower() in member_of:
@@ -446,6 +456,13 @@ def main():
                 unassign_tenant(db, cid, tenant)
             for role in sorted(current_roles - desired_roles):
                 unassign_role(db, cid, role)
+
+        if user_count == 0:
+            print("LDAP query returned no users")
+
+        for group_dn in cfg.group_map:
+            if group_dn.lower() not in seen_groups:
+                print("Group from group map not found in any user: {!r}".format(group_dn))
 
 
 if __name__ == "__main__":
