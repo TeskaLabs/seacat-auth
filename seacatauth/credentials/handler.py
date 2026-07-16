@@ -347,6 +347,76 @@ class CredentialsHandler(object):
 	async def create_credentials(self, request, *, json_data):
 		"""
 		Create new credentials
+
+		---
+		tags: ["Users and credentials"]
+		responses:
+			200:
+				description:
+					Credentials created. With `passwordlink`, `password_reset` reports reset/email outcomes;
+					HTTP 200 means the record was created (even if the password reset might have failed).
+				schema:
+					type: object
+					required: [result, _id, _type, _provider_id]
+					properties:
+						result:
+							type: string
+							description: Overall outcome of credential creation (typically `OK`).
+						_id:
+							type: string
+							description: Identifier of the new credentials.
+						_type:
+							type: string
+							description: Provider type (e.g. human vs machine credentials).
+						_provider_id:
+							type: string
+							description: Credential provider id.
+						password_reset:
+							type: object
+							description: Present only when `passwordlink` was requested.
+							properties:
+								result:
+									type: string
+									description: Outcome of reset-link creation / disclosure policy.
+								password_reset_url:
+									type: string
+									description: Reset URL returned to the caller when policy allows (e.g. superuser).
+								tech_err:
+									type: string
+									description: Error message for the API
+								error:
+									type: string
+									description: Localizable error message for the UI
+								email_sent:
+									type: object
+									description: Email delivery attempt result and optional error details.
+									properties:
+										result:
+											type: string
+										tech_err:
+											type: string
+											description: Error message for the API
+										error:
+											type: string
+											description: Localizable error message for the UI
+									additionalProperties: true
+							additionalProperties: true
+					additionalProperties: true
+			400:
+				description: Credential creation failed (validation, provider, duplicate key, etc.).
+				schema:
+					type: object
+					description: Error payload; fields vary by failure mode.
+					properties:
+						result:
+							type: string
+						tech_err:
+							type: string
+							description: Error message for the API
+						error:
+							type: string
+							description: Localizable error message for the UI
+					additionalProperties: true
 		"""
 		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
@@ -355,15 +425,13 @@ class CredentialsHandler(object):
 		# Create credentials
 		result = await self.CredentialsService.create_credentials(provider_id, json_data)
 
-		if result["status"] != "OK":
-			result["result"] = result["status"]
+		if result["result"] != "OK":
 			return asab.web.rest.json_response(request, result, status=400)
 
 		credentials_id = result["credentials_id"]
 
 		response_data = {
 			"result": "OK",
-			"status": "OK",  # Backward compatibility
 			"_id": credentials_id,
 			"_type": provider.Type,
 			"_provider_id": provider.ProviderID,
@@ -371,55 +439,27 @@ class CredentialsHandler(object):
 
 		if reset_password:
 			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
-			comm_svc = self.App.get_service("seacatauth.CommunicationService")
 			credentials = await self.CredentialsService.get(credentials_id)
-
-			# Check if password reset link can be sent (in email or at least in the response)
 			authz = asab.contextvars.Authz.get()
-			if not (
-				authz.has_superuser_access()
-				or await comm_svc.can_send_to_target(credentials, "email")
-			):
-				L.error("Password reset denied: No way to communicate password reset link.", struct_data={
-					"cid": credentials_id})
-				password_reset_response = {
-					"result": "ERROR",
-					"tech_err": "Password reset link cannot be sent.",
-				}
-				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data)
 
-			password_reset_response = {}
-
-			# Create the password reset link
-			password_reset_url = await change_pwd_svc.init_password_reset(
+			password_reset_response = await change_pwd_svc.admin_request_password_reset(
 				credentials,
+				requester_is_superuser=authz.has_superuser_access(),
 				expiration=json_data.get("expiration"),
+				new_user=True,
 			)
 
-			# Superusers receive the password reset link in response
-			if authz.has_superuser_access():
-				password_reset_response["password_reset_url"] = password_reset_url
-
-			# Email the link to the user
-			try:
-				await comm_svc.password_reset(
-					credentials=credentials,
-					reset_url=password_reset_url,
-					new_user=True
-				)
-			except exceptions.ServerCommunicationError:
-				password_reset_response["result"] = "ERROR"
-				password_reset_response["tech_err"] = "Cannot connect to email service"
-				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data)
-			except exceptions.MessageDeliveryError:
-				password_reset_response["result"] = "ERROR"
-				password_reset_response["tech_err"] = "Failed to send password reset link."
-				response_data["password_reset"] = password_reset_response
-				return asab.web.rest.json_response(request, response_data)
-
-			password_reset_response["result"] = "OK"
+			# Ensure response structure:
+			# {
+			# 	"result": ...,
+			# 	"password_reset": {
+			# 		"result": ...,
+			# 		"password_reset_url": ...,
+			# 		"email_sent": {
+			# 			"result": ...
+			# 		}
+			# 	}
+			# }
 			response_data["password_reset"] = password_reset_response
 
 		return asab.web.rest.json_response(request, response_data)
