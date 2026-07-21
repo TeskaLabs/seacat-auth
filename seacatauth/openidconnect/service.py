@@ -125,17 +125,17 @@ class OpenIdConnectService(asab.Service):
 		if requested_scope is not None:
 			requested_scope = set(requested_scope)
 			unauthorized_scope = requested_scope - set(session.OAuth2.Scope)
-		if len(unauthorized_scope) > 0:
-			AuditLogger.warning("Scope access denied", struct_data={
-				"cid": session.Credentials.Id,
-				"client_id": session.OAuth2.ClientId,
-				"scope": " ".join(unauthorized_scope),
-			})
-			raise exceptions.AccessDeniedError(
-				"Client requested unauthorized scope.",
-				subject=session.OAuth2.ClientId,
-				resource=unauthorized_scope
-			)
+			if len(unauthorized_scope) > 0:
+				AuditLogger.warning("Scope access denied", struct_data={
+					"cid": session.Credentials.Id,
+					"client_id": session.OAuth2.ClientId,
+					"scope": " ".join(unauthorized_scope),
+				})
+				raise exceptions.AccessDeniedError(
+					"Client requested unauthorized scope.",
+					subject=session.OAuth2.ClientId,
+					resource=unauthorized_scope
+				)
 			granted_scope = requested_scope
 		else:
 			granted_scope = session.OAuth2.Scope
