@@ -387,6 +387,10 @@ class CredentialsService(asab.Service):
 					"by": agent_cid,
 				}
 			)
+			AuditLogger.notice("Credentials creation denied", struct_data={
+				"provider_id": provider.ProviderID,
+				"reason": "read-only provider",
+			})
 			return {
 				"status": "FAILED",
 				"message": "Provider does not support credentials creation",
@@ -402,6 +406,10 @@ class CredentialsService(asab.Service):
 				"provider_id": provider.ProviderID,
 				"by": agent_cid,
 			})
+			AuditLogger.notice("Credentials creation denied", struct_data={
+				"provider_id": provider.ProviderID,
+				"reason": "creation policy violated",
+			})
 			return {
 				"status": "FAILED",
 				"message": "Credentials data does not comply with creation policy",
@@ -412,6 +420,10 @@ class CredentialsService(asab.Service):
 			credentials_id = await provider.create(validated_data)
 		except asab.storage.exceptions.DuplicateError as e:
 			L.error("Cannot create credentials: {}".format(e))
+			AuditLogger.notice("Credentials creation denied", struct_data={
+				"provider_id": provider.ProviderID,
+				"reason": "DuplicateError",
+			})
 			return {
 				"status": "FAILED",
 				"message": "Cannot create credentials: Duplicate key",
@@ -419,14 +431,17 @@ class CredentialsService(asab.Service):
 			}
 		except Exception as e:
 			L.error("Cannot create credentials: {}".format(e))
+			AuditLogger.error("Credentials creation denied", struct_data={
+				"provider_id": provider.ProviderID,
+				"reason": e.__class__.__name__,
+			})
 			return {
 				"status": "FAILED",
 				"message": "Cannot create credentials",
 			}
 
-		AuditLogger.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+		AuditLogger.notice("Credentials created", struct_data={
 			"cid": credentials_id,
-			"by_cid": agent_cid,
 		})
 		self.App.PubSub.publish("Credentials.created!", credentials_id=credentials_id)
 
@@ -463,6 +478,10 @@ class CredentialsService(asab.Service):
 					"field": key,
 					"by": agent_cid,
 				})
+				AuditLogger.notice("Credentials update denied", struct_data={
+					"cid": credentials_id,
+					"reason": "sensitive field update",
+				})
 				return {
 					"status": "FAILED",
 					"message": "Data does not comply with update policy",
@@ -478,6 +497,10 @@ class CredentialsService(asab.Service):
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
 				"by": agent_cid,
+			})
+			AuditLogger.notice("Credentials update denied", struct_data={
+				"cid": credentials_id,
+				"reason": "provider does not support editing",
 			})
 			return {
 				"status": "FAILED",
@@ -495,6 +518,10 @@ class CredentialsService(asab.Service):
 				"provider_id": provider.ProviderID,
 				"cid": credentials_id,
 				"by": agent_cid,
+			})
+			AuditLogger.notice("Credentials update denied", struct_data={
+				"cid": credentials_id,
+				"reason": "update policy violated",
 			})
 			return {
 				"status": "FAILED",
@@ -528,6 +555,10 @@ class CredentialsService(asab.Service):
 				"cid": credentials_id,
 				"by": agent_cid,
 			})
+			AuditLogger.notice("Credentials update denied", struct_data={
+				"cid": credentials_id,
+				"reason": "phone and email both empty",
+			})
 			return {
 				"status": "FAILED",
 				"message": "Phone and email cannot both be empty",
@@ -537,13 +568,31 @@ class CredentialsService(asab.Service):
 			validated_data["data"] = custom_data
 
 		# Update in provider
-		await provider.update(credentials_id, validated_data)
+		try:
+			await provider.update(credentials_id, validated_data)
+		except Exception as e:
+			L.error("Cannot update credentials: {}".format(e))
+			AuditLogger.error("Credentials update denied", struct_data={
+				"cid": credentials_id,
+				"reason": e.__class__.__name__,
+			})
+			return {
+				"status": "FAILED",
+				"message": "Cannot update credentials",
+			}
 
-		AuditLogger.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+		AuditLogger.notice("Credentials updated", struct_data={
 			"cid": credentials_id,
-			"by_cid": agent_cid,
 			"attributes": list(validated_data.keys()),
 		})
+		if "suspended" in validated_data:
+			AuditLogger.notice(
+				"Credentials suspended" if validated_data["suspended"] else "Credentials activated",
+				struct_data={
+					"cid": credentials_id,
+					"suspended": validated_data["suspended"],
+				},
+			)
 		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials_id)
 
 		# Log the credentials out if they have been suspended
@@ -564,6 +613,10 @@ class CredentialsService(asab.Service):
 					"agent_cid": agent_cid,
 				}
 			)
+			AuditLogger.notice("Credentials deletion denied", struct_data={
+				"cid": credentials_id,
+				"reason": "read-only provider",
+			})
 			return {
 				"status": "FAILED",
 				"message": "Provider does not support credentials deletion",
@@ -591,8 +644,9 @@ class CredentialsService(asab.Service):
 		# Delete credentials in provider
 		result = await provider.delete(credentials_id)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Credentials deleted", struct_data={
-			"cid": credentials_id, "by_cid": agent_cid})
+		AuditLogger.notice("Credentials deleted", struct_data={
+			"cid": credentials_id,
+		})
 
 		self.App.PubSub.publish("Credentials.deleted!", credentials_id=credentials_id)
 

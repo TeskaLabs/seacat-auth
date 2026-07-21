@@ -16,7 +16,7 @@ import jwcrypto.jws
 from ..models.const import ResourceId
 from ..generic import update_url_query_params
 from ..models import Session, const
-from .. import exceptions, AuditLogger, generic
+from .. import exceptions, AuditLogger
 from . import pkce
 from ..authz import build_credentials_authz
 from ..session.builders import (
@@ -125,12 +125,17 @@ class OpenIdConnectService(asab.Service):
 		if requested_scope is not None:
 			requested_scope = set(requested_scope)
 			unauthorized_scope = requested_scope - set(session.OAuth2.Scope)
-			if len(unauthorized_scope) > 0:
-				raise exceptions.AccessDeniedError(
-					"Client requested unauthorized scope.",
-					subject=session.OAuth2.ClientId,
-					resource=unauthorized_scope
-				)
+		if len(unauthorized_scope) > 0:
+			AuditLogger.warning("Scope access denied", struct_data={
+				"cid": session.Credentials.Id,
+				"client_id": session.OAuth2.ClientId,
+				"scope": " ".join(unauthorized_scope),
+			})
+			raise exceptions.AccessDeniedError(
+				"Client requested unauthorized scope.",
+				subject=session.OAuth2.ClientId,
+				resource=unauthorized_scope
+			)
 			granted_scope = requested_scope
 		else:
 			granted_scope = session.OAuth2.Scope
@@ -388,13 +393,13 @@ class OpenIdConnectService(asab.Service):
 			tenants = await self.TenantService.get_tenants_by_scope(
 				scope, session.Credentials.Id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found", struct_data={"tenant": e.Tenant})
+			AuditLogger.warning("Tenant access denied: Tenant not found", struct_data={"tenant": e.Tenant})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.error("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
+			AuditLogger.warning("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": session.Credentials.Id})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 		except exceptions.NoTenantsError:
-			L.error("Tenant access denied", struct_data={"cid": session.Credentials.Id})
+			AuditLogger.warning("Tenant access denied: No tenants", struct_data={"cid": session.Credentials.Id})
 			raise exceptions.AccessDeniedError(subject=session.Credentials.Id)
 
 		return tenants
@@ -437,10 +442,10 @@ class OpenIdConnectService(asab.Service):
 			tenants: set = await self.TenantService.get_tenants_by_scope(
 				scope, credentials_id, has_access_to_all_tenants)
 		except exceptions.TenantNotFoundError as e:
-			L.error("Tenant not found.", struct_data={"tenant": e.Tenant})
+			AuditLogger.warning("Tenant access denied: Tenant not found", struct_data={"tenant": e.Tenant, "cid": credentials_id})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 		except exceptions.TenantAccessDeniedError as e:
-			L.log(asab.LOG_NOTICE, "Tenant access denied.", struct_data={"tenant": e.Tenant, "cid": credentials_id})
+			AuditLogger.warning("Tenant access denied", struct_data={"tenant": e.Tenant, "cid": credentials_id})
 			raise exceptions.AccessDeniedError(subject=credentials_id)
 
 		if tenants:
@@ -689,9 +694,6 @@ class OpenIdConnectService(asab.Service):
 		if expiration is None:
 			expiration = self.ClientCredentialsGrantExpiration
 
-		request = asab.contextvars.Request.get()
-		from_ip = generic.get_request_access_ips(request)
-
 		# Verify that the client has Seacat Auth credentials enabled
 		cred_provider = self.CredentialsService.CredentialProviders.get("client")
 		try:
@@ -757,15 +759,6 @@ class OpenIdConnectService(asab.Service):
 			expiration=expiration,
 			session_builders=session_builders,
 		)
-
-		# Everything is okay: Request granted
-		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
-			"cid": credentials_id,
-			"sid": session.SessionId,
-			"client_id": client_id,
-			"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
-			"from_ip": from_ip,
-		})
 
 		# Generate new token
 		new_access_token = await self.create_access_token(

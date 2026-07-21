@@ -168,34 +168,22 @@ class AuthenticationAccountHandler(object):
 				impersonator_root_session, target_cid)
 		except exceptions.CredentialsNotFoundError:
 			AuditLogger.warning("Impersonation failed: Target credentials ID not found", struct_data={
-				"impersonator_cid": impersonator_cid,
-				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,
-				"from_ip": impersonator_from_info,
 			})
 			raise aiohttp.web.HTTPForbidden()
 		except exceptions.AccessDeniedError:
 			AuditLogger.warning("Impersonation failed: Access denied", struct_data={
-				"impersonator_cid": impersonator_cid,
-				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,
-				"from_ip": impersonator_from_info,
 			})
 			raise aiohttp.web.HTTPForbidden()
 		except Exception as e:
 			AuditLogger.exception("Impersonation failed: Unexpected error ({})".format(e), struct_data={
-				"impersonator_cid": impersonator_cid,
-				"impersonator_sid": impersonator_root_session.SessionId,
 				"target_cid": target_cid,
-				"from_ip": impersonator_from_info,
 			})
 			raise aiohttp.web.HTTPForbidden()
 		else:
-			AuditLogger.log(asab.LOG_NOTICE, "Impersonation successful", struct_data={
-				"impersonator_cid": impersonator_cid,
-				"impersonator_sid": impersonator_root_session.SessionId,
+			AuditLogger.notice("Impersonation successful", struct_data={
 				"target_cid": target_cid,
 				"target_sid": str(session.Session.Id),
-				"from_ip": impersonator_from_info,
 			})
 		return session

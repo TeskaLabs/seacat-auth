@@ -10,7 +10,7 @@ import asab.web.auth
 import asab.contextvars
 import bson
 
-from .. import exceptions, generic
+from .. import exceptions, generic, AuditLogger
 from ..models import Session
 from ..models.const import ResourceId
 
@@ -140,6 +140,13 @@ class ApiKeyService(asab.Service):
 			expires_at=expires_at,
 		)
 
+		AuditLogger.notice("API key created", struct_data={
+			"key_id": session.Session.Id,
+			"tenant": tenant,
+			"resources": list(resources),
+			"label": label,
+		})
+
 		# Return token response
 		return {
 			"_id": session.Session.Id,
@@ -156,10 +163,9 @@ class ApiKeyService(asab.Service):
 			tenant = asab.contextvars.Tenant.get()
 			apikey = await self.get_api_key(key_id)
 			if tenant != apikey["tenant"]:
-				L.error("Cannot delete API key from different tenant.", struct_data={
+				AuditLogger.warning("API key deletion denied: Cross-tenant access denied", struct_data={
 					"key_id": key_id,
 					"key_tenant": apikey["tenant"],
-					"agent_tenant": tenant,
 				})
 				raise exceptions.ApiKeyNotFoundError(key_id)
 
@@ -167,6 +173,8 @@ class ApiKeyService(asab.Service):
 			await self.SessionService.delete(session_id=key_id)
 		except exceptions.SessionNotFoundError:
 			raise exceptions.ApiKeyNotFoundError(key_id) from None
+
+		AuditLogger.notice("API key deleted", struct_data={"key_id": key_id})
 
 
 	async def get_session_by_api_key(self, token_value: str) -> Session:

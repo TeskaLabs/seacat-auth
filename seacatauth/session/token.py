@@ -8,6 +8,7 @@ import bson
 import pymongo
 
 from ..events import EventTypes
+from .. import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ class SessionTokenService(asab.Service):
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_CREATED)
-		L.info("Session token created.", struct_data={"sid": session_id, "type": token_type})
+		AuditLogger.notice("Session token created", struct_data={"sid": session_id, "type": token_type})
 
 		return token
 
@@ -132,7 +133,7 @@ class SessionTokenService(asab.Service):
 		expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=expiration)
 		upsertor.set(SessionTokenField.ExpiresAt, expires_at)
 		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_EXTENDED)
-		L.info("Session token validity extended.", struct_data={
+		AuditLogger.notice("Session token validity extended", struct_data={
 			"sid": data[SessionTokenField.SessionId], "type": data[SessionTokenField.TokenType]})
 		return data
 
@@ -146,7 +147,7 @@ class SessionTokenService(asab.Service):
 		"""
 		collection = self.StorageService.Database[self.SessionTokenCollection]
 		token_data = await collection.find_one_and_delete(filter={"_id": _hash_token(token)})
-		L.info("Session token deleted.", struct_data={
+		AuditLogger.notice("Session token deleted", struct_data={
 			"sid": token_data[SessionTokenField.SessionId], "type": token_data[SessionTokenField.TokenType]})
 
 
@@ -158,7 +159,7 @@ class SessionTokenService(asab.Service):
 		query_filter = {SessionTokenField.ExpiresAt: {"$lt": datetime.datetime.now(datetime.timezone.utc)}}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Expired session tokens deleted.", struct_data={
+			AuditLogger.notice("Expired session tokens deleted", struct_data={
 				"count": result.deleted_count
 			})
 
@@ -171,7 +172,7 @@ class SessionTokenService(asab.Service):
 		query_filter = {SessionTokenField.SessionId: bson.ObjectId(session_id)}
 		result = await collection.delete_many(query_filter)
 		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Session tokens deleted.", struct_data={
+			AuditLogger.notice("Session tokens deleted", struct_data={
 				"sid": session_id,
 				"count": result.deleted_count,
 			})

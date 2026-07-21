@@ -6,7 +6,7 @@ import asab
 import asab.web.auth
 import asab.web.tenant
 
-from .. import AuditLogger, generic
+from .. import AuditLogger
 from ..generic import nginx_introspection
 from ..models import Session
 
@@ -34,34 +34,48 @@ class M2MIntrospectHandler(object):
 
 		# Get Basic auth credentials
 		if not authorization_bytes.startswith(b'Basic '):
-			L.log(asab.LOG_NOTICE, "Basic auth token not provided in request")
+			AuditLogger.notice("Authentication failed", struct_data={
+				"m2m": True,
+				"reason": "Basic auth token not provided in request",
+			})
 			return None
 
 		try:
 			username_password = base64.urlsafe_b64decode(authorization_bytes[len(b'Basic '):]).decode("ascii")
 		except binascii.Error:
-			L.log(asab.LOG_NOTICE, "Basic auth token must be base64-encoded")
+			AuditLogger.notice("Authentication failed", struct_data={
+				"m2m": True,
+				"reason": "Basic auth token must be base64-encoded",
+			})
 			return None
 
 		try:
 			username, password = username_password.split(":", 1)
 		except ValueError:
-			L.log(asab.LOG_NOTICE, "Basic auth token must match the 'username:password' format")
+			AuditLogger.notice("Authentication failed", struct_data={
+				"m2m": True,
+				"reason": "Basic auth token must match the 'username:password' format",
+			})
 			return None
 
 		# Locate credentials
 		credentials_id = await self.CredentialsService.locate(username, stop_at_first=True)
 		if credentials_id is None:
-			L.log(asab.LOG_NOTICE, "Credentials not found", struct_data={"username": username})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"m2m": True,
+				"username": username,
+				"reason": "Credentials not found",
+			})
 			return None
 		provider = self.CredentialsService.get_provider(credentials_id)
 
 		# Check if machine credentials
 		if provider.Type != "m2m":
-			L.log(
-				asab.LOG_NOTICE,
-				"Authentication method only available for machine credentials",
-				struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"m2m": True,
+				"cid": credentials_id,
+				"reason": "Authentication method only available for machine credentials",
+			})
 			return None
 
 		# Authenticate request
@@ -70,7 +84,11 @@ class M2MIntrospectHandler(object):
 			{"password": password}
 		)
 		if not authenticated:
-			L.log(asab.LOG_NOTICE, "Basic authentication failed", struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"m2m": True,
+				"cid": credentials_id,
+				"reason": "Basic authentication failed",
+			})
 			return None
 
 		# Find session object
@@ -95,17 +113,15 @@ class M2MIntrospectHandler(object):
 				session_expiration=None,  # TODO: Short expiration
 				from_info=access_ips
 			)
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+			AuditLogger.notice("Authentication successful", struct_data={
 				"cid": credentials_id,
 				"sid": str(session.Session.Id),
-				"fi": generic.get_request_access_ips(request),
 				"m2m": True,
 			})
 
 		if session is None:
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+			AuditLogger.notice("Authentication failed", struct_data={
 				"cid": credentials_id,
-				"fi": generic.get_request_access_ips(request),
 				"m2m": True,
 			})
 			return None

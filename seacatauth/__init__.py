@@ -254,6 +254,9 @@ asab.Config.add_defaults({
 	},
 })
 
+from .audit import AuditLogger as _AuditLoggerClass
+
+logging.setLoggerClass(_AuditLoggerClass)
 AuditLogger = logging.getLogger("AUDIT")
 
 __all__ = [

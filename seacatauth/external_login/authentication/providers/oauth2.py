@@ -14,6 +14,7 @@ import jwcrypto.jws
 
 from ...exceptions import ExternalLoginError
 from ....exceptions import AccessDeniedError
+from .... import AuditLogger
 from .abc import ExternalAuthProviderABC
 
 
@@ -319,10 +320,16 @@ class OAuth2AuthProvider(ExternalAuthProviderABC):
 				claims = json.loads(id_token.claims)
 				return claims
 			except jwcrypto.jws.InvalidJWSSignature:
-				L.error("Invalid ID token signature.", struct_data={"provider": self.Type})
+				AuditLogger.error("Authentication failed", struct_data={
+					"provider": self.Type,
+					"reason": "Invalid ID token signature",
+				})
 				raise ExternalLoginError("Invalid ID token signature.")
 			except jwcrypto.jwt.JWTExpired:
-				L.error("Expired ID token.", struct_data={"provider": self.Type})
+				AuditLogger.error("Authentication failed", struct_data={
+					"provider": self.Type,
+					"reason": "Expired ID token",
+				})
 				raise ExternalLoginError("Expired ID token.")
 			except jwcrypto.jwt.JWTMissingKey:
 				if (

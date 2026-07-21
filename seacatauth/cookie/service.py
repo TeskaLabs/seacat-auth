@@ -206,12 +206,12 @@ class CookieService(asab.Service):
 			Id=session_svc.Algorithmic.serialize(session),
 			Domain=client_dict.get("cookie_domain") or None)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+		AuditLogger.notice("Authentication successful", struct_data={
 			"anonymous": True,
 			"cid": anonymous_cid,
 			"client_id": client_dict["_id"],
 			"track_id": track_id,
-			"fi": from_info})
+		})
 
 		return session
 

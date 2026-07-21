@@ -2,6 +2,7 @@ import logging
 import asab
 
 from .abc import LoginFactorABC
+from ... import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -26,8 +27,7 @@ class WebAuthnFactor(LoginFactorABC):
 
 	async def authenticate(self, login_session, request_data) -> bool:
 		if "webauthn" not in request_data:
-			L.log(asab.LOG_NOTICE, "No webauthn data in login request", struct_data={
-				"cid": login_session.CredentialsId})
+			AuditLogger.notice("Authentication failed", struct_data={"reason": "missing webauthn data"})
 			return False
 		public_key_credential = request_data["webauthn"]
 

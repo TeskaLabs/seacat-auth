@@ -1,8 +1,8 @@
 import logging
 import typing
-import asab
 
 from .login_factors import LoginFactorABC
+from .. import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -99,10 +99,11 @@ class LoginDescriptor:
 		assert len(self.FactorGroups) == 1
 		for factor in self.FactorGroups[0]:
 			if (await factor.authenticate(login_session, request_data)) is False:
-				L.log(asab.LOG_NOTICE, "Login factor verification failed.", struct_data={
+				AuditLogger.notice("Authentication failed", struct_data={
+					"cid": login_session.CredentialsId,
 					"descriptor_id": self.ID,
 					"factor_type": factor.Type,
-					"cid": login_session.CredentialsId,
+					"reason": "Login factor verification failed",
 				})
 				return False
 		return True

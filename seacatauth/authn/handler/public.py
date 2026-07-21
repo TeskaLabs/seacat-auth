@@ -186,11 +186,10 @@ class AuthenticationPublicHandler(object):
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			AuditLogger.log(asab.LOG_NOTICE, "Authentication failed", struct_data={
+			AuditLogger.notice("Authentication failed", struct_data={
 				"cid": login_session.SeacatLogin.CredentialsId,
 				"lsid": lsid,
 				"ident": login_session.SeacatLogin.Ident,
-				"from_ip": access_ips
 			})
 			await self.AuthenticationService.LastActivityService.update_last_activity(
 				EventCode.LOGIN_FAILED, login_session.SeacatLogin.CredentialsId, from_ip=access_ips)
@@ -261,10 +260,10 @@ class AuthenticationPublicHandler(object):
 		try:
 			session = await self.CookieService.get_session_by_request_cookie(request)
 		except exceptions.NoCookieError:
-			L.log(asab.LOG_NOTICE, "Unauthorized: No root cookie in request")
+			AuditLogger.notice("Unauthorized: No root cookie in request")
 			return aiohttp.web.HTTPBadRequest()
 		except exceptions.SessionNotFoundError:
-			L.log(asab.LOG_NOTICE, "Unauthorized: Request cookie matched no active session")
+			AuditLogger.notice("Unauthorized: Request cookie matched no active session")
 			return aiohttp.web.HTTPBadRequest()
 
 		await self.SessionService.delete(session.Session.Id)
@@ -283,7 +282,7 @@ class AuthenticationPublicHandler(object):
 			try:
 				impersonator_session = await self.SessionService.get(session.Authentication.ImpersonatorSessionId)
 			except KeyError:
-				L.log(asab.LOG_NOTICE, "Impersonator session not found", struct_data={
+				AuditLogger.notice("Impersonator session not found", struct_data={
 					"sid": session.Authentication.ImpersonatorSessionId})
 			else:
 				if impersonator_session.Cookie is None:
@@ -296,7 +295,7 @@ class AuthenticationPublicHandler(object):
 						client_id=impersonator_session.OAuth2.ClientId,
 					)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
+		AuditLogger.notice("Logout successful", struct_data={
 			"cid": session.Credentials.Id, "sid": session.SessionId, "token_type": "cookie"})
 
 		return response

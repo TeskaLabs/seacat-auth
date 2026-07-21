@@ -7,6 +7,7 @@ import asab.web.tenant
 
 from ..models import Session
 from ..models.const import ResourceId
+from .. import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ class SessionHandler(object):
 		Terminate all sessions
 		"""
 		authz = asab.contextvars.Authz.get()
-		L.warning("Deleting all sessions", struct_data={
+		AuditLogger.warning("Deleting all sessions", struct_data={
 			"requested_by": authz.CredentialsId
 		})
 		await self.SessionService.delete_all_sessions()
@@ -147,7 +148,7 @@ class SessionHandler(object):
 		"""
 		authz = asab.contextvars.Authz.get()
 		credentials_id = request.match_info.get("credentials_id")
-		L.warning("Deleting all user sessions", struct_data={
+		AuditLogger.warning("Deleting all user sessions", struct_data={
 			"cid": credentials_id,
 			"requested_by": authz.CredentialsId,
 		})
@@ -161,7 +162,7 @@ class SessionHandler(object):
 		Terminate all the current user's sessions
 		"""
 		authz = asab.contextvars.Authz.get()
-		L.warning("Deleting all user sessions", struct_data={
+		AuditLogger.warning("Deleting all user sessions", struct_data={
 			"cid": authz.CredentialsId,
 		})
 		await self.SessionService.delete_sessions_by_credentials_id(authz.CredentialsId)

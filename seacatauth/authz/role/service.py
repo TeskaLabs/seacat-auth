@@ -8,7 +8,7 @@ import asab.web.tenant
 import asab.storage.exceptions
 import asab.exceptions
 
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ...api import local_authz
 from ...models.const import ResourceId
 from ...events import EventTypes
@@ -102,7 +102,7 @@ class RoleService(asab.Service):
 			for k, v in properties.items():
 				upsertor.set(k, v)
 			await upsertor.execute()
-			L.log(asab.LOG_NOTICE, "Role created.", struct_data={"role_id": role_id})
+			AuditLogger.notice("Role created", struct_data={"role_id": role_id})
 			return
 
 		if not update:
@@ -125,7 +125,7 @@ class RoleService(asab.Service):
 		for k, v in properties.items():
 			upsertor.set(k, v)
 		await upsertor.execute()
-		L.log(asab.LOG_NOTICE, "Role updated.", struct_data={"role_id": role_id})
+		AuditLogger.notice("Role updated", struct_data={"role_id": role_id})
 
 
 	async def _ensure_system_roles(self):
@@ -393,7 +393,7 @@ class RoleService(asab.Service):
 			upsertor.set("managed_by", "seacat-auth")
 
 		role_id = await upsertor.execute(event_type=EventTypes.ROLE_CREATED)
-		L.log(asab.LOG_NOTICE, "Role created", struct_data={"role_id": role_id})
+		AuditLogger.notice("Role created", struct_data={"role_id": role_id})
 
 		self.App.PubSub.publish("Role.created!", role_id=role_id, asynchronously=True)
 
@@ -441,7 +441,7 @@ class RoleService(asab.Service):
 
 		# Delete the role
 		await self.StorageService.delete(self.RoleCollection, role_id)
-		L.log(asab.LOG_NOTICE, "Role deleted", struct_data={"role_id": role_id})
+		AuditLogger.notice("Role deleted", struct_data={"role_id": role_id})
 		self.App.PubSub.publish("Role.deleted!", role_id=role_id, asynchronously=True)
 		return "OK"
 
@@ -511,7 +511,7 @@ class RoleService(asab.Service):
 			upsertor.set("description", description)
 
 		await upsertor.execute(event_type=EventTypes.ROLE_UPDATED)
-		L.log(asab.LOG_NOTICE, "Role updated", struct_data={"role_id": role_id})
+		AuditLogger.notice("Role updated", struct_data={"role_id": role_id})
 		self.App.PubSub.publish("Role.updated!", role_id=role_id, asynchronously=True)
 
 
@@ -771,7 +771,7 @@ class RoleService(asab.Service):
 				raise asab.exceptions.Conflict("Role already assigned.") from e
 
 		self.App.PubSub.publish("Role.assigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
-		L.log(asab.LOG_NOTICE, "Role assigned", struct_data={
+		AuditLogger.notice("Role assigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,
 		})
@@ -793,7 +793,7 @@ class RoleService(asab.Service):
 		assignment_id = "{} {}".format(credentials_id, role_id)
 		await self.StorageService.delete(self.CredentialsRolesCollection, assignment_id)
 		self.App.PubSub.publish("Role.unassigned!", credentials_id=credentials_id, role_id=role_id, asynchronously=True)
-		L.log(asab.LOG_NOTICE, "Role unassigned", struct_data={
+		AuditLogger.notice("Role unassigned", struct_data={
 			"cid": credentials_id,
 			"role": role_id,
 		})
@@ -823,7 +823,7 @@ class RoleService(asab.Service):
 			result = await collection.delete_many({"r": re.compile(r"^.+/~{}$".format(re.escape(role_name)))})
 			deleted_count += result.deleted_count
 
-		L.log(asab.LOG_NOTICE, "Role unassigned.", struct_data={
+		AuditLogger.notice("Role assignments deleted", struct_data={
 			"role_id": role_id,
 			"deleted_count": deleted_count,
 		})

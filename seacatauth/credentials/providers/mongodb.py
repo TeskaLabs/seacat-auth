@@ -13,7 +13,7 @@ import pymongo
 import pymongo.errors
 
 from .abc import RegistrableCredentialsProviderABC
-from ... import generic, exceptions
+from ... import generic, exceptions, AuditLogger
 from ...events import EventTypes
 
 
@@ -121,7 +121,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 		mongodb_id = await u.execute(event_type=EventTypes.CREDENTIALS_CREATED)
 		credentials_id = self._format_credentials_id(mongodb_id)
 
-		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+		L.info("Credentials created in provider", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
 		})
@@ -162,7 +162,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 
 		try:
 			await u.execute(event_type=EventTypes.CREDENTIALS_UPDATED)
-			L.log(asab.LOG_NOTICE, "Credentials updated", struct_data={
+			L.info("Credentials updated in provider", struct_data={
 				"cid": credentials_id,
 				"fields": ", ".join(updated_fields or []),
 			})
@@ -334,29 +334,44 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 			dbcred = await self.get(credentials_id, include={"__password"})
 		except KeyError:
 			# Should not occur if login prologue happened correctly
-			L.error("Authentication failed: Credentials not found.", struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "Credentials not found",
+			})
 			return False
 
 		if dbcred.get("suspended") is True:
 			# if the user is in suspended state then login no allowed
-			L.info("Authentication failed: Credentials suspended.", struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "Credentials suspended",
+			})
 			return False
 
 		password = credentials.get("password")
 		if not password:
-			L.error("Authentication failed: Login data contain no password.", struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "Login data contain no password",
+			})
 			return False
 
 		password_hash = dbcred.get("__password")
 		if not password_hash:
 			# Should not occur if login prologue happened correctly
-			L.error("Authentication failed: User has no password set.", struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "User has no password set",
+			})
 			return False
 
 		if self._verify_password(password_hash, password):
 			return True
 		else:
-			L.info("Authentication failed: Password verification failed", struct_data={"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "Password verification failed",
+			})
 
 		return False
 

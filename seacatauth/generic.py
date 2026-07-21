@@ -9,6 +9,9 @@ import aiohttp.web
 import asab
 import asab.utils
 import asab.exceptions
+
+from . import AuditLogger
+
 import bcrypt
 import argon2
 import hashlib
@@ -154,7 +157,7 @@ async def nginx_introspection(
 
 	if len(requested_resources) > 0:
 		if not rbac_service.has_resource_access(session.Authorization.Authz, requested_tenant, requested_resources):
-			L.warning("Credentials not authorized for tenant or resource.", struct_data={
+			AuditLogger.warning("Resource access denied", struct_data={
 				"cid": session.Credentials.Id,
 				"tenant": requested_tenant,
 				"resources": " ".join(requested_resources),
