@@ -1,8 +1,9 @@
-import logging
 import typing
 
+import logging
 import asab
 import asab.contextvars
+import asab.log
 
 
 def audit_struct_data(extra: typing.Optional[dict] = None) -> dict:
@@ -60,7 +61,7 @@ def audit_struct_data(extra: typing.Optional[dict] = None) -> dict:
 	return struct_data
 
 
-class AuditLogger(logging.Logger):
+class AuditLogger(asab.log._StructuredDataLogger):
 	"""
 	Audit logger that automatically enriches every ``struct_data`` dict with
 	request, authorization, and tenant context.
@@ -81,10 +82,10 @@ class AuditLogger(logging.Logger):
 		return self.log(asab.LOG_NOTICE, msg, *args, struct_data=struct_data, **kwargs)
 
 	def warning(self, msg, *args, struct_data=None, **kwargs):
-		return self.log(asab.LOG_WARNING, msg, *args, struct_data=struct_data, **kwargs)
+		return self.log(logging.WARNING, msg, *args, struct_data=struct_data, **kwargs)
 
 	def error(self, msg, *args, struct_data=None, **kwargs):
-		return self.log(asab.LOG_ERR, msg, *args, struct_data=struct_data, **kwargs)
+		return self.log(logging.ERROR, msg, *args, struct_data=struct_data, **kwargs)
 
 	def exception(self, msg, *args, struct_data=None, exc_info=True, **kwargs):
-		return self.log(asab.LOG_ERR, msg, *args, exc_info=exc_info, struct_data=struct_data, **kwargs)
+		return self.log(logging.ERROR, msg, *args, exc_info=exc_info, struct_data=struct_data, **kwargs)
