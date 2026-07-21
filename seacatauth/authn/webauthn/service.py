@@ -374,7 +374,7 @@ class WebAuthnService(asab.Service):
 		options = webauthn.generate_registration_options(
 			rp_id=self.RelyingPartyId,
 			rp_name=self.RelyingPartyName,
-			user_id=session.Credentials.Id.encode(),
+			user_id=session.Credentials.Id,
 			user_name=user_name,
 			user_display_name=credentials.get("username"),
 			challenge=challenge,
