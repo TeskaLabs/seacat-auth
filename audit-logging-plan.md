@@ -165,10 +165,10 @@ AuditLogger.log(asab.LOG_NOTICE, "Event description", struct_data={
 
 | File | Line | Message | Key `struct_data` |
 |---|---|---|---|
-| `credentials/service.py` | 427 | `Credentials created` | `cid`, `by_cid` |
-| `credentials/service.py` | 542 | `Credentials updated` | `cid`, `by_cid`, `attributes`. If `suspended` is among the changed attributes, also emit `Credentials suspended` or `Credentials activated` with the new `suspended` value. |
-| `credentials/service.py` | 594 | `Credentials deleted` | `cid`, `by_cid` |
-| `credentials/registration/service.py` | 112 | `Credentials created` | `cid`, `by_cid` |
+| `credentials/service.py` | 427 | `Credentials created` | `cid`, `agent_cid` |
+| `credentials/service.py` | 542 | `Credentials updated` | `cid`, `agent_cid`, `attributes`. If `suspended` is among the changed attributes, also emit `Credentials suspended` or `Credentials activated` with the new `suspended` value. |
+| `credentials/service.py` | 594 | `Credentials deleted` | `cid`, `agent_cid` |
+| `credentials/registration/service.py` | 112 | `Credentials created` | `cid`, `agent_cid` |
 | `credentials/registration/service.py` | 273 | `Invitation accepted by a new user` | `cid` |
 | `credentials/registration/service.py` | 334 | `Invitation accepted by an existing user` | `cid`, `t`, `r` |
 
@@ -219,7 +219,7 @@ AuditLogger.log(asab.LOG_NOTICE, "Event description", struct_data={
 |---|---|---|---|
 | **Request IP address** | `from_ip` | `fi` | `fi` used in `authn/m2m.py` and `cookie/service.py`. Will be extracted from `asab.contextvars.Request` by the enrichment helper. |
 | **Session ID** | `sid` | `psid`, `lsid`, `parent_sid` | `parent_sid` in `session/service.py` (on `L`) |
-| **Acting agent** | `by_cid` (to be renamed) | `impersonator_cid` | `by_cid` for admin CRUD; `impersonator_cid` for impersonation; absent for client secret update. Should be derived from `Authz.CredentialsId` via the enrichment helper. |
+| **Acting agent** | `agent_cid` | `impersonator_cid` | `agent_cid` for admin CRUD; `impersonator_cid` for impersonation; absent for client secret update. Derived from `Authz.CredentialsId` via the enrichment helper. |
 | **Tenants** | `t` (list) | `scope` (string) | `t` in authorization/registration; `scope` in OAuth token denials |
 | **Error detail** | `reason` | `e` | `e` used in `openidconnect/handler/authorize.py` |
 | **Role** | `role` (in `authz/role/service.py` on `L`) | `r` (in invitation acceptance) |  |
@@ -228,7 +228,7 @@ AuditLogger.log(asab.LOG_NOTICE, "Event description", struct_data={
 
 1. **IP address key (`from_ip` vs `fi`)**: The same semantic value is logged under two different keys. M2M and anonymous cookie flows use `fi`; all other flows use `from_ip`. Standardize on `from_ip` by extracting the IP from `asab.contextvars.Request` in the enrichment helper. This also eliminates the need to pass `request` or `from_ip` through many service methods.
 2. **Session ID object access**: Audit logs access `session.SessionId`, `session.Id`, `session.Session.Id`, or `str(session.Session.Id)` inconsistently. The logged `sid` should always be a stable string identifier.
-3. **Acting agent attribution**: The credential CRUD operations record `by_cid` (the admin acting). Impersonation records `impersonator_cid`. Client secret rotation records neither. Tenant/role/resource mutations do not record the acting agent in audit logs (they only log on `L`). With the context enrichment helper, `agent_cid` can be populated automatically for every authenticated request, eliminating the need to pass `by_cid` through method signatures. Internal/system calls that have no `Authz` context will simply omit the field.
+3. **Acting agent attribution**: The credential CRUD operations record `by_cid` (to be renamed `agent_cid`) for the admin acting. Impersonation records `impersonator_cid`. Client secret rotation records neither. Tenant/role/resource mutations do not record the acting agent in audit logs (they only log on `L`). With the context enrichment helper, `agent_cid` can be populated automatically for every authenticated request, eliminating the need to pass `by_cid` through method signatures. Internal/system calls that have no `Authz` context will simply omit the field.
 4. **Tenant context**: Most credential and password audit events do not include tenant context, despite SeaCat Auth being multi-tenant.
 5. **Login session ID**: Real `lsid` is used in interactive login; external login uses a literal `"<external-login>"`; M2M has no `lsid`.
 6. **Error code**: OAuth authorization errors use the key `e` for the error code. A clearer key such as `error` or `error_code` would be more explicit.
@@ -264,7 +264,7 @@ ASAB provides three context variables that can be used to enrich every audit ent
 - `asab.contextvars.Request` — a `contextvars.ContextVar` containing the current `aiohttp.web.Request`. From it we can extract the client IP address (`from_ip`) including `X-Forwarded-For` headers.
 - `asab.contextvars.Tenant` — a `contextvars.ContextVar` containing the current tenant ID string.
 - `asab.contextvars.Authz` — a `contextvars.ContextVar` containing an `asab.web.auth.Authorization` object with:
-  - `CredentialsId` — the acting agent's credentials ID (corresponds to `by_cid` in current audit logs).
+  - `CredentialsId` — the acting agent's credentials ID (corresponds to `agent_cid`; previously `by_cid`).
   - `SessionId` — the acting agent's SSO session ID.
   - `has_superuser_access()` — whether the agent has superuser privileges.
 
@@ -410,11 +410,7 @@ This also removes the current inconsistency where most calls use `AuditLogger.lo
 - **Alignment**: `agent_cid` mirrors the ASAB `Authz.CredentialsId` concept and is a common term in IAM/audit systems.
 - **Consistency**: It avoids the need to explain what `by_cid` means in the audit schema documentation.
 
-Counter-arguments:
-
-- **Backward compatibility**: Existing audit consumers, SIEM parsers, and stored logs use `by_cid`. A hard rename is a breaking change.
-
-**Recommendation**: Rename `by_cid` to `agent_cid` in the new helper and in all new/modified audit events. For a transition period, emit both `agent_cid` and `by_cid` with the same value, then remove `by_cid` in a later release. Alternatively, introduce an explicit audit schema version.
+**Recommendation**: Rename `by_cid` to `agent_cid` everywhere. The old key can be dropped; backward compatibility is not required.
 
 **Other attributes worth renaming**
 
@@ -614,7 +610,7 @@ The following `L.*` calls are security-relevant and should be migrated to `Audit
 2. **Add audit logging for failed credential mutations** (`credentials/service.py` denial paths).
 3. **Add audit logging for MFA/WebAuthn lifecycle** (`authn/otp/service.py`, `authn/webauthn/service.py`).
 4. **Add audit logging for external login pairing** (`external_login/credentials/service.py`, `external_login/authentication/service.py` failures).
-5. **Standardize `struct_data` keys**: use `from_ip` everywhere (rename `fi`), rename `by_cid` to `agent_cid` via the context enrichment helper, rename `e` to `error` or `error_code`, and ensure `tenant` is included where applicable. Emit backward-compatible keys during a transition period if needed.
+5. **Standardize `struct_data` keys**: use `from_ip` everywhere (rename `fi`), rename `by_cid` to `agent_cid` via the context enrichment helper, rename `e` to `error` or `error_code`, and ensure `tenant` is included where applicable. The old `by_cid` key can be dropped.
 6. **Standardize cookie bouncer audit messages**: change `Cookie request denied` / `Cookie request granted` to `Token request denied` / `Token request granted` and add `token_type: "cookie"` to the `struct_data`.
 7. **Make credentials suspension explicit**: when `suspended` is modified in `credentials/service.py:update_credentials`, emit both `Credentials updated` and the explicit `Credentials suspended` / `Credentials activated` event with the new `suspended` value.
 
@@ -677,10 +673,10 @@ The following `L.*` calls are security-relevant and should be migrated to `Audit
 | 41 | `cookie/handler.py` | 462 | `LOG_NOTICE` | `Token request denied: Track ID transfer failed because of invalid Authorization header` | `cid`, `sid`, `client_id`, `from_ip`, `redirect_uri`, `token_type: "cookie"` |
 | 42 | `cookie/handler.py` | 516 | `LOG_NOTICE` | `Token request denied: Webhook error` | `cid`, `sid`, `client_id`, `from_ip`, `redirect_uri`, `token_type: "cookie"` |
 | 43 | `cookie/handler.py` | 525 | `LOG_NOTICE` | `Token request granted` | `cid`, `sid`, `client_id`, `from_ip`, `redirect_uri`, `token_type: "cookie"` |
-| 44 | `credentials/service.py` | 427 | `LOG_NOTICE` | `Credentials created` | `cid`, `by_cid` |
-| 45 | `credentials/service.py` | 542 | `LOG_NOTICE` | `Credentials updated` | `cid`, `by_cid`, `attributes`. If `suspended` changed, also emit `Credentials suspended` or `Credentials activated`. |
-| 46 | `credentials/service.py` | 594 | `LOG_NOTICE` | `Credentials deleted` | `cid`, `by_cid` |
-| 47 | `credentials/registration/service.py` | 112 | `LOG_NOTICE` | `Credentials created` | `cid`, `by_cid` |
+| 44 | `credentials/service.py` | 427 | `LOG_NOTICE` | `Credentials created` | `cid`, `agent_cid` |
+| 45 | `credentials/service.py` | 542 | `LOG_NOTICE` | `Credentials updated` | `cid`, `agent_cid`, `attributes`. If `suspended` changed, also emit `Credentials suspended` or `Credentials activated`. |
+| 46 | `credentials/service.py` | 594 | `LOG_NOTICE` | `Credentials deleted` | `cid`, `agent_cid` |
+| 47 | `credentials/registration/service.py` | 112 | `LOG_NOTICE` | `Credentials created` | `cid`, `agent_cid` |
 | 48 | `credentials/registration/service.py` | 273 | `LOG_NOTICE` | `Invitation accepted by a new user` | `cid` |
 | 49 | `credentials/registration/service.py` | 334 | `LOG_NOTICE` | `Invitation accepted by an existing user` | `cid`, `t`, `r` |
 | 50 | `credentials/change_password/handler.py` | 72 | `LOG_NOTICE` | `Password change failed: Authentication failed` | `cid`, `from_ip` |
