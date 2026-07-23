@@ -168,6 +168,8 @@ class ClientHandler(object):
 				description: Invalid client metadata
 			403:
 				description: Insufficient permissions to register client
+			404:
+				description: Provider not found
 		"""
 		if "preferred_client_id" in json_data:
 			if not self.ClientService._AllowCustomClientID:
