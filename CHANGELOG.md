@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Fixes
+- Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
 - Remove version dirtiness (#583, v26.15-alpha12)
 - Fix failing docker image build (#582, v26.15-alpha11)
 - Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)
@@ -11,7 +12,7 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
-- Improve OpenAPI docs (#586, v26.15-alpha13)
+- Improve OpenAPI docs (#586, v26.15-alpha14)
 - Kibana index management resource (#580, v26.15-alpha9)
 - Resources for Kibana default space access (#579, v26.15-alpha8)
 - CLI password reset (#576, v26.15-alpha6)
@@ -21,6 +22,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-alpha14
 - v26.15-alpha13
 - v26.15-alpha12
 - v26.15-alpha11
