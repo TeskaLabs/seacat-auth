@@ -17,7 +17,7 @@ class ApiKeyHandler(object):
 	API key management
 
 	---
-	tags: ["API key management"]
+	tags: ["API keys"]
 	"""
 	def __init__(self, app, api_key_svc):
 		self.App = app

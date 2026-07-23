@@ -19,7 +19,7 @@ class ClientHandler(object):
 	Client management
 
 	---
-	tags: ["Clients (Applications)"]
+	tags: ["Clients (applications)"]
 	"""
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
