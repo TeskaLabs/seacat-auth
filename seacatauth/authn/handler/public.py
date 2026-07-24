@@ -23,7 +23,7 @@ class AuthenticationPublicHandler(object):
 	Login and authentication
 
 	---
-	tags: ["Login and authentication"]
+	tags: ["Login and logout"]
 	"""
 
 	def __init__(self, app, authn_svc):

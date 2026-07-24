@@ -15,7 +15,7 @@ class ExternalLoginAccountHandler(object):
 	Manage my external login accounts
 
 	---
-	tags: ["Account - External login"]
+	tags: ["My account"]
 	"""
 
 	def __init__(self, app, external_credentials_svc: ExternalCredentialsService):

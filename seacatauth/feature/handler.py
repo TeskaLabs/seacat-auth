@@ -13,7 +13,7 @@ class FeatureHandler(object):
 	Login and registration features
 
 	---
-	tags: ["Login and authentication"]
+	tags: ["Features"]
 	"""
 
 	def __init__(self, app, feture_svc):

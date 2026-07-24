@@ -18,7 +18,7 @@ class WebAuthnAccountHandler(object):
 	Manage FIDO2 Web Authentication
 
 	---
-	tags: ["FIDO2/WebAuthn"]
+	tags: ["My account"]
 	"""
 
 	def __init__(self, app, webauthn_svc):

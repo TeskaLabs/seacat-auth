@@ -19,7 +19,7 @@ class ClientHandler(object):
 	Client management
 
 	---
-	tags: ["Clients (Applications)"]
+	tags: ["Clients (applications)"]
 	"""
 	def __init__(self, app, client_svc):
 		self.ClientService = client_svc
@@ -128,9 +128,48 @@ class ClientHandler(object):
 	@asab.web.auth.require(ResourceId.CLIENT_EDIT)
 	async def register_client(self, request, *, json_data):
 		"""
-		Register a new client
+		Register a new OAuth2/OIDC client
 
-		https://openid.net/specs/openid-connect-registration-1_0.html
+		Registers a new client application for OAuth 2.0 / OpenID Connect authentication.
+		For confidential clients, a client secret is automatically generated and returned.
+
+		Example body:
+		```json
+		{
+			"client_name": "My Application",
+			"redirect_uris": ["https://myapp.example.com/callback"],
+			"application_type": "web",
+			"grant_types": ["authorization_code"],
+			"response_types": ["code"],
+			"token_endpoint_auth_method": "client_secret_basic"
+		}
+		```
+
+		Example response (confidential client):
+		```json
+		{
+			"_id": "my-client-id",
+			"client_id": "my-client-id",
+			"client_name": "My Application",
+			"client_secret": "generated-secret-value",
+			"client_secret_expires_at": 1704067200,
+			"redirect_uris": ["https://myapp.example.com/callback"],
+			"application_type": "web",
+			"grant_types": ["authorization_code"],
+			"response_types": ["code"],
+			"token_endpoint_auth_method": "client_secret_basic"
+		}
+		```
+		---
+		responses:
+			200:
+				description: Client registered successfully
+			400:
+				description: Invalid client metadata
+			403:
+				description: Insufficient permissions to register client
+			404:
+				description: Provider not found
 		"""
 		if "preferred_client_id" in json_data:
 			if not self.ClientService._AllowCustomClientID:
