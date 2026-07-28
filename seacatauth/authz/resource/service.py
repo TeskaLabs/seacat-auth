@@ -112,9 +112,10 @@ class ResourceService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.ResourceIdRegex = re.compile("^{}$".format(self.ResourceNamePattern))
-		self.DisabledResources = frozenset(
-			asab.Config.get("seacatauth:resources", "disabled_resources").split())
-
+		if resources := asab.Config.get("seacatauth:resources", "disabled_resources"):
+			self.DisabledResources = frozenset(re.split(r"\s+", resources.strip()))
+		else:
+			self.DisabledResources = frozenset()
 
 	async def initialize(self, app):
 		await super().initialize(app)
