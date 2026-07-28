@@ -24,6 +24,7 @@ async def build_credentials_authz(
 		credentials_id: ID of the credentials to build authz for.
 		tenants: Iterable of tenant IDs to build authz for. If None, only global resources are included.
 		exclude_resources: Iterable of resource IDs to exclude from the result.
+			Resources listed in `[seacatauth:resources] disabled_resources` are always excluded.
 
 	Returns:
 		A dictionary mapping tenant IDs to lists of resource IDs.
@@ -34,7 +35,8 @@ async def build_credentials_authz(
 				'tenantB': ['resourceA', 'resourceB', 'resourceE', 'resourceD'],
 			}
 	"""
-	exclude_resources = exclude_resources or frozenset()
+	resource_service = role_service.App.get_service("seacatauth.ResourceService")
+	exclude_resources = frozenset(exclude_resources or ()) | resource_service.DisabledResources
 	authz = {}
 
 	# Explicitly gather global resources, add them to all tenants and '*'
