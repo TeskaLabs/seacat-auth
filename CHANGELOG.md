@@ -12,6 +12,7 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Upgrade Dockerfile to Alpine 3.24, upgrade Python to 3.14 (#587, v26.15-alpha15)
 - Improve OpenAPI docs (#586, v26.15-alpha14)
 - Kibana index management resource (#580, v26.15-alpha9)
 - Resources for Kibana default space access (#579, v26.15-alpha8)
