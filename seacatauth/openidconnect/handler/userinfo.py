@@ -1,4 +1,6 @@
 import logging
+import datetime
+
 import asab
 import asab.web.rest
 import asab.web.auth
@@ -21,6 +23,7 @@ class UserInfoHandler(object):
 	"""
 
 	def __init__(self, app, oidc_svc):
+		self.App = app
 		self.OpenIdConnectService = oidc_svc
 		self.CookieService = app.get_service("seacatauth.CookieService")
 
@@ -49,13 +52,20 @@ class UserInfoHandler(object):
 				# Non-canonical
 				session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
 				if session is None:
-					L.log(asab.LOG_NOTICE, "Authentication required.")
-					return asab.exceptions.NotAuthenticatedError(
-						error="invalid_token",
-						error_description="Invalid ID token.",
-						realm="asab",
-						scope=["openid"],
-					)
+					# Token is not a seacat-auth session ID token.
+					# Try to validate it as an internal ASAB auth token (e.g. from bs-query)
+					# via the AuthService's ID token provider, which has the cluster's
+					# internal auth public key registered via InternalAuth.
+					userinfo = await self._build_userinfo_from_internal_token(request)
+					if userinfo is None:
+						L.log(asab.LOG_NOTICE, "Authentication required.")
+						return asab.exceptions.NotAuthenticatedError(
+							error="invalid_token",
+							error_description="Invalid ID token.",
+							realm="asab",
+							scope=["openid"],
+						)
+					return asab.web.rest.json_response(request, userinfo)
 			except ValueError:
 				try:
 					# Canonical
@@ -85,3 +95,73 @@ class UserInfoHandler(object):
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
 		return asab.web.rest.json_response(request, userinfo)
+
+
+	async def _build_userinfo_from_internal_token(self, request):
+		"""
+		Validate the request's Bearer token using the ASAB AuthService's ID token provider
+		and build a userinfo response from the validated claims.
+
+		This handles internal cluster auth tokens (e.g. from bs-query) that are signed
+		with the cluster's internal private key.
+		These tokens are not associated with any seacat-auth session, so we build
+		the userinfo directly from the JWT claims.
+		"""
+		auth_service = self.App.get_service("asab.AuthService")
+		if auth_service is None:
+			L.warning("AuthService not available; cannot validate internal auth token.")
+			return None
+
+		try:
+			authz = await auth_service.authorize_request(request)
+		except asab.exceptions.NotAuthenticatedError:
+			return None
+		except Exception as e:
+			L.warning("Unexpected error during internal auth token validation.", struct_data={
+				"error": str(e),
+			})
+			return None
+
+		if authz is None:
+			return None
+
+		claims = authz._Claims
+		L.log(asab.LOG_NOTICE, "Request authenticated via internal auth token.", struct_data={
+			"iss": claims.get("iss"),
+			"azp": claims.get("azp"),
+		})
+
+		# Determine issued-at timestamp
+		iat_ts = claims.get("iat")
+		if iat_ts is not None:
+			iat = datetime.datetime.fromtimestamp(int(iat_ts), datetime.timezone.utc)
+		else:
+			iat = datetime.datetime.now(datetime.timezone.utc)
+
+		# The internal token represents a service (e.g. bs-query), not a user session.
+		# We use the authorized party (azp) as the subject identifier.
+		service_id = claims.get("azp", "internal:unknown")
+
+		# Build a minimal userinfo response from the internal auth token claims.
+		userinfo = {
+			"iss": self.OpenIdConnectService.Issuer,
+			"sub": claims.get("sub") or service_id,
+			"iat": iat,
+			"sid": "internal:{}".format(service_id),
+		}
+
+		if claims.get("exp") is not None:
+			userinfo["exp"] = claims["exp"]
+
+		if claims.get("azp") is not None:
+			userinfo["azp"] = claims["azp"]
+
+		if claims.get("aud") is not None:
+			userinfo["aud"] = claims["aud"]
+
+		# Include resource authorization info so the web app knows
+		# this token carries superuser privileges
+		if claims.get("resources") is not None:
+			userinfo["resources"] = claims["resources"]
+
+		return userinfo
