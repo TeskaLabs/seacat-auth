@@ -142,16 +142,25 @@ class UserInfoHandler(object):
 		# We use the authorized party (azp) as the subject identifier.
 		service_id = claims.get("azp", "internal:unknown")
 
+		# Expiration
+		exp_ts = claims.get("exp")
+		if exp_ts is not None:
+			exp = datetime.datetime.fromtimestamp(int(exp_ts), datetime.timezone.utc)
+		else:
+			# Default expiry: 30 minutes from now (matching the internal auth token lifetime)
+			exp = iat + datetime.timedelta(minutes=30)
+
 		# Build a minimal userinfo response from the internal auth token claims.
 		userinfo = {
 			"iss": self.OpenIdConnectService.Issuer,
 			"sub": claims.get("sub") or service_id,
 			"iat": iat,
+			"exp": exp,
 			"sid": "internal:{}".format(service_id),
+			# Include username fields needed by the web application
+			"username": "internal:{}".format(service_id),
+			"preferred_username": "internal:{}".format(service_id),
 		}
-
-		if claims.get("exp") is not None:
-			userinfo["exp"] = claims["exp"]
 
 		if claims.get("azp") is not None:
 			userinfo["azp"] = claims["azp"]
