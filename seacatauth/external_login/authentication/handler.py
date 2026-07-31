@@ -18,7 +18,7 @@ class ExternalAuthenticationHandler(object):
 	External login
 
 	---
-	tags: ["Public - External login"]
+	tags: ["External login"]
 	"""
 
 	def __init__(self, app, external_authentication_svc: ExternalAuthenticationService):

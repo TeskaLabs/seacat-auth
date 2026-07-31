@@ -10,6 +10,15 @@ L = logging.getLogger(__name__)
 
 
 class SeaCatAuthApplication(asab.Application):
+	"""
+	Authentication, authorization, and identity management for applications and APIs.
+
+	SeaCat Auth provides login and multi-factor authentication, user and tenant
+	administration, role-based access control, session management, and OAuth 2.0 /
+	OpenID Connect for connecting client applications. It exposes a public API for
+	sign-in and federation flows, and an admin API for managing users, tenants,
+	roles, clients, and access policies.
+	"""
 
 	def __init__(self):
 		super().__init__()

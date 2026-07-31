@@ -21,7 +21,7 @@ class AuthenticationAccountHandler(object):
 	Login and authentication
 
 	---
-	tags: ["Login and authentication"]
+	tags: ["My account"]
 	"""
 
 	def __init__(self, app, authn_svc):
