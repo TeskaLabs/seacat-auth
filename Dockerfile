@@ -51,7 +51,8 @@ RUN apk add --no-cache  \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
 
-RUN cat /venv/lib/python3.14/site-packages/asab/__version__.py
+# This is for github CI/CD logs
+RUN /venv/bin/python3 -c "import asab; print(asab.__version__)"
 
 RUN mkdir -p /app/seacat-auth
 COPY . /app/seacat-auth
