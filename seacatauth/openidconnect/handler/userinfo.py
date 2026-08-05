@@ -129,31 +129,16 @@ class UserInfoHandler(object):
 			"azp": claims.get("azp"),
 		})
 
-		# Determine issued-at timestamp
-		iat_ts = claims.get("iat")
-		if iat_ts is not None:
-			iat = datetime.datetime.fromtimestamp(int(iat_ts), datetime.timezone.utc)
-		else:
-			iat = datetime.datetime.now(datetime.timezone.utc)
-
 		# The internal token represents a service (e.g. "asab-iris"), not a user session.
 		# We use the authorized party (azp) as the subject identifier.
 		service_id = claims.get("azp", "internal:unknown")
-
-		# Expiration
-		exp_ts = claims.get("exp")
-		if exp_ts is not None:
-			exp = datetime.datetime.fromtimestamp(int(exp_ts), datetime.timezone.utc)
-		else:
-			# Default expiry: 30 minutes from now (matching the internal auth token lifetime)
-			exp = iat + datetime.timedelta(minutes=30)
 
 		# Build a minimal userinfo response from the internal auth token claims.
 		userinfo = {
 			"iss": self.OpenIdConnectService.Issuer,
 			"sub": claims.get("sub") or service_id,
-			"iat": iat,
-			"exp": exp,
+			"iat": claims.get("iat"),
+			"exp": claims.get("exp"),
 			"sid": service_id,
 			# Include username fields needed by the web application
 			"username": service_id,
