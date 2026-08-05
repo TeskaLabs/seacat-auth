@@ -53,9 +53,8 @@ class UserInfoHandler(object):
 				session = await self.OpenIdConnectService.get_session_by_id_token(token_value)
 				if session is None:
 					# Token is not a seacat-auth session ID token.
-					# Try to validate it as an internal ASAB auth token (e.g. from bs-query)
-					# via the AuthService's ID token provider, which has the cluster's
-					# internal auth public key registered via InternalAuth.
+					# Try to validate it as an internal ASAB auth token via the AuthService's ID token provider,
+					# which has the cluster's internal auth public key registered via InternalAuth.
 					userinfo = await self._build_userinfo_from_internal_token(request)
 					if userinfo is None:
 						L.log(asab.LOG_NOTICE, "Authentication required.")
@@ -102,10 +101,9 @@ class UserInfoHandler(object):
 		Validate the request's Bearer token using the ASAB AuthService's ID token provider
 		and build a userinfo response from the validated claims.
 
-		This handles internal cluster auth tokens (e.g. from bs-query) that are signed
-		with the cluster's internal private key.
-		These tokens are not associated with any seacat-auth session, so we build
-		the userinfo directly from the JWT claims.
+		This handles internal cluster auth tokens that are signed with the cluster's internal private key.
+		These tokens are not associated with any seacat-auth session, so we build the userinfo
+		directly from the JWT claims.
 		"""
 		auth_service = self.App.get_service("asab.AuthService")
 		if auth_service is None:
@@ -138,7 +136,7 @@ class UserInfoHandler(object):
 		else:
 			iat = datetime.datetime.now(datetime.timezone.utc)
 
-		# The internal token represents a service (e.g. bs-query), not a user session.
+		# The internal token represents a service (e.g. "asab-iris"), not a user session.
 		# We use the authorized party (azp) as the subject identifier.
 		service_id = claims.get("azp", "internal:unknown")
 
@@ -156,10 +154,10 @@ class UserInfoHandler(object):
 			"sub": claims.get("sub") or service_id,
 			"iat": iat,
 			"exp": exp,
-			"sid": "internal:{}".format(service_id),
+			"sid": service_id,
 			# Include username fields needed by the web application
-			"username": "internal:{}".format(service_id),
-			"preferred_username": "internal:{}".format(service_id),
+			"username": service_id,
+			"preferred_username": service_id,
 		}
 
 		if claims.get("azp") is not None:
