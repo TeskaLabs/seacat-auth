@@ -12,6 +12,7 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Accept ASAB internal auth tokens at userinfo endpoint (#591, v26.15-alpha16)
 - Upgrade Dockerfile to Alpine 3.24, upgrade Python to 3.14 (#587, v26.15-alpha15)
 - Improve OpenAPI docs (#586, v26.15-alpha14)
 - Kibana index management resource (#580, v26.15-alpha9)
@@ -23,6 +24,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-alpha16
 - v26.15-alpha15
 - v26.15-alpha14
 - v26.15-alpha13
