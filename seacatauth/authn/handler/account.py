@@ -162,7 +162,6 @@ class AuthenticationAccountHandler(object):
 		Create a new impersonated session and log the event.
 		"""
 		# TODO: Restrict impersonation based on agent X target resource intersection
-		impersonator_cid = impersonator_root_session.Credentials.Id
 		try:
 			session = await self.AuthenticationService.create_impersonated_session(
 				impersonator_root_session, target_cid)

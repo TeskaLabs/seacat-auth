@@ -265,7 +265,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		try:
 			user_info = await provider.process_auth_callback(request, payload, state)
-		except exceptions.AccessDeniedError as e:
+		except exceptions.AccessDeniedError:
 			AuditLogger.notice("Authentication failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
@@ -460,7 +460,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		try:
 			user_info = await provider.process_auth_callback(request, payload, state)
-		except exceptions.AccessDeniedError as e:
+		except exceptions.AccessDeniedError:
 			AuditLogger.notice("Authentication failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
@@ -570,7 +570,7 @@ class ExternalAuthenticationService(asab.Service):
 
 		try:
 			user_info = await provider.process_auth_callback(request, payload, state)
-		except exceptions.AccessDeniedError as e:
+		except exceptions.AccessDeniedError:
 			AuditLogger.notice("External account pairing failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],

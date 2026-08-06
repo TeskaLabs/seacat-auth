@@ -2,6 +2,11 @@ import asab
 import logging
 
 from .app import SeaCatAuthApplication
+from .audit import AuditLogger as _AuditLoggerClass
+
+
+logging.setLoggerClass(_AuditLoggerClass)
+AuditLogger = logging.getLogger("AUDIT")
 
 
 asab.Config.add_defaults({
@@ -253,11 +258,6 @@ asab.Config.add_defaults({
 		"token_byte_length": 36,
 	},
 })
-
-from .audit import AuditLogger as _AuditLoggerClass
-
-logging.setLoggerClass(_AuditLoggerClass)
-AuditLogger = logging.getLogger("AUDIT")
 
 __all__ = [
 	"SeaCatAuthApplication"

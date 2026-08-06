@@ -15,7 +15,7 @@ import jwcrypto.jws
 
 from ..models.const import ResourceId
 from ..generic import update_url_query_params
-from ..models import Session, const
+from ..models import Session
 from .. import exceptions, AuditLogger
 from . import pkce
 from ..authz import build_credentials_authz

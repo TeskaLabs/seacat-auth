@@ -102,7 +102,7 @@ class TokenIntrospectionHandler(object):
 		if token_type.casefold() == "bearer":
 			try:
 				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-			except exceptions.SessionNotFoundError as e:
+			except exceptions.SessionNotFoundError:
 				AuditLogger.notice("Introspection denied: Access token matched no session", struct_data={
 					"token_fingerprint": fingerprint(token_value)})
 				return None
@@ -110,7 +110,7 @@ class TokenIntrospectionHandler(object):
 		elif token_type.casefold() == self.ApiKeyService.TOKEN_TYPE.casefold():
 			try:
 				session = await self.ApiKeyService.get_session_by_api_key(token_value)
-			except exceptions.SessionNotFoundError as e:
+			except exceptions.SessionNotFoundError:
 				AuditLogger.notice("Introspection denied: API key matched no session", struct_data={
 					"token_fingerprint": fingerprint(token_value)})
 				return None
