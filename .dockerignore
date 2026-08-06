@@ -1,7 +1,3 @@
-doc
-example
-.github
-
 # Python build artifacts
 build/
 dist/

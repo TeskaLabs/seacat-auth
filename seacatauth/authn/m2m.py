@@ -15,6 +15,12 @@ L = logging.getLogger(__name__)
 
 
 class M2MIntrospectHandler(object):
+	"""
+	Machine-to-machine gateway introspection
+
+	---
+	tags: ["HTTP cookies and gateway introspection"]
+	"""
 
 	def __init__(self, app, authn_svc, session_svc, credentials_service, rbac_service):
 		self.App = app
@@ -141,9 +147,6 @@ class M2MIntrospectHandler(object):
 			proxy_pass            http://seacat-auth-svc:8081/m2m/nginx;
 		}
 		```
-
-		---
-		tags: ["Nginx"]
 		"""
 		# TODO: API key auth
 		# TODO: Certificate auth

@@ -22,7 +22,7 @@ class ResourceHandler(object):
 	Resource management
 
 	---
-	tags: ["Resources"]
+	tags: ["Resources and access checks"]
 	"""
 
 	def __init__(self, app, rbac_svc):

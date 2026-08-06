@@ -40,25 +40,49 @@ class SessionHandler(object):
 		"""
 		List sessions
 
+		Returns a paginated list of active and optionally expired sessions.
+
+		Example response:
+		```json
+		{
+			"data": [
+				{
+					"_id": "6579a1b2c3d4e5f6a7b8c9d0",
+					"type": "root",
+					"cid": "mongodb:default:abc123def456",
+					"created": "2024-01-15T10:30:00Z",
+					"expiration": "2024-01-15T18:30:00Z"
+				}
+			],
+			"count": 150
+		}
+		```
 		---
 		parameters:
 		-	name: p
 			in: query
-			description: Page number
+			description: Page number (1-based)
 			schema:
 				type: integer
+				default: 1
 		-	name: i
 			in: query
 			description: Items per page
 			schema:
 				type: integer
+				default: 10
 		-	name: include_expired
 			in: query
 			description: Whether to include expired sessions in the results
 			required: false
 			schema:
 				type: boolean
-				default: no
+				default: false
+		responses:
+			200:
+				description: List of sessions retrieved successfully
+			403:
+				description: Insufficient permissions to access sessions
 		"""
 		page = int(request.query.get("p", 1)) - 1
 		limit = int(request.query.get("i", 10))
