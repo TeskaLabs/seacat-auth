@@ -30,7 +30,7 @@ jobs:
     - name: Install lint dependencies
       run: |
         # --only-group installs ONLY the lint group (no project / prod deps)
-        uv sync --only-group lint
+        uv sync --only-group lint --locked
 
     - name: Lint with flake8
       run: |
@@ -55,7 +55,7 @@ jobs:
     - name: Install test dependencies
       run: |
         # --only-group installs ONLY the test group (no python-ldap etc.)
-        uv sync --only-group test
+        uv sync --only-group test --locked
 
     - name: Test with unittest
       run: |

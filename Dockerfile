@@ -41,7 +41,7 @@ COPY . /app/seacat-auth
 # Install main deps + ldap into /venv (uses uv.lock when present)
 ENV UV_PROJECT_ENVIRONMENT=/venv
 ENV UV_LINK_MODE=copy
-RUN uv sync --extra ldap --frozen --no-cache --no-editable
+RUN uv sync --extra ldap --no-cache --no-editable --locked
 
 # This is for github CI/CD logs
 RUN /venv/bin/python3 -c "import asab; print(asab.__version__)"
