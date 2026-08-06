@@ -90,7 +90,9 @@ class XHeaderFactor(LoginFactorABC):
 		:returns False if the HTTP header value doesn't match the configured value.
 		:raises ValueError if the HTTP header is missing.
 		"""
-		return self._check_header(request_data["request_headers"])
+		success = self._check_header(request_data["request_headers"])
+		self.audit_verification(login_session, success)
+		return success
 
 	def _check_header(self, request_headers) -> bool:
 		request_header = request_headers.get(self.Header)

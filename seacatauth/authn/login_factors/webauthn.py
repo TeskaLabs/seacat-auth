@@ -1,8 +1,6 @@
 import logging
-import asab
 
 from .abc import LoginFactorABC
-from ... import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -27,13 +25,19 @@ class WebAuthnFactor(LoginFactorABC):
 
 	async def authenticate(self, login_session, request_data) -> bool:
 		if "webauthn" not in request_data:
-			AuditLogger.notice("Authentication failed", struct_data={"reason": "missing webauthn data"})
+			L.warning("Authentication failed", struct_data={
+				"cid": login_session.CredentialsId,
+				"reason": "missing webauthn data",
+			})
+			self.audit_verification(login_session, False)
 			return False
 		public_key_credential = request_data["webauthn"]
 
 		webauthn_svc = self.AuthenticationService.App.get_service("seacatauth.WebAuthnService")
-		return await webauthn_svc.authenticate_credential(
+		success = await webauthn_svc.authenticate_credential(
 			login_session.CredentialsId,
 			login_session.Data.get("webauthn"),
 			public_key_credential
 		)
+		self.audit_verification(login_session, success)
+		return success

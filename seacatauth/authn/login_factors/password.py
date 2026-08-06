@@ -12,4 +12,6 @@ class PasswordFactor(LoginFactorABC):
 
 	async def authenticate(self, login_session, request_data) -> bool:
 		cred_svc = self.AuthenticationService.CredentialsService
-		return await cred_svc.authenticate(login_session.CredentialsId, request_data)
+		success = await cred_svc.authenticate(login_session.CredentialsId, request_data)
+		self.audit_verification(login_session, success)
+		return success

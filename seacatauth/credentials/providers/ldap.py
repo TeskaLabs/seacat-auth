@@ -14,7 +14,7 @@ import asab.proactor
 import asab.config
 
 from .abc import CredentialsProviderABC
-from ... import exceptions, AuditLogger
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -319,7 +319,7 @@ class LDAPCredentialsProvider(CredentialsProviderABC):
 		try:
 			ldap_client.simple_bind_s(dn, password)
 		except ldap.INVALID_CREDENTIALS:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"dn": dn,
 				"reason": "Invalid LDAP credentials",
 			})

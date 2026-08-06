@@ -2,7 +2,6 @@ import logging
 import typing
 
 from .login_factors import LoginFactorABC
-from .. import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -99,12 +98,6 @@ class LoginDescriptor:
 		assert len(self.FactorGroups) == 1
 		for factor in self.FactorGroups[0]:
 			if (await factor.authenticate(login_session, request_data)) is False:
-				AuditLogger.notice("Authentication failed", struct_data={
-					"cid": login_session.CredentialsId,
-					"descriptor_id": self.ID,
-					"factor_type": factor.Type,
-					"reason": "Login factor verification failed",
-				})
 				return False
 		return True
 

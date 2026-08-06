@@ -186,7 +186,7 @@ class AuthenticationPublicHandler(object):
 		authenticated = await self.AuthenticationService.authenticate(login_session, request_data)
 
 		if not authenticated:
-			AuditLogger.notice("Authentication failed", struct_data={
+			AuditLogger.notice("Login failed", struct_data={
 				"cid": login_session.SeacatLogin.CredentialsId,
 				"lsid": lsid,
 				"ident": login_session.SeacatLogin.Ident,

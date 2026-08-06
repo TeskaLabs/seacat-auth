@@ -684,7 +684,7 @@ class ExternalAuthenticationService(asab.Service):
 				session_builders=session_builders,
 			)
 
-		AuditLogger.notice("Authentication successful", struct_data={
+		AuditLogger.notice("Login successful", struct_data={
 			"cid": credentials_id,
 			"lsid": "<external-login>",
 			"sid": str(new_sso_session.Session.Id),

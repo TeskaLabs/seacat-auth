@@ -1,5 +1,7 @@
 import abc
 
+from ... import AuditLogger
+
 
 class LoginFactorABC(abc.ABC):
 	Type = None
@@ -20,6 +22,21 @@ class LoginFactorABC(abc.ABC):
 		Used in HTTP JSON responses.
 		"""
 		return {"type": self.Type}
+
+	def audit_verification(self, login_session, success: bool):
+		"""
+		Emit an audit log for the outcome of this factor's authentication.
+		"""
+		if success:
+			AuditLogger.notice("Authentication successful", struct_data={
+				"cid": login_session.CredentialsId,
+				"factor_type": self.Type,
+			})
+		else:
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": login_session.CredentialsId,
+				"factor_type": self.Type,
+			})
 
 	async def is_eligible(self, login_data: dict) -> bool:
 		# TODO: Refactor login_data into explicit kwargs

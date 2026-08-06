@@ -335,20 +335,6 @@ class AuthenticationService(asab.Service):
 					struct_data={"cid": login.CredentialsId}
 				)
 				break
-			else:
-				AuditLogger.notice("Authentication failed", struct_data={
-					"cid": login.CredentialsId,
-					"lsid": login_session.Id,
-					"descriptor_id": descriptor.ID,
-					"reason": "Login descriptor verification failed",
-				})
-		if not authenticated:
-			AuditLogger.notice("Authentication failed", struct_data={
-				"cid": login.CredentialsId,
-				"lsid": login_session.Id,
-				"descriptor_id": request_data.get("descriptor"),
-				"reason": "No matching login descriptor",
-			})
 		return authenticated
 
 	async def login(self, login_session, root_session: Session | None = None, from_info: list = None):
@@ -374,7 +360,7 @@ class AuthenticationService(asab.Service):
 				session_builders=session_builders,
 			)
 
-		AuditLogger.notice("Authentication successful", struct_data={
+		AuditLogger.notice("Login successful", struct_data={
 			"cid": login_session.SeacatLogin.CredentialsId,
 			"lsid": login_session.Id,
 			"sid": str(new_sso_session.Session.Id),

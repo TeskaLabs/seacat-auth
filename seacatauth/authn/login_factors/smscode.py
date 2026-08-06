@@ -71,9 +71,10 @@ class SMSCodeFactor(LoginFactorABC):
 
 	async def authenticate(self, login_session, request_data) -> bool:
 		if self.Type not in request_data or self.Type not in login_session.Data:
+			self.audit_verification(login_session, False)
 			return False
 		user_input = request_data[self.Type].strip()
 		token = login_session.Data[self.Type]["token"]
-		if token is not None and user_input == token:
-			return True
-		return False
+		success = token is not None and user_input == token
+		self.audit_verification(login_session, success)
+		return success

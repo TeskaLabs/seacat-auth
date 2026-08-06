@@ -13,7 +13,7 @@ import pymongo
 import pymongo.errors
 
 from .abc import RegistrableCredentialsProviderABC
-from ... import generic, exceptions, AuditLogger
+from ... import generic, exceptions
 from ...events import EventTypes
 
 
@@ -334,7 +334,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 			dbcred = await self.get(credentials_id, include={"__password"})
 		except KeyError:
 			# Should not occur if login prologue happened correctly
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Credentials not found",
 			})
@@ -342,7 +342,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 
 		if dbcred.get("suspended") is True:
 			# if the user is in suspended state then login no allowed
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Credentials suspended",
 			})
@@ -350,7 +350,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 
 		password = credentials.get("password")
 		if not password:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Login data contain no password",
 			})
@@ -359,7 +359,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 		password_hash = dbcred.get("__password")
 		if not password_hash:
 			# Should not occur if login prologue happened correctly
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "User has no password set",
 			})
@@ -368,7 +368,7 @@ class MongoDBCredentialsProvider(RegistrableCredentialsProviderABC):
 		if self._verify_password(password_hash, password):
 			return True
 		else:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Password verification failed",
 			})

@@ -495,7 +495,7 @@ class WebAuthnService(asab.Service):
 		sign_count = wa_credential["sc"]
 
 		if credentials_id != wa_credential["cid"]:
-			AuditLogger.notice("Authentication failed", struct_data={"cid": credentials_id, "reason": "credentials id mismatch"})
+			L.warning("Authentication failed", struct_data={"cid": credentials_id, "reason": "credentials id mismatch"})
 			return False
 
 		try:
@@ -509,7 +509,10 @@ class WebAuthnService(asab.Service):
 				require_user_verification=False,
 			)
 		except Exception as e:
-			AuditLogger.notice("Authentication failed", struct_data={"cid": credentials_id, "reason": "webauthn verification failed: {}".format(type(e).__name__)})
+			L.warning(
+				"Authentication failed",
+				struct_data={"cid": credentials_id, "reason": "webauthn verification failed: {}".format(type(e).__name__)}
+			)
 			return False
 
 		# Update sign count in storage

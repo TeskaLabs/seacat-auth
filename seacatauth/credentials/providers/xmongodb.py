@@ -8,7 +8,7 @@ import motor.motor_asyncio
 import bson.json_util
 
 from .abc import CredentialsProviderABC
-from ... import exceptions, AuditLogger
+from ... import exceptions
 
 
 L = logging.getLogger(__name__)
@@ -151,14 +151,14 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		try:
 			dbcred = await self.get(credentials_id, include=[self.PasswordField])
 		except KeyError:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Credentials not found",
 			})
 			return False
 
 		if dbcred.get("suspended") is True:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Credentials suspended",
 			})
@@ -166,7 +166,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 
 		password = credentials.get("password")
 		if not password:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Login data contain no password",
 			})
@@ -175,7 +175,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		password_hash = dbcred.get(self.PasswordField)
 		if not password_hash:
 			# Should not occur if login prologue happened correctly
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "User has no password set",
 			})
@@ -184,7 +184,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 		if self._verify_password(password_hash, password):
 			return True
 		else:
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.warning("Authentication failed", struct_data={
 				"cid": credentials_id,
 				"reason": "Password verification failed",
 			})
