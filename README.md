@@ -9,6 +9,81 @@ It is designed to be used as an access control app for other microservices.
 SeaCat Auth provides a rich REST API [documented in a Postman collection](./doc/postman.md).
 
 
+## Installation
+
+SeaCat Auth uses [uv](https://docs.astral.sh/uv/) for dependency management. Requires Python 3.11+.
+
+### Run with uv
+
+1. Install uv (see [uv installation](https://docs.astral.sh/uv/getting-started/installation/)).
+
+2. Clone this repository and enter it:
+
+```bash
+git clone https://github.com/TeskaLabs/seacat-auth.git
+cd seacat-auth
+```
+
+3. Install project dependencies into a local virtual environment:
+
+```bash
+uv sync
+```
+
+Optional LDAP support (needs system LDAP development headers):
+
+```bash
+uv sync --extra ldap
+```
+
+4. Start SeaCat Auth with a config file (for example `etc/seacatauth.conf`):
+
+```bash
+uv run python seacatauth.py -c etc/seacatauth.conf
+```
+
+### Local editable ASAB
+
+By default, ASAB is installed from GitHub. For local ASAB development, use an editable checkout so changes apply without reinstalling.
+
+1. Clone ASAB next to this repository (sibling directories):
+
+```bash
+# from the parent directory that contains seacat-auth/
+git clone https://github.com/TeskaLabs/asab.git
+```
+
+Layout:
+
+```text
+├── asab/
+└── seacat-auth/
+```
+
+2. From the `seacat-auth` directory, point the `asab` dependency at the local path:
+
+```bash
+cd seacat-auth
+uv add --editable ../asab
+```
+
+This updates `pyproject.toml` with a `[tool.uv.sources]` entry similar to:
+
+```toml
+[tool.uv.sources]
+asab = { path = "../asab", editable = true }
+```
+
+3. Sync and run:
+
+```bash
+uv sync
+uv run python seacatauth.py -c etc/seacatauth.conf
+```
+
+Do not commit the local `[tool.uv.sources]` override. Before committing, restore the git source (for example `git checkout -- pyproject.toml uv.lock`) so CI and Docker keep installing ASAB from GitHub.
+
+
 ## Features
 
 * Authentication
@@ -104,8 +179,7 @@ Is employed by SeaCat Auth for storage of known users and other related persiste
 
 ## Unit test
 
-This is how unit tests are executed:
-
-```
-python3 -m unittest test
+```bash
+uv sync --only-group test
+uv run --no-sync python -m unittest test
 ```

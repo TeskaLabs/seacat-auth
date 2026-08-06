@@ -15,9 +15,9 @@ dist/
 *.egg
 MANIFEST
 
-# Poetry cache and config
-.poetry/
-poetry.toml
+# uv
+.uv/
+uv.toml
 
 # Unit test / coverage reports
 htmlcov/

@@ -17,6 +17,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Poetry
-.poetry/
-poetry.toml
+# uv
+.uv/
+uv.toml

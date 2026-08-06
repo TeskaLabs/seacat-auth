@@ -4,20 +4,21 @@ LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
 
+# Install uv (static binary)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 RUN set -ex \
   && apk update \
   && apk upgrade
 
 RUN apk add --no-cache \
   python3 \
-  py3-pip \
   libstdc++ \
   openssl \
   xmlsec \
   openldap
 
 # Create build environment so that dependencies like aiohttp can be built
-# Run all as a single command in order to reduce image size --virtual buildenv
 RUN apk add --no-cache  \
     git \
     python3-dev \
@@ -31,15 +32,16 @@ RUN apk add --no-cache  \
     cargo
 
 # Create virtual environment
-RUN python3 -m venv /venv \
-    && /venv/bin/pip3 install --upgrade pip
+RUN python3 -m venv /venv
 
 RUN mkdir -p /app/seacat-auth
 WORKDIR /app/seacat-auth
 COPY . /app/seacat-auth
 
-# Install using pip with pyproject.toml (includes all main deps + ldap extra)
-RUN /venv/bin/pip3 install --no-cache-dir ".[ldap]"
+# Install main deps + ldap into /venv (uses uv.lock when present)
+ENV UV_PROJECT_ENVIRONMENT=/venv
+ENV UV_LINK_MODE=copy
+RUN uv sync --extra ldap --frozen --no-cache --no-editable
 
 # This is for github CI/CD logs
 RUN /venv/bin/python3 -c "import asab; print(asab.__version__)"
