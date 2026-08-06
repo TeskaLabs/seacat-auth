@@ -2,7 +2,31 @@
 
 ## v26.15
 
+### Fixes
+- Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
+- Remove version dirtiness (#583, v26.15-alpha12)
+- Fix failing docker image build (#582, v26.15-alpha11)
+- Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)
+- Remove password reset script from the Docker container (#578, v26.15-alpha7)
+- Treat HTTP authentication scheme as case-insensitive (#575, v26.15-alpha5)
+- Update webauthn package (#572, v26.15-alpha3)
+
+### Features
+- Accept ASAB internal auth tokens at userinfo endpoint (#591, v26.15-alpha16)
+- Upgrade Dockerfile to Alpine 3.24, upgrade Python to 3.14 (#587, v26.15-alpha15)
+- Improve OpenAPI docs (#586, v26.15-alpha14)
+- Kibana index management resource (#580, v26.15-alpha9)
+- Resources for Kibana default space access (#579, v26.15-alpha8)
+- CLI password reset (#576, v26.15-alpha6)
+- Script for synchronizing LDAP group membership to roles and tenants (#570, v26.15-alpha4)
+- Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
+- Redirect to login when external login initialization fails (#565, v26.15-alpha1)
+- Always include link in response if SMTP is not configured (#561, v26.15-alpha)
+
 ### Pre-releases
+- v26.15-alpha16
+- v26.15-alpha15
+- v26.15-alpha14
 - v26.15-alpha13
 - v26.15-alpha12
 - v26.15-alpha11
@@ -17,24 +41,6 @@
 - v26.15-alpha2
 - v26.15-alpha1
 - v26.15-alpha
-
-### Fixes
-- Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
-- Remove version dirtiness (#583, v26.15-alpha12)
-- Fix failing docker image build (#582, v26.15-alpha11)
-- Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)
-- Remove password reset script from the Docker container (#578, v26.15-alpha7)
-- Treat HTTP authentication scheme as case-insensitive (#575, v26.15-alpha5)
-- Update webauthn package (#572, v26.15-alpha3)
-
-### Features
-- Kibana index management resource (#580, v26.15-alpha9)
-- Resources for Kibana default space access (#579, v26.15-alpha8)
-- CLI password reset (#576, v26.15-alpha6)
-- Script for synchronizing LDAP group membership to roles and tenants (#570, v26.15-alpha4)
-- Introduce resources seacat:role:assign:global and seacat:role:edit:global for global role management (#567, v26.15-alpha2)
-- Redirect to login when external login initialization fails (#565, v26.15-alpha1)
-- Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ---
 

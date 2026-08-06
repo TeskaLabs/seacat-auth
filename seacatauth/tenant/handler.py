@@ -62,6 +62,14 @@ class TenantHandler(object):
 	async def list(self, request):
 		"""
 		List all registered tenant IDs
+
+		Returns a list of all tenant IDs in the system.
+		This endpoint is publicly accessible and requires no authentication.
+
+		Example response:
+		```json
+		["acme-corp", "my-eshop", "test-tenant"]
+		```
 		"""
 		result = await self.TenantService.list_tenant_ids()
 		return asab.web.rest.json_response(request, data=result)
@@ -130,7 +138,30 @@ class TenantHandler(object):
 
 	async def get(self, request):
 		"""
-		Get tenant detail
+		Get tenant details
+
+		Retrieve detailed information about a specific tenant.
+		The tenant is determined from the URL path parameter.
+
+		Example response:
+		```json
+		{
+			"_id": "acme-corp",
+			"label": "ACME Corporation",
+			"description": "Primary tenant for ACME Corp",
+			"data": {
+				"email": "admin@acme.test",
+				"department": "IT"
+			},
+			"managed_by": null
+		}
+		```
+		---
+		responses:
+			200:
+				description: Tenant details retrieved successfully
+			404:
+				description: Tenant not found
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		data = await self.TenantService.get_tenant(tenant_id)
@@ -142,15 +173,45 @@ class TenantHandler(object):
 	@asab.web.auth.require(ResourceId.TENANT_CREATE)
 	async def create(self, request, *, json_data):
 		"""
-		Create a tenant
+		Create a new tenant
 
+		Creates a new tenant with the specified ID and optional metadata.
+		The tenant ID must be unique and cannot be changed once created.
+
+		Example body:
+		```json
+		{
+			"id": "acme-corp",
+			"label": "ACME Corporation",
+			"description": "Primary tenant for ACME Corp",
+			"data": {
+				"email": "admin@acme.test",
+				"department": "IT"
+			}
+		}
+		```
+
+		Example response:
+		```json
+		{"id": "acme-corp"}
+		```
 		---
 		parameters:
 		-	name: assign_me
 			in: query
-			description: Page number
+			description:
+				If set to true, automatically grants the creating user access to the tenant
+				and assigns them the tenant admin role.
 			schema:
 				type: boolean
+				default: false
+		responses:
+			200:
+				description: Tenant created successfully
+			400:
+				description: Invalid request data or tenant ID already exists
+			403:
+				description: Insufficient permissions to create tenant
 		"""
 		authz = asab.contextvars.Authz.get()
 		tenant_id = json_data["id"]
@@ -195,7 +256,45 @@ class TenantHandler(object):
 	@asab.web.auth.require(ResourceId.TENANT_EDIT)
 	async def update_tenant(self, request, *, json_data):
 		"""
-		Update tenant description and/or its structured data
+		Update tenant details
+
+		Update the label, description, or custom data of an existing tenant.
+		Only fields provided in the request body will be updated.
+
+		Example body:
+		```json
+		{
+			"label": "ACME Corp Inc.",
+			"description": "Updated description",
+			"data": {
+				"email": "support@acmecorp.test",
+				"department": "Engineering"
+			}
+		}
+		```
+
+		Example response:
+		```json
+		{
+			"_id": "acme-corp",
+			"label": "ACME Corp Inc.",
+			"description": "Updated description",
+			"data": {
+				"email": "support@acmecorp.test",
+				"department": "Engineering"
+			}
+		}
+		```
+		---
+		responses:
+			200:
+				description: Tenant updated successfully
+			400:
+				description: Invalid request data
+			403:
+				description: Insufficient permissions to edit tenant
+			404:
+				description: Tenant not found
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		result = await self.TenantService.update_tenant(tenant_id, **json_data)
@@ -205,7 +304,23 @@ class TenantHandler(object):
 	@asab.web.auth.require(ResourceId.TENANT_DELETE)
 	async def delete(self, request):
 		"""
-		Delete a tenant. Also delete all its roles and assignments linked to this tenant.
+		Delete a tenant
+
+		Permanently removes a tenant and all associated data, including roles and role assignments.
+		This action cannot be undone.
+
+		Example response:
+		```json
+		{"result": "OK"}
+		```
+		---
+		responses:
+			200:
+				description: Tenant deleted successfully
+			403:
+				description: Insufficient permissions to delete tenant
+			404:
+				description: Tenant not found
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		await self.TenantService.delete_tenant(tenant_id)
@@ -240,7 +355,38 @@ class TenantHandler(object):
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def assign_tenant(self, request):
 		"""
-		Grant specified tenant access to requested credentials
+		Grant tenant access to credentials
+
+		Grants a specific tenant access to the specified credentials.
+		The tenant is determined from the URL path.
+
+		Example response:
+		```json
+		{"result": "OK"}
+		```
+		---
+		parameters:
+		-	name: credentials_id
+			in: path
+			description: ID of the credentials to grant access to
+			required: true
+			schema:
+				type: string
+		-	name: tenant
+			in: path
+			description: ID of the tenant to grant access to
+			required: true
+			schema:
+				type: string
+		responses:
+			200:
+				description: Tenant access granted successfully
+			400:
+				description: Credentials or tenant not found
+			403:
+				description: Insufficient permissions to assign tenant
+			409:
+				description: Tenant already assigned to credentials
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		await self.TenantService.assign_tenant(
@@ -253,9 +399,39 @@ class TenantHandler(object):
 	@asab.web.auth.require(ResourceId.TENANT_ASSIGN)
 	async def unassign_tenant(self, request):
 		"""
-		Revoke specified tenant access to requested credentials
+		Revoke tenant access from credentials
 
-		The tenant's roles are unassigned in the process.
+		Revokes access to a specific tenant from the specified credentials.
+		Any tenant-specific roles assigned to the credentials are also removed.
+		The tenant is determined from the URL path.
+
+		Example response:
+		```json
+		{"result": "OK"}
+		```
+		---
+		parameters:
+		-	name: credentials_id
+			in: path
+			description: ID of the credentials to revoke access from
+			required: true
+			schema:
+				type: string
+		-	name: tenant
+			in: path
+			description: ID of the tenant to revoke access to
+			required: true
+			schema:
+				type: string
+		responses:
+			200:
+				description: Tenant access revoked successfully
+			400:
+				description: Credentials not found
+			403:
+				description: Insufficient permissions to unassign tenant
+			404:
+				description: Tenant not assigned to credentials
 		"""
 		tenant_id = asab.contextvars.Tenant.get()
 		await self.TenantService.unassign_tenant(

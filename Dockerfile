@@ -1,5 +1,5 @@
 # ---- Build stage ----
-FROM alpine:3.21 AS builder
+FROM alpine:3.24 AS builder
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
@@ -51,7 +51,8 @@ RUN apk add --no-cache  \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
 
-RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
+# This is for github CI/CD logs
+RUN /venv/bin/python3 -c "import asab; print(asab.__version__)"
 
 RUN mkdir -p /app/seacat-auth
 COPY . /app/seacat-auth
@@ -61,7 +62,7 @@ RUN (cd /app/seacat-auth && /venv/bin/asab-manifest.py ./MANIFEST.json)
 
 
 # ---- Runtime stage ----
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache \
   python3 \

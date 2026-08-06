@@ -18,7 +18,7 @@ class AuthenticationAdminHandler(object):
 	Authentication method management
 
 	---
-	tags: ["Login and authentication"]
+	tags: ["Users and credentials"]
 	"""
 
 	def __init__(self, app, authn_svc):

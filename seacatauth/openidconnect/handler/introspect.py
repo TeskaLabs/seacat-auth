@@ -208,9 +208,6 @@ class TokenIntrospectionHandler(object):
 				}
 
 		}
-
-		---
-		tags: ["Nginx"]
 		"""
 
 		session = await self._authenticate_request(request)
