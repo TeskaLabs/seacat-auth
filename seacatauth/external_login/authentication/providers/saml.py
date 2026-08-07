@@ -10,7 +10,6 @@ import saml2.httpbase
 
 from ...exceptions import ExternalLoginError
 from .abc import ExternalAuthProviderABC
-from .... import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -197,7 +196,7 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			raise ExternalLoginError("Malformed SAML response.") from e
 
 		if not authn_response.status_ok():
-			AuditLogger.notice("Authentication failed", struct_data={
+			L.error("Authentication failed", struct_data={
 				"provider": self.Type,
 				"reason": "SAML authentication failed",
 			})
