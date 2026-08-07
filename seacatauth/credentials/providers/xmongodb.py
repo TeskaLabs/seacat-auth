@@ -188,8 +188,7 @@ class XMongoDBCredentialsProvider(CredentialsProviderABC):
 				"cid": credentials_id,
 				"reason": "Password verification failed",
 			})
-
-		return True
+			return False
 
 
 	def _nomalize_credentials(self, db_obj, include=None):
