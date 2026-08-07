@@ -18,11 +18,10 @@ _PROVISIONING_INTRO_MESSAGE = """
 
 SeaCat Auth is running in provisioning mode.
 
-Provisioning superuser created. Use the following username to log in:
+Provisioning superuser created. Use the following credentials to log in:
 
 	USERNAME:   {username}
-
-The password has been generated and is not logged for security reasons.
+	PASSWORD:   {password}
 
 """
 
