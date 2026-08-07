@@ -250,7 +250,7 @@ class WebAuthnService(asab.Service):
 			upsertor.set("ll", last_login)
 
 		await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_UPDATED)
-		AuditLogger.notice("WebAuthn credential updated", struct_data={"cid": credentials_id, "credential_id": webauthn_credential_id.hex()})
+		AuditLogger.notice("WebAuthn credential updated", struct_data={"cid": wa_credential["cid"], "credential_id": webauthn_credential_id.hex()})
 
 
 	async def delete_webauthn_credential(self, webauthn_credential_id: bytes, credentials_id: str = None):
