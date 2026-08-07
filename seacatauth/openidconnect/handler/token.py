@@ -92,14 +92,12 @@ class TokenHandler(object):
 							- grant_type
 		"""
 		form_data = await request.post()
-		from_ip = generic.get_request_access_ips(request)
 
 		# Authenticate the client
 		try:
 			client = await self.OpenIdConnectService.ClientService.authenticate_client_request(request)
 		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized client.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Unauthorized client.", struct_data={
 				"client_id": e.ClientID,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
@@ -108,14 +106,13 @@ class TokenHandler(object):
 		# Choose flow based on grant_type
 		grant_type = form_data.get("grant_type")
 		if grant_type == const.OAuth2.GrantType.AUTHORIZATION_CODE:
-			process_token_request = self._authorization_code_grant(request, client, from_ip)
+			process_token_request = self._authorization_code_grant(request, client)
 		elif grant_type == const.OAuth2.GrantType.REFRESH_TOKEN:
-			process_token_request = self._refresh_token_grant(request, client, from_ip)
+			process_token_request = self._refresh_token_grant(request, client)
 		elif grant_type == const.OAuth2.GrantType.CLIENT_CREDENTIALS:
-			process_token_request = self._client_credentials_grant(request, client, from_ip)
+			process_token_request = self._client_credentials_grant(request, client)
 		else:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unsupported grant type.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Unsupported grant type.", struct_data={
 				"grant_type": grant_type,
 				"client_id": form_data.get("client_id"),
 				"redirect_uri": form_data.get("redirect_uri"),
@@ -125,24 +122,21 @@ class TokenHandler(object):
 		try:
 			return await process_token_request
 		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized client.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Unauthorized client.", struct_data={
 				"grant_type": grant_type,
 				"client_id": e.ClientID,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.UnauthorizedClient)
 		except exceptions.OAuth2InvalidClient as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid client.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Invalid client.", struct_data={
 				"grant_type": grant_type,
 				"client_id": e.ClientId,
 				"redirect_uri": form_data.get("redirect_uri"),
 			})
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
 		except exceptions.OAuth2InvalidScope as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid scope.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Invalid scope.", struct_data={
 				"grant_type": grant_type,
 				"client_id": e.ClientId,
 				"scope": e.Scope,
@@ -154,8 +148,7 @@ class TokenHandler(object):
 	async def _authorization_code_grant(
 		self,
 		request: aiohttp.web.Request,
-		client: dict,
-		from_ip: list
+		client: dict
 	) -> aiohttp.web.Response:
 
 		form_data = await request.post()
@@ -166,11 +159,9 @@ class TokenHandler(object):
 			session = await self._get_session_by_authorization_code(request)
 
 		except (exceptions.SessionNotFoundError, KeyError):
-			AuditLogger.log(
-				asab.LOG_NOTICE,
+			AuditLogger.notice(
 				"Token request denied: Invalid or expired authorization code.",
 				struct_data={
-					"from_ip": from_ip,
 					"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
@@ -179,11 +170,9 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
 
 		except pkce.CodeChallengeFailedError:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
+			AuditLogger.notice(
 				"Token request denied: Code challenge failed.",
 				struct_data={
-					"from_ip": from_ip,
 					"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
@@ -192,8 +181,7 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
 
 		except exceptions.URLValidationError:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Redirect URI mismatch.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Redirect URI mismatch.", struct_data={
 				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 				"client_id": client_id,
 				"redirect_uri": form_data.get("redirect_uri"),
@@ -201,8 +189,7 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidRequest)
 
 		except asab.exceptions.ValidationError:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Invalid request.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Invalid request.", struct_data={
 				"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 				"client_id": client_id,
 				"redirect_uri": form_data.get("redirect_uri"),
@@ -214,16 +201,7 @@ class TokenHandler(object):
 				"Client ID in token request does not match the one used in authorization request.")
 
 		# Establish and propagate track ID
-		session = await self.set_track_id(request, session, from_ip)
-
-		# Everything is okay: Request granted
-		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
-			"cid": session.Credentials.Id,
-			"sid": session.Id,
-			"client_id": session.OAuth2.ClientId,
-			"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
-			"from_ip": from_ip
-		})
+		session = await self.set_track_id(request, session)
 
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
@@ -240,6 +218,13 @@ class TokenHandler(object):
 		else:
 			response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
 
+		AuditLogger.notice("Token request granted.", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
+		})
+
 		headers = {
 			"Cache-Control": "no-store",
 			"Pragma": "no-cache",
@@ -251,8 +236,7 @@ class TokenHandler(object):
 	async def _refresh_token_grant(
 		self,
 		request: aiohttp.web.Request,
-		client: dict,
-		from_ip: list
+		client: dict
 	) -> aiohttp.web.Response:
 
 		form_data = await request.post()
@@ -263,11 +247,9 @@ class TokenHandler(object):
 			session = await self._get_session_by_refresh_token(request)
 
 		except (exceptions.SessionNotFoundError, KeyError):
-			AuditLogger.log(
-				asab.LOG_NOTICE,
+			AuditLogger.notice(
 				"Token request denied: Invalid or expired refresh token.",
 				struct_data={
-					"from_ip": from_ip,
 					"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 					"client_id": client_id,
 				}
@@ -275,8 +257,7 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
 
 		except exceptions.ClientAuthenticationError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Cannot verify client.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Cannot verify client.", struct_data={
 				"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 				"client_id": e.ClientID,
 			})
@@ -292,19 +273,17 @@ class TokenHandler(object):
 		# Delete the used refresh token and the current access token
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
-		# Everything is okay: Request granted
-		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
-			"cid": session.Credentials.Id,
-			"sid": session.Id,
-			"client_id": session.OAuth2.ClientId,
-			"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
-			"from_ip": from_ip,
-		})
-
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
 
 		response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
+
+		AuditLogger.notice("Token request granted.", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
+		})
 
 		headers = {
 			"Cache-Control": "no-store",
@@ -317,19 +296,16 @@ class TokenHandler(object):
 	async def _client_credentials_grant(
 		self,
 		request: aiohttp.web.Request,
-		client: dict,
-		from_ip: list
+		client: dict
 	) -> aiohttp.web.Response:
 
 		form_data = await request.post()
 		client_id = client["_id"]
 
 		if "scope" not in form_data:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
+			AuditLogger.notice(
 				"Token request denied: Missing scope parameter.",
 				struct_data={
-					"from_ip": from_ip,
 					"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
 					"client_id": form_data.get("client_id"),
 				}
@@ -345,11 +321,9 @@ class TokenHandler(object):
 			)
 
 		except exceptions.CredentialsNotFoundError:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
+			AuditLogger.notice(
 				"Token request denied: Client does not have Seacat Auth credentials enabled.",
 				struct_data={
-					"from_ip": from_ip,
 					"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
 					"client_id": client_id,
 				}
@@ -357,8 +331,7 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidClient)
 
 		except exceptions.NoTenantsError:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Client has no tenants.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Client has no tenants.", struct_data={
 				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
 				"client_id": client_id,
 				"scope": " ".join(scope),
@@ -366,8 +339,7 @@ class TokenHandler(object):
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidScope)
 
 		except exceptions.AccessDeniedError:
-			AuditLogger.log(asab.LOG_NOTICE, "Token request denied: Unauthorized tenant access.", struct_data={
-				"from_ip": from_ip,
+			AuditLogger.notice("Token request denied: Unauthorized tenant access.", struct_data={
 				"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
 				"client_id": client_id,
 				"scope": " ".join(scope),
@@ -376,12 +348,11 @@ class TokenHandler(object):
 
 		# Token request successful
 		session = tokens["session"]
-		AuditLogger.log(asab.LOG_NOTICE, "Token request granted.", struct_data={
+		AuditLogger.notice("Token request granted.", struct_data={
 			"cid": session.Credentials.Id,
 			"sid": session.SessionId,
 			"client_id": client_id,
 			"grant_type": const.OAuth2.GrantType.CLIENT_CREDENTIALS,
-			"from_ip": from_ip,
 		})
 
 		response_payload = {
@@ -547,7 +518,7 @@ class TokenHandler(object):
 		return asab.web.rest.json_response(request, token_payload)
 
 
-	async def set_track_id(self, request, session, from_ip):
+	async def set_track_id(self, request, session):
 		# Set track ID if not set yet
 		if session.TrackId is None:
 			session = await self.SessionService.inherit_track_id_from_root(session)
@@ -557,17 +528,15 @@ class TokenHandler(object):
 			if token_value is not None:
 				try:
 					old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-				except exceptions.SessionNotFoundError:
-					AuditLogger.log(
-						asab.LOG_NOTICE,
+				except exceptions.SessionNotFoundError as e:
+					AuditLogger.notice(
 						"Token request denied: Track ID transfer failed because of invalid Authorization header",
 						struct_data={
-							"from_ip": from_ip,
 							"cid": session.Credentials.Id,
 							"client_id": session.OAuth2.ClientId,
 						}
 					)
-					return aiohttp.web.HTTPBadRequest()
+					raise aiohttp.web.HTTPBadRequest() from e
 			else:
 				# Use cookie only if there is no access token
 				try:
@@ -582,11 +551,9 @@ class TokenHandler(object):
 				session = await self.SessionService.inherit_or_generate_new_track_id(session, old_session)
 			except ValueError as e:
 				# Return 400 to prevent disclosure while keeping the stacktrace
-				AuditLogger.log(
-					asab.LOG_NOTICE,
+				AuditLogger.notice(
 					"Token request denied: Failed to produce session track ID",
 					struct_data={
-						"from_ip": from_ip,
 						"cid": session.Credentials.Id,
 						"client_id": session.OAuth2.ClientId,
 					}

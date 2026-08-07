@@ -4,8 +4,7 @@ import asab.web.auth
 import asab.web.tenant
 import aiohttp.web
 
-from .. import exceptions
-from .. import generic
+from .. import exceptions, generic, AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -53,21 +52,22 @@ class BatmanHandler(object):
 			try:
 				session = await oidc_service.get_session_by_access_token(token_value)
 			except exceptions.SessionNotFoundError:
-				L.log(asab.LOG_NOTICE, "Session not found by access token")
+				AuditLogger.notice("Batman introspection denied: Session not found by access token")
 				return aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
 				session = await cookie_service.get_session_by_request_cookie(request, client_id)
 			except exceptions.NoCookieError:
-				L.log(asab.LOG_NOTICE, "No client cookie in request", struct_data={"client_id": client_id})
+				AuditLogger.notice("Batman introspection denied: No client cookie in request", struct_data={"client_id": client_id})
 				return aiohttp.web.HTTPUnauthorized()
 			except exceptions.SessionNotFoundError:
-				L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
+				AuditLogger.notice("Batman introspection denied: Session not found by client cookie", struct_data={"client_id": client_id})
 				return aiohttp.web.HTTPUnauthorized()
 
 		if session.Batman is None:
 			# This should not happen - session is not of Batman type
-			L.error("Session not authorized for Batman")
+			AuditLogger.notice("Batman introspection denied: Session not authorized for Batman", struct_data={
+				"sid": session.SessionId, "cid": session.Credentials.Id})
 			return aiohttp.web.HTTPUnauthorized()
 
 		return aiohttp.web.HTTPOk(headers={

@@ -370,10 +370,11 @@ class AuthorizeHandler(object):
 			root_session = None
 		if root_session is not None:
 			if root_session.Session.Type != "root":
-				L.error("Session type must be 'root'", struct_data={"sid": root_session.Id, "type": root_session.Session.Type})
+				AuditLogger.notice("Authorization denied: Session type must be 'root'", struct_data={
+					"sid": root_session.Id, "type": root_session.Session.Type, "client_id": client_id})
 				root_session = None
 			elif root_session.is_anonymous() and not client_dict.get("authorize_anonymous_users", False):
-				L.warning("Not allowed to authorize with anonymous session.", struct_data={
+				AuditLogger.notice("Authorization denied: Anonymous session not allowed", struct_data={
 					"sid": root_session.Id, "client_id": client_id})
 				root_session = None
 
@@ -395,7 +396,7 @@ class AuthorizeHandler(object):
 			authn_age = (datetime.datetime.now(datetime.UTC) - root_session.Authentication.AuthnTime).total_seconds()
 			if prompt == const.OAuth2.Prompt.LOGIN:
 				# Log the user out and redirect to login
-				L.log(asab.LOG_NOTICE, "Login prompt requested by client.", struct_data={
+				AuditLogger.notice("Login prompt requested by client", struct_data={
 					"sid": root_session.SessionId,
 					"client_id": client_id,
 				})
@@ -414,7 +415,7 @@ class AuthorizeHandler(object):
 
 			elif max_age is not None and authn_age > max_age:
 				# Log the user out and redirect to login
-				L.log(asab.LOG_NOTICE, "Authentication age exceeds requested max_age.", struct_data={
+				AuditLogger.notice("Authentication age exceeds requested max_age", struct_data={
 					"sid": root_session.SessionId,
 					"client_id": client_id,
 					"authn_age": authn_age,
@@ -474,7 +475,7 @@ class AuthorizeHandler(object):
 					redirect_uri=redirect_uri,
 					state=state
 				)
-			L.log(asab.LOG_NOTICE, "Login required", struct_data={
+			AuditLogger.notice("Login required", struct_data={
 				"client_id": client_id})
 			return await self.reply_with_redirect_to_login(
 				scope=requested_scope,
@@ -616,14 +617,13 @@ class AuthorizeHandler(object):
 			else:
 				raise ValueError("Unexpected auth_token_type: {!r}".format(auth_token_type))
 
-		AuditLogger.log(asab.LOG_NOTICE, "Authorization successful", struct_data={
+		AuditLogger.notice("Authorization successful", struct_data={
 			"psid": new_session.Session.ParentSessionId,
 			"sid": new_session.SessionId,
 			"cid": new_session.Credentials.Id,
 			"t": [t for t in new_session.Authorization.Authz if t != "*"],
 			"client_id": client_id,
 			"anonymous": new_session.is_anonymous(),
-			"from_ip": from_info,
 			"scope": requested_scope,
 		})
 		await self.OpenIdConnectService.LastActivityService.update_last_activity(
@@ -936,8 +936,8 @@ class AuthorizeHandler(object):
 		"""
 		Append an authorization error entry to the audit.
 		"""
-		AuditLogger.log(asab.LOG_NOTICE, "Authorization failed", struct_data={
-			"e": error.Error,
+		AuditLogger.notice("Authorization failed", struct_data={
+			"error": error.Error,
 			"cid": error.CredentialsId,
 			"client_id": error.ClientId,
 			**error.StructData

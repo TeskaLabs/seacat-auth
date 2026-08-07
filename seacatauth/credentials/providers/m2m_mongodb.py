@@ -82,7 +82,7 @@ class M2MMongoDBCredentialsProvider(MongoDBCredentialsProvider):
 		obj_id = await u.execute(event_type=EventTypes.M2M_CREDENTIALS_CREATED)
 		credentials_id = self._format_credentials_id(obj_id)
 
-		L.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+		L.info("Credentials created in provider", struct_data={
 			"provider_id": self.ProviderID,
 			"cid": credentials_id
 		})

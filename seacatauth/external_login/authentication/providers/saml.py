@@ -196,8 +196,9 @@ class SamlAuthProvider(ExternalAuthProviderABC):
 			raise ExternalLoginError("Malformed SAML response.") from e
 
 		if not authn_response.status_ok():
-			L.error("SAML authentication failed.", struct_data={
+			L.error("Authentication failed", struct_data={
 				"provider": self.Type,
+				"reason": "SAML authentication failed",
 			})
 			raise ExternalLoginError("SAML authentication failed.")
 

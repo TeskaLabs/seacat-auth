@@ -15,7 +15,7 @@ import pymongo
 
 from ..api import local_authz
 from ..models.const import ResourceId
-from .. import exceptions
+from .. import exceptions, AuditLogger
 from ..events import EventTypes
 from ..models import Session
 from ..models.session import rest_get
@@ -177,7 +177,7 @@ class SessionService(asab.Service):
 			await self.delete(session_id=sid)
 
 		if len(expired) > 0:
-			L.log(asab.LOG_NOTICE, "Expired sessions deleted.", struct_data={"count": len(expired)})
+			AuditLogger.notice("Expired sessions deleted", struct_data={"count": len(expired)})
 
 
 	async def create_session(
@@ -246,7 +246,7 @@ class SessionService(asab.Service):
 		}
 		if parent_session_id is not None:
 			struct_data["parent_sid"] = parent_session_id
-		L.log(asab.LOG_NOTICE, "Session created", struct_data=struct_data)
+		AuditLogger.notice("Session created", struct_data=struct_data)
 		return await self.get(session_id)
 
 
@@ -287,7 +287,7 @@ class SessionService(asab.Service):
 		upsertor.set(Session.FN.Session.Expiration, expires_at)
 		await upsertor.execute(event_type=EventTypes.SESSION_UPDATED)
 
-		L.log(asab.LOG_NOTICE, "Session expiration updated.", struct_data={
+		AuditLogger.notice("Session expiration updated", struct_data={
 			"sid": session_id,
 			"type": session_dict.get(Session.FN.Session.Type),
 		})
@@ -547,7 +547,7 @@ class SessionService(asab.Service):
 
 		# Delete the session itself
 		await self.StorageService.delete(self.SessionCollection, bson.ObjectId(session_id))
-		L.log(asab.LOG_NOTICE, "Session deleted", struct_data={"sid": session_id})
+		AuditLogger.notice("Session deleted", struct_data={"sid": session_id})
 
 		# Delete all the session's tokens
 		await self.TokenService.delete_tokens_by_session_id(session_id)
@@ -573,7 +573,7 @@ class SessionService(asab.Service):
 				await self.StorageService.delete(self.SessionCollection, session_dict["_id"])
 				deleted += 1
 			except Exception as e:
-				L.error("Cannot delete session", struct_data={
+				AuditLogger.error("Cannot delete session", struct_data={
 					"sid": session_dict["_id"],
 					"error": type(e).__name__
 				})
@@ -582,7 +582,7 @@ class SessionService(asab.Service):
 			# Delete all the session's tokens
 			await self.TokenService.delete_tokens_by_session_id(session_dict["_id"])
 
-		L.log(asab.LOG_NOTICE, "Sessions deleted", struct_data={
+		AuditLogger.notice("Sessions deleted", struct_data={
 			"deleted_count": deleted,
 			"failed_count": failed
 		})
@@ -606,7 +606,7 @@ class SessionService(asab.Service):
 			root_session = await self.get(session.Session.ParentSessionId)
 			if root_session.TrackId is not None:
 				# This can happen if there are multiple authorize calls from the same subject
-				L.warning("Root session changed between authorize and token request.", struct_data={
+				AuditLogger.warning("Root session changed between authorize and token request", struct_data={
 					"client_session": session.SessionId,
 					"root_session": root_session.SessionId,
 				})
