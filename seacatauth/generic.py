@@ -245,11 +245,11 @@ def update_url_query_params(url: str, **params):
 
 
 def get_request_access_ips(request) -> list:
-	access_ips = {request.remote}
+	access_ips = [request.remote]
 	ff = request.headers.get("X-Forwarded-For")
 	if ff is not None:
-		access_ips.update(ff.split(", "))
-	return list(access_ips)
+		access_ips.extend(ff.split(", "))
+	return access_ips
 
 
 def bcrypt_hash(secret: bytes | str) -> str:
