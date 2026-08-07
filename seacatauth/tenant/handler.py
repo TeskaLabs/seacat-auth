@@ -583,7 +583,7 @@ class TenantHandler(object):
 						success = True
 					except Exception as e:
 						AuditLogger.warning("Cannot assign tenant", exc_info=True, struct_data={
-							"cid": credential_id, "tenant": tenant, "reason": str(e)})
+							"cid": credential_id, "tenant_id": tenant, "reason": str(e)})
 						error_details.append({"cid": credential_id, "tenant": tenant})
 					if not success:
 						continue
@@ -644,7 +644,7 @@ class TenantHandler(object):
 							"cid": credential_id, "tenant": tenant})
 					except Exception as e:
 						AuditLogger.warning("Cannot unassign tenant", exc_info=True, struct_data={
-							"cid": credential_id, "tenant": tenant, "reason": str(e)})
+							"cid": credential_id, "tenant_id": tenant, "reason": str(e)})
 						error_details.append({"cid": credential_id, "tenant": tenant})
 				else:
 					# If any roles are listed under the tenant (e.g. `"my-tenant": ["my-tenant/user"]`),

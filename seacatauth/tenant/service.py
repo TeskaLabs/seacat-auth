@@ -216,7 +216,7 @@ class TenantService(asab.Service):
 				if not authz.has_resource_access(ResourceId.TENANT_ASSIGN):
 					message = "Not authorized for tenant un/assignment."
 					AuditLogger.warning("Tenant assignment denied", struct_data={
-						"tenant": tenant
+						"tenant_id": tenant
 					})
 					return {
 						"result": "NOT-AUTHORIZED",
@@ -283,7 +283,7 @@ class TenantService(asab.Service):
 
 		AuditLogger.notice("Tenant assigned", struct_data={
 			"cid": credentials_id,
-			"tenant": tenant,
+			"tenant_id": tenant,
 		})
 		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
 
