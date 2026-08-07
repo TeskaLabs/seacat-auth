@@ -112,7 +112,10 @@ class ResourceService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.ResourceIdRegex = re.compile("^{}$".format(self.ResourceNamePattern))
-
+		if resources := asab.Config.get("seacatauth:resources", "disabled_resources"):
+			self.DisabledResources = frozenset(re.split(r"\s+", resources.strip()))
+		else:
+			self.DisabledResources = frozenset()
 
 	async def initialize(self, app):
 		await super().initialize(app)
@@ -334,6 +337,8 @@ class ResourceService(asab.Service):
 	def normalize_resource(self, resource: dict):
 		if resource["_id"] in SEACAT_AUTH_RESOURCES or resource.get("managed_by"):
 			resource["read_only"] = True
+		if resource["_id"] in self.DisabledResources:
+			resource["disabled"] = True
 		return resource
 
 

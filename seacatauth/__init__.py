@@ -261,6 +261,13 @@ asab.Config.add_defaults({
 		# Length of API key token
 		"token_byte_length": 36,
 	},
+
+	"seacatauth:resources": {
+		# Whitespace-separated list of resource IDs that are disabled.
+		# Disabled resources remain in the database but cannot be authorized in sessions
+		# and are marked with "disabled": true in REST API responses.
+		"disabled_resources": "",
+	},
 })
 
 __all__ = [
