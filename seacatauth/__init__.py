@@ -5,8 +5,12 @@ from .app import SeaCatAuthApplication
 from .audit import AuditLogger as _AuditLoggerClass
 
 
+_previous_logger_class = logging.getLoggerClass()
 logging.setLoggerClass(_AuditLoggerClass)
-AuditLogger = logging.getLogger("AUDIT")
+try:
+	AuditLogger = logging.getLogger("AUDIT")
+finally:
+	logging.setLoggerClass(_previous_logger_class)
 
 
 asab.Config.add_defaults({
