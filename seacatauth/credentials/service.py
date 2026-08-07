@@ -420,25 +420,32 @@ class CredentialsService(asab.Service):
 			credentials_id = await provider.create(validated_data)
 		except asab.storage.exceptions.DuplicateError as e:
 			L.error("Cannot create credentials: {}".format(e))
-			AuditLogger.notice("Credentials creation denied", struct_data={
+			struct_data = {
 				"provider_id": provider.ProviderID,
 				"reason": "DuplicateError",
-			})
+			}
+			if e.KeyValue is not None:
+				struct_data["conflict"] = e.KeyValue
+			AuditLogger.notice("Credentials creation failed", struct_data=struct_data)
 			return {
 				"status": "FAILED",
 				"message": "Cannot create credentials: Duplicate key",
 				"conflict": e.KeyValue
 			}
-		except Exception as e:
+		except ValueError as e:
 			L.error("Cannot create credentials: {}".format(e))
-			AuditLogger.error("Credentials creation denied", struct_data={
+			AuditLogger.notice("Credentials creation failed", struct_data={
 				"provider_id": provider.ProviderID,
 				"reason": e.__class__.__name__,
+				"error": str(e),
 			})
 			return {
 				"status": "FAILED",
-				"message": "Cannot create credentials",
+				"message": "Cannot create credentials: {}".format(e),
 			}
+		except Exception:
+			L.exception("Cannot create credentials")
+			raise
 
 		AuditLogger.notice("Credentials created", struct_data={
 			"cid": credentials_id,
@@ -570,16 +577,30 @@ class CredentialsService(asab.Service):
 		# Update in provider
 		try:
 			await provider.update(credentials_id, validated_data)
-		except Exception as e:
+		except (
+			asab.exceptions.Conflict,
+			exceptions.CredentialsNotFoundError,
+			ValueError,
+			KeyError,
+		) as e:
 			L.error("Cannot update credentials: {}".format(e))
-			AuditLogger.error("Credentials update denied", struct_data={
+			struct_data = {
 				"cid": credentials_id,
 				"reason": e.__class__.__name__,
-			})
-			return {
-				"status": "FAILED",
-				"message": "Cannot update credentials",
+				"error": str(e),
 			}
+			response = {
+				"status": "FAILED",
+				"message": "Cannot update credentials: {}".format(e),
+			}
+			if isinstance(e, asab.exceptions.Conflict) and e.Key is not None:
+				struct_data["conflict"] = {e.Key: e.Value}
+				response["conflict"] = {e.Key: e.Value}
+			AuditLogger.notice("Credentials update failed", struct_data=struct_data)
+			return response
+		except Exception:
+			L.exception("Cannot update credentials")
+			raise
 
 		AuditLogger.notice("Credentials updated", struct_data={
 			"cid": credentials_id,
