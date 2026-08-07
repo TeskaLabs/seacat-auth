@@ -158,14 +158,14 @@ class CookieHandler(object):
 		if session is None:
 			response = aiohttp.web.HTTPUnauthorized()
 		elif session.is_anonymous():
-			L.log(asab.LOG_NOTICE, "Anonymous user access not allowed", struct_data={
+			AuditLogger.notice("Cookie introspection denied: Anonymous user access not allowed", struct_data={
 				"client_id": client_id, "cid": session.Credentials.Id})
 			response = aiohttp.web.HTTPUnauthorized()
 		else:
 			try:
 				response = await generic.nginx_introspection(request, session, self.App)
 			except Exception as e:
-				L.exception("Introspection failed: {}".format(e))
+				AuditLogger.exception("Cookie introspection failed: {}".format(e))
 				response = aiohttp.web.HTTPUnauthorized()
 
 		if response.status_code != 200:
@@ -365,37 +365,32 @@ class CookieHandler(object):
 		Exchange authorization code for cookie and redirect to specified redirect URI.
 		"""
 		client_svc = self.App.get_service("seacatauth.ClientService")
-		from_ip = generic.get_request_access_ips(request)
-
 		client_id = parameters.get("client_id")
 		if client_id is None:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
-				"Cookie request denied: No 'client_id' in request query",
-				struct_data={"from_ip": from_ip}
+			AuditLogger.notice(
+				"Token request denied: No 'client_id' in request query",
+				struct_data={"token_type": "cookie"}
 			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 		try:
 			client = await client_svc.get_client(client_id)
 		except KeyError:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
-				"Cookie request denied: Client not found",
-				struct_data={"from_ip": from_ip, "client_id": client_id}
+			AuditLogger.notice(
+				"Token request denied: Client not found",
+				struct_data={"client_id": client_id, "token_type": "cookie"}
 			)
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidClient}, status=400)
 
 		grant_type = parameters.get("grant_type")
 		if grant_type != OAuth2.GrantType.AUTHORIZATION_CODE:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
-				"Cookie request denied: Unsupported grant type",
+			AuditLogger.notice(
+				"Token request denied: Unsupported grant type",
 				struct_data={
 					"client_id": client_id,
-					"from_ip": from_ip,
 					"grant_type": grant_type,
+					"token_type": "cookie",
 				}
 			)
 			return asab.web.rest.json_response(
@@ -404,12 +399,11 @@ class CookieHandler(object):
 		# Use the code to get session ID
 		authorization_code = parameters.get("code")
 		if not authorization_code:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
-				"Cookie request denied: No 'code' in request query",
+			AuditLogger.notice(
+				"Token request denied: No 'code' in request query",
 				struct_data={
 					"client_id": client_id,
-					"from_ip": from_ip,
+					"token_type": "cookie",
 				}
 			)
 			return asab.web.rest.json_response(
@@ -417,12 +411,11 @@ class CookieHandler(object):
 		try:
 			session = await self.CookieService.get_session_by_authorization_code(authorization_code)
 		except KeyError:
-			AuditLogger.log(
-				asab.LOG_NOTICE,
-				"Cookie request denied: Invalid or expired authorization code",
+			AuditLogger.notice(
+				"Token request denied: Invalid or expired authorization code",
 				struct_data={
 					"client_id": client_id,
-					"from_ip": from_ip,
+					"token_type": "cookie",
 				}
 			)
 			return asab.web.rest.json_response(
@@ -457,15 +450,14 @@ class CookieHandler(object):
 					old_session = await self.CookieService.OpenIdConnectService.get_session_by_access_token(token_value)
 				except exceptions.SessionNotFoundError:
 					# Invalid access token should result in error
-					AuditLogger.log(
-						asab.LOG_NOTICE,
-						"Cookie request denied: Track ID transfer failed because of invalid Authorization header",
+					AuditLogger.notice(
+						"Token request denied: Track ID transfer failed because of invalid Authorization header",
 						struct_data={
 							"cid": session.Credentials.Id,
 							"sid": session.Id,
 							"client_id": session.OAuth2.ClientId,
-							"from_ip": from_ip,
-							"redirect_uri": redirect_uri
+							"redirect_uri": redirect_uri,
+							"token_type": "cookie",
 						}
 					)
 					return aiohttp.web.HTTPBadRequest()
@@ -511,21 +503,21 @@ class CookieHandler(object):
 		except exceptions.ClientResponseError as e:
 			L.log(asab.LOG_NOTICE, "Webhook responded with error", struct_data={
 				"status": e.Status, "text": e.Data})
-			AuditLogger.log(asab.LOG_NOTICE, "Cookie request denied: Webhook error", struct_data={
+			AuditLogger.notice("Token request denied: Webhook error", struct_data={
 				"cid": session.Credentials.Id,
 				"sid": session.Id,
 				"client_id": session.OAuth2.ClientId,
-				"from_ip": from_ip,
-				"redirect_uri": redirect_uri})
+				"redirect_uri": redirect_uri,
+				"token_type": "cookie"})
 			return asab.web.rest.json_response(
 				request, {"error": TokenRequestErrorResponseCode.InvalidRequest}, status=400)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Cookie request granted", struct_data={
+		AuditLogger.notice("Token request granted", struct_data={
 			"cid": session.Credentials.Id,
 			"sid": session.Id,
 			"client_id": session.OAuth2.ClientId,
-			"from_ip": from_ip,
-			"redirect_uri": redirect_uri})
+			"redirect_uri": redirect_uri,
+			"token_type": "cookie"})
 
 		return response
 
@@ -539,10 +531,10 @@ class CookieHandler(object):
 		try:
 			session = await self.CookieService.get_session_by_request_cookie(request, client_id)
 		except exceptions.NoCookieError:
-			L.log(asab.LOG_NOTICE, "No client cookie found in request", struct_data={"client_id": client_id})
+			AuditLogger.notice("Cookie introspection denied: No client cookie found in request", struct_data={"client_id": client_id})
 			return None
 		except exceptions.SessionNotFoundError:
-			L.log(asab.LOG_NOTICE, "Session not found by client cookie", struct_data={"client_id": client_id})
+			AuditLogger.notice("Cookie introspection denied: Session not found by client cookie", struct_data={"client_id": client_id})
 			return None
 
 		# Validate client
@@ -551,11 +543,11 @@ class CookieHandler(object):
 			try:
 				client = await client_svc.get_client(client_id)
 			except KeyError:
-				L.error("Client not found.", struct_data={"client_id": client_id})
+				AuditLogger.notice("Cookie introspection denied: Client not found", struct_data={"client_id": client_id})
 				return None
 
 			if session.OAuth2.ClientId != client_id:
-				L.error("Client mismatch.", struct_data={
+				AuditLogger.notice("Cookie introspection denied: Client mismatch", struct_data={
 					"sid": session.SessionId,
 					"request_client_id": client_id,
 					"session_client_id": session.OAuth2.ClientId
@@ -568,12 +560,12 @@ class CookieHandler(object):
 			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
 		if max_age is not None:
 			if not session.Authentication.AuthnTime:
-				L.error("Session has no authentication age.", struct_data={"sid": session.SessionId})
+				AuditLogger.notice("Cookie introspection denied: Session has no authentication age", struct_data={"sid": session.SessionId})
 				return None
 
 			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
 			if authn_age > max_age:
-				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.", struct_data={
+				AuditLogger.notice("Cookie introspection denied: Maximum authentication age exceeded", struct_data={
 					"sid": session.SessionId,
 					"client_id": client_id,
 					"max_authn_age": max_age,

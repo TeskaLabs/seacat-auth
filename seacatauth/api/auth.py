@@ -16,6 +16,7 @@ import asab.exceptions
 
 from ..exceptions import SessionNotFoundError
 from ..models import Session
+from .. import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -81,12 +82,12 @@ class AsabAuthProvider(asab.web.auth.providers.IdTokenAuthProvider):
 		try:
 			session = await self.SessionService.get(claims["sid"])
 		except SessionNotFoundError:
-			L.error("Session not found.", struct_data={"sid": claims["sid"]})
+			AuditLogger.notice("Session not found", struct_data={"sid": claims["sid"]})
 			raise asab.exceptions.NotAuthenticatedError()
 
 		# Deny anonymous sessions
 		if session.is_anonymous():
-			L.error("Seacat Auth API access denied to anonymous session.", struct_data={
+			AuditLogger.notice("API access denied to anonymous session", struct_data={
 				"sid": session.SessionId, "cid": session.Credentials.Id})
 			raise asab.exceptions.NotAuthenticatedError()
 

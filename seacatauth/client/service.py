@@ -240,7 +240,7 @@ class ClientService(asab.Service):
 		client_data = self._validate_and_normalize_client_update(current=None, update=client_data)
 		internal_client_id = await provider.create_client(client_id, **client_data)
 		client_id = _build_client_id(provider.ProviderId, internal_client_id)
-		L.log(asab.LOG_NOTICE, "Client created.", struct_data={"client_id": client_id})
+		AuditLogger.notice("Client created", struct_data={"client_id": client_id})
 		return client_id
 
 
@@ -295,7 +295,7 @@ class ClientService(asab.Service):
 			update["client_secret_expires_at"] = client_secret_expires_at
 
 		await provider.update_client(internal_client_id, **update)
-		AuditLogger.log(asab.LOG_NOTICE, "Client secret updated.", struct_data={"client_id": client_id})
+		AuditLogger.notice("Client secret updated.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 
 		return client_secret, client_secret_expires_at
@@ -312,7 +312,7 @@ class ClientService(asab.Service):
 
 		client_data = self._validate_and_normalize_client_update(current=current_client, update=client_data)
 		await provider.update_client(internal_client_id, **client_data)
-		L.log(asab.LOG_NOTICE, "Client updated.", struct_data={"client_id": client_id})
+		AuditLogger.notice("Client updated", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 
 
@@ -326,7 +326,7 @@ class ClientService(asab.Service):
 		assert_client_is_editable(current_client)
 
 		await provider.delete_client(internal_client_id)
-		L.log(asab.LOG_NOTICE, "Client deleted.", struct_data={"client_id": client_id})
+		AuditLogger.notice("Client deleted", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 
 
@@ -413,7 +413,8 @@ class ClientService(asab.Service):
 			OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
 		)
 		if auth_method != expected_auth_method:
-			L.error("Unexpected client authentication method.", struct_data={
+			AuditLogger.warning("Client authentication denied: Unexpected authentication method", struct_data={
+				"client_id": client_id,
 				"received_auth_method": auth_method,
 				"expected_auth_method": expected_auth_method,
 			})
@@ -430,16 +431,16 @@ class ClientService(asab.Service):
 		# Check secret expiration
 		client_secret_expires_at = client_dict.get("client_secret_expires_at", None)
 		if client_secret_expires_at and client_secret_expires_at < datetime.datetime.now(datetime.timezone.utc):
-			L.error("Expired client secret.", struct_data={"client_id": client_id})
+			AuditLogger.warning("Client authentication denied: Expired client secret", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Expired client secret.", client_id=client_id)
 
 		# Verify client secret
 		client_secret_hash = client_dict.get("__client_secret", None)
 		if not client_secret_hash:
-			L.error("Client does not have a secret set.", struct_data={"client_id": client_id})
+			AuditLogger.warning("Client authentication denied: Client does not have a secret set", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Client does not have a secret set.", client_id=client_id)
 		if not generic.argon2_verify(client_secret_hash, client_secret):
-			L.error("Incorrect client secret.", struct_data={"client_id": client_id})
+			AuditLogger.warning("Client authentication denied: Incorrect client secret", struct_data={"client_id": client_id})
 			raise exceptions.ClientAuthenticationError("Incorrect client secret.", client_id=client_id)
 
 		return client_dict

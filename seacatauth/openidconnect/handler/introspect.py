@@ -9,7 +9,7 @@ import asab.web.tenant
 import asab.utils
 import asab.exceptions
 
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ...generic import (
 	nginx_introspection,
 	get_access_token_value_from_websocket,
@@ -95,28 +95,29 @@ class TokenIntrospectionHandler(object):
 		if token is None:
 			token = get_access_token_value_from_websocket(request)
 		if token is None:
-			L.log(asab.LOG_NOTICE, "Access token not found in 'Authorization' nor 'Sec-WebSocket-Protocol' header")
+			AuditLogger.notice("Introspection denied: Access token not found in request")
 			return None
 
 		token_type, token_value = token
 		if token_type.casefold() == "bearer":
 			try:
 				session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-			except exceptions.SessionNotFoundError as e:
-				L.log(asab.LOG_NOTICE, "Access token matched no session: {}".format(e), struct_data={
+			except exceptions.SessionNotFoundError:
+				AuditLogger.notice("Introspection denied: Access token matched no session", struct_data={
 					"token_fingerprint": fingerprint(token_value)})
 				return None
 
 		elif token_type.casefold() == self.ApiKeyService.TOKEN_TYPE.casefold():
 			try:
 				session = await self.ApiKeyService.get_session_by_api_key(token_value)
-			except exceptions.SessionNotFoundError as e:
-				L.log(asab.LOG_NOTICE, "API key matched no session: {}".format(e), struct_data={
+			except exceptions.SessionNotFoundError:
+				AuditLogger.notice("Introspection denied: API key matched no session", struct_data={
 					"token_fingerprint": fingerprint(token_value)})
 				return None
 
 		else:
-			L.error("Unsupported token type: {}".format(token_type))
+			AuditLogger.notice("Introspection denied: Unsupported token type", struct_data={
+				"token_type": token_type})
 			return None
 
 		# Validate client if requested
@@ -126,11 +127,11 @@ class TokenIntrospectionHandler(object):
 			try:
 				client = await self.ClientService.get_client(client_id)
 			except KeyError:
-				L.error("Client not found.", struct_data={"client_id": client_id})
+				AuditLogger.notice("Introspection denied: Client not found", struct_data={"client_id": client_id})
 				return None
 
 			if session.OAuth2.ClientId != client_id:
-				L.error("Client mismatch.", struct_data={
+				AuditLogger.notice("Introspection denied: Client mismatch", struct_data={
 					"sid": session.SessionId,
 					"request_client_id": client_id,
 					"session_client_id": session.OAuth2.ClientId
@@ -143,12 +144,12 @@ class TokenIntrospectionHandler(object):
 			max_age = asab.utils.convert_to_seconds(request.query["max_age"])
 		if max_age is not None:
 			if not session.Authentication.AuthnTime:
-				L.error("Session has no authentication age.", struct_data={"sid": session.SessionId})
+				AuditLogger.notice("Introspection denied: Session has no authentication age", struct_data={"sid": session.SessionId})
 				return None
 
 			authn_age = (datetime.datetime.now(datetime.UTC) - session.Authentication.AuthnTime).total_seconds()
 			if authn_age > max_age:
-				L.log(asab.LOG_NOTICE, "Maximum authentication age exceeded.", struct_data={
+				AuditLogger.notice("Introspection denied: Maximum authentication age exceeded", struct_data={
 					"sid": session.SessionId,
 					"client_id": client_id,
 					"max_authn_age": max_age,

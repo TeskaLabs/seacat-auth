@@ -69,8 +69,8 @@ class ChangePasswordHandler(object):
 		authenticated = await self.CredentialsService.authenticate(
 			credentials_id, {"password": old_password})
 		if not authenticated:
-			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: Authentication failed", struct_data={
-				"cid": credentials_id, "from_ip": from_ip})
+			AuditLogger.notice("Password change failed: Authentication failed", struct_data={
+				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=401, data={
@@ -81,8 +81,8 @@ class ChangePasswordHandler(object):
 		# Verify that the new password is different from the old one
 		# TODO: Users should not reuse their last 10 passwords at least
 		if new_password == old_password:
-			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: Reusing old passwords is not allowed.", struct_data={
-				"cid": credentials_id, "from_ip": from_ip})
+			AuditLogger.notice("Password change denied: Reusing old passwords is not allowed.", struct_data={
+				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=400, data={
@@ -94,8 +94,8 @@ class ChangePasswordHandler(object):
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
 		except exceptions.WeakPasswordError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Password change denied: New password too weak.", struct_data={
-				"cid": credentials_id, "from_ip": from_ip})
+			AuditLogger.notice("Password change denied: New password too weak.", struct_data={
+				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=400, data={
@@ -104,16 +104,16 @@ class ChangePasswordHandler(object):
 			})
 		except Exception as e:
 			L.exception("Password change failed: {}".format(e))
-			AuditLogger.log(asab.LOG_NOTICE, "Password change failed: {}".format(e.__class__.__name__), struct_data={
-				"cid": credentials_id, "from_ip": from_ip})
+			AuditLogger.notice("Password change failed: {}".format(e.__class__.__name__), struct_data={
+				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 
 		# Record the change in audit
-		AuditLogger.log(
-			asab.LOG_NOTICE, "Password change successful",
-			struct_data={"cid": credentials_id, "from_ip": from_ip}
+		AuditLogger.notice(
+			"Password change successful",
+			struct_data={"cid": credentials_id}
 		)
 		await self.LastActivityService.update_last_activity(
 			EventCode.PASSWORD_CHANGE_SUCCESS, credentials_id=credentials_id, from_ip=from_ip)
@@ -141,24 +141,21 @@ class ChangePasswordHandler(object):
 				password_reset_token)
 			credentials_id = password_reset_details["cid"]
 		except KeyError:
-			AuditLogger.log(
-				asab.LOG_NOTICE, "Password reset failed: Invalid password reset token",
-				struct_data={"from_ip": from_ip, "token": password_reset_token}
-			)
+			AuditLogger.notice("Password reset failed: Invalid password reset token")
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 
 		# Change the password
 		try:
 			await self.ChangePasswordService.change_password(credentials_id, new_password)
 		except exceptions.CredentialsSuspendedError:
-			AuditLogger.log(asab.LOG_NOTICE, "Password reset denied: Credentials suspended", struct_data={
+			AuditLogger.notice("Password reset denied: Credentials suspended", struct_data={
 				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 		except exceptions.WeakPasswordError as e:
-			AuditLogger.log(asab.LOG_NOTICE, "Password reset denied: New password too weak.", struct_data={
-				"cid": credentials_id, "from_ip": from_ip})
+			AuditLogger.notice("Password reset denied: New password too weak.", struct_data={
+				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=400, data={
@@ -167,8 +164,8 @@ class ChangePasswordHandler(object):
 			})
 		except Exception as e:
 			L.exception("Password reset failed: {}".format(e))
-			AuditLogger.log(asab.LOG_NOTICE, "Password reset failed: {}".format(e.__class__.__name__), struct_data={
-				"cid": credentials_id, "from_ip": from_ip})
+			AuditLogger.notice("Password reset failed: {}".format(e.__class__.__name__), struct_data={
+				"cid": credentials_id})
 			await self.LastActivityService.update_last_activity(
 				EventCode.PASSWORD_CHANGE_FAILED, credentials_id=credentials_id, from_ip=from_ip)
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
@@ -182,9 +179,9 @@ class ChangePasswordHandler(object):
 		)
 
 		# Record in audit
-		AuditLogger.log(
-			asab.LOG_NOTICE, "Password reset successful",
-			struct_data={"cid": credentials_id, "from_ip": from_ip}
+		AuditLogger.notice(
+			"Password reset successful",
+			struct_data={"cid": credentials_id}
 		)
 		await self.LastActivityService.update_last_activity(
 			EventCode.PASSWORD_CHANGE_SUCCESS, credentials_id=credentials_id, from_ip=from_ip)

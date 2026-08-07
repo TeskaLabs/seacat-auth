@@ -133,7 +133,10 @@ class ExternalAuthenticationService(asab.Service):
 		redirect_uri: typing.Optional[str]
 	) -> aiohttp.web.Response:
 		if not self.can_sign_up_new_credentials(provider_type):
-			L.error("Signup with external account is not enabled.")
+			AuditLogger.warning("External login sign-up denied", struct_data={
+				"provider": provider_type,
+				"reason": "sign-up not enabled",
+			})
 			return await self._error_redirect_response(
 				self.LoginUri,
 				result=ExtLoginResult.SIGNUP_FAILED,
@@ -262,11 +265,11 @@ class ExternalAuthenticationService(asab.Service):
 
 		try:
 			user_info = await provider.process_auth_callback(request, payload, state)
-		except exceptions.AccessDeniedError as e:
-			L.log(asab.LOG_NOTICE, "External authentication failed: Access denied.", struct_data={
+		except exceptions.AccessDeniedError:
+			AuditLogger.notice("Authentication failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
-				"error": str(e),
+				"reason": "Access denied",
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -276,10 +279,10 @@ class ExternalAuthenticationService(asab.Service):
 				ext_login_error=ExtLoginError.ACCESS_DENIED,
 			)
 		except ExternalLoginError as e:
-			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
+			AuditLogger.notice("Authentication failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
-				"error": str(e),
+				"reason": str(e),
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -306,7 +309,11 @@ class ExternalAuthenticationService(asab.Service):
 				current_sso_session = None
 
 		except ExternalAccountNotFoundError as e:
-			L.log(asab.LOG_NOTICE, "External account not found.", struct_data={"query": e.Query})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"provider": provider_type,
+				"query": e.Query,
+				"reason": "External account not found",
+			})
 			credentials_id = None
 			current_sso_session = None
 
@@ -375,10 +382,11 @@ class ExternalAuthenticationService(asab.Service):
 			The located credentials ID if found and paired, otherwise None.
 		"""
 		if user_info.get("email_verified") is not True:
-			L.log(asab.LOG_NOTICE, "Cannot pair external account: Email not verified.", struct_data={
+			AuditLogger.notice("External account pairing failed", struct_data={
 				"provider": provider_type,
 				"sub": user_info.get("sub"),
 				"email": user_info.get("email"),
+				"reason": "Email not verified",
 			})
 			return None
 
@@ -390,14 +398,12 @@ class ExternalAuthenticationService(asab.Service):
 					await self.ExternalCredentialsService.create_ext_credentials(
 						credentials_id, provider_type, user_info)
 				except asab.exceptions.Conflict:
-					L.error(
-						"Cannot create external credentials: Already registered.",
-						struct_data={
-							"cid": credentials_id,
-							"provider": provider_type,
-							"sub": user_info.get("sub"),
-						}
-					)
+					AuditLogger.notice("External account pairing failed", struct_data={
+						"cid": credentials_id,
+						"provider": provider_type,
+						"sub": user_info.get("sub"),
+						"reason": "Already registered",
+					})
 					return None
 
 		return credentials_id
@@ -454,11 +460,11 @@ class ExternalAuthenticationService(asab.Service):
 
 		try:
 			user_info = await provider.process_auth_callback(request, payload, state)
-		except exceptions.AccessDeniedError as e:
-			L.log(asab.LOG_NOTICE, "External authentication failed: Access denied.", struct_data={
+		except exceptions.AccessDeniedError:
+			AuditLogger.notice("Authentication failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
-				"error": str(e),
+				"reason": "Access denied",
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -468,10 +474,10 @@ class ExternalAuthenticationService(asab.Service):
 				ext_login_error=ExtLoginError.ACCESS_DENIED,
 			)
 		except ExternalLoginError as e:
-			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
+			AuditLogger.notice("Authentication failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
-				"error": str(e),
+				"reason": str(e),
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -481,7 +487,10 @@ class ExternalAuthenticationService(asab.Service):
 			)
 
 		if not self.can_sign_up_new_credentials(provider_type):
-			L.error("Sign-up with external account not enabled.")
+			AuditLogger.notice("External account signup failed", struct_data={
+				"provider": provider_type,
+				"reason": "Sign-up not enabled",
+			})
 			return await self._error_redirect_response(
 				self.LoginUri,
 				result=ExtLoginResult.SIGNUP_FAILED,
@@ -495,8 +504,11 @@ class ExternalAuthenticationService(asab.Service):
 			with local_authz(self.Name, resources={ResourceId.CREDENTIALS_ACCESS}):
 				await self.ExternalCredentialsService.get_ext_credentials_by_type_and_sub(
 					provider_type, subject_id=user_info["sub"])
-			L.log(asab.LOG_NOTICE, "Cannot sign up with external account: Account already paired.", struct_data={
-				"provider": provider_type, "sub": user_info.get("sub")})
+			AuditLogger.notice("External account signup failed", struct_data={
+				"provider": provider_type,
+				"sub": user_info.get("sub"),
+				"reason": "Account already paired",
+			})
 			return await self._error_redirect_response(
 				self.LoginUri,
 				result=ExtLoginResult.SIGNUP_FAILED,
@@ -514,7 +526,10 @@ class ExternalAuthenticationService(asab.Service):
 			credentials_id = await self.ExternalCredentialsService.sign_up_ext_credentials(
 				provider_type, user_info, payload)
 		except exceptions.CredentialsRegistrationError as e:
-			L.error("Sign-up with external account failed: {}".format(e))
+			AuditLogger.notice("External account signup failed", struct_data={
+				"provider": provider_type,
+				"reason": str(e),
+			})
 			return await self._error_redirect_response(
 				self.LoginUri,
 				result=ExtLoginResult.SIGNUP_FAILED,
@@ -555,11 +570,11 @@ class ExternalAuthenticationService(asab.Service):
 
 		try:
 			user_info = await provider.process_auth_callback(request, payload, state)
-		except exceptions.AccessDeniedError as e:
-			L.log(asab.LOG_NOTICE, "External authentication failed: Access denied.", struct_data={
+		except exceptions.AccessDeniedError:
+			AuditLogger.notice("External account pairing failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
-				"error": str(e),
+				"reason": "Access denied",
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -568,10 +583,10 @@ class ExternalAuthenticationService(asab.Service):
 				ext_login_error=ExtLoginError.ACCESS_DENIED,
 			)
 		except ExternalLoginError as e:
-			L.log(asab.LOG_NOTICE, "External authentication failed.", struct_data={
+			AuditLogger.notice("External account pairing failed", struct_data={
 				"provider": provider_type,
 				"state": state["_id"],
-				"error": str(e),
+				"reason": str(e),
 			})
 			return await self._error_redirect_response(
 				self._get_final_redirect_uri(state),
@@ -583,10 +598,11 @@ class ExternalAuthenticationService(asab.Service):
 		try:
 			current_sso_session = await cookie_service.get_session_by_request_cookie(request)
 		except (exceptions.NoCookieError, exceptions.SessionNotFoundError):
-			L.error("Cannot finalize pairing external account: No active SSO session.", struct_data={
+			AuditLogger.notice("External account pairing failed", struct_data={
 				"provider": provider_type,
 				"sub": user_info.get("sub"),
 				"state": state["_id"],
+				"reason": "No active SSO session",
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -597,10 +613,11 @@ class ExternalAuthenticationService(asab.Service):
 			)
 
 		if current_sso_session.is_anonymous():
-			L.error("Cannot finalize pairing external account: Anonymous SSO session.", struct_data={
+			AuditLogger.notice("External account pairing failed", struct_data={
 				"provider": provider_type,
 				"sub": user_info.get("sub"),
 				"state": state["_id"],
+				"reason": "Anonymous SSO session",
 			})
 			return await self._error_redirect_response(
 				self.LoginUri,
@@ -618,14 +635,12 @@ class ExternalAuthenticationService(asab.Service):
 				await self.ExternalCredentialsService.create_ext_credentials(
 					credentials_id, provider_type, user_info)
 		except asab.exceptions.Conflict:
-			L.error(
-				"Cannot finalize pairing external account: Record for this account already exists.",
-				struct_data={
-					"cid": credentials_id,
-					"provider": provider_type,
-					"sub": user_info.get("sub"),
-				}
-			)
+			AuditLogger.notice("External account pairing failed", struct_data={
+				"cid": credentials_id,
+				"provider": provider_type,
+				"sub": user_info.get("sub"),
+				"reason": "Already registered",
+			})
 			return await self._error_redirect_response(
 				self._get_final_redirect_uri(state),
 				result=ExtLoginResult.PAIRING_FAILED,
@@ -669,11 +684,10 @@ class ExternalAuthenticationService(asab.Service):
 				session_builders=session_builders,
 			)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+		AuditLogger.notice("Login successful", struct_data={
 			"cid": credentials_id,
 			"lsid": "<external-login>",
 			"sid": str(new_sso_session.Session.Id),
-			"from_ip": from_ip,
 			"authn_by": login_descriptor,
 		})
 		await self.LastActivityService.update_last_activity(

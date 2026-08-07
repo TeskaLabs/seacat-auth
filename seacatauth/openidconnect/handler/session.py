@@ -68,7 +68,7 @@ class SessionHandler(object):
 		# Delete the root session which will also remove this session
 		await self.SessionService.delete(parent_session.Session.Id)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Logout successful", struct_data={
+		AuditLogger.notice("Logout successful", struct_data={
 			"cid": session.Credentials.Id,
 			"sid": session.SessionId,
 			"psid": parent_session.SessionId,

@@ -8,7 +8,7 @@ import asab.web.rest
 import asab.exceptions
 import pymongo
 
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ...api import local_authz
 from ...models.const import ResourceId
 from ..exceptions import (
@@ -148,12 +148,7 @@ class ExternalCredentialsService(asab.Service):
 			external_account_id = await upsertor.execute()
 		except asab.storage.exceptions.DuplicateError as e:
 			raise asab.exceptions.Conflict("External account already registered") from e
-		L.log(asab.LOG_NOTICE, "External login account added", struct_data={
-			"provider": provider_type,
-			"sub": sub,
-			"ext_account_id": external_account_id,
-			"cid": credentials_id,
-		})
+		AuditLogger.notice("External login account added", struct_data={"cid": credentials_id, "provider": provider_type})
 		return external_account_id
 
 
@@ -300,10 +295,7 @@ class ExternalCredentialsService(asab.Service):
 		collection = self.StorageService.Database[self.ExternalCredentialsCollection]
 		result = await collection.delete_many({"cid": credentials_id})
 		if result.deleted_count > 0:
-			L.log(asab.LOG_NOTICE, "Deleted external login accounts linked to deleted credentials", struct_data={
-				"credentials_id": credentials_id,
-				"deleted_count": result.deleted_count,
-			})
+			AuditLogger.notice("External login accounts deleted", struct_data={"cid": credentials_id, "deleted_count": result.deleted_count})
 
 	def _normalize_ext_credentials(self, account: dict):
 		# Normalize old field names
