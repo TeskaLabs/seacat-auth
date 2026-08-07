@@ -203,14 +203,6 @@ class TokenHandler(object):
 		# Establish and propagate track ID
 		session = await self.set_track_id(request, session)
 
-		# Everything is okay: Request granted
-		AuditLogger.notice("Token request granted.", struct_data={
-			"cid": session.Credentials.Id,
-			"sid": session.Id,
-			"client_id": session.OAuth2.ClientId,
-			"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
-		})
-
 		# Client can limit the session scope to a subset of the scope granted at authorization time
 		scope = form_data.get("scope")
 
@@ -225,6 +217,13 @@ class TokenHandler(object):
 			}
 		else:
 			response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
+
+		AuditLogger.notice("Token request granted.", struct_data={
+			"cid": session.Credentials.Id,
+			"sid": session.Id,
+			"client_id": session.OAuth2.ClientId,
+			"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
+		})
 
 		headers = {
 			"Cache-Control": "no-store",
@@ -274,18 +273,17 @@ class TokenHandler(object):
 		# Delete the used refresh token and the current access token
 		await self.SessionService.TokenService.delete_tokens_by_session_id(session.SessionId)
 
-		# Everything is okay: Request granted
+		# Client can limit the session scope to a subset of the scope granted at authorization time
+		scope = form_data.get("scope")
+
+		response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
+
 		AuditLogger.notice("Token request granted.", struct_data={
 			"cid": session.Credentials.Id,
 			"sid": session.Id,
 			"client_id": session.OAuth2.ClientId,
 			"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 		})
-
-		# Client can limit the session scope to a subset of the scope granted at authorization time
-		scope = form_data.get("scope")
-
-		response_payload = await self._refresh_session_and_issue_tokens(session, scope=scope)
 
 		headers = {
 			"Cache-Control": "no-store",
