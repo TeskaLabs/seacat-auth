@@ -528,7 +528,7 @@ class TokenHandler(object):
 			if token_value is not None:
 				try:
 					old_session = await self.OpenIdConnectService.get_session_by_access_token(token_value)
-				except exceptions.SessionNotFoundError:
+				except exceptions.SessionNotFoundError as e:
 					AuditLogger.notice(
 						"Token request denied: Track ID transfer failed because of invalid Authorization header",
 						struct_data={
@@ -536,7 +536,7 @@ class TokenHandler(object):
 							"client_id": session.OAuth2.ClientId,
 						}
 					)
-					return aiohttp.web.HTTPBadRequest()
+					raise aiohttp.web.HTTPBadRequest() from e
 			else:
 				# Use cookie only if there is no access token
 				try:
