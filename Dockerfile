@@ -49,7 +49,10 @@ RUN apk add --no-cache  \
     pysaml2 \
     pymongo \
     sentry-sdk \
+    git+https://github.com/TeskaLabs/kazoo.git \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
+
+# ^^^ Use vendored Kazoo library till https://github.com/python-zk/kazoo/pull/715 is merged (persistent watcher support)
 
 # This is for github CI/CD logs
 RUN /venv/bin/python3 -c "import asab; print(asab.__version__)"
