@@ -49,6 +49,7 @@ RUN apk add --no-cache  \
     pysaml2 \
     pymongo \
     sentry-sdk \
+    git+https://github.com/TeskaLabs/kazoo.git \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
 
 # This is for github CI/CD logs
