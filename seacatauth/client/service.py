@@ -82,7 +82,11 @@ class ClientService(asab.Service):
 		self.DefaultProviderId: str = asab.Config.get("seacatauth:client", "default_provider_id")
 		self._create_providers_from_config()
 
+		self.TaskService = app.get_service("asab.TaskService")
+		self.PublicClientOrigins: frozenset[str] = frozenset()
+
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
+		app.PubSub.subscribe("Application.tick/600!", self._on_tick600)
 
 
 	def _create_providers_from_config(self):
@@ -109,6 +113,7 @@ class ClientService(asab.Service):
 			self.register_provider(provider)
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
+		self.TaskService.schedule(self._rescan_public_client_origins())
 
 
 	def register_provider(self, provider: ClientProviderABC):
@@ -703,6 +708,27 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
+	def _on_tick600(self, event_name):
+		self.TaskService.schedule(self._rescan_public_client_origins())
+
+
+	def is_origin_allowed(self, origin: str) -> bool:
+		return origin in self.PublicClientOrigins
+
+
+	async def _rescan_public_client_origins(self):
+		origins = set()
+		async for client in self.iterate_clients():
+			if is_client_confidential(client):
+				continue
+			for uri in client.get("redirect_uris") or []:
+				origin = origin_from_redirect_uri(uri)
+				if origin is not None:
+					origins.add(origin)
+		self.PublicClientOrigins = frozenset(origins)
+		L.debug("Public client origin cache updated.", struct_data={"count": len(origins)})
+
+
 	def _normalize_client(self, provider_id: str, raw_client: dict):
 		client = {
 			k: v
@@ -719,6 +745,28 @@ class ClientService(asab.Service):
 		if "__client_secret" in raw_client:
 			client["client_secret"] = True
 		return client
+
+
+def origin_from_redirect_uri(uri: str) -> str | None:
+	"""
+	Return the web origin of an http(s) redirect URI, or None if it is not a web origin.
+	"""
+	try:
+		parsed = urllib.parse.urlparse(uri)
+		hostname = parsed.hostname
+		port = parsed.port
+	except ValueError:
+		return None
+	if parsed.scheme not in ("http", "https") or not hostname:
+		return None
+	if ":" in hostname:
+		# Wrap IPv6
+		host = "[{}]".format(hostname)
+	else:
+		host = hostname
+	if port is None or (parsed.scheme == "https" and port == 443) or (parsed.scheme == "http" and port == 80):
+		return "{}://{}".format(parsed.scheme, host)
+	return "{}://{}:{}".format(parsed.scheme, host, port)
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
