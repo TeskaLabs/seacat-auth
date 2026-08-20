@@ -9,6 +9,7 @@ from .handler.introspect import TokenIntrospectionHandler
 from .handler.session import SessionHandler
 from .handler.public_keys import PublicKeysHandler
 from .handler.discovery import DiscoveryHandler
+from .cors import install_oauth_cors
 
 
 class OpenIdConnectModule(asab.Module):
@@ -46,3 +47,7 @@ class OpenIdConnectModule(asab.Module):
 		self.SessionHandler = SessionHandler(app, self.OpenIdConnectService, self.SessionService)
 		self.PublicKeysHandler = PublicKeysHandler(app, self.OpenIdConnectService)
 		self.DiscoveryHandler = DiscoveryHandler(app, self.OpenIdConnectService)
+
+		client_svc = app.get_service("seacatauth.ClientService")
+		install_oauth_cors(app.WebContainer.WebApp, client_svc)
+		install_oauth_cors(app.PublicWebContainer.WebApp, client_svc)
