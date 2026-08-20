@@ -9,7 +9,6 @@ from .handler.introspect import TokenIntrospectionHandler
 from .handler.session import SessionHandler
 from .handler.public_keys import PublicKeysHandler
 from .handler.discovery import DiscoveryHandler
-from .cors import install_oauth_cors
 
 
 class OpenIdConnectModule(asab.Module):
@@ -49,5 +48,18 @@ class OpenIdConnectModule(asab.Module):
 		self.DiscoveryHandler = DiscoveryHandler(app, self.OpenIdConnectService)
 
 		client_svc = app.get_service("seacatauth.ClientService")
-		install_oauth_cors(app.WebContainer.WebApp, client_svc)
-		install_oauth_cors(app.PublicWebContainer.WebApp, client_svc)
+		oauth_cors_paths = [
+			"/openidconnect/*",
+			"/.well-known/openid-configuration",
+			"/.well-known/oauth-authorization-server",
+			"/.well-known/jwks.json",
+			"/.well-known/oauth-protected-resource",
+			"/.well-known/oauth-protected-resource/*",
+		]
+		for container in (app.WebContainer, app.PublicWebContainer):
+			container.enable_cors(
+				allow_origin=client_svc.is_origin_allowed,
+				preflight_paths=oauth_cors_paths,
+				allow_headers=["Authorization", "Content-Type", "X-App", "X-Request-Id"],
+				allow_credentials=True,
+			)
