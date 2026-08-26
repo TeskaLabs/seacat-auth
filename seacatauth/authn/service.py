@@ -304,16 +304,19 @@ class AuthenticationService(asab.Service):
 
 		# Fail if we have a fake login session
 		if login.CredentialsId == "":
-			L.log(asab.LOG_NOTICE, "Login failed: Fake login session", struct_data={"lsid": login_session.Id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"lsid": login_session.Id,
+				"reason": "Fake login session",
+			})
 			return False
 
 		# First make sure that the user is not suspended
 		credentials = await self.CredentialsService.get(login.CredentialsId, include=frozenset(["suspended"]))
 		if credentials.get("suspended") is True:
-			L.warning(
-				"Login failed: User suspended",
-				struct_data={"cid": login.CredentialsId}
-			)
+			AuditLogger.warning("Authentication failed", struct_data={
+				"cid": login.CredentialsId,
+				"reason": "User suspended",
+			})
 			return False
 
 		authenticated = False
@@ -357,11 +360,10 @@ class AuthenticationService(asab.Service):
 				session_builders=session_builders,
 			)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Authentication successful", struct_data={
+		AuditLogger.notice("Login successful", struct_data={
 			"cid": login_session.SeacatLogin.CredentialsId,
 			"lsid": login_session.Id,
 			"sid": str(new_sso_session.Session.Id),
-			"from_ip": from_info,
 		})
 		await self.LastActivityService.update_last_activity(
 			EventCode.LOGIN_SUCCESS, login_session.SeacatLogin.CredentialsId, from_ip=from_info)
@@ -421,19 +423,22 @@ class AuthenticationService(asab.Service):
 		try:
 			await self.CredentialsService.get(target_cid)
 		except KeyError:
-			L.log(asab.LOG_NOTICE, "Impersonation target does not exist.", struct_data={
-				"impersonator_cid": impersonator_cid, "target_cid": target_cid})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"target_cid": target_cid,
+				"reason": "Impersonation target does not exist",
+			})
 			raise exceptions.CredentialsNotFoundError(target_cid)
 
 		# Make sure that the target is not a superuser
 		target_authz = await build_credentials_authz(
 			self.TenantService, self.RoleService, target_cid, tenants=None)
 		if self.RBACService.is_superuser(target_authz):
-			L.log(
-				asab.LOG_NOTICE,
-				"Impersonation target is a superuser. Resource 'authz:superuser' will be excluded "
-				"from the impersonated session's authorization scope.",
-				struct_data={"impersonator_cid": impersonator_cid, "target_cid": target_cid})
+			AuditLogger.warning("Authentication failed", struct_data={
+				"impersonator_cid": impersonator_cid,
+				"target_cid": target_cid,
+				"reason": "Impersonation target is a superuser",
+			})
 
 		session_builders = await self.SessionService.build_sso_root_session(
 			credentials_id=target_cid,
@@ -522,18 +527,26 @@ class AuthenticationService(asab.Service):
 		credentials_id = await self.CredentialsService.locate(ident, stop_at_first=True, login_dict=login_dict)
 
 		if credentials_id is None or credentials_id == []:
-			L.log(asab.LOG_NOTICE, "Cannot locate credentials", struct_data={"ident": ident})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"ident": ident,
+				"reason": "Cannot locate credentials",
+			})
 			raise exceptions.LoginPrologueDeniedError("Unmatched ident")
 		elif credentials_id.startswith("m2m:"):
 			# Deny login to m2m credentials
-			L.log(asab.LOG_NOTICE, "Cannot login with machine credentials", struct_data={
-				"cid": credentials_id})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "Cannot login with machine credentials",
+			})
 			raise exceptions.LoginPrologueDeniedError("Cannot login with M2M credentials")
 
 		credentials = await self.CredentialsService.get(credentials_id)
 		if credentials.get("suspended") is True:
 			# Deny login to suspended credentials
-			L.warning("Login denied to suspended credentials", struct_data={"cid": credentials_id})
+			AuditLogger.warning("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"reason": "Login denied to suspended credentials",
+			})
 			raise exceptions.LoginPrologueDeniedError("Cannot login with suspended credentials")
 
 		login_descriptors = await self.prepare_login_descriptors(
@@ -542,8 +555,11 @@ class AuthenticationService(asab.Service):
 			login_preferences=login_preferences
 		)
 		if login_descriptors is None:
-			L.log(asab.LOG_NOTICE, "No suitable login descriptor", struct_data={
-				"cid": credentials_id, "ldid": login_preferences})
+			AuditLogger.notice("Authentication failed", struct_data={
+				"cid": credentials_id,
+				"ldid": login_preferences,
+				"reason": "No suitable login descriptor",
+			})
 			raise exceptions.LoginPrologueDeniedError("No suitable login descriptor")
 
 		login_session.initialize_seacat_login(

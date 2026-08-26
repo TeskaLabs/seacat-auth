@@ -6,7 +6,7 @@ import asab.exceptions
 import asab.utils
 import asab.contextvars
 
-from .. import exceptions
+from .. import exceptions, AuditLogger
 from ..api import local_authz
 from ..models.const import ResourceId
 from .random_name import propose_name
@@ -582,8 +582,8 @@ class TenantHandler(object):
 							"cid": credential_id, "tenant": tenant})
 						success = True
 					except Exception as e:
-						L.error("Cannot assign tenant: {}".format(e), exc_info=True, struct_data={
-							"cid": credential_id, "tenant": tenant})
+						AuditLogger.warning("Cannot assign tenant", exc_info=True, struct_data={
+							"cid": credential_id, "tenant_id": tenant, "reason": str(e)})
 						error_details.append({"cid": credential_id, "tenant": tenant})
 					if not success:
 						continue
@@ -599,8 +599,8 @@ class TenantHandler(object):
 						L.info("Skipping: Role already assigned.", struct_data={
 							"cid": credential_id, "role": role})
 					except Exception as e:
-						L.error("Cannot assign role: {}".format(e), exc_info=True, struct_data={
-							"cid": credential_id, "role": role})
+						AuditLogger.warning("Cannot assign role", exc_info=True, struct_data={
+							"cid": credential_id, "role": role, "reason": str(e)})
 						error_details.append({"cid": credential_id, "role": role})
 
 		data = {
@@ -643,8 +643,8 @@ class TenantHandler(object):
 						L.info("Skipping: Tenant not assigned.", struct_data={
 							"cid": credential_id, "tenant": tenant})
 					except Exception as e:
-						L.error("Cannot unassign tenant: {}".format(e), exc_info=True, struct_data={
-							"cid": credential_id, "tenant": tenant})
+						AuditLogger.warning("Cannot unassign tenant", exc_info=True, struct_data={
+							"cid": credential_id, "tenant_id": tenant, "reason": str(e)})
 						error_details.append({"cid": credential_id, "tenant": tenant})
 				else:
 					# If any roles are listed under the tenant (e.g. `"my-tenant": ["my-tenant/user"]`),
@@ -656,8 +656,8 @@ class TenantHandler(object):
 							L.info("Skipping: Role not assigned.", struct_data={
 								"cid": credential_id, "role": role})
 						except Exception as e:
-							L.error("Cannot unassign role: {}".format(e), exc_info=True, struct_data={
-								"cid": credential_id, "role": role})
+							AuditLogger.warning("Cannot unassign role", exc_info=True, struct_data={
+								"cid": credential_id, "role": role, "reason": str(e)})
 							error_details.append({"cid": credential_id, "role": role})
 
 		data = {

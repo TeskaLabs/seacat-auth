@@ -2,6 +2,15 @@ import asab
 import logging
 
 from .app import SeaCatAuthApplication
+from .audit import AuditLogger as _AuditLoggerClass
+
+
+_previous_logger_class = logging.getLoggerClass()
+logging.setLoggerClass(_AuditLoggerClass)
+try:
+	AuditLogger = logging.getLogger("AUDIT")
+finally:
+	logging.setLoggerClass(_previous_logger_class)
 
 
 asab.Config.add_defaults({
@@ -252,9 +261,14 @@ asab.Config.add_defaults({
 		# Length of API key token
 		"token_byte_length": 36,
 	},
-})
 
-AuditLogger = logging.getLogger("AUDIT")
+	"seacatauth:resources": {
+		# Whitespace-separated list of resource IDs that are disabled.
+		# Disabled resources remain in the database but cannot be authorized in sessions
+		# and are marked with "disabled": true in REST API responses.
+		"disabled_resources": "",
+	},
+})
 
 __all__ = [
 	"SeaCatAuthApplication"

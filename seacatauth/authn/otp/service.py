@@ -6,7 +6,7 @@ import urllib.parse
 import asab
 import asab.storage
 
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ...events import EventTypes
 from ..provider import AuthnMethodProviderABC
 
@@ -43,8 +43,7 @@ class OTPService(asab.Service):
 		if asab.Config.getboolean("seacatauth:otp", "reset_on_password_reset"):
 			try:
 				await self.deactivate_totp(credentials_id)
-				L.log(asab.LOG_NOTICE, "Deactivated TOTP due to password reset.", struct_data={
-					"cid": credentials_id})
+				AuditLogger.notice("TOTP deactivated", struct_data={"cid": credentials_id, "reason": "password reset"})
 			except exceptions.TOTPDeactivationError:
 				# TOTP was not active, nothing to do
 				pass
@@ -66,8 +65,7 @@ class OTPService(asab.Service):
 		Delete active TOTP secret for requested credentials.
 		"""
 		if not await self.has_activated_totp(credentials_id):
-			L.log(asab.LOG_NOTICE, "Cannot deactivate TOTP because it is not active.", struct_data={
-				"cid": credentials_id})
+			AuditLogger.warning("TOTP deactivation denied", struct_data={"cid": credentials_id, "reason": "not active"})
 			raise exceptions.TOTPDeactivationError("TOTP is not active.", credentials_id)
 		try:
 			await self.StorageService.delete(collection=self.TOTPCollection, obj_id=credentials_id)
@@ -88,7 +86,7 @@ class OTPService(asab.Service):
 		"""
 
 		credentials: dict = await self.CredentialsService.get(credentials_id)
-		secret: str = await self._create_totp_secret(session.SessionId)
+		secret: str = await self._create_totp_secret(session.SessionId, credentials_id)
 		username: str = credentials.get("username")
 		url: str = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name=self.Issuer)
 
@@ -108,34 +106,31 @@ class OTPService(asab.Service):
 		Requires entering the generated OTP to succeed.
 		"""
 		if await self.has_activated_totp(credentials_id):
-			L.log(asab.LOG_NOTICE, "Cannot activate TOTP because it is already active.", struct_data={
-				"cid": credentials_id})
+			AuditLogger.notice("TOTP activation denied", struct_data={"cid": credentials_id, "reason": "already active"})
 			raise exceptions.TOTPActivationError("TOTP is already active.", credentials_id)
 
 		try:
 			secret = await self._get_prepared_totp_secret_by_session_id(session.SessionId)
 		except KeyError:
-			L.log(asab.LOG_NOTICE, "Cannot activate TOTP because the secret is not ready or has expired.", struct_data={
-				"cid": credentials_id})
+			AuditLogger.notice("TOTP activation denied", struct_data={"cid": credentials_id, "reason": "secret not ready or expired"})
 			raise exceptions.TOTPActivationError("TOTP secret is not ready, or possibly has expired.", credentials_id)
 
 		totp = pyotp.TOTP(secret)
 		if totp.verify(request_otp) is False:
 			# TOTP secret does not match
-			L.log(asab.LOG_NOTICE, "Cannot activate TOTP because the verification failed.", struct_data={
-				"cid": credentials_id})
+			AuditLogger.notice("TOTP activation denied", struct_data={"cid": credentials_id, "reason": "verification failed"})
 			raise exceptions.TOTPActivationError("TOTP verification failed.", credentials_id)
 
 		# Store secret in its own dedicated collection
 		upsertor = self.StorageService.upsertor(collection=self.TOTPCollection, obj_id=credentials_id)
 		upsertor.set("__totp", secret.encode("ascii"), encrypt=True)
 		await upsertor.execute(event_type=EventTypes.TOTP_REGISTERED)
-		L.log(asab.LOG_NOTICE, "TOTP activated.", struct_data={"cid": credentials_id})
+		AuditLogger.notice("TOTP activated", struct_data={"cid": credentials_id})
 
 		await self._delete_prepared_totp_secret(session.SessionId)
 
 
-	async def _create_totp_secret(self, session_id: str) -> str:
+	async def _create_totp_secret(self, session_id: str, credentials_id: str) -> str:
 		"""
 		Create TOTP secret and save it into `PreparedTOTPCollection`. Delete it if already exists.
 		"""
@@ -155,7 +150,7 @@ class OTPService(asab.Service):
 		upsertor.set("__s", secret, encrypt=True)
 
 		await upsertor.execute(event_type=EventTypes.TOTP_CREATED)
-		L.log(asab.LOG_NOTICE, "TOTP secret created.", struct_data={"sid": session_id})
+		AuditLogger.notice("TOTP secret created", struct_data={"cid": credentials_id})
 
 		return secret
 

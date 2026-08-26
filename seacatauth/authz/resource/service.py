@@ -4,7 +4,7 @@ import asab.storage.exceptions
 import asab
 import asab.exceptions
 
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ...api import local_authz
 from ...events import EventTypes
 from ...models.const import ResourceId
@@ -112,7 +112,10 @@ class ResourceService(asab.Service):
 		super().__init__(app, service_name)
 		self.StorageService = app.get_service("asab.StorageService")
 		self.ResourceIdRegex = re.compile("^{}$".format(self.ResourceNamePattern))
-
+		if resources := asab.Config.get("seacatauth:resources", "disabled_resources"):
+			self.DisabledResources = frozenset(re.split(r"\s+", resources.strip()))
+		else:
+			self.DisabledResources = frozenset()
 
 	async def initialize(self, app):
 		await super().initialize(app)
@@ -206,7 +209,7 @@ class ResourceService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict()
 
-		L.log(asab.LOG_NOTICE, "Resource created", struct_data={"resource": resource_id})
+		AuditLogger.notice("Resource created", struct_data={"resource_id": resource_id})
 
 
 	async def update(self, resource_id: str, description: str):
@@ -247,7 +250,7 @@ class ResourceService(asab.Service):
 			upsertor.set("managed_by", "seacat-auth")
 
 		await upsertor.execute(event_type=EventTypes.RESOURCE_UPDATED)
-		L.log(asab.LOG_NOTICE, "Resource updated", struct_data={"resource": resource["_id"]})
+		AuditLogger.notice("Resource updated", struct_data={"resource_id": resource["_id"]})
 
 
 	async def delete(self, resource_id: str, hard_delete: bool = False):
@@ -260,15 +263,15 @@ class ResourceService(asab.Service):
 		if roles["count"] > 0:
 			for role in roles["data"]:
 				await role_svc.update(role["_id"], resources_to_remove=[resource_id])
-			L.log(asab.LOG_NOTICE, "Resource unassigned", struct_data={
-				"resource": resource_id,
+			AuditLogger.notice("Resource unassigned", struct_data={
+				"resource_id": resource_id,
 				"n_roles": roles["count"],
 			})
 
 		if hard_delete:
 			await self.StorageService.delete(self.ResourceCollection, resource_id)
-			L.warning("Resource deleted", struct_data={
-				"resource": resource_id,
+			AuditLogger.notice("Resource deleted", struct_data={
+				"resource_id": resource_id,
 			})
 		else:
 			upsertor = self.StorageService.upsertor(
@@ -278,8 +281,8 @@ class ResourceService(asab.Service):
 			)
 			upsertor.set("deleted", True)
 			await upsertor.execute(event_type=EventTypes.RESOURCE_DELETED)
-			L.log(asab.LOG_NOTICE, "Resource soft-deleted", struct_data={
-				"resource": resource_id,
+			AuditLogger.notice("Resource soft-deleted", struct_data={
+				"resource_id": resource_id,
 			})
 
 
@@ -295,8 +298,8 @@ class ResourceService(asab.Service):
 		)
 		upsertor.unset("deleted")
 		await upsertor.execute(event_type=EventTypes.RESOURCE_UNDELETED)
-		L.log(asab.LOG_NOTICE, "Resource undeleted", struct_data={
-			"resource": resource_id,
+		AuditLogger.notice("Resource undeleted", struct_data={
+			"resource_id": resource_id,
 		})
 
 
@@ -324,9 +327,9 @@ class ResourceService(asab.Service):
 					resources_to_remove=[resource_id],
 					resources_to_add=[new_resource_id])
 
-		L.log(asab.LOG_NOTICE, "Resource renamed", struct_data={
-			"old_resource": resource_id,
-			"new_resource": resource_id,
+		AuditLogger.notice("Resource renamed", struct_data={
+			"old_resource_id": resource_id,
+			"resource_id": new_resource_id,
 			"n_roles": roles["count"],
 		})
 
@@ -334,6 +337,8 @@ class ResourceService(asab.Service):
 	def normalize_resource(self, resource: dict):
 		if resource["_id"] in SEACAT_AUTH_RESOURCES or resource.get("managed_by"):
 			resource["read_only"] = True
+		if resource["_id"] in self.DisabledResources:
+			resource["disabled"] = True
 		return resource
 
 

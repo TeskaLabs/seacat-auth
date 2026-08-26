@@ -109,9 +109,8 @@ class RegistrationService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict()
 
-		AuditLogger.log(asab.LOG_NOTICE, "Credentials created", struct_data={
+		AuditLogger.notice("Credentials created", struct_data={
 			"cid": credential_id,
-			"by_cid": invited_by_cid,
 		})
 
 		return credential_id
@@ -270,7 +269,7 @@ class RegistrationService(asab.Service):
 
 		await self.CredentialProvider.update(credentials["_id"], update_dict)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Invitation accepted by a new user", struct_data={
+		AuditLogger.notice("Invitation accepted by a new user", struct_data={
 			"cid": credentials["_id"],
 		})
 
@@ -331,7 +330,7 @@ class RegistrationService(asab.Service):
 		):
 			await self.CredentialsService.delete_credentials(reg_credential_id)
 
-		AuditLogger.log(asab.LOG_NOTICE, "Invitation accepted by an existing user", struct_data={
+		AuditLogger.notice("Invitation accepted by an existing user", struct_data={
 			"cid": credentials_id,
 			"t": reg_tenants,
 			"r": reg_roles,

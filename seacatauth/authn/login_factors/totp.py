@@ -24,4 +24,6 @@ class TOTPFactor(LoginFactorABC):
 	async def authenticate(self, login_session, request_data) -> bool:
 		otp_service = self.AuthenticationService.App.get_service("seacatauth.OTPService")
 		credentials_id = login_session.CredentialsId
-		return await otp_service.verify_request_totp(credentials_id, request_data)
+		success = await otp_service.verify_request_totp(credentials_id, request_data)
+		self.audit_verification(login_session, success)
+		return success

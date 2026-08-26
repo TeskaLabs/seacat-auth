@@ -6,6 +6,7 @@ import asab.storage.exceptions
 from .abc import EditableTenantProviderABC
 
 from ...events import EventTypes
+from ... import AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 		if managed_by is not None:
 			u.set("managed_by", managed_by)
 		tenant_id = await u.execute()
-		L.log(asab.LOG_NOTICE, "Tenant created", struct_data={"tenant": tenant_id})
+		AuditLogger.notice("Tenant created", struct_data={"tenant_id": tenant_id})
 		return tenant_id
 
 
@@ -124,7 +125,7 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 			u.set("managed_by", managed_by)
 		tenant_id = await u.execute()
 
-		L.log(asab.LOG_NOTICE, "Tenant data updated.", struct_data={"tenant": tenant_id})
+		AuditLogger.notice("Tenant updated", struct_data={"tenant_id": tenant_id})
 		return "OK"
 
 
@@ -133,7 +134,7 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 		Delete tenant
 		"""
 		await self.MongoDBStorageService.delete(self.TenantsCollection, tenant_id)
-		L.log(asab.LOG_NOTICE, "Tenant deleted.", struct_data={"tenant": tenant_id})
+		AuditLogger.notice("Tenant deleted", struct_data={"tenant_id": tenant_id})
 
 
 	async def get(self, tenant_id) -> typing.Optional[dict]:
@@ -195,9 +196,9 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 		assignment_id = "{} {}".format(credentials_id, tenant)
 		await self.MongoDBStorageService.delete(self.AssignCollection, obj_id=assignment_id)
 
-		L.log(asab.LOG_NOTICE, "Tenant successfully unassigned from credentials", struct_data={
+		AuditLogger.notice("Tenant unassigned", struct_data={
 			"cid": credentials_id,
-			"tenant": tenant,
+			"tenant_id": tenant,
 		})
 
 
@@ -232,8 +233,8 @@ class MongoDBTenantProvider(EditableTenantProviderABC):
 		collection = await self.MongoDBStorageService.collection(self.AssignCollection)
 		result = await collection.delete_many({"t": tenant})
 
-		L.log(asab.LOG_NOTICE, "Tenant unassigned", struct_data={
-			"tenant": tenant,
+		AuditLogger.notice("Tenant assignments deleted", struct_data={
+			"tenant_id": tenant,
 			"deleted_count": result.deleted_count
 		})
 

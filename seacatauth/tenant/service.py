@@ -5,7 +5,7 @@ import asab.storage.exceptions
 import asab.exceptions
 
 from ..models.const import ResourceId
-from .. import exceptions
+from .. import exceptions, AuditLogger
 
 
 L = logging.getLogger(__name__)
@@ -215,9 +215,8 @@ class TenantService(asab.Service):
 			with asab.contextvars.tenant_context(tenant):
 				if not authz.has_resource_access(ResourceId.TENANT_ASSIGN):
 					message = "Not authorized for tenant un/assignment."
-					L.error(message, struct_data={
-						"agent_cid": authz.CredentialsId,
-						"tenant": tenant
+					AuditLogger.warning("Tenant assignment denied", struct_data={
+						"tenant_id": tenant
 					})
 					return {
 						"result": "NOT-AUTHORIZED",
@@ -242,9 +241,8 @@ class TenantService(asab.Service):
 					"cid": credentials_id, "tenant": tenant})
 				failed_count += 1
 
-		L.log(asab.LOG_NOTICE, "Tenants successfully assigned to credentials", struct_data={
+		AuditLogger.notice("Tenants assigned", struct_data={
 			"cid": credentials_id,
-			"agent_cid": authz.CredentialsId,
 			"assigned_count": len(tenants_to_assign),
 			"unassigned_count": len(tenants_to_unassign),
 			"failed_count": failed_count,
@@ -283,9 +281,9 @@ class TenantService(asab.Service):
 			else:
 				raise asab.exceptions.Conflict("Tenant already assigned.")
 
-		L.log(asab.LOG_NOTICE, "Tenant assigned to credentials", struct_data={
+		AuditLogger.notice("Tenant assigned", struct_data={
 			"cid": credentials_id,
-			"tenant": tenant,
+			"tenant_id": tenant,
 		})
 		self.App.PubSub.publish("Tenant.assigned!", credentials_id=credentials_id, tenant_id=tenant)
 

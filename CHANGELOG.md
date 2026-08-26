@@ -12,6 +12,9 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Use vendored kazoo for persistent watcher support (#592, v26.15-alpha19)
+- Disabling resources (#590, v26.15-alpha18)
+- Improve audit logging (#589, v26.15-alpha17)
 - Accept ASAB internal auth tokens at userinfo endpoint (#591, v26.15-alpha16)
 - Upgrade Dockerfile to Alpine 3.24, upgrade Python to 3.14 (#587, v26.15-alpha15)
 - Improve OpenAPI docs (#586, v26.15-alpha14)
@@ -24,9 +27,12 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Refactoring
-- Add pyproject.toml, update CI (#577, v26.15-alpha17)
+- Add pyproject.toml, use uv instead of pip, update CI (#577, v26.15-alpha20)
 
 ### Pre-releases
+- v26.15-alpha20
+- v26.15-alpha19
+- v26.15-alpha18
 - v26.15-alpha17
 - v26.15-alpha16
 - v26.15-alpha15

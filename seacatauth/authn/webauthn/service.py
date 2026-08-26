@@ -10,7 +10,7 @@ import webauthn
 import webauthn.registration
 import webauthn.helpers.structs
 
-from ... import exceptions
+from ... import exceptions, AuditLogger
 from ...events import EventTypes
 from ..provider import AuthnMethodProviderABC
 
@@ -141,7 +141,7 @@ class WebAuthnService(asab.Service):
 		upsertor.set("name", name)
 
 		passkey_id = await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_CREATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential created.", struct_data={"passkey_id": passkey_id.hex()})
+		AuditLogger.notice("WebAuthn credential created", struct_data={"cid": credentials_id, "credential_id": passkey_id.hex()})
 
 
 	async def get_webauthn_credential(
@@ -250,9 +250,7 @@ class WebAuthnService(asab.Service):
 			upsertor.set("ll", last_login)
 
 		await upsertor.execute(event_type=EventTypes.WEBAUTHN_CREDENTIALS_UPDATED)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential updated.", struct_data={
-			"passkey_id": webauthn_credential_id.hex(),
-		})
+		AuditLogger.notice("WebAuthn credential updated", struct_data={"cid": wa_credential["cid"], "credential_id": webauthn_credential_id.hex()})
 
 
 	async def delete_webauthn_credential(self, webauthn_credential_id: bytes, credentials_id: str = None):
@@ -275,7 +273,7 @@ class WebAuthnService(asab.Service):
 				})
 
 		await self.StorageService.delete(self.WebAuthnCredentialCollection, webauthn_credential_id)
-		L.log(asab.LOG_NOTICE, "WebAuthn credential deleted.", struct_data={"passkey_id": webauthn_credential_id.hex()})
+		AuditLogger.notice("WebAuthn credential deleted", struct_data={"cid": credentials_id, "credential_id": webauthn_credential_id.hex()})
 
 
 	async def delete_all_webauthn_credentials(self, credentials_id: str):
@@ -289,10 +287,7 @@ class WebAuthnService(asab.Service):
 
 		query_filter = {"cid": credentials_id}
 		result = await collection.delete_many(query_filter)
-		L.log(asab.LOG_NOTICE, "WebAuthn credentials deleted.", struct_data={
-			"cid": credentials_id,
-			"count": result.deleted_count
-		})
+		AuditLogger.notice("WebAuthn credentials deleted", struct_data={"cid": credentials_id, "deleted_count": result.deleted_count})
 
 
 	async def create_registration_challenge(self, session_id: str) -> bytes:
@@ -379,7 +374,7 @@ class WebAuthnService(asab.Service):
 		options = webauthn.generate_registration_options(
 			rp_id=self.RelyingPartyId,
 			rp_name=self.RelyingPartyName,
-			user_id=session.Credentials.Id.encode(),
+			user_id=session.Credentials.Id,
 			user_name=user_name,
 			user_display_name=credentials.get("username"),
 			challenge=challenge,
@@ -500,10 +495,7 @@ class WebAuthnService(asab.Service):
 		sign_count = wa_credential["sc"]
 
 		if credentials_id != wa_credential["cid"]:
-			L.error("WebAuthn login failed: Credentials ID does not match.", struct_data={
-				"cid": credentials_id,
-				"passkey_id": wa_credential["_id"],
-			})
+			L.warning("Authentication failed", struct_data={"cid": credentials_id, "reason": "credentials id mismatch"})
 			return False
 
 		try:
@@ -517,7 +509,10 @@ class WebAuthnService(asab.Service):
 				require_user_verification=False,
 			)
 		except Exception as e:
-			L.warning("WebAuthn login failed with {}: {}.".format(type(e).__name__, str(e)))
+			L.warning(
+				"Authentication failed",
+				struct_data={"cid": credentials_id, "reason": "webauthn verification failed: {}".format(type(e).__name__)}
+			)
 			return False
 
 		# Update sign count in storage
