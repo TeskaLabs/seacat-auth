@@ -149,6 +149,13 @@ class MongoDBClientProvider(ClientProviderABC):
 			raise KeyError(client_id)
 
 
+	async def watch(self):
+		coll = await self.StorageService.collection(self.CollectionName)
+		async with coll.watch() as stream:
+			async for change in stream:
+				yield change
+
+
 	def _add_provider_attributes(self, client_dict: dict) -> dict:
 		client_dict["_provider_id"] = self.ProviderId
 		client_dict["read_only"] = not self.Editable

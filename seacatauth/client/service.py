@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import binascii
 import datetime
@@ -86,7 +87,6 @@ class ClientService(asab.Service):
 		self.PublicClientOrigins: frozenset[str] = frozenset()
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
-		app.PubSub.subscribe("Application.tick/600!", self._on_tick600)
 
 
 	def _create_providers_from_config(self):
@@ -106,14 +106,16 @@ class ClientService(asab.Service):
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
+		from .provider.mongodb import MongoDBClientProvider
 		if self.DefaultProviderId not in self.ClientProviders:
 			# If no provider with the default ID is registered, register a MongoDB provider with that ID by default.
-			from .provider.mongodb import MongoDBClientProvider
 			provider = MongoDBClientProvider(app, provider_id=self.DefaultProviderId)
 			self.register_provider(provider)
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
 		self.TaskService.schedule(self._rescan_public_client_origins())
+		if any(isinstance(provider, MongoDBClientProvider) for provider in self.ClientProviders.values()):
+			self.TaskService.run_forever(self._watch_client_origins)
 
 
 	def register_provider(self, provider: ClientProviderABC):
@@ -708,12 +710,35 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
-	def _on_tick600(self, event_name):
-		self.TaskService.schedule(self._rescan_public_client_origins())
-
-
 	def is_origin_allowed(self, origin: str) -> bool:
 		return origin in self.PublicClientOrigins
+
+
+	async def _watch_client_origins(self):
+		from .provider.mongodb import MongoDBClientProvider
+		try:
+			await asyncio.gather(*[
+				self._watch_provider_clients(provider)
+				for provider in self.ClientProviders.values()
+				if isinstance(provider, MongoDBClientProvider)
+			])
+		except asyncio.CancelledError:
+			raise
+		except Exception:
+			L.exception("Client origin watch failed; retrying.")
+			await asyncio.sleep(10)
+
+
+	async def _watch_provider_clients(self, provider):
+		async for change in provider.watch():
+			L.debug(
+				"Client origin cache: client collection changed.",
+				struct_data={
+					"provider_id": provider.ProviderId,
+					"operation": change.get("operationType"),
+				},
+			)
+			await self._rescan_public_client_origins()
 
 
 	async def _rescan_public_client_origins(self):
