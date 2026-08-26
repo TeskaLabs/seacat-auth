@@ -62,6 +62,7 @@ dependencies = [
     "pysaml2",
     "pymongo",
     "sentry-sdk",
+    "git+https://github.com/TeskaLabs/kazoo.git",  # Vendored build with persistent watch feature
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
 ]
 
