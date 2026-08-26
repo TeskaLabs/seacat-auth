@@ -4,7 +4,6 @@
 
 ### Fixes
 - Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
-- Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
 - Remove version dirtiness (#583, v26.15-alpha12)
 - Fix failing docker image build (#582, v26.15-alpha11)
 - Move index management privilege from Kibana to ElasticSearch (#581, v26.15-alpha10)
@@ -13,7 +12,8 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
-- Use vendored kazoo for pesistent watcher support (#592, v26.15-alpha19)
+- Use uv instead of pip; Add pyproject.toml (#577, v26.15-alpha20)
+- Use vendored kazoo for persistent watcher support (#592, v26.15-alpha19)
 - Disabling resources (#590, v26.15-alpha18)
 - Improve audit logging (#589, v26.15-alpha17)
 - Accept ASAB internal auth tokens at userinfo endpoint (#591, v26.15-alpha16)
@@ -28,6 +28,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-alpha20
 - v26.15-alpha19
 - v26.15-alpha18
 - v26.15-alpha17

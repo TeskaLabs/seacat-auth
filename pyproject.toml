@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seacat-auth"
+version = "26.15.0"
+description = "SeaCat Auth is a microservice that provides authentication, authorization, identity management, session management and other access control features."
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "TeskaLabs Ltd", email = "support@teskalabs.com"}
+]
+maintainers = [
+    {name = "TeskaLabs Ltd", email = "support@teskalabs.com"}
+]
+keywords = [
+    "authentication",
+    "authorization",
+    "identity",
+    "session-management",
+    "openid-connect",
+    "oauth2",
+    "rbac",
+    "microservice",
+    "access-control",
+    "webauthn",
+    "2fa",
+    "mfa",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Systems Administration :: Authentication/Directory",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp",
+    "aiosmtplib",
+    "motor",
+    "cryptography",
+    "jwcrypto>=0.9.1",
+    "fastjsonschema",
+    "bcrypt",
+    "argon2-cffi",
+    "aiomysql",
+    "jinja2",
+    "pyotp",
+    "webauthn",
+    "pyyaml",
+    "pysaml2",
+    "pymongo",
+    "sentry-sdk",
+    "kazoo @ git+https://github.com/TeskaLabs/kazoo.git",  # Vendored build with persistent watch feature
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
+]
+
+[project.optional-dependencies]
+# Requires system headers (openldap-dev / libldap-dev)
+ldap = ["python-ldap"]
+
+[project.urls]
+Homepage = "https://github.com/TeskaLabs/seacat-auth"
+Documentation = "https://docs.teskalabs.com/seacat-auth"
+"Docker Image" = "https://hub.docker.com/r/teskalabs/seacat-auth"
+Changelog = "https://github.com/TeskaLabs/seacat-auth/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/TeskaLabs/seacat-auth/issues"
+
+# PEP 735 dependency groups — independent of project deps
+# uv sync --only-group lint   → flake8 only
+# uv sync --only-group test   → test deps only (no python-ldap)
+[dependency-groups]
+lint = ["flake8"]
+test = [
+    "pymongo",
+    "bcrypt",
+    "argon2-cffi",
+    "jwcrypto>=0.9.1",
+    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git",
+]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.setuptools.packages.find]
+include = ["seacatauth*"]
+
+[tool.uv]
+# Don't install the default "dev" group on plain `uv sync`
+default-groups = []
