@@ -1587,7 +1587,7 @@ requires-dist = [
     { name = "aiomysql" },
     { name = "aiosmtplib" },
     { name = "argon2-cffi" },
-    { name = "asab", extras = ["encryption"], git = "https://github.com/TeskaLabs/asab.git" },
+    { name = "asab", extras = ["encryption"], git = "https://github.com/TeskaLabs/asab.git?rev=v26.37" },
     { name = "bcrypt" },
     { name = "cryptography" },
     { name = "fastjsonschema" },
