@@ -86,6 +86,8 @@ class ClientService(asab.Service):
 		self.TaskService = app.get_service("asab.TaskService")
 		# None until the first successful scan; empty frozenset means scanned with no public origins.
 		self.PublicClientOrigins: frozenset[str] | None = None
+		self._PublicClientOriginsRefreshLock = asyncio.Lock()
+		self._PublicClientOriginsRefreshPending = False
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
@@ -114,7 +116,7 @@ class ClientService(asab.Service):
 			self.register_provider(provider)
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
-		self.TaskService.schedule(self._rescan_public_client_origins())
+		self.TaskService.schedule(self._refresh_public_client_origins())
 		if any(isinstance(provider, MongoDBClientProvider) for provider in self.ClientProviders.values()):
 			self.TaskService.run_forever(self._watch_client_origins)
 
@@ -713,9 +715,23 @@ class ClientService(asab.Service):
 
 	def is_origin_allowed(self, origin: str) -> bool:
 		if self.PublicClientOrigins is None:
-			self.TaskService.schedule(self._rescan_public_client_origins())
+			self._schedule_public_client_origins_refresh()
 			raise RuntimeError("Public client origins are not initialized yet")
 		return origin in self.PublicClientOrigins
+
+
+	def _schedule_public_client_origins_refresh(self):
+		"""Fire-and-forget entry for sync callers (startup / CORS check)."""
+		self.TaskService.schedule(self._refresh_public_client_origins())
+
+
+	async def _refresh_public_client_origins(self):
+		"""Serialize origin refreshes; coalesce overlapping requests into a follow-up scan."""
+		self._PublicClientOriginsRefreshPending = True
+		async with self._PublicClientOriginsRefreshLock:
+			while self._PublicClientOriginsRefreshPending:
+				self._PublicClientOriginsRefreshPending = False
+				await self._rescan_public_client_origins()
 
 
 	async def _watch_client_origins(self):
@@ -742,7 +758,7 @@ class ClientService(asab.Service):
 					"operation": change.get("operationType"),
 				},
 			)
-			await self._rescan_public_client_origins()
+			await self._refresh_public_client_origins()
 
 
 	async def _rescan_public_client_origins(self):
