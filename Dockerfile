@@ -4,20 +4,21 @@ LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
 
+# Install uv (static binary)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 RUN set -ex \
   && apk update \
   && apk upgrade
 
 RUN apk add --no-cache \
   python3 \
-  py3-pip \
   libstdc++ \
   openssl \
   xmlsec \
   openldap
 
-# Create build environment so that dependencies like aiohttp can be build
-# Run all as a single command in order to reduce image size --virtual buildenv
+# Create build environment so that dependencies like aiohttp can be built
 RUN apk add --no-cache  \
     git \
     python3-dev \
@@ -28,40 +29,26 @@ RUN apk add --no-cache  \
     musl-dev \
     openldap-dev \
     rust \
-    cargo \
-&& python3 -m venv /venv \
-&& /venv/bin/pip3 install --upgrade pip \
-&& /venv/bin/pip3 install --no-cache-dir \
-    aiohttp \
-    aiosmtplib \
-    motor \
-    cryptography \
-    jwcrypto>=0.9.1 \
-    fastjsonschema \
-    bcrypt \
-    argon2_cffi \
-    python-ldap \
-    aiomysql \
-    jinja2 \
-    pyotp \
-    webauthn \
-    pyyaml \
-    pysaml2 \
-    pymongo \
-    sentry-sdk \
-    git+https://github.com/TeskaLabs/kazoo.git \
-    "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git"
+    cargo
 
-# ^^^ Use vendored Kazoo library till https://github.com/python-zk/kazoo/pull/715 is merged (persistent watcher support)
+# Create virtual environment
+RUN python3 -m venv /venv
+
+RUN mkdir -p /app/seacat-auth
+WORKDIR /app/seacat-auth
+COPY . /app/seacat-auth
+
+# Install main deps + ldap into /venv (uses uv.lock when present)
+ENV UV_PROJECT_ENVIRONMENT=/venv
+ENV UV_LINK_MODE=copy
+RUN uv sync --extra ldap --no-cache --no-editable --locked
 
 # This is for github CI/CD logs
 RUN /venv/bin/python3 -c "import asab; print(asab.__version__)"
 
-RUN mkdir -p /app/seacat-auth
-COPY . /app/seacat-auth
-
+# Create MANIFEST.json in the working directory
 # The manifest script needs the entire repo in a clean state (to avoid the -dirty tag)
-RUN (cd /app/seacat-auth && /venv/bin/asab-manifest.py ./MANIFEST.json)
+RUN /venv/bin/asab-manifest.py ./MANIFEST.json
 
 
 # ---- Runtime stage ----
