@@ -212,8 +212,8 @@ wheels = [
 
 [[package]]
 name = "asab"
-version = "26.30a1+69.g90d4aea"
-source = { git = "https://github.com/TeskaLabs/asab.git#90d4aea5f3f3fe0c2f5f08f5c794119f669ed0f8" }
+version = "26.36+32.g0fac088"
+source = { git = "https://github.com/TeskaLabs/asab.git#0fac0886dd069c7b5601129926767b5e71874c7d" }
 dependencies = [
     { name = "aiohttp" },
     { name = "fastjsonschema" },
