@@ -12,6 +12,7 @@
 - Update webauthn package (#572, v26.15-alpha3)
 
 ### Features
+- Proper CORS policy for OAuth API (#593, v26.15-alpha21)
 - Use uv instead of pip; Add pyproject.toml (#577, v26.15-alpha20)
 - Use vendored kazoo for persistent watcher support (#592, v26.15-alpha19)
 - Disabling resources (#590, v26.15-alpha18)
@@ -28,6 +29,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-alpha21
 - v26.15-alpha20
 - v26.15-alpha19
 - v26.15-alpha18
