@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import binascii
 import datetime
@@ -82,6 +83,12 @@ class ClientService(asab.Service):
 		self.DefaultProviderId: str = asab.Config.get("seacatauth:client", "default_provider_id")
 		self._create_providers_from_config()
 
+		self.TaskService = app.get_service("asab.TaskService")
+		# None until the first successful scan; empty frozenset means scanned with no public origins.
+		self.PublicClientOrigins: frozenset[str] | None = None
+		self._PublicClientOriginsRefreshLock = asyncio.Lock()
+		self._PublicClientOriginsRefreshPending = False
+
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
 
@@ -102,13 +109,16 @@ class ClientService(asab.Service):
 
 	async def initialize(self, app):
 		self.OIDCService = app.get_service("seacatauth.OpenIdConnectService")
+		from .provider.mongodb import MongoDBClientProvider
 		if self.DefaultProviderId not in self.ClientProviders:
 			# If no provider with the default ID is registered, register a MongoDB provider with that ID by default.
-			from .provider.mongodb import MongoDBClientProvider
 			provider = MongoDBClientProvider(app, provider_id=self.DefaultProviderId)
 			self.register_provider(provider)
 		for provider in self.ClientProviders.values():
 			await provider.initialize(app)
+		self.TaskService.schedule(self._refresh_public_client_origins())
+		if any(isinstance(provider, MongoDBClientProvider) for provider in self.ClientProviders.values()):
+			self.TaskService.run_forever(self._watch_client_origins)
 
 
 	def register_provider(self, provider: ClientProviderABC):
@@ -703,6 +713,67 @@ class ClientService(asab.Service):
 		self.Cache = valid
 
 
+	def is_origin_allowed(self, origin: str) -> bool:
+		if self.PublicClientOrigins is None:
+			self._schedule_public_client_origins_refresh()
+			raise RuntimeError("Public client origins are not initialized yet")
+		return origin in self.PublicClientOrigins
+
+
+	def _schedule_public_client_origins_refresh(self):
+		"""Fire-and-forget entry for sync callers (startup / CORS check)."""
+		self.TaskService.schedule(self._refresh_public_client_origins())
+
+
+	async def _refresh_public_client_origins(self):
+		"""Serialize origin refreshes; coalesce overlapping requests into a follow-up scan."""
+		self._PublicClientOriginsRefreshPending = True
+		async with self._PublicClientOriginsRefreshLock:
+			while self._PublicClientOriginsRefreshPending:
+				self._PublicClientOriginsRefreshPending = False
+				await self._rescan_public_client_origins()
+
+
+	async def _watch_client_origins(self):
+		from .provider.mongodb import MongoDBClientProvider
+		try:
+			await asyncio.gather(*[
+				self._watch_provider_clients(provider)
+				for provider in self.ClientProviders.values()
+				if isinstance(provider, MongoDBClientProvider)
+			])
+		except asyncio.CancelledError:
+			raise
+		except Exception:
+			L.exception("Client origin watch failed; retrying.")
+			await asyncio.sleep(10)
+
+
+	async def _watch_provider_clients(self, provider):
+		async for change in provider.watch():
+			L.debug(
+				"Client origin cache: client collection changed.",
+				struct_data={
+					"provider_id": provider.ProviderId,
+					"operation": change.get("operationType"),
+				},
+			)
+			await self._refresh_public_client_origins()
+
+
+	async def _rescan_public_client_origins(self):
+		origins = set()
+		async for client in self.iterate_clients():
+			if is_client_confidential(client):
+				continue
+			for uri in client.get("redirect_uris") or []:
+				origin = origin_from_redirect_uri(uri)
+				if origin is not None:
+					origins.add(origin)
+		self.PublicClientOrigins = frozenset(origins)
+		L.debug("Public client origin cache updated.", struct_data={"count": len(origins)})
+
+
 	def _normalize_client(self, provider_id: str, raw_client: dict):
 		client = {
 			k: v
@@ -719,6 +790,28 @@ class ClientService(asab.Service):
 		if "__client_secret" in raw_client:
 			client["client_secret"] = True
 		return client
+
+
+def origin_from_redirect_uri(uri: str) -> str | None:
+	"""
+	Return the web origin of an http(s) redirect URI, or None if it is not a web origin.
+	"""
+	try:
+		parsed = urllib.parse.urlparse(uri)
+		hostname = parsed.hostname
+		port = parsed.port
+	except ValueError:
+		return None
+	if parsed.scheme not in ("http", "https") or not hostname:
+		return None
+	if ":" in hostname:
+		# Wrap IPv6
+		host = "[{}]".format(hostname)
+	else:
+		host = hostname
+	if port is None or (parsed.scheme == "https" and port == 443) or (parsed.scheme == "http" and port == 80):
+		return "{}://{}".format(parsed.scheme, host)
+	return "{}://{}:{}".format(parsed.scheme, host, port)
 
 
 def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_method: str = "full_match"):
@@ -749,10 +842,9 @@ def validate_redirect_uri(redirect_uri: str, registered_uris: list, validation_m
 
 
 def is_client_confidential(client: dict):
-	token_endpoint_auth_method = client.get("token_endpoint_auth_method", OAuth2.TokenEndpointAuthMethod.NONE)
-	if token_endpoint_auth_method not in OAuth2.TokenEndpointAuthMethod:
-		raise NotImplementedError("Unsupported token_endpoint_auth_method: {!r}".format(token_endpoint_auth_method))
-
+	token_endpoint_auth_method = OAuth2.TokenEndpointAuthMethod(
+		client.get("token_endpoint_auth_method") or OAuth2.TokenEndpointAuthMethod.NONE
+	)
 	if token_endpoint_auth_method == OAuth2.TokenEndpointAuthMethod.NONE:
 		return False
 	else:

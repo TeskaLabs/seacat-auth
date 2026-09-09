@@ -1,5 +1,6 @@
 import logging
 
+import aiohttp.hdrs
 import asab
 import asab.web.rest
 import asab.web.auth
@@ -92,7 +93,12 @@ class UserInfoHandler(object):
 
 		userinfo = await self.OpenIdConnectService.build_userinfo(session)
 
-		return asab.web.rest.json_response(request, userinfo)
+		headers = {
+			# Prevent cached claims from being reused after an account change
+			aiohttp.hdrs.CACHE_CONTROL: "no-store",
+		}
+
+		return asab.web.rest.json_response(request, userinfo, headers=headers)
 
 
 	async def _build_userinfo_from_internal_token(self, request):

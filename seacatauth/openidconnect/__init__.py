@@ -46,3 +46,22 @@ class OpenIdConnectModule(asab.Module):
 		self.SessionHandler = SessionHandler(app, self.OpenIdConnectService, self.SessionService)
 		self.PublicKeysHandler = PublicKeysHandler(app, self.OpenIdConnectService)
 		self.DiscoveryHandler = DiscoveryHandler(app, self.OpenIdConnectService)
+
+		client_svc = app.get_service("seacatauth.ClientService")
+		# Browser SPA needs: token (+ revoke), userinfo; discovery/JWKS for client-side OIDC libs.
+		oauth_cors_paths = [
+			OpenIdConnectService.TokenPath,
+			OpenIdConnectService.TokenRevokePath,
+			OpenIdConnectService.UserInfoPath,
+			OpenIdConnectService.JwksPath,
+			"/.well-known/openid-configuration",
+			"/.well-known/oauth-authorization-server",
+			"/.well-known/jwks.json",
+		]
+		for container in (app.WebContainer, app.PublicWebContainer):
+			container.enable_cors(
+				allow_origin=client_svc.is_origin_allowed,
+				preflight_paths=oauth_cors_paths,
+				allow_headers=["Authorization", "Content-Type", "X-App", "X-Request-Id"],
+				allow_credentials=False,
+			)

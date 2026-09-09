@@ -4,7 +4,7 @@ import base64
 import datetime
 import typing
 
-from ..authz.rbac.service import RBACService
+import asab.web.auth.authorization
 
 
 L = logging.getLogger(__name__)
@@ -295,7 +295,7 @@ class Session:
 		return (
 			self.Authorization is not None
 			and self.Authorization.Authz is not None
-			and RBACService.is_superuser(self.Authorization.Authz)
+			and asab.web.auth.authorization.is_superuser(self.Authorization.Authz)
 		)
 
 	def has_tenant_access(self, tenant_id: str) -> bool:
@@ -317,7 +317,9 @@ class Session:
 		return (
 			self.Authorization is not None
 			and self.Authorization.Authz is not None
-			and RBACService.has_resource_access(self.Authorization.Authz, tenant_id, {resource_id})
+			and asab.web.auth.authorization.has_resource_access(
+				self.Authorization.Authz, {resource_id}, tenant_id
+			)
 		)
 
 	def has_global_resource_access(self, resource_id: str) -> bool:
@@ -327,7 +329,9 @@ class Session:
 		return (
 			self.Authorization is not None
 			and self.Authorization.Authz is not None
-			and RBACService.has_resource_access(self.Authorization.Authz, None, {resource_id})
+			and asab.web.auth.authorization.has_resource_access(
+				self.Authorization.Authz, {resource_id}, None
+			)
 		)
 
 	@classmethod
