@@ -29,6 +29,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-beta
 - v26.15-alpha21
 - v26.15-alpha20
 - v26.15-alpha19
