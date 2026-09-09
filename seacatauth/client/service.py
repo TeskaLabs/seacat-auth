@@ -84,7 +84,8 @@ class ClientService(asab.Service):
 		self._create_providers_from_config()
 
 		self.TaskService = app.get_service("asab.TaskService")
-		self.PublicClientOrigins: frozenset[str] = frozenset()
+		# None until the first successful scan; empty frozenset means scanned with no public origins.
+		self.PublicClientOrigins: frozenset[str] | None = None
 
 		app.PubSub.subscribe("Application.tick/600!", self._clear_expired_cache)
 
@@ -711,6 +712,9 @@ class ClientService(asab.Service):
 
 
 	def is_origin_allowed(self, origin: str) -> bool:
+		if self.PublicClientOrigins is None:
+			self.TaskService.schedule(self._rescan_public_client_origins())
+			raise RuntimeError("Public client origins are not initialized yet")
 		return origin in self.PublicClientOrigins
 
 
