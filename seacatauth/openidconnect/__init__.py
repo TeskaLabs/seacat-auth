@@ -63,5 +63,5 @@ class OpenIdConnectModule(asab.Module):
 				allow_origin=client_svc.is_origin_allowed,
 				preflight_paths=oauth_cors_paths,
 				allow_headers=["Authorization", "Content-Type", "X-App", "X-Request-Id"],
-				allow_credentials=True,
+				allow_credentials=False,
 			)
