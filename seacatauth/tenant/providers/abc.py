@@ -6,8 +6,9 @@ import asab
 class TenantProviderABC(asab.Configurable, abc.ABC):
 
 
-	def __init__(self, provider_id, config_section_name, config=None):
+	def __init__(self, app, provider_id, config_section_name, config=None):
 		super().__init__(config_section_name=config_section_name, config=config)
+		self.App = app
 		self.ProviderID = provider_id
 
 
