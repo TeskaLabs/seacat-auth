@@ -377,6 +377,10 @@ class OpenIdConnectService(asab.Service):
 		#   User info is optional and its parts should be included (or not) based on SCOPE
 		payload = await self.build_userinfo(session)
 
+		if "custom" in payload:
+			# Reduce the token size - This removes lengthy LDAP attributes
+			del payload["custom"]
+
 		payload["iat"] = int(datetime.datetime.now(datetime.UTC).timestamp())
 		if expires_at:
 			payload["exp"] = int(expires_at.timestamp())
