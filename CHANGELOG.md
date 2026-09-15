@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v28.37
+
+### Fixes
+- Exclude "custom" from ID token payload (#598, v26.37-alpha)
+
+### Pre-releases
+- v26.37-alpha
+
+---
+
+
 ## v26.15
 
 ### Fixes
