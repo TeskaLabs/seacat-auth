@@ -2,6 +2,9 @@
 
 ## v26.15
 
+### Patches
+- Fix Authorization header for LDAP users (#597, v26.15-beta1)
+
 ### Fixes
 - Ensure LDAP script always includes memberOf attr (#588, v26.15-alpha13)
 - Remove version dirtiness (#583, v26.15-alpha12)
@@ -29,6 +32,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-beta1
 - v26.15-beta
 - v26.15-alpha21
 - v26.15-alpha20
