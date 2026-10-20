@@ -25,14 +25,25 @@ LOGIN_DESCRIPTOR_FAKE = [{
 }]
 
 
-def audit_log_credentials_update(credentials_id: str, updated_attributes: dict):
+def audit_log_credentials_update(
+	credentials_id: str,
+	updated_attributes: dict,
+	current_attributes: typing.Optional[dict] = None,
+):
 	"""
-	Emit one audit log line per changed credentials attribute.
+	Emit one audit log line per actually changed credentials attribute.
 
+	Attributes whose new value equals the current value are skipped.
 	Suspension and activation are logged with explicit messages.
 	"""
+	if current_attributes is None:
+		current_attributes = {}
+
 	for attribute, value in updated_attributes.items():
 		if attribute == "suspended":
+			# Missing "suspended" means active (False)
+			if bool(current_attributes.get("suspended", False)) == bool(value):
+				continue
 			AuditLogger.notice(
 				"Credentials suspended" if value else "Credentials activated",
 				struct_data={
@@ -41,6 +52,8 @@ def audit_log_credentials_update(credentials_id: str, updated_attributes: dict):
 				},
 			)
 		else:
+			if current_attributes.get(attribute) == value:
+				continue
 			AuditLogger.notice(
 				"Credentials '{}' updated".format(attribute),
 				struct_data={
@@ -627,7 +640,7 @@ class CredentialsService(asab.Service):
 			L.exception("Cannot update credentials")
 			raise
 
-		audit_log_credentials_update(credentials_id, validated_data)
+		audit_log_credentials_update(credentials_id, validated_data, current_dict)
 		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials_id)
 
 		# Log the credentials out if they have been suspended
