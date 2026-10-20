@@ -25,6 +25,31 @@ LOGIN_DESCRIPTOR_FAKE = [{
 }]
 
 
+def audit_log_credentials_update(credentials_id: str, updated_attributes: dict):
+	"""
+	Emit one audit log line per changed credentials attribute.
+
+	Suspension and activation are logged with explicit messages.
+	"""
+	for attribute, value in updated_attributes.items():
+		if attribute == "suspended":
+			AuditLogger.notice(
+				"Credentials suspended" if value else "Credentials activated",
+				struct_data={
+					"cid": credentials_id,
+					"suspended": value,
+				},
+			)
+		else:
+			AuditLogger.notice(
+				"Credentials '{}' updated".format(attribute),
+				struct_data={
+					"cid": credentials_id,
+					"attribute": attribute,
+				},
+			)
+
+
 class CredentialsService(asab.Service):
 	def __init__(self, app, service_name="seacatauth.CredentialsService", tenant_service=None):
 		super().__init__(app, service_name)
@@ -602,18 +627,7 @@ class CredentialsService(asab.Service):
 			L.exception("Cannot update credentials")
 			raise
 
-		AuditLogger.notice("Credentials updated", struct_data={
-			"cid": credentials_id,
-			"attributes": list(validated_data.keys()),
-		})
-		if "suspended" in validated_data:
-			AuditLogger.notice(
-				"Credentials suspended" if validated_data["suspended"] else "Credentials activated",
-				struct_data={
-					"cid": credentials_id,
-					"suspended": validated_data["suspended"],
-				},
-			)
+		audit_log_credentials_update(credentials_id, validated_data)
 		self.App.PubSub.publish("Credentials.updated!", credentials_id=credentials_id)
 
 		# Log the credentials out if they have been suspended
