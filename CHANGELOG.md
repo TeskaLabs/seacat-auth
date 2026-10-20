@@ -3,6 +3,7 @@
 ## v26.15
 
 ### Patches
+- Explicit audit logs for credentials updates (v26.15-beta3)
 - Update ASAB to fix auth initialization race condition (#599, v26.15-beta2)
 - Fix Authorization header for LDAP users (#597, v26.15-beta1)
 
@@ -33,6 +34,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15-beta3
 - v26.15-beta2
 - v26.15-beta1
 - v26.15-beta
