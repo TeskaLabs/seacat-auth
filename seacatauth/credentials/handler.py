@@ -414,9 +414,16 @@ class CredentialsHandler(object):
 			"status": "OK",
 			"_id": "mongodb:default:abc123def456",
 			"_type": "mongodb",
-			"_provider_id": "mongodb:default"
+			"_provider_id": "mongodb:default",
+			"tenant_assign": {
+				"tenant": "acme",
+				"result": "OK"
+			}
 		}
 		```
+
+		`tenant_assign` is included only when the `tenant` query parameter is non-empty.
+		A failed assignment keeps the credentials response and reports `"result": "ERROR"` with `tech_err`.
 		---
 		parameters:
 		-	name: provider
@@ -463,9 +470,6 @@ class CredentialsHandler(object):
 
 		credentials_id = result["credentials_id"]
 
-		if tenant:
-			await self.TenantService.assign_tenant(credentials_id, tenant)
-
 		response_data = {
 			"result": "OK",
 			"status": "OK",  # Backward compatibility
@@ -473,6 +477,23 @@ class CredentialsHandler(object):
 			"_type": provider.Type,
 			"_provider_id": provider.ProviderID,
 		}
+
+		if tenant:
+			tenant_assign = {"tenant": tenant}
+			try:
+				await self.TenantService.assign_tenant(credentials_id, tenant)
+				tenant_assign["result"] = "OK"
+			except Exception as e:
+				L.error("Failed to assign tenant: {}".format(e), struct_data={
+					"cid": credentials_id, "tenant": tenant})
+				tenant_assign["result"] = "ERROR"
+				if isinstance(e, exceptions.TenantNotFoundError):
+					tenant_assign["tech_err"] = "Tenant not found."
+				elif isinstance(e, asab.exceptions.Conflict):
+					tenant_assign["tech_err"] = "Tenant already assigned."
+				else:
+					tenant_assign["tech_err"] = "Failed to assign tenant."
+			response_data["tenant_assign"] = tenant_assign
 
 		if reset_password:
 			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
