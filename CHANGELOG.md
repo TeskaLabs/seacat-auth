@@ -6,10 +6,12 @@
 - Exclude "custom" from ID token payload (#598, v26.37-alpha)
 
 ### Features
+- Move the tenant parameter into the "new credentials" request body (#604, v26.37-alpha3)
 - Assign tenant to newly created credentials with query param (#603, v26.37-alpha2)
 - Explicit audit logs for credentials updates (#601, v26.37-alpha1)
 
 ### Pre-releases
+- v26.37-alpha3
 - v26.37-alpha2
 - v26.37-alpha1
 - v26.37-alpha
