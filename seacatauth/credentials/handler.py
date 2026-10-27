@@ -394,7 +394,7 @@ class CredentialsHandler(object):
 		Create new credentials
 
 		Creates new user credentials in the specified provider.
-		Optionally sends a password reset link to the new user.
+		Optionally assigns the new credentials to a tenant and sends a password reset link to the new user.
 
 		Example body:
 		```json
@@ -425,19 +425,34 @@ class CredentialsHandler(object):
 			required: true
 			schema:
 				type: string
+		-	name: tenant
+			in: query
+			description:
+				Tenant to assign to the new credentials.
+				The caller must have access to `seacat:tenant:assign` in that tenant.
+			required: false
+			schema:
+				type: string
 		responses:
 			200:
 				description: Credentials created successfully
 			400:
 				description: Invalid request data or credentials already exist
 			403:
-				description: Insufficient permissions to create credentials
+				description: Insufficient permissions to create credentials or assign the requested tenant
 			404:
 				description: Provider not found
 		"""
 		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
+		tenant = request.query.get("tenant", "").strip()
+
+		# Reject tenant assignment before creating the user when the caller cannot assign it
+		if tenant:
+			authz = asab.contextvars.Authz.get()
+			with asab.contextvars.tenant_context(tenant):
+				authz.require_resource_access(ResourceId.TENANT_ASSIGN)
 
 		# Create credentials
 		result = await self.CredentialsService.create_credentials(provider_id, json_data)
@@ -447,6 +462,9 @@ class CredentialsHandler(object):
 			return asab.web.rest.json_response(request, result, status=400)
 
 		credentials_id = result["credentials_id"]
+
+		if tenant:
+			await self.TenantService.assign_tenant(credentials_id, tenant)
 
 		response_data = {
 			"result": "OK",
