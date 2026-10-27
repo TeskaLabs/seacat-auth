@@ -63,7 +63,11 @@ CREATE_CREDENTIALS = {
 				"password",  # M2M credentials allow direct setting of password
 				"passwordlink",
 			])
-		}
+		},
+		"tenant": {
+			"type": "string",
+			"description": "Tenant to assign to the new credentials",
+		},
 	},
 }
 
