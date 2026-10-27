@@ -394,7 +394,7 @@ class CredentialsHandler(object):
 		Create new credentials
 
 		Creates new user credentials in the specified provider.
-		Optionally sends a password reset link to the new user.
+		Optionally assigns the new credentials to a tenant and sends a password reset link to the new user.
 
 		Example body:
 		```json
@@ -414,9 +414,16 @@ class CredentialsHandler(object):
 			"status": "OK",
 			"_id": "mongodb:default:abc123def456",
 			"_type": "mongodb",
-			"_provider_id": "mongodb:default"
+			"_provider_id": "mongodb:default",
+			"tenant_assign": {
+				"tenant": "acme",
+				"result": "OK"
+			}
 		}
 		```
+
+		`tenant_assign` is included only when the `tenant` query parameter is non-empty.
+		A failed assignment keeps the credentials response and reports `"result": "ERROR"` with `tech_err`.
 		---
 		parameters:
 		-	name: provider
@@ -425,19 +432,34 @@ class CredentialsHandler(object):
 			required: true
 			schema:
 				type: string
+		-	name: tenant
+			in: query
+			description:
+				Tenant to assign to the new credentials.
+				The caller must have access to `seacat:tenant:assign` in that tenant.
+			required: false
+			schema:
+				type: string
 		responses:
 			200:
 				description: Credentials created successfully
 			400:
 				description: Invalid request data or credentials already exist
 			403:
-				description: Insufficient permissions to create credentials
+				description: Insufficient permissions to create credentials or assign the requested tenant
 			404:
 				description: Provider not found
 		"""
 		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
+		tenant = request.query.get("tenant", "").strip()
+
+		# Reject tenant assignment before creating the user when the caller cannot assign it
+		if tenant:
+			authz = asab.contextvars.Authz.get()
+			with asab.contextvars.tenant_context(tenant):
+				authz.require_resource_access(ResourceId.TENANT_ASSIGN)
 
 		# Create credentials
 		result = await self.CredentialsService.create_credentials(provider_id, json_data)
@@ -455,6 +477,23 @@ class CredentialsHandler(object):
 			"_type": provider.Type,
 			"_provider_id": provider.ProviderID,
 		}
+
+		if tenant:
+			tenant_assign = {"tenant": tenant}
+			try:
+				await self.TenantService.assign_tenant(credentials_id, tenant)
+				tenant_assign["result"] = "OK"
+			except Exception as e:
+				L.error("Failed to assign tenant: {}".format(e), struct_data={
+					"cid": credentials_id, "tenant": tenant})
+				tenant_assign["result"] = "ERROR"
+				if isinstance(e, exceptions.TenantNotFoundError):
+					tenant_assign["tech_err"] = "Tenant not found."
+				elif isinstance(e, asab.exceptions.Conflict):
+					tenant_assign["tech_err"] = "Tenant already assigned."
+				else:
+					tenant_assign["tech_err"] = "Failed to assign tenant."
+			response_data["tenant_assign"] = tenant_assign
 
 		if reset_password:
 			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
