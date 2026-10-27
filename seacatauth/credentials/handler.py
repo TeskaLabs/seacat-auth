@@ -403,7 +403,8 @@ class CredentialsHandler(object):
 			"email": "john.doe@example.com",
 			"phone": "+1234567890",
 			"password": "SecureP@ssw0rd",
-			"passwordlink": false
+			"passwordlink": false,
+			"tenant": "acme"
 		}
 		```
 
@@ -422,22 +423,15 @@ class CredentialsHandler(object):
 		}
 		```
 
-		`tenant_assign` is included only when the `tenant` query parameter is non-empty.
+		`tenant_assign` is included only when the request body contains a non-empty `tenant`.
 		A failed assignment keeps the credentials response and reports `"result": "ERROR"` with `tech_err`.
+		The caller must have access to `seacat:tenant:assign` in that tenant.
 		---
 		parameters:
 		-	name: provider
 			in: path
 			description: ID of the credential provider to create the credentials in
 			required: true
-			schema:
-				type: string
-		-	name: tenant
-			in: query
-			description:
-				Tenant to assign to the new credentials.
-				The caller must have access to `seacat:tenant:assign` in that tenant.
-			required: false
 			schema:
 				type: string
 		responses:
@@ -453,7 +447,7 @@ class CredentialsHandler(object):
 		reset_password = json_data.pop("passwordlink", False)
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
-		tenant = request.query.get("tenant", "").strip()
+		tenant = json_data.pop("tenant", "").strip()
 
 		# Reject tenant assignment before creating the user when the caller cannot assign it
 		if tenant:
