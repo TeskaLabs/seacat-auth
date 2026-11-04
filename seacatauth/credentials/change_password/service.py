@@ -8,7 +8,7 @@ import asab
 import asab.exceptions
 
 from ... import exceptions
-from ...generic import generate_ergonomic_token
+from ...generic import fingerprint, generate_ergonomic_token
 from ...events import EventTypes
 from ...authn.provider import AuthnMethodProviderABC
 
@@ -81,7 +81,10 @@ class ChangePasswordService(asab.Service):
 			seconds=expiration if expiration is not None else self.Expiration))
 
 		await upsertor.execute(event_type=EventTypes.PWD_RESET_TOKEN_CREATED)
-		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={"cid": credentials_id})
+		L.log(asab.LOG_NOTICE, "Password reset token created", struct_data={
+			"cid": credentials_id,
+			"token_fingerprint": fingerprint(password_reset_token),
+		})
 		return password_reset_token
 
 
@@ -93,7 +96,9 @@ class ChangePasswordService(asab.Service):
 	async def delete_password_reset_token(self, password_reset_token: str):
 		token_id = await self._token_id_from_token_string(password_reset_token)
 		await self.StorageService.delete(self.ChangePasswordCollection, token_id)
-		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={"pwd_token": password_reset_token})
+		L.log(asab.LOG_NOTICE, "Password reset token deleted", struct_data={
+			"token_fingerprint": fingerprint(password_reset_token),
+		})
 
 
 	async def get_password_reset_token_details(self, password_reset_token: str):

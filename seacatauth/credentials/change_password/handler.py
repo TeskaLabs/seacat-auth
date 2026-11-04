@@ -141,7 +141,9 @@ class ChangePasswordHandler(object):
 				password_reset_token)
 			credentials_id = password_reset_details["cid"]
 		except KeyError:
-			AuditLogger.notice("Password reset failed: Invalid password reset token")
+			AuditLogger.notice("Password reset failed: Invalid password reset token", struct_data={
+				"token_fingerprint": generic.fingerprint(password_reset_token),
+			})
 			return asab.web.rest.json_response(request, status=401, data={"result": "FAILED"})
 
 		# Change the password

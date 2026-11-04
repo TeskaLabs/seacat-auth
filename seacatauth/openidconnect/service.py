@@ -14,7 +14,7 @@ import jwcrypto.jwk
 import jwcrypto.jws
 
 from ..models.const import ResourceId
-from ..generic import update_url_query_params
+from ..generic import fingerprint, update_url_query_params
 from ..models import Session
 from .. import exceptions, AuditLogger
 from . import pkce
@@ -584,10 +584,12 @@ class OpenIdConnectService(asab.Service):
 		try:
 			token_bytes = base64.urlsafe_b64decode(code.encode("ascii"))
 		except binascii.Error as e:
-			L.error("Corrupt authorization code format: Base64 decoding failed.", struct_data={"code": code})
+			L.error("Corrupt authorization code format: Base64 decoding failed.", struct_data={
+				"token_fingerprint": fingerprint(code)})
 			raise exceptions.SessionNotFoundError("Corrupt authorization code format") from e
 		except UnicodeEncodeError as e:
-			L.error("Corrupt authorization code format: ASCII decoding failed.", struct_data={"code": code})
+			L.error("Corrupt authorization code format: ASCII decoding failed.", struct_data={
+				"token_fingerprint": fingerprint(code)})
 			raise exceptions.SessionNotFoundError("Corrupt authorization code format") from e
 
 		token_data = await self.TokenService.get(token_bytes, token_type=AuthorizationCode.TokenType)
@@ -616,11 +618,11 @@ class OpenIdConnectService(asab.Service):
 			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		except binascii.Error as e:
 			L.error("Corrupt access token format: Base64 decoding failed.", struct_data={
-				"token_value": token_value})
+				"token_fingerprint": fingerprint(token_value)})
 			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
 		except UnicodeEncodeError as e:
 			L.error("Corrupt access token format: ASCII decoding failed.", struct_data={
-				"token_value": token_value})
+				"token_fingerprint": fingerprint(token_value)})
 			raise exceptions.SessionNotFoundError("Corrupt access token format") from e
 
 		try:
@@ -631,7 +633,8 @@ class OpenIdConnectService(asab.Service):
 			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
 			L.error("Integrity error: Access token points to a nonexistent session.", struct_data={
-				"sid": token_data["sid"]})
+				"sid": token_data["sid"],
+				"token_fingerprint": fingerprint(token_value)})
 			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Access token points to a nonexistent session")
 
@@ -651,11 +654,11 @@ class OpenIdConnectService(asab.Service):
 			token_bytes = base64.urlsafe_b64decode(token_value.encode("ascii"))
 		except binascii.Error as e:
 			L.error("Corrupt refresh token format: Base64 decoding failed.", struct_data={
-				"token_value": token_value})
+				"token_fingerprint": fingerprint(token_value)})
 			raise exceptions.SessionNotFoundError("Corrupt refresh token format") from e
 		except UnicodeEncodeError as e:
 			L.error("Corrupt refresh token format: ASCII decoding failed.", struct_data={
-				"token_value": token_value})
+				"token_fingerprint": fingerprint(token_value)})
 			raise exceptions.SessionNotFoundError("Corrupt refresh token format") from e
 
 		try:
@@ -666,7 +669,8 @@ class OpenIdConnectService(asab.Service):
 			session = await self.SessionService.get(token_data["sid"])
 		except KeyError:
 			L.error("Integrity error: Refresh token points to a nonexistent session.", struct_data={
-				"sid": token_data["sid"]})
+				"sid": token_data["sid"],
+				"token_fingerprint": fingerprint(token_value)})
 			await self.TokenService.delete(token_bytes)
 			raise exceptions.SessionNotFoundError("Refresh token points to a nonexistent session")
 

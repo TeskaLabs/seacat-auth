@@ -1,3 +1,4 @@
+import base64
 import datetime
 import logging
 import secrets
@@ -8,6 +9,7 @@ import bson
 import pymongo
 
 from ..events import EventTypes
+from ..generic import fingerprint
 from .. import AuditLogger
 
 
@@ -91,7 +93,11 @@ class SessionTokenService(asab.Service):
 				upsertor.set(k, v)
 
 		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_CREATED)
-		AuditLogger.notice("Session token created", struct_data={"sid": session_id, "type": token_type})
+		AuditLogger.notice("Session token created", struct_data={
+			"sid": session_id,
+			"type": token_type,
+			"token_fingerprint": _token_fingerprint(token),
+		})
 
 		return token
 
@@ -134,7 +140,10 @@ class SessionTokenService(asab.Service):
 		upsertor.set(SessionTokenField.ExpiresAt, expires_at)
 		await upsertor.execute(event_type=EventTypes.AUTH_TOKEN_EXTENDED)
 		AuditLogger.notice("Session token validity extended", struct_data={
-			"sid": data[SessionTokenField.SessionId], "type": data[SessionTokenField.TokenType]})
+			"sid": data[SessionTokenField.SessionId],
+			"type": data[SessionTokenField.TokenType],
+			"token_fingerprint": _token_fingerprint(token),
+		})
 		return data
 
 
@@ -148,7 +157,10 @@ class SessionTokenService(asab.Service):
 		collection = self.StorageService.Database[self.SessionTokenCollection]
 		token_data = await collection.find_one_and_delete(filter={"_id": _hash_token(token)})
 		AuditLogger.notice("Session token deleted", struct_data={
-			"sid": token_data[SessionTokenField.SessionId], "type": token_data[SessionTokenField.TokenType]})
+			"sid": token_data[SessionTokenField.SessionId],
+			"type": token_data[SessionTokenField.TokenType],
+			"token_fingerprint": _token_fingerprint(token),
+		})
 
 
 	async def _delete_expired_tokens(self):
@@ -187,6 +199,11 @@ def _is_token_valid(token_data: dict):
 
 def _hash_token(token: bytes):
 	return hashlib.sha256(token).digest()
+
+
+def _token_fingerprint(token: bytes) -> str:
+	# Hash the base64 form clients present, so this matches later token logs.
+	return fingerprint(base64.urlsafe_b64encode(token).decode("ascii"))
 
 
 def _generate_token(token_length: int):

@@ -6,6 +6,8 @@ import typing
 
 import asab.web.auth.authorization
 
+from ..generic import fingerprint
+
 
 L = logging.getLogger(__name__)
 
@@ -400,7 +402,9 @@ class Session:
 				id_token = id_token.decode("ascii")
 			except UnicodeDecodeError:
 				# Probably old ID token, encoded differently
-				L.error("Cannot deserialize ID token", struct_data={"id_token": id_token})
+				L.error("Cannot deserialize ID token", struct_data={
+					"token_fingerprint": fingerprint(id_token.decode("latin-1")),
+				})
 
 		access_token = session_dict.pop(cls.FN.OAuth2.AccessToken, None)
 		if access_token is not None:

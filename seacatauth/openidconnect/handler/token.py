@@ -165,6 +165,7 @@ class TokenHandler(object):
 					"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
+					"token_fingerprint": generic.fingerprint(form_data.get("code")),
 				}
 			)
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
@@ -176,6 +177,7 @@ class TokenHandler(object):
 					"grant_type": const.OAuth2.GrantType.AUTHORIZATION_CODE,
 					"client_id": client_id,
 					"redirect_uri": form_data.get("redirect_uri"),
+					"token_fingerprint": generic.fingerprint(form_data.get("code")),
 				}
 			)
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
@@ -252,6 +254,7 @@ class TokenHandler(object):
 				struct_data={
 					"grant_type": const.OAuth2.GrantType.REFRESH_TOKEN,
 					"client_id": client_id,
+					"token_fingerprint": generic.fingerprint(form_data.get("refresh_token")),
 				}
 			)
 			return self.token_error_response(request, TokenRequestErrorResponseCode.InvalidGrant)
@@ -534,6 +537,7 @@ class TokenHandler(object):
 						struct_data={
 							"cid": session.Credentials.Id,
 							"client_id": session.OAuth2.ClientId,
+							"token_fingerprint": generic.fingerprint(token_value),
 						}
 					)
 					raise aiohttp.web.HTTPBadRequest() from e
