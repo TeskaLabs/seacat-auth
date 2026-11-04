@@ -3,6 +3,7 @@
 ## v28.37
 
 ### Fixes
+- Upgrade dependencies (#606, v26.37-alpha4)
 - Exclude "custom" from ID token payload (#598, v26.37-alpha)
 
 ### Features
@@ -11,6 +12,7 @@
 - Explicit audit logs for credentials updates (#601, v26.37-alpha1)
 
 ### Pre-releases
+- v26.37-alpha4
 - v26.37-alpha3
 - v26.37-alpha2
 - v26.37-alpha1
