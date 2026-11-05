@@ -3,6 +3,7 @@
 ## v28.37
 
 ### Fixes
+- Extend invitation TTL to one week (#609, v26.37-alpha6)
 - Add role assignment option to credentials creation handler (#608, v26.37-alpha5)
 - Upgrade dependencies (#606, v26.37-alpha4)
 - Exclude "custom" from ID token payload (#598, v26.37-alpha)
@@ -13,6 +14,7 @@
 - Explicit audit logs for credentials updates (#601, v26.37-alpha1)
 
 ### Pre-releases
+- v26.37-alpha6
 - v26.37-alpha5
 - v26.37-alpha4
 - v26.37-alpha3
