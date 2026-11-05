@@ -394,7 +394,7 @@ class CredentialsHandler(object):
 		Create new credentials
 
 		Creates new user credentials in the specified provider.
-		Optionally assigns the new credentials to a tenant and sends a password reset link to the new user.
+		Optionally assigns the new credentials to a tenant and a role, and sends a password reset link to the new user.
 
 		Example body:
 		```json
@@ -404,7 +404,8 @@ class CredentialsHandler(object):
 			"phone": "+1234567890",
 			"password": "SecureP@ssw0rd",
 			"passwordlink": false,
-			"tenant": "acme"
+			"tenant": "acme",
+			"role": "acme/reader"
 		}
 		```
 
@@ -419,13 +420,21 @@ class CredentialsHandler(object):
 			"tenant_assign": {
 				"tenant": "acme",
 				"result": "OK"
+			},
+			"role_assign": {
+				"role": "acme/reader",
+				"result": "OK"
 			}
 		}
 		```
 
 		`tenant_assign` is included only when the request body contains a non-empty `tenant`.
+		`role_assign` is included only when the request body contains a non-empty `role`.
+		The role is assigned after the tenant.
+		`role` is a role ID (`{tenant}/{role}` or `*/{role}`).
 		A failed assignment keeps the credentials response and reports `"result": "ERROR"` with `tech_err`.
-		The caller must have access to `seacat:tenant:assign` in that tenant.
+		The caller must have access to `seacat:tenant:assign` in the requested tenant.
+		The caller must have access to `seacat:role:assign` in the role's tenant, or `seacat:role:assign:global` for a global role.
 		---
 		parameters:
 		-	name: provider
@@ -440,7 +449,7 @@ class CredentialsHandler(object):
 			400:
 				description: Invalid request data or credentials already exist
 			403:
-				description: Insufficient permissions to create credentials or assign the requested tenant
+				description: Insufficient permissions to create credentials or assign the requested tenant or role
 			404:
 				description: Provider not found
 		"""
@@ -448,12 +457,21 @@ class CredentialsHandler(object):
 		provider_id = request.match_info["provider"]
 		provider = self.CredentialsService.CredentialProviders[provider_id]
 		tenant = json_data.pop("tenant", "").strip()
+		role = json_data.pop("role", "").strip()
+		role_id = ""
+		role_tenant = None
+		if role:
+			role_id, role_tenant = _resolve_role_id(role)
 
 		# Reject tenant assignment before creating the user when the caller cannot assign it
 		if tenant:
 			authz = asab.contextvars.Authz.get()
 			with asab.contextvars.tenant_context(tenant):
 				authz.require_resource_access(ResourceId.TENANT_ASSIGN)
+
+		# Reject role assignment before creating the user when the caller cannot assign it
+		if role_id:
+			_require_role_assign_access(role_tenant)
 
 		# Create credentials
 		result = await self.CredentialsService.create_credentials(provider_id, json_data)
@@ -488,6 +506,21 @@ class CredentialsHandler(object):
 				else:
 					tenant_assign["tech_err"] = "Failed to assign tenant."
 			response_data["tenant_assign"] = tenant_assign
+
+		if role_id:
+			role_assign = {"role": role_id}
+			try:
+				role_service = self.App.get_service("seacatauth.RoleService")
+				await _assign_created_credentials_role(role_service, credentials_id, role_id, role_tenant)
+				role_assign["result"] = "OK"
+			except (asab.exceptions.AccessDeniedError, asab.exceptions.NotAuthenticatedError):
+				raise
+			except Exception as e:
+				L.error("Failed to assign role: {}".format(e), struct_data={
+					"cid": credentials_id, "role": role_id})
+				role_assign["result"] = "ERROR"
+				role_assign["tech_err"] = _role_assign_tech_err(e)
+			response_data["role_assign"] = role_assign
 
 		if reset_password:
 			change_pwd_svc = self.App.get_service("seacatauth.ChangePasswordService")
@@ -642,3 +675,72 @@ class CredentialsHandler(object):
 		credentials_id = request.match_info["credentials_id"]  # Who will be deleted
 		result = await self.CredentialsService.delete_credentials(credentials_id, authz.CredentialsId)
 		return asab.web.rest.json_response(request, {"result": result})
+
+
+def _resolve_role_id(role: str) -> tuple[str, str | None]:
+	"""
+	Parse a role ID from the credentials creation request.
+
+	The value must be a full role ID: `{tenant}/{role}` or `*/{role}`.
+
+	Returns (role_id, role_tenant). `role_tenant` is None for a global role.
+	"""
+	tenant_part, separator, role_name = role.partition("/")
+	if not separator or not tenant_part or not role_name or "/" in role_name:
+		raise asab.exceptions.ValidationError(
+			"Role ID must match the format {tenant}/{role}."
+		)
+	if tenant_part == "*":
+		return role, None
+	return role, tenant_part
+
+
+def _require_role_assign_access(role_tenant: str | None):
+	"""
+	Reject role assignment before the credentials are created.
+
+	Global role assignment requires `seacat:role:assign:global`.
+	Tenant role assignment requires that resource, or `seacat:role:assign` in the role's tenant.
+	"""
+	authz = asab.contextvars.Authz.get()
+	context_tenant = _role_assign_tenant_context(authz, role_tenant)
+	with asab.contextvars.tenant_context(context_tenant):
+		if context_tenant is None:
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL)
+		else:
+			authz.require_resource_access(ResourceId.ROLE_ASSIGN)
+	if role_tenant is not None:
+		# assign_role() loads the role, which requires access to the role's tenant
+		authz.require_tenant_access(role_tenant)
+
+
+def _role_assign_tenant_context(authz, role_tenant: str | None) -> str | None:
+	"""
+	Tenant context in which RoleService.assign_role authorizes the caller.
+
+	Callers with global role assignment are checked outside a tenant.
+	Other callers are checked inside the role's tenant.
+	"""
+	with asab.contextvars.tenant_context(None):
+		if authz.has_resource_access(ResourceId.ROLE_ASSIGN_GLOBAL):
+			return None
+	return role_tenant
+
+
+async def _assign_created_credentials_role(role_service, credentials_id: str, role_id: str, role_tenant: str | None):
+	authz = asab.contextvars.Authz.get()
+	context_tenant = _role_assign_tenant_context(authz, role_tenant)
+	with asab.contextvars.tenant_context(context_tenant):
+		await role_service.assign_role(credentials_id, role_id)
+
+
+def _role_assign_tech_err(error: Exception) -> str:
+	if isinstance(error, exceptions.RoleNotFoundError):
+		return "Role not found."
+	if isinstance(error, exceptions.TenantNotFoundError):
+		return "Tenant not found."
+	if isinstance(error, exceptions.TenantNotAssignedError):
+		return "Tenant not assigned."
+	if isinstance(error, asab.exceptions.Conflict):
+		return "Role already assigned."
+	return "Failed to assign role."

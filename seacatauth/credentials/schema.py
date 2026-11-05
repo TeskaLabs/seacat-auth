@@ -68,6 +68,10 @@ CREATE_CREDENTIALS = {
 			"type": "string",
 			"description": "Tenant to assign to the new credentials",
 		},
+		"role": {
+			"type": "string",
+			"description": "Role ID to assign after the tenant (`{tenant}/{role}` or `*/{role}`).",
+		},
 	},
 }
 
