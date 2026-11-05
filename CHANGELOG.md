@@ -3,6 +3,11 @@
 ## v26.15
 
 ### Patches
+- Extend invitation TTL to one week (v26.15.02)
+- Upgrade dependencies (v26.15.02)
+- Exclude "custom" from ID token payload (v26.15.02)
+- Assign tenant and role to newly created credentials (v26.15.02)
+- Explicit audit logs for credentials updates (v26.15.02)
 - Assign tenant to newly created credentials from the request body (v26.15.01)
 - Explicit audit logs for credentials updates (v26.15-beta3)
 - Update ASAB to fix auth initialization race condition (#599, v26.15-beta2)
@@ -35,6 +40,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15.02
 - v26.15.01
 - v26.15-beta3
 - v26.15-beta2
