@@ -1,33 +1,13 @@
 # CHANGELOG
 
-## v28.37
-
-### Fixes
-- Extend invitation TTL to one week (#609, v26.37-alpha6)
-- Add role assignment option to credentials creation handler (#608, v26.37-alpha5)
-- Upgrade dependencies (#606, v26.37-alpha4)
-- Exclude "custom" from ID token payload (#598, v26.37-alpha)
-
-### Features
-- Move the tenant parameter into the "new credentials" request body (#604, v26.37-alpha3)
-- Assign tenant to newly created credentials with query param (#603, v26.37-alpha2)
-- Explicit audit logs for credentials updates (#601, v26.37-alpha1)
-
-### Pre-releases
-- v26.37-alpha6
-- v26.37-alpha5
-- v26.37-alpha4
-- v26.37-alpha3
-- v26.37-alpha2
-- v26.37-alpha1
-- v26.37-alpha
-
----
-
-
 ## v26.15
 
 ### Patches
+- Extend invitation TTL to one week (v26.15.02)
+- Upgrade dependencies (v26.15.02)
+- Exclude "custom" from ID token payload (v26.15.02)
+- Assign tenant and role to newly created credentials (v26.15.02)
+- Explicit audit logs for credentials updates (v26.15.02)
 - Assign tenant to newly created credentials from the request body (v26.15.01)
 - Explicit audit logs for credentials updates (v26.15-beta3)
 - Update ASAB to fix auth initialization race condition (#599, v26.15-beta2)
@@ -60,6 +40,7 @@
 - Always include link in response if SMTP is not configured (#561, v26.15-alpha)
 
 ### Pre-releases
+- v26.15.02
 - v26.15.01
 - v26.15-beta3
 - v26.15-beta2
