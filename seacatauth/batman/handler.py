@@ -52,7 +52,9 @@ class BatmanHandler(object):
 			try:
 				session = await oidc_service.get_session_by_access_token(token_value)
 			except exceptions.SessionNotFoundError:
-				AuditLogger.notice("Batman introspection denied: Session not found by access token")
+				AuditLogger.notice("Batman introspection denied: Session not found by access token", struct_data={
+					"token_fingerprint": generic.fingerprint(token_value),
+				})
 				return aiohttp.web.HTTPUnauthorized()
 		else:
 			try:

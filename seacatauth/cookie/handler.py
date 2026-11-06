@@ -416,6 +416,7 @@ class CookieHandler(object):
 				struct_data={
 					"client_id": client_id,
 					"token_type": "cookie",
+					"token_fingerprint": generic.fingerprint(authorization_code),
 				}
 			)
 			return asab.web.rest.json_response(
@@ -458,6 +459,7 @@ class CookieHandler(object):
 							"client_id": session.OAuth2.ClientId,
 							"redirect_uri": redirect_uri,
 							"token_type": "cookie",
+							"token_fingerprint": generic.fingerprint(token_value),
 						}
 					)
 					return aiohttp.web.HTTPBadRequest()

@@ -9,6 +9,7 @@ import asab.storage
 import asab.exceptions
 
 from .. import exceptions
+from ..generic import fingerprint
 from ..models import Session
 
 from ..models.session import CookieData
@@ -123,19 +124,25 @@ class CookieService(asab.Service):
 
 		# Then try looking for the session in the database
 		try:
-			cookie_value = base64.urlsafe_b64decode(cookie_value.encode("ascii"))
+			cookie_bytes = base64.urlsafe_b64decode(cookie_value.encode("ascii"))
 		except ValueError as e:
 			raise exceptions.SessionNotFoundError(
-				"Cookie value is not base64", query={"cookie_value": cookie_value}) from e
+				"Cookie value is not base64",
+				query={"token_fingerprint": fingerprint(cookie_value)}) from e
 
 		try:
-			session = await self.SessionService.get_by(Session.FN.Cookie.Id, cookie_value)
+			session = await self.SessionService.get_by(Session.FN.Cookie.Id, cookie_bytes)
+		except exceptions.SessionNotFoundError as e:
+			raise exceptions.SessionNotFoundError(
+				str(e), query={"token_fingerprint": fingerprint(cookie_value)}) from e
 		except KeyError as e:
 			raise exceptions.SessionNotFoundError(
-				"Session not found", query={"cookie_value": cookie_value}) from e
+				"Session not found",
+				query={"token_fingerprint": fingerprint(cookie_value)}) from e
 		except ValueError as e:
 			raise exceptions.SessionNotFoundError(
-				"Error deserializing session", query={"cookie_value": cookie_value}) from e
+				"Error deserializing session",
+				query={"token_fingerprint": fingerprint(cookie_value)}) from e
 
 		return session
 
