@@ -205,18 +205,30 @@ class ClientHandler(object):
 		"""
 		Edit an existing client
 
+		Changing ``token_endpoint_auth_method`` from ``none`` to a confidential method
+		issues a new client secret. Changing it back to ``none`` removes the secret.
+		A newly issued secret is returned in ``client_secret`` as the plaintext string.
+		On later reads that field is only a boolean indicating that a secret is set.
+
 		https://openid.net/specs/openid-connect-registration-1_0.html
 		"""
 		client_id = request.match_info["client_id"]
 		if "preferred_client_id" in json_data:
 			raise asab.exceptions.ValidationError("Cannot update attribute 'preferred_client_id'.")
 		try:
-			await self.ClientService.update_client(client_id, **json_data)
+			client_secret, client_secret_expires_at = await self.ClientService.update_client(client_id, **json_data)
 		except exceptions.NotEditableError as e:
 			return e.json_response(request)
+		response_data = self._rest_normalize(await self.ClientService.get_client(client_id))
+		response_data["result"] = "OK"
+		if client_secret is not None:
+			# Replace the boolean "secret is set" flag with the one-time plaintext secret.
+			response_data["client_secret"] = client_secret
+			if client_secret_expires_at:
+				response_data["client_secret_expires_at"] = client_secret_expires_at
 		return asab.web.rest.json_response(
 			request,
-			data={"result": "OK"},
+			data=response_data,
 		)
 
 
