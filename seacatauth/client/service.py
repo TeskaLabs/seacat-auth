@@ -315,10 +315,9 @@ class ClientService(asab.Service):
 		"""
 		Update client metadata.
 
-		Switching ``token_endpoint_auth_method`` between ``none`` and a confidential
-		method updates the secret in the same write: a new secret is issued when the
-		client becomes confidential, and the secret is removed when it becomes public.
-		Switching between confidential methods leaves the existing secret in place.
+		When the update sets a confidential ``token_endpoint_auth_method`` and the
+		client has no secret, a new secret is issued in the same write. An existing
+		secret is left in place, including when the method changes to ``none``.
 
 		Returns:
 			The newly issued client secret and its expiration, or ``(None, None)``
@@ -337,28 +336,21 @@ class ClientService(asab.Service):
 
 		client_secret = None
 		client_secret_expires_at = None
-		secret_removed = False
-		if auth_method_in_update:
-			was_confidential = is_client_confidential(current_client)
-			will_be_confidential = is_client_confidential(client_data)
-			if was_confidential and not will_be_confidential:
-				secret_removed = "__client_secret" in current_client
-				client_data["__client_secret"] = None
-				client_data["client_secret_expires_at"] = None
-				client_data["client_secret_updated_at"] = None
-			elif not was_confidential and will_be_confidential:
-				client_secret, client_secret_expires_at = self._generate_client_secret()
-				client_data["__client_secret"] = generic.argon2_hash(client_secret)
-				client_data["client_secret_updated_at"] = datetime.datetime.now(datetime.timezone.utc)
-				# None clears a leftover expiration from a previous secret.
-				client_data["client_secret_expires_at"] = client_secret_expires_at
+		if (
+			auth_method_in_update
+			and is_client_confidential(client_data)
+			and "__client_secret" not in current_client
+		):
+			client_secret, client_secret_expires_at = self._generate_client_secret()
+			client_data["__client_secret"] = generic.argon2_hash(client_secret)
+			client_data["client_secret_updated_at"] = datetime.datetime.now(datetime.timezone.utc)
+			# None clears a leftover expiration from a previous secret.
+			client_data["client_secret_expires_at"] = client_secret_expires_at
 
 		await provider.update_client(internal_client_id, **client_data)
 		AuditLogger.notice("Client updated", struct_data={"client_id": client_id})
 		if client_secret is not None:
 			AuditLogger.notice("Client secret updated.", struct_data={"client_id": client_id})
-		elif secret_removed:
-			AuditLogger.notice("Client secret removed.", struct_data={"client_id": client_id})
 		self._delete_from_cache(client_id)
 		return client_secret, client_secret_expires_at
 

@@ -56,7 +56,7 @@ def _service(provider):
 
 class UpdateClientSecretTestCase(unittest.IsolatedAsyncioTestCase):
 
-	async def test_public_to_confidential_resets_secret(self):
+	async def test_public_to_confidential_without_secret_issues_secret(self):
 		provider = _Provider(_client(
 			token_endpoint_auth_method=OAuth2.TokenEndpointAuthMethod.NONE,
 			client_secret_expires_at=datetime.datetime(2020, 1, 1, tzinfo=datetime.timezone.utc),
@@ -76,7 +76,7 @@ class UpdateClientSecretTestCase(unittest.IsolatedAsyncioTestCase):
 		self.assertNotIn("client_secret_expires_at", provider.client)
 		self.assertIn("client_secret_updated_at", provider.client)
 
-	async def test_missing_auth_method_to_confidential_resets_secret(self):
+	async def test_missing_auth_method_without_secret_issues_secret(self):
 		client = _client()
 		del client["token_endpoint_auth_method"]
 		provider = _Provider(client)
@@ -91,7 +91,65 @@ class UpdateClientSecretTestCase(unittest.IsolatedAsyncioTestCase):
 		self.assertEqual(secret, "generated-secret")
 		self.assertEqual(provider.client["__client_secret"], "hashed")
 
-	async def test_confidential_to_public_unsets_secret(self):
+	async def test_missing_auth_method_with_secret_to_client_secret_post_keeps_secret(self):
+		client = _client(__client_secret="hashed")
+		del client["token_endpoint_auth_method"]
+		provider = _Provider(client)
+		svc = _service(provider)
+
+		secret, _ = await svc.update_client(
+			"cid",
+			token_endpoint_auth_method=OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_POST,
+		)
+
+		self.assertIsNone(secret)
+		self.assertEqual(provider.client["__client_secret"], "hashed")
+		self.assertNotIn("__client_secret", provider.updates[0])
+
+	async def test_public_with_secret_to_confidential_keeps_secret(self):
+		provider = _Provider(_client(
+			token_endpoint_auth_method=OAuth2.TokenEndpointAuthMethod.NONE,
+			__client_secret="hashed",
+			client_secret_expires_at=datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc),
+		))
+		svc = _service(provider)
+
+		secret, _ = await svc.update_client(
+			"cid",
+			token_endpoint_auth_method=OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_POST,
+		)
+
+		self.assertIsNone(secret)
+		self.assertEqual(provider.client["__client_secret"], "hashed")
+		self.assertEqual(
+			provider.client["client_secret_expires_at"],
+			datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc),
+		)
+		self.assertNotIn("__client_secret", provider.updates[0])
+
+	async def test_missing_auth_method_with_secret_to_none_keeps_secret(self):
+		client = _client(
+			__client_secret="hashed",
+			client_secret_expires_at=datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc),
+			client_secret_updated_at=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+		)
+		del client["token_endpoint_auth_method"]
+		provider = _Provider(client)
+		svc = _service(provider)
+
+		secret, expires_at = await svc.update_client(
+			"cid",
+			token_endpoint_auth_method=OAuth2.TokenEndpointAuthMethod.NONE,
+		)
+
+		self.assertIsNone(secret)
+		self.assertIsNone(expires_at)
+		self.assertEqual(provider.client["__client_secret"], "hashed")
+		self.assertIn("client_secret_expires_at", provider.client)
+		self.assertIn("client_secret_updated_at", provider.client)
+		self.assertNotIn("__client_secret", provider.updates[0])
+
+	async def test_confidential_to_public_keeps_secret(self):
 		provider = _Provider(_client(
 			token_endpoint_auth_method=OAuth2.TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
 			__client_secret="hashed",
@@ -107,9 +165,10 @@ class UpdateClientSecretTestCase(unittest.IsolatedAsyncioTestCase):
 
 		self.assertIsNone(secret)
 		self.assertIsNone(expires_at)
-		self.assertNotIn("__client_secret", provider.client)
-		self.assertNotIn("client_secret_expires_at", provider.client)
-		self.assertNotIn("client_secret_updated_at", provider.client)
+		self.assertEqual(provider.client["__client_secret"], "hashed")
+		self.assertIn("client_secret_expires_at", provider.client)
+		self.assertIn("client_secret_updated_at", provider.client)
+		self.assertNotIn("__client_secret", provider.updates[0])
 
 	async def test_confidential_method_switch_keeps_secret(self):
 		provider = _Provider(_client(

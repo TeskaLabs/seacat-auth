@@ -205,8 +205,9 @@ class ClientHandler(object):
 		"""
 		Edit an existing client
 
-		Changing ``token_endpoint_auth_method`` from ``none`` to a confidential method
-		issues a new client secret. Changing it back to ``none`` removes the secret.
+		Changing ``token_endpoint_auth_method`` to a confidential method issues a
+		client secret when the client does not have one. An existing secret is kept,
+		including when the method is set to ``none``.
 		A newly issued secret is returned in ``client_secret`` as the plaintext string.
 		On later reads that field is only a boolean indicating that a secret is set.
 
