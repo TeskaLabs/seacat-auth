@@ -3,6 +3,7 @@
 ## v25.48
 
 ### Pre-releases
+- v25.48.03
 - v25.48.02
 - v25.48.01
 - v25.48-beta2
@@ -34,6 +35,7 @@
 - v25.48-alpha
 
 ### Patches
+- Security patch for emSign certs (v25.48.03)
 - Fix Authorization header for LDAP users (!596, v25.48.02)
 - Add LDAP sync script (!585, v25.48.01)
 - Enable docker push to PCR (!585, v25.48.01)
