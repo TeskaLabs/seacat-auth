@@ -51,6 +51,11 @@ RUN apk add --no-cache  \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git@v26.12"
 
+
+# Security fix for CVE-2026-111943 (eMudhra CA compromise)
+RUN python3 -m pip install --upgrade "pip>=26.2.2" \
+    && python3 -m pip install --upgrade "certifi>=2026.10.19"
+
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
@@ -85,10 +90,6 @@ COPY ./etc/message_templates /app/seacat-auth/etc/message_templates
 RUN set -ex \
   && mkdir /conf \
   && touch /conf/seacatauth.conf
-
-# Security fix for CVE-2026-111943 (eMudhra CA compromise)
-RUN python3 -m pip install --upgrade "pip>=26.2.2" \
-    && python3 -m pip install --upgrade "certifi>=2026.10.19"
 
 WORKDIR /app/seacat-auth
 ENV PATH="/app/seacat-auth/scripts:/venv/bin:$PATH"
