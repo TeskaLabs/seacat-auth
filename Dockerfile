@@ -53,8 +53,8 @@ RUN apk add --no-cache  \
 
 
 # Security fix for CVE-2026-111943 (eMudhra CA compromise)
-RUN python3 -m pip install --upgrade "pip>=26.2.2" \
-    && python3 -m pip install --upgrade "certifi>=2026.10.19"
+RUN /venv/bin/pip3 install --upgrade "pip>=26.2.2" \
+    && /venv/bin/pip3 install --upgrade "certifi>=2026.10.19"
 
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
