@@ -1,5 +1,5 @@
 # ---- Build stage ----
-FROM alpine:3.21 AS builder
+FROM alpine:3.22 AS builder
 LABEL maintainer="TeskaLabs Ltd (support@teskalabs.com)"
 
 ENV LANG=C.UTF-8
@@ -18,6 +18,7 @@ RUN apk add --no-cache \
 
 # Create build environment so that dependencies like aiohttp can be build
 # Run all as a single command in order to reduce image size --virtual buildenv
+# Security fix for CVE-2026-111943 (eMudhra CA compromise)
 RUN apk add --no-cache  \
     git \
     python3-dev \
@@ -30,13 +31,13 @@ RUN apk add --no-cache  \
     rust \
     cargo \
 && python3 -m venv /venv \
-&& /venv/bin/pip3 install --upgrade pip \
+&& /venv/bin/pip3 install --upgrade --no-cache "pip>=26.2.2" "certifi>=2026.10.19" \
 && /venv/bin/pip3 install --no-cache-dir \
     aiohttp \
     aiosmtplib \
     motor \
     cryptography \
-    jwcrypto>=0.9.1 \
+    "jwcrypto>=0.9.1" \
     fastjsonschema \
     bcrypt \
     argon2_cffi \
@@ -51,11 +52,6 @@ RUN apk add --no-cache  \
     sentry-sdk \
     "asab[encryption] @ git+https://github.com/TeskaLabs/asab.git@v26.12"
 
-
-# Security fix for CVE-2026-111943 (eMudhra CA compromise)
-RUN /venv/bin/pip3 install --upgrade "pip>=26.2.2" \
-    && /venv/bin/pip3 install --upgrade "certifi>=2026.10.19"
-
 RUN cat /venv/lib/python3.12/site-packages/asab/__version__.py
 
 RUN mkdir -p /app/seacat-auth
@@ -69,13 +65,17 @@ RUN /venv/bin/asab-manifest.py ./MANIFEST.json
 
 
 # ---- Runtime stage ----
-FROM alpine:3.21
+FROM alpine:3.22
 
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache \
+&& apk add --no-cache \
   python3 \
   openssl \
   xmlsec \
   openldap
+
+# Security fix for CVE-2026-111943 (eMudhra CA compromise)
+RUN apk upgrade --no-cache ca-certificates-bundle
 
 COPY --from=builder /venv /venv
 

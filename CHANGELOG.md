@@ -36,7 +36,7 @@
 - v25.48-alpha
 
 ### Patches
-- Security patch for emSign certs (v25.48.04)
+- Security patch for emSign certs - CVE-2026-111943 (v25.48.04)
 - Fix Authorization header for LDAP users (!596, v25.48.02)
 - Add LDAP sync script (!585, v25.48.01)
 - Enable docker push to PCR (!585, v25.48.01)
