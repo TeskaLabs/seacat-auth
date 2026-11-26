@@ -1,6 +1,17 @@
 # CHANGELOG
 
-## v28.37
+## v26.48
+
+### Features
+- Clients with non-empty `managed_by` are now editable; the `read_only` client attribute is set only for clients from non-editable providers
+
+### Pre-releases
+- v26.48-alpha
+
+---
+
+
+## v26.37
 
 ### Fixes
 - Extend invitation TTL to one week (#609, v26.37-alpha6)
@@ -9,6 +20,7 @@
 - Exclude "custom" from ID token payload (#598, v26.37-alpha)
 
 ### Features
+- Clients with non-empty `managed_by` are now editable; the `read_only` client attribute is set only for clients from non-editable providers
 - Move the tenant parameter into the "new credentials" request body (#604, v26.37-alpha3)
 - Assign tenant to newly created credentials with query param (#603, v26.37-alpha2)
 - Explicit audit logs for credentials updates (#601, v26.37-alpha1)
