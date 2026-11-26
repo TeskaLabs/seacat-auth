@@ -293,7 +293,7 @@ class ClientService(asab.Service):
 			client = await provider.get_client(internal_client_id)
 		except KeyError:
 			raise exceptions.ClientNotFoundError(client_id)
-		assert_client_is_editable(client)
+		assert_client_is_editable(provider, client)
 
 		client_secret, client_secret_expires_at = self._generate_client_secret()
 		client_secret_hash = generic.argon2_hash(client_secret)
@@ -318,7 +318,7 @@ class ClientService(asab.Service):
 			current_client = await provider.get_client(internal_client_id)
 		except KeyError:
 			raise exceptions.ClientNotFoundError(client_id)
-		assert_client_is_editable(current_client)
+		assert_client_is_editable(provider, current_client)
 
 		client_data = self._validate_and_normalize_client_update(current=current_client, update=client_data)
 		await provider.update_client(internal_client_id, **client_data)
@@ -333,7 +333,7 @@ class ClientService(asab.Service):
 			current_client = await provider.get_client(internal_client_id)
 		except KeyError:
 			raise exceptions.ClientNotFoundError(client_id)
-		assert_client_is_editable(current_client)
+		assert_client_is_editable(provider, current_client)
 
 		await provider.delete_client(internal_client_id)
 		AuditLogger.notice("Client deleted", struct_data={"client_id": client_id})
@@ -785,8 +785,6 @@ class ClientService(asab.Service):
 			client["client_id_aliases"] = [raw_client["_id"]]
 		client = _set_cookie_name(self.App, client)
 		client = _set_credentials_id(self.App, client)
-		if "read_only" not in client and client.get("managed_by"):
-			client["read_only"] = True
 		if "__client_secret" in raw_client:
 			client["client_secret"] = True
 		return client
@@ -851,8 +849,8 @@ def is_client_confidential(client: dict):
 		return True
 
 
-def assert_client_is_editable(client: dict):
-	if client.get("read_only") or client.get("managed_by") is not None:
+def assert_client_is_editable(provider: ClientProviderABC, client: dict):
+	if not provider.Editable:
 		L.log(asab.LOG_NOTICE, "Client is not editable.", struct_data={"client_id": client["_id"]})
 		raise exceptions.NotEditableError("Client is not editable.")
 	return True
