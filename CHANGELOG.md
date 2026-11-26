@@ -3,7 +3,7 @@
 ## v26.48
 
 ### Features
-- Clients with non-empty `managed_by` are now editable; the `read_only` client attribute is set only for clients from non-editable providers
+- Clients with non-empty `managed_by` are now editable; the `read_only` client attribute is set only for clients from non-editable providers (#614, v26.48-alpha)
 
 ### Pre-releases
 - v26.48-alpha
