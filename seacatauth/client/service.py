@@ -785,7 +785,7 @@ class ClientService(asab.Service):
 			client["client_id_aliases"] = [raw_client["_id"]]
 		client = _set_cookie_name(self.App, client)
 		client = _set_credentials_id(self.App, client)
-		if "read_only" not in client and client.get("managed_by"):
+		if client.get("managed_by"):
 			client["read_only"] = True
 		if "__client_secret" in raw_client:
 			client["client_secret"] = True

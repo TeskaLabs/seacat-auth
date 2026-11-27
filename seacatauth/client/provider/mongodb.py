@@ -158,5 +158,6 @@ class MongoDBClientProvider(ClientProviderABC):
 
 	def _add_provider_attributes(self, client_dict: dict) -> dict:
 		client_dict["_provider_id"] = self.ProviderId
-		client_dict["read_only"] = not self.Editable
+		if not self.Editable:
+			client_dict["read_only"] = True
 		return client_dict
